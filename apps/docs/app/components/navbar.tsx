@@ -25,8 +25,11 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-b border-gray-100 shadow-sm">
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/20 via-violet-400/20 to-blue-400/20 animate-gradient-shift" />
+      <div className="absolute inset-0 bg-gradient-to-tl from-blue-400/10 via-violet-400/10 to-indigo-400/10 animate-gradient-shift-reverse" />
+      
       <div className="max-w-8xl mx-auto px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
+        <div className="flex justify-between items-center h-18">
           {/* Logo */}
           <Link 
             href="/" 
@@ -57,13 +60,6 @@ export default function Navbar() {
             )}
             {isAuthenticated && (
               <>
-            <Link
-            href="/dashboard"
-            className="block w-full px-6 py-3 text-center text-gray-700 font-semibold rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-white transition-all duration-200"
-            onClick={() => setIsOpen(false)}
-          >
-            Dashboard
-          </Link>
             <button
               onClick={handleLogout}  
               className="ml-4 px-4 py-2.5 text-white font-semibold rounded-xl bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 shadow-md hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 ease-in-out"
@@ -127,13 +123,7 @@ export default function Navbar() {
           </>)}
           {isAuthenticated && (
             <>
-            <Link
-            href="#"
-            className="block w-full px-6 py-3 text-center text-gray-700 font-semibold rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-white transition-all duration-200"
-            onClick={() => setIsOpen(false)}
-          >
-            Dashboard
-          </Link>
+           
           
           <button
             onClick={handleLogout}  

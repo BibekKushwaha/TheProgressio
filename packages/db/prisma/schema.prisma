@@ -10,14 +10,125 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" 
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String     @id @default(uuid())
+  username         String     @unique
+  email            String     @unique
+  password         String
+  dailyGoalHours   Float      @default(4.0)
+  createdAt        DateTime   @default(now())
+  
+  // Relationships with Cascade - Deleting user wipes all their data
+  categories       Category[]
+  tasks            Task[]
+  habits           Habit[]
+}
+
+model Category {
+  id           String   @id @default(uuid())
+  name         String
+  colorCode    String   @default("#3B82F6")
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+
+  @@unique([userId, name])
+}
+
+model Task {
+  id           String     @id @default(uuid())
+  title        String
+  status       Status     @default(PENDING)
+  priority     Priority   @default(MEDIUM)
+  dueDate      DateTime?
+  isRecurring  Boolean    @default(false)
+  
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  categoryId   String?
+  category     Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  activityLogs ActivityLog[]
+  reminders    Reminder[]
+}
+
+model Habit {
+  id            String    @id @default(uuid())
+  name          String
+  frequency     Frequency @default(DAILY)
+  targetValue   Int       @default(1) 
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  lastLogDate   DateTime? 
+  
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  logs          HabitLog[]
+  reminders     Reminder[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model HabitLog {
+  id             String   @id @default(uuid())
+  habitId        String
+  habit          Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  completedValue Int      @default(1)
+  loggedAt       DateTime @default(now())
+
+  @@index([habitId, loggedAt])
+}
+
+model ActivityLog {
+  id              String      @id @default(uuid())
+  startTime       DateTime    @default(now())
+  endTime         DateTime?
+  durationMinutes Int?        
+  sessionType     SessionType @default(DEEP_WORK)
+  
+  taskId          String
+  task            Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model Reminder {
+  id           String   @id @default(uuid())
+  reminderTime DateTime
+  isSent       Boolean  @default(false)
+  
+  taskId       String?
+  task         Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  habitId      String?
+  habit        Habit?   @relation(fields: [habitId], references: [id], onDelete: Cascade)
+}
+
+// --- Enums for better Data Integrity ---
+
+enum Status {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+}
+
+enum SessionType {
+  DEEP_WORK
+  POMODORO
+  BREAK
 }

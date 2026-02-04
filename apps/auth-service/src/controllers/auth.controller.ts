@@ -12,106 +12,86 @@ import jwt from 'jsonwebtoken';
 // import { redisClient } from "../index.js";
 
 
-export const  registerUser = TryCatch(async(req,res)=>{
-      const result = registerSchema.safeParse(req.body);
+export const registerUser = TryCatch(async (req, res) => {
+  const result = registerSchema.safeParse(req.body);
 
-    if (!result.success) {
-      return res.status(400).json({
-        errors: result.error.flatten(),
-      });
+  if (!result.success) {
+    return res.status(400).json({
+      errors: result.error.flatten(),
+    });
+  }
+  const { username, email, password } = result.data;
+
+  let existingUser: any = null;
+  try {
+    existingUser = await prisma.user.findFirst({
+      where: { email },
+    });
+  } catch (err) {
+    console.error('Prisma findFirst error (register)', { email }, err);
+    throw new ErrorHandler(500, 'Database error during user lookup');
+  }
+
+
+  if (existingUser) {
+    throw new ErrorHandler(409, "User with this email already exists");
+  }
+
+  const hashPassword = await bcrypt.hash(password, 10);
+
+
+  const response = await prisma.user.create({
+    data: {
+      username,
+      email,
+      password: hashPassword
+
+    },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      dailyGoalHours: true,
+      createdAt: true,
+    },
+  })
+  if (!process.env.JWT_SEC) {
+    throw new ErrorHandler(500, "JWT secret not configured");
+  }
+  const token = jwt.sign(
+    { id: response?.id },
+    process.env.JWT_SEC as string,
+    {
+      expiresIn: "15d",
     }
-      const { name, email, password } = result.data;
+  );
 
-    let existingUser: any = null;
-    try {
-      existingUser = await prisma.user.findFirst({
-        where: { email },
-      });
-    } catch (err) {
-      console.error('Prisma findFirst error (register)', { email }, err);
-      throw new ErrorHandler(500, 'Database error during user lookup');
-    }
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 15 * 24 * 60 * 60 * 1000,
+  };
 
+  res.cookie('token', token, cookieOptions);
 
-    if (existingUser) {
-        throw new ErrorHandler(409, "User with this email already exists");
-    }
-
-    const hashPassword = await bcrypt.hash(password, 10);
-
-
-        // const file = req.file;
-
-        // if (!file) {
-        // throw new ErrorHandler(400, "Resume file is required for jobseekers");
-        // }
-
-        // const fileBuffer = getBuffer(file);
-
-        // if (!fileBuffer || !fileBuffer.content) {
-        // throw new ErrorHandler(500, "Failed to generate buffer");
-        // }
-
-        // if (!process.env.UPLOAD_SERVICE) {
-        //     throw new ErrorHandler(500, "Upload service not configured");
-        // }
-
-        // const { data } = await axios.post(
-        // `${process.env.UPLOAD_SERVICE}/api/utils/upload`,
-        // { buffer: fileBuffer.content }
-        // );
-        
-        const response = await prisma.user.create({
-          data: {
-              name,
-              email,
-              password: hashPassword
-            
-          },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            createdAt: true,
-          },
-        })
-        if (!process.env.JWT_SEC) {
-          throw new ErrorHandler(500, "JWT secret not configured");
-        }
-    const token = jwt.sign(
-        { id: response?.id },
-        process.env.JWT_SEC as string,
-        {
-        expiresIn: "15d",
-        }
-    );
-
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
-      maxAge: 15 * 24 * 60 * 60 * 1000,
-    };
-
-res.cookie('token', token, cookieOptions);
-
-return res.status(201).json({
-  success: true,
-  message: "User registered successfully",
-  user: response,
-});
+  return res.status(201).json({
+    success: true,
+    message: "User registered successfully",
+    user: response,
+  });
 
 });
 
 export const loginUser = TryCatch(async (req, res) => {
-      const result = loginSchema.safeParse(req.body);
+  const result = loginSchema.safeParse(req.body);
 
-    if (!result.success) {
-      return res.status(400).json({
-        errors: result.error.flatten(),
-      });
-    }
-      const { email, password } = result.data;
+  if (!result.success) {
+    return res.status(400).json({
+      errors: result.error.flatten(),
+    });
+  }
+  const { email, password } = result.data;
 
   let user: any = null;
   try {
@@ -135,7 +115,7 @@ export const loginUser = TryCatch(async (req, res) => {
   if (!matchPassword) {
     throw new ErrorHandler(400, "Invalid credentials");
   }
-  
+
   const token = jwt.sign(
     { id: user?.id },
     process.env.JWT_SEC as string,
@@ -144,16 +124,20 @@ export const loginUser = TryCatch(async (req, res) => {
     }
   );
   const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  maxAge: 15 * 24 * 60 * 60 * 1000,
-};
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 15 * 24 * 60 * 60 * 1000,
+  };
 
-res.cookie('token', token, cookieOptions);
+  res.cookie('token', token, cookieOptions);
+
+  // Remove password from user object before sending response
+  const { password: _, ...userWithoutPassword } = user;
+
   res.json({
     message: "user Loggedin",
-    user: user, 
+    user: userWithoutPassword,
   });
 });
 
@@ -194,7 +178,13 @@ export const getCurrentUser = TryCatch(async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      dailyGoalHours: true,
+      createdAt: true
+    },
   });
 
   if (!user) {

@@ -1,21 +1,24 @@
 {
-  "name": "utils-service",
+  "name": "@repo/planner-service",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cloudinary": "^2.9.0",
+    "@repo/db": "*",
+    "@types/cookie-parser": "^1.4.10",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "nodemailer": "^7.0.13",
+    "jsonwebtoken": "^9.0.3",
     "tsx": "^4.21.0"
   }
 }
