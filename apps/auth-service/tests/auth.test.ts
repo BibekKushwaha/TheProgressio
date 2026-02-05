@@ -22,6 +22,7 @@ vi.mock('@repo/db/client', () => {
 import app from '../src/index'
 import { prisma } from '@repo/db/client'
 import bcrypt from 'bcrypt'
+import type { use } from 'react'
 
 describe('Auth endpoints', () => {
   beforeEach(() => {
@@ -38,14 +39,14 @@ describe('Auth endpoints', () => {
     (prisma as any).user.findFirst.mockResolvedValue(null)
     ;(prisma as any).user.create.mockResolvedValue({
       id: '1',
-      name: 'Tester',
+      username: 'Tester',
       email: 'test@example.com',
       createdAt: new Date(),
     })
 
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'Tester', email: 'test@example.com', password: 'password' })
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ username: 'Tester', email: 'test@example.com', password: 'password', confirmPassword: 'password' })
 
     expect(res.status).toBe(201)
     expect(res.body).toHaveProperty('success', true)
@@ -57,7 +58,7 @@ describe('Auth endpoints', () => {
     const hashed = await (bcrypt as any).hash('password', 10)
     ;(prisma as any).user.findUnique.mockResolvedValue({
       id: '1',
-      name: 'Tester',
+      username: 'Tester',
       email: 'test@example.com',
       password: hashed,
     })

@@ -4,6 +4,7 @@ import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 
 export const createCategory = async (req: AuthenticatedRequest, res: Response) => {
     try {
+        console.log('[category.create] incoming body:', req.body);
         if (!req.user || !req.user.id) {
             return res.status(401).json({ message: "Unauthorized" });
         }
@@ -34,6 +35,7 @@ export const createCategory = async (req: AuthenticatedRequest, res: Response) =
 
 export const getAllCategories = async (req: AuthenticatedRequest, res: Response) => {
     try {
+        console.log('[category.getAll] user:', req.user?.id);
         if (!req.user || !req.user.id) {
             return res.status(401).json({ message: "Unauthorized" });
         }

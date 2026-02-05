@@ -4,15 +4,17 @@ const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://loc
 
 export interface User {
   id: string;
-  name: string;
+  username: string;
   email: string;
+  dailyGoalHours?: number;
   createdAt: string;
 }
 
 export interface RegisterRequest {
-  name: string;
+  username: string;
   email: string;
   password: string;
+  confirmPassword: string;
 }
 
 export interface LoginRequest {
@@ -21,10 +23,10 @@ export interface LoginRequest {
 }
 
 export interface AuthResponse {
-  success: boolean;
-  message: string;
+  success?: boolean;
+  message?: string;
   user: User;
-  token: string;
+  token?: string;
 }
 
 export const authApi = createApi({
@@ -65,7 +67,7 @@ export const authApi = createApi({
     logout: builder.mutation<void, void>({
       query: () => ({
         url: '/logout',
-        method: 'POST',
+        method: 'DELETE',
       }),
       invalidatesTags: ['User'],
     }),

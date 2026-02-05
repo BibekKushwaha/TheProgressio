@@ -25,6 +25,7 @@ model User {
   categories       Category[]
   tasks            Task[]
   habits           Habit[]
+  taskCompletionStats TaskCompletionStat[]
 }
 
 model Category {
@@ -54,6 +55,7 @@ model Task {
   
   activityLogs ActivityLog[]
   reminders    Reminder[]
+  taskCompletionStat TaskCompletionStat?
 }
 
 model Habit {
@@ -94,6 +96,20 @@ model ActivityLog {
   
   taskId          String
   task            Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model TaskCompletionStat {
+  id            String   @id @default(uuid())
+  taskId        String   @unique
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalMinutes  Int
+  completedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, completedAt])
 }
 
 model Reminder {

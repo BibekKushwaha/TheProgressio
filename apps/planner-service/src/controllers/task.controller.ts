@@ -70,6 +70,9 @@ export const getAllTasks = async (req: AuthenticatedRequest, res: Response) => {
                     },
                 }),
             },
+            include: {
+                category: true, // 👈 includes full category object
+            },
             orderBy: {
                 dueDate: "asc",
             },

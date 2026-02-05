@@ -3,7 +3,7 @@ import type { RootState } from '../store';
 
 export interface User {
   id: string;
-  name: string;
+  username: string;
   email: string;
   createdAt: string;
 }

@@ -1,21 +1,43 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { makeStore, AppStore } from './store';
-import { useGetProfileQuery } from './services/authApi';
+import { useGetProfileQuery, useLogoutMutation } from './services/authApi';
 import { useAppDispatch } from './hooks';
-import { hydrateAuth } from './slices/authSlice';
+import { hydrateAuth, logout } from './slices/authSlice';
 
 function AuthHydrator() {
   const dispatch = useAppDispatch();
-  const { data, isSuccess } = useGetProfileQuery();
+  const [shouldFetch, setShouldFetch] = useState(false);
+  const [logoutApi] = useLogoutMutation();
+  const { data, isSuccess, error } = useGetProfileQuery(undefined, {
+    skip: !shouldFetch,
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hasSession = localStorage.getItem('auth:hasSession') === '1';
+    setShouldFetch(hasSession);
+  }, []);
 
   useEffect(() => {
     if (isSuccess && data?.user) {
       dispatch(hydrateAuth({ user: data.user }));
     }
   }, [isSuccess, data, dispatch]);
+
+  useEffect(() => {
+    if (!error) return;
+    const status = 'status' in error ? error.status : undefined;
+    if (status === 401 || status === 404) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth:hasSession');
+      }
+      dispatch(logout());
+      logoutApi();
+    }
+  }, [error, dispatch, logoutApi]);
 
   return null;
 }
