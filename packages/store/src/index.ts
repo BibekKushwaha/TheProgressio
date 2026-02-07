@@ -53,13 +53,21 @@ export {
   useUpdateTaskMutation,
   useDeleteTaskMutation,
   useToggleTaskMutation,
+  useCreateSubTaskMutation,
+  useUpdateSubTaskMutation,
+  useDeleteSubTaskMutation,
+  useCreateAttachmentMutation,
+  useDeleteAttachmentMutation,
 } from './services/tasksApi';
 export type {
   Task,
+  SubTask,
+  Attachment,
   CreateTaskRequest,
   UpdateTaskRequest,
 } from './services/tasksApi';
 export type { Status, Priority } from './services/tasksApi';
+export { TaskStatus, PriorityEnum } from './services/tasksApi';
 
 // Categories API
 export {
@@ -89,3 +97,40 @@ export {
   selectCategoriesLoading,
   selectCategoriesError,
 } from './slices/categoriesSlice';
+
+// Habits API
+export { Frequency } from './services/habitsApi';
+export {
+  habitsApi,
+  useGetHabitsQuery,
+  useGetHabitStatsQuery,
+  useCreateHabitMutation,
+  useUpdateHabitMutation,
+  useDeleteHabitMutation,
+  useLogHabitMutation,
+  useResetHabitMutation,
+} from './services/habitsApi';
+export type {
+  Habit,
+  HabitLog,
+  HabitStats,
+  CreateHabitRequest,
+  UpdateHabitRequest,
+} from './services/habitsApi';
+
+// Analytics API
+export {
+  analyticsApi,
+  useLogSessionMutation,
+  useGetDailySummaryQuery,
+  useGetWeeklyTrendsQuery,
+  useGetTaskEfficiencyQuery,
+  useGetFocusScoreQuery,
+} from './services/analyticsApi';
+export type {
+  ActivityLog,
+  LogSessionRequest,
+  DailyStats,
+} from './services/analyticsApi';
+export { SessionType } from './services/analyticsApi';
+

@@ -4,9 +4,9 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, ArrowRight } from "lucide-react";
-import GlassCard from "../../components/ui/glass-card";
-import GradientButton from "../../components/ui/gradient-button";
-import Input from "../../components/ui/input";
+import GlassCard from "../../../components/auth/glass-card";
+import GradientButton from "../../../components/auth/gradient-button";
+import Input from "../../../components/auth/input";
 import { hydrateAuth, useAppDispatch, useLoginMutation } from "@repo/store";
 import { loginSchema } from "@repo/schemas/auth";
 
@@ -51,14 +51,14 @@ const LoginPage = () => {
         <div className="min-h-screen grid grid-cols-1 lg:grid-cols-5">
             {/* Left Side - Abstract Art */}
             <div className="hidden lg:flex lg:col-span-3 bg-slate-900 relative overflow-hidden items-center justify-center p-12">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-black opacity-80" />
-                <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob" />
-                <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-violet-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000" />
+                <div className="absolute inset-0 bg-gradient-to-br from-[#6366f1]/20 via-slate-900 to-black opacity-80" />
+                <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#6366f1] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob" />
+                <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-[#a855f7] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000" />
 
                 <div className="relative z-10 max-w-2xl text-left">
                     <h1 className="text-6xl font-bold text-white mb-6 leading-tight">
                         Master your habits,<br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#6366f1] to-[#a855f7]">
                             master your future.
                         </span>
                     </h1>

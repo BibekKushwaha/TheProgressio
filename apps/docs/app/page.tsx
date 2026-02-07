@@ -1,10 +1,10 @@
 "use client";
-import Navbar from './components/navbar'
+import Navbar from '../components/landing/navbar'
 import React from 'react'
-import AnimatedGradientBackground from './components/animated-gradient-background';
-import GlassCardGrid from './components/glassgridcard';
+import AnimatedGradientBackground from '../components/landing/animated-gradient-background';
+import GlassCardGrid from '../components/landing/glassgridcard';
 import { cards } from '../constant';
-import Footer from './components/footer';
+import Footer from '../components/landing/footer';
 
 const HomePage = () => {
 

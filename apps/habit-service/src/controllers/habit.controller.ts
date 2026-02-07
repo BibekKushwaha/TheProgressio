@@ -130,7 +130,7 @@ export const createHabit = async (
     res: Response
 ): Promise<void> => {
     try {
-        const { name, frequency, targetValue } = req.body;
+        const { name, frequency, targetValue, icon, color } = req.body;
         const userId = req.user?.id;
 
         if (!userId) {
@@ -148,6 +148,8 @@ export const createHabit = async (
                 name,
                 frequency: frequency || "DAILY",
                 targetValue: targetValue || 1,
+                icon,
+                color,
                 userId,
             },
         });
@@ -182,7 +184,7 @@ export const logHabitCompletion = async (
         if (!id || typeof id !== "string") {
             res.status(400).json({ message: "Habit ID is required" });
             return;
-        }   
+        }
         // Verify habit belongs to user
         const habit = await prisma.habit.findFirst({
             where: { id: id as string, userId },
@@ -318,13 +320,21 @@ export const getHabitStats = async (
         }));
 
         // Calculate completion rate for last 30 days
+        const daysToCheck = 30;
         const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - daysToCheck);
+
         const recentLogs = (habit.logs || []).filter(
             (log: any) => log.loggedAt >= thirtyDaysAgo
         );
-        const completionRate = (recentLogs.length / 30) * 100;
+
+        let expectedCompletions = daysToCheck;
+        if (habit.frequency === 'WEEKLY') {
+            // Calculate how many week-starts were in the last 30 days
+            expectedCompletions = Math.ceil(daysToCheck / 7);
+        }
+
+        const completionRate = Math.min(recentLogs.length / expectedCompletions, 1);
 
         res.status(200).json({
             message: "Habit stats fetched successfully",
@@ -338,7 +348,7 @@ export const getHabitStats = async (
                 currentStreak,
                 longestStreak: habit.longestStreak,
                 totalCompletions,
-                completionRate: Math.round(completionRate * 10) / 10,
+                completionRate: Math.round(completionRate * 1000) / 1000,
                 lastLogDate: habit.lastLogDate,
                 streakStatus: getStreakStatus(habit.lastLogDate, habit.frequency),
                 heatmapData,
@@ -360,7 +370,7 @@ export const updateHabit = async (
 ): Promise<void> => {
     try {
         const { id } = req.params;
-        const { name, frequency, targetValue } = req.body;
+        const { name, frequency, targetValue, icon, color } = req.body;
         const userId = req.user?.id;
 
         if (!userId) {
@@ -388,6 +398,8 @@ export const updateHabit = async (
                 name: name ?? habit.name,
                 frequency: frequency ?? habit.frequency,
                 targetValue: targetValue ?? habit.targetValue,
+                icon: icon ?? habit.icon,
+                color: color ?? habit.color,
             },
         });
 

@@ -3,9 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
-import GlassCard from "../../components/ui/glass-card";
-import GradientButton from "../../components/ui/gradient-button";
-import Input from "../../components/ui/input";
+import GlassCard from "../../../components/auth/glass-card";
+import GradientButton from "../../../components/auth/gradient-button";
+import Input from "../../../components/auth/input";
 
 // Note: Forgot Password API not fully implemented in backend/auth.controller.ts yet (commented out),
 // but implementing frontend for completeness.
@@ -29,8 +29,8 @@ const ForgotPasswordPage = () => {
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
             {/* Background Mesh */}
             <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-indigo-500/10 rounded-full blur-[100px]" />
-                <div className="absolute top-[40%] right-[10%] w-[40%] h-[40%] bg-violet-500/10 rounded-full blur-[100px]" />
+                <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-[#6366f1]/10 rounded-full blur-[100px]" />
+                <div className="absolute top-[40%] right-[10%] w-[40%] h-[40%] bg-[#a855f7]/10 rounded-full blur-[100px]" />
             </div>
 
             <GlassCard className="w-full max-w-md p-8 relative z-10" gradient>

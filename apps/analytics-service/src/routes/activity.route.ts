@@ -6,7 +6,7 @@ import { logSession } from "../controllers/activity.controller.js";
 const router = Router();
 
 // Activity
-router.post("/activity/log", isAuth, logSession);
+router.post("/log", isAuth, logSession);
 // Events
 
 export default router;

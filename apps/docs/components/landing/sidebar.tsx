@@ -10,25 +10,29 @@ import {
     BarChart2,
     Settings,
     LogOut,
-    Menu
+    Menu,
+    Calendar
 } from "lucide-react";
-import { cn } from "../../../lib/utils";
-import GlassCard from "./glass-card";
+import { cn } from "../../lib/utils";
+import GlassCard from "../auth/glass-card";
 
 const Sidebar = () => {
     const pathname = usePathname();
 
     const navItems = [
         { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-        { name: "Planner", icon: CheckSquare, href: "/planner" },
-        { name: "Habits", icon: Trophy, href: "/habits" },
         { name: "Analytics", icon: BarChart2, href: "/analytics" },
+        { name: "Habits", icon: Trophy, href: "/habits" },
+        { name: "Planner", icon: Calendar, href: "/planner" },
+        { name: "Achievements", icon: Trophy, href: "/achievements" },
+        { name: "Reports", icon: BarChart2, href: "/reports" },
     ];
+
 
     return (
         <>
             {/* Desktop Sidebar */}
-            <div className="hidden lg:flex w-64 flex-col h-screen fixed left-0 top-0 p-4 z-50">
+            <div className="hidden lg:flex w-85 flex-col h-screen fixed left-0 top-0 p-4 z-50">
                 <GlassCard className="h-full flex flex-col p-4" gradient>
                     <div className="flex items-center gap-2 px-2 mb-8 mt-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-xl">

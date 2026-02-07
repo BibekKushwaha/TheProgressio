@@ -42,7 +42,13 @@ export const categoriesApi = createApi({
                 url: '/',
                 method: 'GET',
             }),
-            providesTags: ['Categories'],
+            providesTags: (result) =>
+                result
+                    ? [
+                        ...result.map(({ id }) => ({ type: 'Categories' as const, id })),
+                        { type: 'Categories', id: 'LIST' },
+                    ]
+                    : [{ type: 'Categories', id: 'LIST' }],
         }),
         getCategoryById: builder.query<Category, string>({
             query: (id) => `/${id}`,
@@ -54,7 +60,17 @@ export const categoriesApi = createApi({
                 method: 'POST',
                 body,
             }),
-            invalidatesTags: ['Categories'],
+            invalidatesTags: [{ type: 'Categories', id: 'LIST' }],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    const { data: newCategory } = await queryFulfilled;
+                    dispatch(
+                        categoriesApi.util.updateQueryData('getCategories', undefined, (draft) => {
+                            draft.push(newCategory);
+                        })
+                    );
+                } catch { }
+            },
         }),
         updateCategory: builder.mutation<Category, UpdateCategoryRequest>({
             query: ({ id, ...body }) => ({
@@ -62,14 +78,46 @@ export const categoriesApi = createApi({
                 method: 'PATCH',
                 body,
             }),
-            invalidatesTags: (_result, _error, { id }) => ['Categories', { type: 'Categories', id }],
+            invalidatesTags: (_result, _error, { id }) => [{ type: 'Categories', id }],
+            async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
+                const patchResult = dispatch(
+                    categoriesApi.util.updateQueryData('getCategories', undefined, (draft) => {
+                        const category = draft.find((c) => c.id === id);
+                        if (category) {
+                            Object.assign(category, patch);
+                        }
+                    })
+                );
+                dispatch(
+                    categoriesApi.util.updateQueryData('getCategoryById', id, (draft) => {
+                        Object.assign(draft, patch);
+                    })
+                );
+                try {
+                    await queryFulfilled;
+                } catch {
+                    patchResult.undo();
+                }
+            },
         }),
         deleteCategory: builder.mutation<{ message: string }, string>({
             query: (id) => ({
                 url: `/${id}`,
                 method: 'DELETE',
             }),
-            invalidatesTags: ['Categories'],
+            invalidatesTags: (_result, _error, id) => [{ type: 'Categories', id }, { type: 'Categories', id: 'LIST' }],
+            async onQueryStarted(id, { dispatch, queryFulfilled }) {
+                const patchResult = dispatch(
+                    categoriesApi.util.updateQueryData('getCategories', undefined, (draft) => {
+                        return draft.filter((c) => c.id !== id);
+                    })
+                );
+                try {
+                    await queryFulfilled;
+                } catch {
+                    patchResult.undo();
+                }
+            },
         }),
     }),
 });

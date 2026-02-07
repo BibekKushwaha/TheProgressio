@@ -1,0 +1,176 @@
+import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation } from '@repo/store';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { TaskDialog } from '../TaskDialog';
+
+interface TaskCardProps {
+    task: Task;
+    completed: boolean;
+}
+
+const PRIORITY_COLORS = {
+    [PriorityEnum.HIGH]: 'text-red-400 bg-red-500/20 border-red-500/30',
+    [PriorityEnum.MEDIUM]: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
+    [PriorityEnum.LOW]: 'text-green-400 bg-green-500/20 border-green-500/30',
+};
+
+function formatDueDate(dueDate?: string | null) {
+    if (!dueDate) return "No due date";
+
+    const date = new Date(dueDate);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+
+    const diffDays =
+        (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tomorrow";
+    if (diffDays === -1) return "Yesterday";
+    if (diffDays > 1 && diffDays <= 7) return "Next week";
+
+    // fallback
+    return target.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+}
+
+export function TaskCard({ task, completed }: TaskCardProps) {
+    const router = useRouter();
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [deleteTask] = useDeleteTaskMutation();
+    const [toggleTask] = useToggleTaskMutation();
+
+
+
+    const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[PriorityEnum.LOW];
+    const categoryColor = task.category?.colorCode || '#6B7280'; // Default gray
+    const categoryName = task.category?.name || 'No Category';
+
+
+    const handleDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (confirm('Are you sure you want to delete this task?')) {
+            deleteTask(task.id);
+        }
+    };
+
+    const handleToggle = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        toggleTask(task.id);
+    };
+
+    const handleEdit = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsEditDialogOpen(true);
+    };
+
+    const handleCardClick = () => {
+        router.push(`/planner/${task.id}`);
+    };
+
+    return (
+        <div
+            className={`group bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-5 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 cursor-pointer ${completed ? 'opacity-60' : ''
+                }`}
+        >
+            <div className="flex items-start justify-between mb-3">
+                <span
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold text-white/90`}
+                    style={{ backgroundColor: categoryColor }}
+                >
+                    {categoryName}
+                </span>
+                <div className="flex items-center gap-2">
+                    <span className={`flex items-center gap-1 px-2.5 py-1 ${priorityColor} border rounded-lg text-xs font-semibold`}>
+                        <Flag className="w-3 h-3" />
+                        {task.priority}
+                    </span>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                className="p-1 hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <MoreVertical className="w-4 h-4 text-slate-400" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-slate-900 border-white/10 text-slate-200">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem onClick={handleEdit} className="focus:bg-white/10 focus:text-white cursor-pointer">
+                                <Clock className="w-4 h-4 mr-2" />
+                                Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleToggle} className="focus:bg-white/10 focus:text-white cursor-pointer">
+                                {task.status === TaskStatus.PENDING && (
+                                    <>
+                                        <Clock className="w-4 h-4 mr-2 text-blue-400" />
+                                        <span>Start Task</span>
+                                    </>
+                                )}
+                                {task.status === TaskStatus.IN_PROGRESS && (
+                                    <>
+                                        <CheckCircle className="w-4 h-4 mr-2 text-green-400" />
+                                        <span>Complete Task</span>
+                                    </>
+                                )}
+                                {task.status === TaskStatus.COMPLETED && (
+                                    <>
+                                        <XCircle className="w-4 h-4 mr-2 text-slate-400" />
+                                        <span>Reset Task</span>
+                                    </>
+                                )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleDelete} className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
+
+            {isEditDialogOpen && (
+                <TaskDialog
+                    task={task}
+                    onClose={() => setIsEditDialogOpen(false)}
+                    onSubmit={async () => { }}
+                />
+            )}
+
+            <div onClick={handleCardClick}>
+                <h3 className={`text-lg font-bold mb-2 text-white ${completed ? 'line-through text-slate-400' : ''}`}>
+                    {task.title}
+                </h3>
+
+                {task.description && (
+                    <p className="text-sm text-slate-400 mb-4 line-clamp-2">{task.description}</p>
+                )}
+
+                <div className="flex items-center justify-between mt-4">
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                        <Clock className="w-4 h-4" />
+                        <span>{formatDueDate(task.dueDate)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

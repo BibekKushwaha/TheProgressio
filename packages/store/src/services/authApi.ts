@@ -48,6 +48,14 @@ export const authApi = createApi({
         body: credentials,
       }),
       invalidatesTags: ['User'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            authApi.util.updateQueryData('getProfile', undefined, () => data)
+          );
+        } catch { }
+      },
     }),
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (credentials) => ({
@@ -56,6 +64,14 @@ export const authApi = createApi({
         body: credentials,
       }),
       invalidatesTags: ['User'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            authApi.util.updateQueryData('getProfile', undefined, () => data)
+          );
+        } catch { }
+      },
     }),
     getProfile: builder.query<AuthResponse, void>({
       query: () => ({
@@ -70,6 +86,12 @@ export const authApi = createApi({
         method: 'DELETE',
       }),
       invalidatesTags: ['User'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(authApi.util.resetApiState());
+        } catch { }
+      },
     }),
   }),
 });

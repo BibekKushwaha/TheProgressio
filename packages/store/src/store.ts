@@ -2,9 +2,12 @@ import { configureStore } from '@reduxjs/toolkit';
 import { authApi } from './services/authApi';
 import { tasksApi } from './services/tasksApi';
 import { categoriesApi } from './services/categoriesApi';
+import { habitsApi } from './services/habitsApi';
+import { analyticsApi } from './services/analyticsApi';
 import authReducer from './slices/authSlice';
 import tasksReducer from './slices/tasksSlice';
 import categoriesReducer from './slices/categoriesSlice';
+import habitsReducer from './slices/habitsSlice';
 
 export const makeStore = () => {
   return configureStore({
@@ -12,12 +15,21 @@ export const makeStore = () => {
       auth: authReducer,
       tasks: tasksReducer,
       categories: categoriesReducer,
+      habits: habitsReducer,
       [authApi.reducerPath]: authApi.reducer,
       [tasksApi.reducerPath]: tasksApi.reducer,
       [categoriesApi.reducerPath]: categoriesApi.reducer,
+      [habitsApi.reducerPath]: habitsApi.reducer,
+      [analyticsApi.reducerPath]: analyticsApi.reducer,
     },
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(authApi.middleware, tasksApi.middleware, categoriesApi.middleware),
+      getDefaultMiddleware().concat(
+        authApi.middleware,
+        tasksApi.middleware,
+        categoriesApi.middleware,
+        habitsApi.middleware,
+        analyticsApi.middleware
+      ),
   });
 };
 

@@ -26,15 +26,29 @@ export const getDailySummary = async (
             return;
         }
 
+        const { days = "1" } = req.query;
+        const daysNum = parseInt(days as string) || 1;
+
+        const end = new Date();
+        end.setHours(23, 59, 59, 999);
+
         const start = startOfDay(new Date());
-        const end = new Date(start);
-        end.setDate(start.getDate() + 1);
+        start.setDate(start.getDate() - (daysNum - 1));
 
         const summary = await prisma.activityLog.aggregate({
             _sum: { durationMinutes: true },
             where: {
                 task: { userId },
-                startTime: { gte: start, lt: end },
+                startTime: { gte: start, lte: end },
+            },
+        });
+
+        const breakdown = await prisma.activityLog.groupBy({
+            by: ['sessionType'],
+            _sum: { durationMinutes: true },
+            where: {
+                task: { userId },
+                startTime: { gte: start, lte: end },
             },
         });
 
@@ -42,18 +56,23 @@ export const getDailySummary = async (
         const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
 
         res.status(200).json({
-            message: "Daily summary fetched successfully",
+            message: "Summary fetched successfully",
             stats: {
                 totalMinutes,
                 totalHours,
-                dailyGoalHours,
-                remainingHours: Math.max(0, dailyGoalHours - totalHours),
+                dailyGoalHours: dailyGoalHours * daysNum,
+                remainingHours: Math.max(0, (dailyGoalHours * daysNum) - totalHours),
+                breakdown: breakdown.map(item => ({
+                    type: item.sessionType,
+                    minutes: item._sum.durationMinutes || 0,
+                    percentage: totalMinutes > 0 ? Math.round(((item._sum.durationMinutes || 0) / totalMinutes) * 100) : 0
+                }))
             },
         });
     } catch (error) {
-        console.error("Error fetching daily summary:", error);
+        console.error("Error fetching summary:", error);
         res.status(500).json({
-            message: "Failed to fetch daily summary",
+            message: "Failed to fetch summary",
             error: error instanceof Error ? error.message : "Unknown error",
         });
     }
@@ -162,15 +181,15 @@ export const getTaskEfficiency = async (
         const averageMinutes =
             similarTasks.length > 0
                 ? Math.round(
-                      similarTasks.reduce((sum, t) => {
-                          const minutes = t.activityLogs.reduce(
-                              (innerSum, log) =>
-                                  innerSum + (log.durationMinutes ?? 0),
-                              0
-                          );
-                          return sum + minutes;
-                      }, 0) / similarTasks.length
-                  )
+                    similarTasks.reduce((sum, t) => {
+                        const minutes = t.activityLogs.reduce(
+                            (innerSum, log) =>
+                                innerSum + (log.durationMinutes ?? 0),
+                            0
+                        );
+                        return sum + minutes;
+                    }, 0) / similarTasks.length
+                )
                 : null;
 
         res.status(200).json({

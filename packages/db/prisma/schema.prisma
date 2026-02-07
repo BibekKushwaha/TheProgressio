@@ -53,9 +53,33 @@ model Task {
   categoryId   String?
   category     Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   
+  description  String?
+  subtasks     SubTask[]
+  attachments  Attachment[]
+
   activityLogs ActivityLog[]
   reminders    Reminder[]
   taskCompletionStat TaskCompletionStat?
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  size      String?
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model SubTask {
+  id        String   @id @default(uuid())
+  title     String
+  completed Boolean  @default(false)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Habit {
@@ -65,6 +89,8 @@ model Habit {
   targetValue   Int       @default(1) 
   currentStreak Int       @default(0)
   longestStreak Int       @default(0)
+  icon          String?
+  color         String?
   lastLogDate   DateTime? 
   
   userId        String

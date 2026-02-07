@@ -23,6 +23,7 @@ export const createTask = async (req: AuthenticatedRequest, res: Response) => {
         const task = await prisma.task.create({
             data: {
                 title,
+                description,
                 status: (status as Status) ?? Status.PENDING,
                 priority: (priority as Priority) ?? Priority.MEDIUM,
                 dueDate: dueDate ? new Date(dueDate) : null,
@@ -31,6 +32,7 @@ export const createTask = async (req: AuthenticatedRequest, res: Response) => {
                 categoryId: categoryId || null,
             },
         });
+
 
         return res.status(201).json(task);
     } catch (error) {
@@ -52,6 +54,7 @@ export const getAllTasks = async (req: AuthenticatedRequest, res: Response) => {
             priority,
             categoryId,
             search,
+            date, // 👈 New date parameter
         } = req.query;
 
         const pageNumber = Number(page);
@@ -63,6 +66,12 @@ export const getAllTasks = async (req: AuthenticatedRequest, res: Response) => {
                 ...(status && { status: status as Status }),
                 ...(priority && { priority: priority as Priority }),
                 ...(categoryId && { categoryId: categoryId as string }),
+                ...(date && typeof date === "string" && {
+                    dueDate: {
+                        gte: new Date(`${date}T00:00:00.000Z`),
+                        lte: new Date(`${date}T23:59:59.999Z`),
+                    },
+                }),
                 ...(search && typeof search === "string" && {
                     title: {
                         contains: search,
@@ -101,6 +110,13 @@ export const getTaskById = async (req: AuthenticatedRequest, res: Response) => {
 
         const task = await prisma.task.findUnique({
             where: { id },
+            include: {
+                category: true,
+                subtasks: {
+                    orderBy: { createdAt: 'asc' }
+                },
+                attachments: true
+            }
         });
 
         if (!task) {
@@ -132,7 +148,7 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response) => {
             });
         }
 
-        const { title, status, priority, dueDate, isRecurring, categoryId } = req.body;
+        const { title, description, status, priority, dueDate, isRecurring, categoryId } = req.body;
 
         if (!id || typeof id !== "string") {
             return res.status(400).json({ message: "Invalid task id" });
@@ -154,6 +170,7 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response) => {
             where: { id },
             data: {
                 ...(typeof title === "string" && { title }),
+                ...(typeof description === "string" && { description }),
                 ...(status && { status: status as Status }),
                 ...(priority && { priority: priority as Priority }),
                 ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
@@ -228,10 +245,14 @@ export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
             return res.status(403).json({ message: "Forbidden: You don't own this task" });
         }
 
-        const newStatus =
-            existingTask.status === Status.COMPLETED
-                ? Status.PENDING
-                : Status.COMPLETED;
+        let newStatus: Status;
+        if (existingTask.status === Status.PENDING) {
+            newStatus = Status.IN_PROGRESS;
+        } else if (existingTask.status === Status.IN_PROGRESS) {
+            newStatus = Status.COMPLETED;
+        } else {
+            newStatus = Status.PENDING;
+        }
 
         const updatedTask = await prisma.task.update({
             where: { id },

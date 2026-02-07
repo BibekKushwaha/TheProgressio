@@ -2,8 +2,8 @@ import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import analyticsRouter from "./routes/activity.route.js";
-
+import activityRouter from "./routes/activity.route.js";
+import statsRouter from "./routes/stats.route.js";
 
 const app = express();
 
@@ -21,9 +21,10 @@ app.get("/", (_req, res) => {
     res.send("Analytics Service API");
 });
 
-app.use("/api", analyticsRouter);
+app.use("/api/activity", activityRouter);
+app.use("/api/stats", statsRouter);
 
-const PORT = process.env.PORT || 4002;
+const PORT = process.env.PORT || 4003;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
