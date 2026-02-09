@@ -1,6 +1,24 @@
 import type { Request, Response } from "express";
 import { prisma, type Frequency } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import {
+    calculateGentleStreak,
+    awardXP,
+    XP_REWARDS,
+    getStreakBonusXP,
+    getYearlyHeatmap,
+    calculateLevel,
+    xpToNextLevel,
+} from "../services/streak.service.js";
+import {
+    detectStreakRisks,
+    detectExamWarnings,
+    generateMorningBriefing,
+    detectSlipPatterns,
+    getUserNudges,
+    markNudgeRead,
+    markAllNudgesRead,
+} from "../services/nudge.service.js";
 
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
@@ -111,17 +129,25 @@ const logHabitCompletionInternal = async (params: {
         },
     });
 
-    const newStreak = await calculateStreak(params.habitId);
+    // Use Gentle Streak engine
+    const streakResult = await calculateGentleStreak(params.habitId);
     const updatedHabit = await prisma.habit.update({
         where: { id: params.habitId },
         data: {
-            currentStreak: newStreak,
-            longestStreak: Math.max(habit.longestStreak, newStreak),
+            currentStreak: streakResult.currentStreak,
+            longestStreak: streakResult.longestStreak,
+            mercyDaysUsed: streakResult.mercyDaysUsed,
             lastLogDate: occurredAt,
         },
     });
 
-    return { status: "logged" as const, habit: updatedHabit, log };
+    // Award XP for habit completion
+    try {
+        const bonusXP = getStreakBonusXP(streakResult.currentStreak);
+        await awardXP(habit.userId, XP_REWARDS.HABIT_LOG + bonusXP);
+    } catch (_e) { /* XP is non-critical */ }
+
+    return { status: "logged" as const, habit: updatedHabit, log, streakResult };
 };
 
 // Create Habit - POST /habits
@@ -130,7 +156,7 @@ export const createHabit = async (
     res: Response
 ): Promise<void> => {
     try {
-        const { name, frequency, targetValue, icon, color } = req.body;
+        const { name, frequency, targetValue, icon, color, mercyDaysAllowed, linkedCategoryId } = req.body;
         const userId = req.user?.id;
 
         if (!userId) {
@@ -151,6 +177,8 @@ export const createHabit = async (
                 icon,
                 color,
                 userId,
+                mercyDaysAllowed: mercyDaysAllowed ?? 1,
+                linkedCategoryId: linkedCategoryId ?? null,
             },
         });
 
@@ -251,14 +279,17 @@ export const getAllHabits = async (
             orderBy: { createdAt: 'desc' },
         });
 
-        // Recalculate streaks for accuracy
+        // Recalculate streaks using Gentle Streak engine
         const habitsWithStreaks = await Promise.all(
             habits.map(async (habit) => {
-                const currentStreak = await calculateStreak(habit.id);
+                const streakResult = await calculateGentleStreak(habit.id);
                 return {
                     ...habit,
-                    currentStreak,
-                    streakStatus: getStreakStatus(habit.lastLogDate, habit.frequency),
+                    currentStreak: streakResult.currentStreak,
+                    streakStatus: streakResult.streakHealth,
+                    streakHealth: streakResult.streakHealth,
+                    mercyDaysUsed: streakResult.mercyDaysUsed,
+                    isMercyActive: streakResult.isMercyActive,
                 };
             })
         );
@@ -309,15 +340,19 @@ export const getHabitStats = async (
             return;
         }
 
-        // Calculate stats
+        // Calculate stats using Gentle Streak
         const totalCompletions = habit.logs?.length || 0;
-        const currentStreak = await calculateStreak(id as string);
+        const streakResult = await calculateGentleStreak(id as string);
 
-        // Prepare calendar heatmap data
-        const heatmapData = (habit.logs || []).map((log: any) => ({
-            date: log.loggedAt.toISOString().split('T')[0],
-            value: log.completedValue,
-        }));
+        // Prepare calendar heatmap data (365 days)
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const heatmapData = (habit.logs || [])
+            .filter((log: any) => log.loggedAt >= oneYearAgo)
+            .map((log: any) => ({
+                date: log.loggedAt.toISOString().split('T')[0],
+                value: log.completedValue,
+            }));
 
         // Calculate completion rate for last 30 days
         const daysToCheck = 30;
@@ -344,13 +379,17 @@ export const getHabitStats = async (
                     name: habit.name,
                     frequency: habit.frequency,
                     targetValue: habit.targetValue,
+                    mercyDaysAllowed: habit.mercyDaysAllowed,
                 },
-                currentStreak,
-                longestStreak: habit.longestStreak,
+                currentStreak: streakResult.currentStreak,
+                longestStreak: streakResult.longestStreak,
+                streakHealth: streakResult.streakHealth,
+                mercyDaysUsed: streakResult.mercyDaysUsed,
+                isMercyActive: streakResult.isMercyActive,
                 totalCompletions,
                 completionRate: Math.round(completionRate * 1000) / 1000,
                 lastLogDate: habit.lastLogDate,
-                streakStatus: getStreakStatus(habit.lastLogDate, habit.frequency),
+                streakStatus: streakResult.streakHealth,
                 heatmapData,
             },
         });
@@ -370,7 +409,7 @@ export const updateHabit = async (
 ): Promise<void> => {
     try {
         const { id } = req.params;
-        const { name, frequency, targetValue, icon, color } = req.body;
+        const { name, frequency, targetValue, icon, color, mercyDaysAllowed, linkedCategoryId } = req.body;
         const userId = req.user?.id;
 
         if (!userId) {
@@ -400,20 +439,20 @@ export const updateHabit = async (
                 targetValue: targetValue ?? habit.targetValue,
                 icon: icon ?? habit.icon,
                 color: color ?? habit.color,
+                mercyDaysAllowed: mercyDaysAllowed ?? habit.mercyDaysAllowed,
+                linkedCategoryId: linkedCategoryId !== undefined ? linkedCategoryId : habit.linkedCategoryId,
             },
         });
 
-        const currentStreak = await calculateStreak(updatedHabit.id);
+        const streakResult = await calculateGentleStreak(updatedHabit.id);
 
         res.status(200).json({
             message: "Habit updated successfully",
             habit: {
                 ...updatedHabit,
-                currentStreak,
-                streakStatus: getStreakStatus(
-                    updatedHabit.lastLogDate,
-                    updatedHabit.frequency
-                ),
+                currentStreak: streakResult.currentStreak,
+                streakStatus: streakResult.streakHealth,
+                streakHealth: streakResult.streakHealth,
             },
         });
     } catch (error) {
@@ -548,6 +587,7 @@ export const resetHabit = async (
             where: { id: id as string },
             data: {
                 currentStreak: 0,
+                mercyDaysUsed: 0,
                 lastLogDate: null,
             },
         });
@@ -562,5 +602,151 @@ export const resetHabit = async (
             message: "Failed to reset habit",
             error: error instanceof Error ? error.message : "Unknown error",
         });
+    }
+};
+
+// ── XP & Gamification ──────────────────────────────────────────────────
+
+// GET /habits/xp — Get user XP, level, and progress
+export const getUserXP = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { xp: true, level: true },
+        });
+        if (!user) { res.status(404).json({ message: "User not found" }); return; }
+
+        const xp = user.xp ?? 0;
+        const level = calculateLevel(xp);
+        const progress = xpToNextLevel(xp);
+
+        res.status(200).json({
+            xp,
+            level,
+            nextLevelXP: progress.next,
+            currentLevelXP: progress.current,
+            progressPercent: progress.progress,
+        });
+    } catch (error) {
+        console.error("Error fetching XP:", error);
+        res.status(500).json({ message: "Failed to fetch XP", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// ── 365-Day Contribution Heatmap ───────────────────────────────────────
+
+// GET /habits/heatmap — GitHub-style yearly contribution heatmap
+export const getContributionHeatmap = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const heatmap = await getYearlyHeatmap(userId);
+        const totalContributions = heatmap.reduce((sum, d) => sum + d.count, 0);
+        const activeDays = heatmap.filter(d => d.count > 0).length;
+
+        res.status(200).json({
+            message: "Heatmap generated successfully",
+            heatmap,
+            summary: {
+                totalContributions,
+                activeDays,
+                totalDays: heatmap.length,
+                consistencyRate: Math.round((activeDays / heatmap.length) * 100),
+            },
+        });
+    } catch (error) {
+        console.error("Error generating heatmap:", error);
+        res.status(500).json({ message: "Failed to generate heatmap", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// ── Nudges ─────────────────────────────────────────────────────────────
+
+// GET /habits/nudges — Adaptive smart nudges
+export const getNudges = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        // Generate fresh nudges before fetching
+        await detectStreakRisks(userId);
+        await detectExamWarnings(userId);
+
+        const unreadOnly = req.query.unread === "true";
+        const nudges = await getUserNudges(userId, unreadOnly);
+
+        res.status(200).json({ message: "Nudges fetched", nudges });
+    } catch (error) {
+        console.error("Error fetching nudges:", error);
+        res.status(500).json({ message: "Failed to fetch nudges", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// POST /habits/nudges/:id/read — Mark nudge as read
+export const markNudgeAsRead = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        const { id } = req.params;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        await markNudgeRead(id as string, userId);
+        res.status(200).json({ message: "Nudge marked as read" });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to mark nudge", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// POST /habits/nudges/read-all — Mark all nudges as read
+export const markAllNudgesAsRead = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        await markAllNudgesRead(userId);
+        res.status(200).json({ message: "All nudges marked as read" });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to mark nudges", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// GET /habits/briefing — Morning briefing
+export const getMorningBriefing = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const briefing = await generateMorningBriefing(userId);
+        const slipDetection = await detectSlipPatterns(userId);
+
+        res.status(200).json({
+            message: "Morning briefing generated",
+            briefing,
+            slipDetection,
+        });
+    } catch (error) {
+        console.error("Error generating briefing:", error);
+        res.status(500).json({ message: "Failed to generate briefing", error: error instanceof Error ? error.message : "Unknown error" });
     }
 };

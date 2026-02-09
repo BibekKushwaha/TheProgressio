@@ -51,10 +51,11 @@ export function SubTaskList({ taskId, subtasks }: SubTaskListProps) {
             <h3 className="text-lg font-semibold mb-4">Sub-Tasks</h3>
 
             <div className="space-y-3 mb-4">
-                {subtasks.map((task) => (
+                {subtasks.map((task, index) => (
                     <div
                         key={task.id}
-                        className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all duration-300 group"
+                        className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all duration-300 group animate-in slide-in-from-left-2 fade-in"
+                        style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'both' }}
                     >
                         <div onClick={() => handleToggle(task)} className="flex items-center gap-3 flex-1 cursor-pointer">
                             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-indigo-500 border-indigo-500' : 'border-indigo-500 bg-transparent'}`}>

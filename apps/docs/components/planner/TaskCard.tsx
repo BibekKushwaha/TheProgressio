@@ -155,6 +155,33 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                     <p className="text-sm text-slate-400 mb-4 line-clamp-2">{task.description}</p>
                 )}
 
+                {task.subtasks && task.subtasks.length > 0 && (() => {
+                    const total = task.subtasks.length;
+                    const done = task.subtasks.filter(s => s.completed).length;
+                    const pct = Math.round((done / total) * 100);
+                    return (
+                        <div className="mt-3 mb-1">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-semibold text-slate-400 tracking-wide">
+                                    {done}/{total} subtasks
+                                </span>
+                                <span className={`text-[11px] font-bold tracking-wide ${pct === 100 ? 'text-green-400' : 'text-purple-400'}`}>
+                                    {pct}%
+                                </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-500 ease-out ${pct === 100
+                                        ? 'bg-gradient-to-r from-green-500 to-emerald-400'
+                                        : 'bg-gradient-to-r from-purple-500 to-pink-500'
+                                        }`}
+                                    style={{ width: `${pct}%` }}
+                                />
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 <div className="flex items-center justify-between mt-4">
                     <div className="flex items-center gap-2 text-sm text-slate-400">
                         <Clock className="w-4 h-4" />

@@ -81,6 +81,28 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                             {task.priority}
                         </span>
                     </div>
+
+                    {task.subtasks && task.subtasks.length > 0 && (() => {
+                        const total = task.subtasks.length;
+                        const done = task.subtasks.filter(s => s.completed).length;
+                        const pct = Math.round((done / total) * 100);
+                        return (
+                            <div className="flex items-center gap-2 mt-1">
+                                <div className="w-24 h-1 bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-500 ease-out ${pct === 100
+                                            ? 'bg-gradient-to-r from-green-500 to-emerald-400'
+                                            : 'bg-gradient-to-r from-purple-500 to-pink-500'
+                                            }`}
+                                        style={{ width: `${pct}%` }}
+                                    />
+                                </div>
+                                <span className={`text-[10px] font-semibold ${pct === 100 ? 'text-green-400' : 'text-slate-500'}`}>
+                                    {done}/{total}
+                                </span>
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
 

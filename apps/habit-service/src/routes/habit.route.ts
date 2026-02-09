@@ -7,29 +7,37 @@ import {
     logHabitCompletion,
     updateHabit,
     resetHabit,
+    getUserXP,
+    getContributionHeatmap,
+    getNudges,
+    markNudgeAsRead,
+    markAllNudgesAsRead,
+    getMorningBriefing,
 } from "../controllers/habit.controller.js";
 
 const router = Router();
 
-// Create Habit
+// ── XP & Gamification ──────────────────
+router.get("/xp", getUserXP);
+
+// ── 365-Day Heatmap ────────────────────
+router.get("/heatmap", getContributionHeatmap);
+
+// ── Adaptive Nudges ────────────────────
+router.get("/nudges", getNudges);
+router.post("/nudges/:id/read", markNudgeAsRead);
+router.post("/nudges/read-all", markAllNudgesAsRead);
+
+// ── Morning Briefing ───────────────────
+router.get("/briefing", getMorningBriefing);
+
+// ── Core CRUD ──────────────────────────
 router.post("/", createHabit);
-
-// Log Completion
 router.post("/:id/log", logHabitCompletion);
-
-// Get All Habits
 router.get("/", getAllHabits);
-
-// Get Habit Stats (Calendar Heatmap data)
 router.get("/:id/stats", getHabitStats);
-
-// Update Habit
 router.put("/:id", updateHabit);
-
-// Delete Habit
 router.delete("/:id", deleteHabit);
-
-// Reset Habit Streak (admin/testing only)
 router.post("/:id/reset", resetHabit);
 
 export default router;

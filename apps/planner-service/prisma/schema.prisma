@@ -1,0 +1,172 @@
+// This is the Planner Service's own Prisma schema (Database-per-Service pattern).
+// userId is an opaque string — no FK to User table (owned by auth-service).
+// This schema owns: Task, Category, SubTask, Attachment, Subject, Exam, StudyGoal, Timetable, RotationPattern, Reminder
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Category {
+  id           String   @id @default(uuid())
+  name         String
+  colorCode    String   @default("#3B82F6")
+  icon         String?  // Lucide icon name
+  userId       String
+  tasks        Task[]
+
+  @@unique([userId, name])
+}
+
+model Task {
+  id           String     @id @default(uuid())
+  title        String
+  status       Status     @default(PENDING)
+  priority     Priority   @default(MEDIUM)
+  dueDate      DateTime?
+  isRecurring  Boolean    @default(false)
+  description  String?
+  
+  userId       String
+  
+  categoryId   String?
+  category     Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  subjectId    String?
+  subject      Subject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  
+  subtasks     SubTask[]
+  attachments  Attachment[]
+  reminders    Reminder[]
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  size      String?
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model SubTask {
+  id        String   @id @default(uuid())
+  title     String
+  completed Boolean  @default(false)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  code        String?
+  teacher     String?
+  room        String?
+  color       String   @default("#3B82F6")
+  
+  userId      String
+  
+  tasks       Task[]
+  exams       Exam[]
+  goals       StudyGoal[]
+  timetable   Timetable[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
+model Exam {
+  id          String   @id @default(uuid())
+  title       String
+  date        DateTime
+  durationMinutes Int
+  location    String?
+  topics      String?
+  priority    Priority @default(HIGH)
+  
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  userId      String
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StudyGoal {
+  id          String   @id @default(uuid())
+  title       String
+  targetDate  DateTime?
+  isAchieved  Boolean  @default(false)
+  
+  subjectId   String?
+  subject     Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  
+  userId      String
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Timetable {
+  id          String   @id @default(uuid())
+  dayOfWeek   Int
+  startTime   String
+  endTime     String
+  
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  rotation    String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RotationPattern {
+  id            String   @id @default(uuid())
+  name          String
+  pattern       String[]
+  startDate     DateTime
+  cycleLengthDays Int    @default(7)
+  
+  userId        String
+  isActive      Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
+model Reminder {
+  id           String   @id @default(uuid())
+  reminderTime DateTime
+  isSent       Boolean  @default(false)
+  
+  taskId       String?
+  task         Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+enum Status {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}

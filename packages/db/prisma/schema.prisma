@@ -21,18 +21,26 @@ model User {
   dailyGoalHours   Float      @default(4.0)
   createdAt        DateTime   @default(now())
   
+  // XP / Gamification
+  xp               Int        @default(0)
+  level            Int        @default(1)
+  
   // Relationships with Cascade - Deleting user wipes all their data
   categories       Category[]
   tasks            Task[]
   habits           Habit[]
   taskCompletionStats TaskCompletionStat[]
   achievements     UserAchievement[]
+  nudges           Nudge[]
+  gradeEntries     GradeEntry[]
+  courseGrades      CourseGrade[]
   
   // Academic Relations
   subjects         Subject[]
   exams            Exam[]
   studyGoals       StudyGoal[]
   timetable        Timetable[]
+  rotationPatterns RotationPattern[]
 }
 
 model Achievement {
@@ -63,6 +71,7 @@ model Category {
   id           String   @id @default(uuid())
   name         String
   colorCode    String   @default("#3B82F6")
+  icon         String?  // Lucide icon name e.g. "Calculator", "Beaker", "BookOpen"
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks        Task[]
@@ -126,6 +135,13 @@ model Habit {
   icon          String?
   color         String?
   lastLogDate   DateTime? 
+  
+  // Gentle Streak settings
+  mercyDaysAllowed Int     @default(1)   // how many skips before streak breaks
+  mercyDaysUsed    Int     @default(0)   // skips used in current streak
+  
+  // Auto-link: category name match -> auto-log on task completion
+  linkedCategoryId String?
   
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -283,4 +299,81 @@ model Timetable {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Custom rotation pattern — allows users to define their own rotation calendar
+model RotationPattern {
+  id            String   @id @default(uuid())
+  name          String   // e.g., "Week A/B", "Day 1-4 Block"
+  pattern       String[] // ordered cycle labels e.g. ["A","B"] or ["1","2","3","4"]
+  startDate     DateTime // anchor date: the first day of the rotation
+  cycleLengthDays Int    @default(7) // how many days each label lasts (7 = weekly rotation)
+  
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
+// ── Phase 2: Nudge System ──────────────────────────────────────────────
+
+model Nudge {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        String    // "STREAK_RISK", "EXAM_WARNING", "MORNING_BRIEFING", "SLIP_DETECTION"
+  title       String
+  message     String
+  priority    Priority  @default(MEDIUM)
+  isRead      Boolean   @default(false)
+  scheduledAt DateTime  @default(now())
+  expiresAt   DateTime?
+  metadata    String?   // JSON string for extra context
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId, isRead])
+  @@index([userId, scheduledAt])
+}
+
+// ── Phase 3: GPA / Grade Tracking ──────────────────────────────────────
+
+model CourseGrade {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  courseName  String
+  credits     Float    @default(3)
+  gradePoint  Float?   // e.g., 9.0 on a 10-point scale
+  grade       String?  // e.g., "A", "B+", "O"
+  semester    Int      @default(1)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId, semester])
+}
+
+model GradeEntry {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  subjectName   String
+  chapter       String?
+  totalMarks    Float
+  obtainedMarks Float
+  examType      String   // "JEE", "NEET", "UPSC", "INTERNAL", "BOARD"
+  timeTakenMins Int?     // time taken per question/section
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([userId, subjectName])
+  @@index([userId, examType])
 }

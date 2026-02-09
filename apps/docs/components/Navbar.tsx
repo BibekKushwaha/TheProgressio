@@ -4,6 +4,7 @@ import { useAppSelector } from '@repo/store';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, Calendar, Trophy, Settings, User as UserIcon, LogOut, Search, Plus, Sparkles } from 'lucide-react';
+import { SyncStatusIndicator } from '@/components/ui/SyncStatusIndicator';
 
 type NavbarProps = {
     navLinks: string[];
@@ -73,7 +74,7 @@ export function Navbar({ navLinks, buttonText, onClick }: NavbarProps) {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {/* Search shortcut or other icon could go here */}
+                        <SyncStatusIndicator />
 
                         {buttonText && (
                             <button

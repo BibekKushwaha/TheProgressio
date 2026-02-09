@@ -7,6 +7,8 @@ import { QuickActions } from '../../../components/dashboard/QuickAction';
 import { TodaysTasks } from '../../../components/dashboard/TodayTask';
 import { HabitStreaks } from '../../../components/dashboard/HabitStreaks';
 
+import { QuietHoursPanel } from '../../../components/settings/QuietHoursPanel';
+
 export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white">
@@ -22,6 +24,7 @@ export default function DashboardPage() {
                     <div className="space-y-6">
                         <QuickActions />
                         <HabitStreaks />
+                        <QuietHoursPanel />
                     </div>
                 </div>
             </main>

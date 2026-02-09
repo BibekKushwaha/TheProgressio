@@ -144,6 +144,7 @@ export type {
 export { SessionType } from './services/analyticsApi';
 export * from './services/timetableApi';
 export * from './services/calendarApi';
+export * from './services/rotationsApi';
 
 // Timetable API
 export {
@@ -176,3 +177,31 @@ export {
   selectAnalyticsLoading,
   selectAnalyticsError,
 } from './slices/analyticsSlice';
+
+// ─── Local-First Persistence (IndexedDB) ────────────────────────────────────────
+export {
+  localDb,
+  localTasks,
+  localCategories,
+  syncQueue,
+  clearLocalData,
+} from './local-db';
+export type {
+  LocalTask,
+  LocalCategory,
+  LocalSubTask,
+  LocalAttachment,
+  SyncQueueItem,
+  SyncAction,
+} from './local-db';
+
+export { syncEngine } from './sync-engine';
+
+export {
+  useSyncStatus,
+  useLocalTasks,
+  useLocalCategories,
+  useLocalDbHydration,
+  usePendingSyncCount,
+  useClearLocalData,
+} from './use-local-db';

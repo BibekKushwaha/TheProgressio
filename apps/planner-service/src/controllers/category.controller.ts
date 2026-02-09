@@ -9,7 +9,7 @@ export const createCategory = async (req: AuthenticatedRequest, res: Response) =
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { name, colorCode } = req.body;
+        const { name, colorCode, icon } = req.body;
 
         if (!name || typeof name !== "string") {
             return res.status(400).json({ message: "Name is required" });
@@ -19,6 +19,7 @@ export const createCategory = async (req: AuthenticatedRequest, res: Response) =
             data: {
                 name,
                 colorCode: colorCode ?? "#3B82F6",
+                icon: icon ?? null,
                 userId: req.user.id,
             },
         });
@@ -102,7 +103,7 @@ export const updateCategory = async (req: AuthenticatedRequest, res: Response) =
         if (typeof id !== "string") {
             return res.status(400).json({ message: "Invalid category id" });
         }
-        const { name, colorCode } = req.body;
+        const { name, colorCode, icon } = req.body;
 
         const existingCategory = await prisma.category.findUnique({
             where: { id },
@@ -121,6 +122,7 @@ export const updateCategory = async (req: AuthenticatedRequest, res: Response) =
             data: {
                 ...(name && { name }),
                 ...(colorCode && { colorCode }),
+                ...(icon !== undefined && { icon: icon || null }),
             },
         });
 

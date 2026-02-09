@@ -1,6 +1,10 @@
 import type { Request, Response } from "express";
 import { prisma } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { predictTaskDuration, getCycleTimePercentiles } from "../services/prediction.service.js";
+import { generateSWOT, getSubjectPerformance } from "../services/swot.service.js";
+import { calculateCGPA, whatIfGPA, addCourseGrade, updateCourseGrade, deleteCourseGrade } from "../services/gpa.service.js";
+import { getPlannedVsActual, detectPeakProductivity, getPredictivePerformance } from "../services/focus.service.js";
 
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
@@ -548,5 +552,294 @@ export const handleTaskCompletedEvent = async (
             message: "Failed to process task completion event",
             error: error instanceof Error ? error.message : "Unknown error",
         });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// Phase 3 — Duration Prediction (PERT)
+// ═══════════════════════════════════════════════════════════════════════
+
+// GET /stats/predict
+export const getPrediction = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { categoryId, subject, taskId } = req.query;
+        const prediction = await predictTaskDuration(userId, {
+            categoryId: categoryId as string | undefined,
+            subject: subject as string | undefined,
+            taskId: taskId as string | undefined,
+        });
+
+        res.status(200).json({ message: "Prediction generated", prediction });
+    } catch (error) {
+        console.error("Error generating prediction:", error);
+        res.status(500).json({ message: "Failed to generate prediction", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// GET /stats/cycle-time
+export const getCycleTime = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { categoryId, subject } = req.query;
+        const data = await getCycleTimePercentiles(userId, {
+            categoryId: categoryId as string | undefined,
+            subject: subject as string | undefined,
+        });
+
+        res.status(200).json({ message: "Cycle time percentiles", data });
+    } catch (error) {
+        console.error("Error fetching cycle time:", error);
+        res.status(500).json({ message: "Failed to fetch cycle time", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// Phase 3 — SWOT Analysis
+// ═══════════════════════════════════════════════════════════════════════
+
+// GET /stats/swot/:examType
+export const getSWOTAnalysis = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { examType } = req.params;
+        if (!examType) { res.status(400).json({ message: "examType is required" }); return; }
+
+        const swot = await generateSWOT(userId, examType);
+        res.status(200).json({ message: "SWOT analysis generated", swot });
+    } catch (error) {
+        console.error("Error generating SWOT:", error);
+        res.status(500).json({ message: "Failed to generate SWOT", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// GET /stats/subject/:name
+export const getSubjectStats = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { name } = req.params;
+        if (!name) { res.status(400).json({ message: "Subject name is required" }); return; }
+
+        const data = await getSubjectPerformance(userId, decodeURIComponent(name));
+        res.status(200).json({ message: "Subject performance fetched", data });
+    } catch (error) {
+        console.error("Error fetching subject stats:", error);
+        res.status(500).json({ message: "Failed to fetch subject stats", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// Phase 3 — GPA Calculator
+// ═══════════════════════════════════════════════════════════════════════
+
+// GET /stats/gpa
+export const getGPA = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const scale = (req.query.scale as string) || "INDIA_10";
+        const result = await calculateCGPA(userId, scale);
+        res.status(200).json({ message: "CGPA calculated", result });
+    } catch (error) {
+        console.error("Error calculating GPA:", error);
+        res.status(500).json({ message: "Failed to calculate GPA", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// POST /stats/gpa/what-if
+export const getWhatIfGPA = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { targetCGPA, remainingCredits, scale } = req.body ?? {};
+        if (!targetCGPA || !remainingCredits) {
+            res.status(400).json({ message: "targetCGPA and remainingCredits are required" });
+            return;
+        }
+
+        const result = await whatIfGPA(userId, parseFloat(targetCGPA), parseInt(remainingCredits), scale || "INDIA_10");
+        res.status(200).json({ message: "What-if result", result });
+    } catch (error) {
+        console.error("Error in what-if GPA:", error);
+        res.status(500).json({ message: "Failed to calculate what-if GPA", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// POST /stats/gpa/course
+export const addCourse = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { courseName, credits, gradePoint, grade, semester } = req.body ?? {};
+        if (!courseName || credits == null || gradePoint == null) {
+            res.status(400).json({ message: "courseName, credits, and gradePoint are required" });
+            return;
+        }
+
+        const course = await addCourseGrade(userId, {
+            courseName, credits: parseFloat(credits), gradePoint: parseFloat(gradePoint), grade, semester: semester ? parseInt(semester) : undefined,
+        });
+        res.status(201).json({ message: "Course added", course });
+    } catch (error) {
+        console.error("Error adding course:", error);
+        res.status(500).json({ message: "Failed to add course", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// PUT /stats/gpa/course/:id
+export const updateCourse = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { id } = req.params;
+        const course = await updateCourseGrade(id!, req.body);
+        res.status(200).json({ message: "Course updated", course });
+    } catch (error) {
+        console.error("Error updating course:", error);
+        res.status(500).json({ message: "Failed to update course", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// DELETE /stats/gpa/course/:id
+export const deleteCourse = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { id } = req.params;
+        await deleteCourseGrade(id!);
+        res.status(200).json({ message: "Course deleted" });
+    } catch (error) {
+        console.error("Error deleting course:", error);
+        res.status(500).json({ message: "Failed to delete course", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// Phase 3 — Grade Entries (for SWOT / Predictive)
+// ═══════════════════════════════════════════════════════════════════════
+
+// POST /stats/grade-entry
+export const addGradeEntry = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { subjectName, chapter, totalMarks, obtainedMarks, examType, timeTakenMins } = req.body ?? {};
+        if (!subjectName || totalMarks == null || obtainedMarks == null) {
+            res.status(400).json({ message: "subjectName, totalMarks, and obtainedMarks are required" });
+            return;
+        }
+
+        const entry = await prisma.gradeEntry.create({
+            data: {
+                userId, subjectName, chapter, totalMarks: parseFloat(totalMarks), obtainedMarks: parseFloat(obtainedMarks),
+                examType: examType || "JEE", timeTakenMins: timeTakenMins ? parseInt(timeTakenMins) : null,
+            },
+        });
+        res.status(201).json({ message: "Grade entry added", entry });
+    } catch (error) {
+        console.error("Error adding grade entry:", error);
+        res.status(500).json({ message: "Failed to add grade entry", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// GET /stats/grade-entries
+export const getGradeEntries = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { examType, subject } = req.query;
+        const entries = await prisma.gradeEntry.findMany({
+            where: {
+                userId,
+                ...(examType ? { examType: examType as string } : {}),
+                ...(subject ? { subjectName: subject as string } : {}),
+            },
+            orderBy: { createdAt: "desc" },
+        });
+        res.status(200).json({ message: "Grade entries fetched", entries });
+    } catch (error) {
+        console.error("Error fetching grade entries:", error);
+        res.status(500).json({ message: "Failed to fetch grade entries", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// DELETE /stats/grade-entry/:id
+export const deleteGradeEntry = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { id } = req.params;
+        await prisma.gradeEntry.delete({ where: { id: id! } });
+        res.status(200).json({ message: "Grade entry deleted" });
+    } catch (error) {
+        console.error("Error deleting grade entry:", error);
+        res.status(500).json({ message: "Failed to delete grade entry", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// Phase 3 — Focus / Time Leakage
+// ═══════════════════════════════════════════════════════════════════════
+
+// GET /stats/focus/leakage
+export const getTimeLeakage = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const days = parseInt(req.query.days as string) || 14;
+        const report = await getPlannedVsActual(userId, days);
+        res.status(200).json({ message: "Time leakage report", report });
+    } catch (error) {
+        console.error("Error fetching leakage:", error);
+        res.status(500).json({ message: "Failed to fetch leakage report", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// GET /stats/focus/peak-window
+export const getPeakWindow = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const days = parseInt(req.query.days as string) || 30;
+        const data = await detectPeakProductivity(userId, days);
+        res.status(200).json({ message: "Peak productivity window", data });
+    } catch (error) {
+        console.error("Error detecting peak window:", error);
+        res.status(500).json({ message: "Failed to detect peak window", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// GET /stats/performance/:examType
+export const getPredictivePerformanceEndpoint = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { examType } = req.params;
+        if (!examType) { res.status(400).json({ message: "examType is required" }); return; }
+
+        const data = await getPredictivePerformance(userId, examType);
+        res.status(200).json({ message: "Predictive performance", data });
+    } catch (error) {
+        console.error("Error fetching predictive performance:", error);
+        res.status(500).json({ message: "Failed to fetch predictive performance", error: error instanceof Error ? error.message : "Unknown error" });
     }
 };

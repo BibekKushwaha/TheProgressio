@@ -13,6 +13,7 @@ import { PageActions } from '@/components/createtask/PageAction';
 import { Edit, Calendar as CalendarIcon, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/toast-provider';
 import {
     useSmartCreateTaskMutation,
     usePreviewSubtasksMutation,
@@ -32,6 +33,7 @@ function CreateTaskPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const taskId = searchParams.get('id');
+    const { toast } = useToast();
 
     const [taskDescription, setTaskDescription] = useState('');
     const [description, setDescription] = useState('');
@@ -118,7 +120,7 @@ function CreateTaskPageContent() {
                 setParsedMeta({});
                 // Don't clear manually set due date even if title is short
             }
-        }, 1000);
+        }, 500);
 
         return () => clearTimeout(timer);
     }, [taskDescription, parseTask, categories]);
@@ -190,9 +192,12 @@ function CreateTaskPageContent() {
                 }).unwrap();
             }
 
+            toast(taskId ? '✏️ Task updated!' : '✅ Task created!', 'success');
+            if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
             router.push('/planner');
         } catch (error) {
             console.error('Failed to save task:', error);
+            toast('Failed to save task', 'error');
         }
     };
     const handleGenerateSubtasks = async () => {
@@ -235,6 +240,11 @@ function CreateTaskPageContent() {
                                 value={taskDescription}
                                 onChange={setTaskDescription}
                                 isParsing={isSmartCreating || isParsingTask}
+                                highlights={[
+                                    ...(parsedMeta.subject ? [{ text: parsedMeta.subject, type: 'subject' as const }] : []),
+                                    ...(parsedMeta.date ? [{ text: parsedMeta.date, type: 'date' as const }] : []),
+                                    ...(parsedMeta.time ? [{ text: parsedMeta.time, type: 'time' as const }] : []),
+                                ]}
                             />
                             {(() => {
                                 const matchedCategory = categories?.find(c => c.name.toLowerCase() === parsedMeta.subject?.toLowerCase());

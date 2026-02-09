@@ -7,6 +7,7 @@ export interface Category {
     id: string;
     name: string;
     colorCode: string;
+    icon?: string | null;
     userId: string;
     _count?: {
         tasks: number;
@@ -17,12 +18,14 @@ export interface Category {
 export interface CreateCategoryRequest {
     name: string;
     colorCode?: string;
+    icon?: string;
 }
 
 export interface UpdateCategoryRequest {
     id: string;
     name?: string;
     colorCode?: string;
+    icon?: string | null;
 }
 
 export const categoriesApi = createApi({

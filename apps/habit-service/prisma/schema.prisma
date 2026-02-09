@@ -1,0 +1,55 @@
+// This is the Habit Service's own Prisma schema (Database-per-Service pattern).
+// userId is an opaque string — no FK to User table (owned by auth-service).
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Habit {
+  id            String    @id @default(uuid())
+  name          String
+  frequency     Frequency @default(DAILY)
+  targetValue   Int       @default(1) 
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  icon          String?
+  color         String?
+  lastLogDate   DateTime? 
+  
+  userId        String    // references auth-service User.id
+  
+  logs          HabitLog[]
+  reminders     HabitReminder[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model HabitLog {
+  id             String   @id @default(uuid())
+  habitId        String
+  habit          Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  completedValue Int      @default(1)
+  loggedAt       DateTime @default(now())
+
+  @@index([habitId, loggedAt])
+}
+
+model HabitReminder {
+  id           String   @id @default(uuid())
+  reminderTime DateTime
+  isSent       Boolean  @default(false)
+  
+  habitId      String
+  habit        Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+}

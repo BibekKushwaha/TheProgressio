@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { prisma, Status, Priority } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService } from "../services/ai.service.js";
-import { producer } from "../services/producer.service.js";
+import { emitTaskEvent, TaskEventType } from "../services/producer.service.js";
 
 export const createTask = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -35,6 +35,13 @@ export const createTask = async (req: AuthenticatedRequest, res: Response) => {
             },
         });
 
+        // Emit task-created event
+        await emitTaskEvent(TaskEventType.TASK_CREATED, task.id, req.user.id, {
+            title: task.title,
+            priority: task.priority,
+            dueDate: task.dueDate,
+            categoryId: task.categoryId,
+        });
 
         return res.status(201).json(task);
     } catch (error) {
@@ -181,6 +188,28 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response) => {
             },
         });
 
+        // Emit task-updated event with changed fields
+        const changedFields: Record<string, unknown> = {};
+        if (typeof title === "string") changedFields.title = title;
+        if (status) changedFields.status = status;
+        if (priority) changedFields.priority = priority;
+        if (dueDate !== undefined) changedFields.dueDate = dueDate;
+        if (categoryId !== undefined) changedFields.categoryId = categoryId;
+
+        await emitTaskEvent(TaskEventType.TASK_UPDATED, id, req.user.id, {
+            changedFields,
+            previousStatus: existingTask.status,
+            newStatus: updatedTask.status,
+        });
+
+        // If status changed to COMPLETED, also emit a completion event
+        if (status && updatedTask.status === Status.COMPLETED && existingTask.status !== Status.COMPLETED) {
+            await emitTaskEvent(TaskEventType.TASK_COMPLETED, id, req.user.id, {
+                title: updatedTask.title,
+                completedAt: new Date().toISOString(),
+            });
+        }
+
         return res.status(200).json(updatedTask);
     } catch (error) {
         console.error(error);
@@ -214,6 +243,12 @@ export const deleteTask = async (req: AuthenticatedRequest, res: Response) => {
 
         await prisma.task.delete({
             where: { id },
+        });
+
+        // Emit task-deleted event
+        await emitTaskEvent(TaskEventType.TASK_DELETED, id, req.user.id, {
+            title: existingTask.title,
+            previousStatus: existingTask.status,
         });
 
         return res.status(200).json({ message: "Task deleted successfully" });
@@ -263,6 +298,21 @@ export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
             },
         });
 
+        // Emit status-changed event
+        await emitTaskEvent(TaskEventType.TASK_STATUS_CHANGED, id, req.user.id, {
+            previousStatus: existingTask.status,
+            newStatus: updatedTask.status,
+            title: updatedTask.title,
+        });
+
+        // If toggled to COMPLETED, also emit a completion event
+        if (newStatus === Status.COMPLETED) {
+            await emitTaskEvent(TaskEventType.TASK_COMPLETED, id, req.user.id, {
+                title: updatedTask.title,
+                completedAt: new Date().toISOString(),
+            });
+        }
+
         return res.status(200).json(updatedTask);
     } catch (error) {
         console.error(error);
@@ -302,13 +352,14 @@ export const smartCreateTask = async (req: AuthenticatedRequest, res: Response) 
             }
         });
 
-        // 3. Emit Event
-        await producer.send("task-created", [{
-            taskId: task.id,
-            userId: task.userId,
+        // 3. Emit structured task event
+        await emitTaskEvent(TaskEventType.TASK_CREATED, task.id, req.user.id, {
             title: task.title,
-            timestamp: new Date()
-        }]);
+            priority: task.priority,
+            dueDate: task.dueDate,
+            source: "nlp-smart-create",
+            rawInput: text,
+        });
 
         return res.status(201).json({
             message: "Smart task created successfully",

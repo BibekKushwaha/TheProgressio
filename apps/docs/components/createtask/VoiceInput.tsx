@@ -3,6 +3,7 @@
 
 import { Mic } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useToast } from '@/components/ui/toast-provider';
 
 interface VoiceInputProps {
     onResult: (text: string) => void;
@@ -12,6 +13,7 @@ interface VoiceInputProps {
 export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
     const [isActive, setIsActive] = useState(false);
     const [recognition, setRecognition] = useState<any>(null);
+    const { toast } = useToast();
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -25,6 +27,8 @@ export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
                 recognitionInstance.onresult = (event: any) => {
                     const transcript = event.results[0][0].transcript;
                     onResult(transcript);
+                    toast('🎤 Voice captured!', 'success');
+                    if (window.navigator?.vibrate) window.navigator.vibrate(200);
                     setIsActive(false);
                 };
 

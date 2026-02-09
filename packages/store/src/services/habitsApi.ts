@@ -61,7 +61,45 @@ export interface HabitStats {
     completionRate: number;
     lastLogDate: string | null;
     streakStatus: string;
+    streakHealth?: string;
+    mercyDaysUsed?: number;
+    isMercyActive?: boolean;
     heatmapData: { date: string; value: number }[];
+}
+
+export interface UserXP {
+    xp: number;
+    level: number;
+    levelName: string;
+    xpToNextLevel: number;
+    progress: number;
+}
+
+export interface HeatmapDay {
+    date: string;
+    count: number;
+    intensity: 0 | 1 | 2 | 3 | 4;
+}
+
+export interface Nudge {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    priority: string;
+    isRead: boolean;
+    scheduledAt: string;
+    expiresAt?: string;
+    metadata?: Record<string, unknown>;
+    createdAt: string;
+}
+
+export interface MorningBriefing {
+    dueTasks: number;
+    habitsToComplete: number;
+    upcomingExams: Array<{ title: string; daysUntil: number }>;
+    streaksAtRisk: Array<{ name: string; currentStreak: number }>;
+    conflicts: string[];
 }
 
 export const habitsApi = createApi({
@@ -198,6 +236,47 @@ export const habitsApi = createApi({
                 } catch { }
             },
         }),
+
+        // ── Phase 2: XP & Gamification ─────────────────────────────────────
+        getUserXP: builder.query<{ message: string; xp: UserXP }, void>({
+            query: () => '/xp',
+            providesTags: [{ type: 'Habits', id: 'XP' }],
+        }),
+
+        // ── Phase 2: 365-Day Contribution Heatmap ─────────────────────────
+        getContributionHeatmap: builder.query<{ message: string; heatmap: HeatmapDay[] }, void>({
+            query: () => '/heatmap',
+            providesTags: [{ type: 'Habits', id: 'HEATMAP' }],
+        }),
+
+        // ── Phase 2: Nudges ────────────────────────────────────────────────
+        getNudges: builder.query<{ message: string; nudges: Nudge[] }, boolean | void>({
+            query: (unreadOnly) => ({
+                url: '/nudges',
+                params: unreadOnly ? { unreadOnly: 'true' } : {},
+            }),
+            providesTags: [{ type: 'Habits', id: 'NUDGES' }],
+        }),
+        markNudgeAsRead: builder.mutation<{ message: string }, string>({
+            query: (id) => ({
+                url: `/nudges/${id}/read`,
+                method: 'POST',
+            }),
+            invalidatesTags: [{ type: 'Habits', id: 'NUDGES' }],
+        }),
+        markAllNudgesAsRead: builder.mutation<{ message: string }, void>({
+            query: () => ({
+                url: '/nudges/read-all',
+                method: 'POST',
+            }),
+            invalidatesTags: [{ type: 'Habits', id: 'NUDGES' }],
+        }),
+
+        // ── Phase 2: Morning Briefing ──────────────────────────────────────
+        getMorningBriefing: builder.query<{ message: string; briefing: MorningBriefing }, void>({
+            query: () => '/briefing',
+            providesTags: [{ type: 'Habits', id: 'BRIEFING' }],
+        }),
     }),
 });
 
@@ -209,4 +288,11 @@ export const {
     useDeleteHabitMutation,
     useLogHabitMutation,
     useResetHabitMutation,
+    // Phase 2
+    useGetUserXPQuery,
+    useGetContributionHeatmapQuery,
+    useGetNudgesQuery,
+    useMarkNudgeAsReadMutation,
+    useMarkAllNudgesAsReadMutation,
+    useGetMorningBriefingQuery,
 } = habitsApi;

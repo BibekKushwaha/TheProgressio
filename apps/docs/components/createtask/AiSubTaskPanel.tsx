@@ -47,11 +47,12 @@ export function AISubtaskPanel({ subtasks, onSubtaskToggle, isLoading, onGenerat
             </div>
 
             <div className="space-y-3">
-                {subtasks.map((subtask) => (
+                {subtasks.map((subtask, index) => (
                     <label
                         key={subtask.id}
-                        className={`flex items-start gap-3 p-3 bg-white/5 border border-white/10 rounded-xl transition-all ${subtask.loading ? 'opacity-50' : 'hover:bg-white/10 cursor-pointer'
+                        className={`flex items-start gap-3 p-3 bg-white/5 border border-white/10 rounded-xl transition-all animate-in slide-in-from-left-2 fade-in ${subtask.loading ? 'opacity-50' : 'hover:bg-white/10 cursor-pointer'
                             }`}
+                        style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'both' }}
                     >
                         <input
                             type="checkbox"

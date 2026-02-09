@@ -5,11 +5,26 @@ import { prisma } from "@repo/db";
 export class TimetableService {
 
     /**
-     * Determines the current rotation (e.g., Week A or Week B) based on a reference date.
-     * Assumes a 2-week cycle starting from a reference date (e.g., first Monday of the year).
+     * Determines the current rotation based on the user's custom rotation pattern.
+     * Falls back to algorithmic even/odd week if no custom pattern is defined.
      */
-    getRotationForDate(date: Date): "A" | "B" {
-        // Simplified logic: Even weeks are A, Odd weeks are B relative to year start
+    async getRotationForDate(userId: string, date: Date): Promise<string> {
+        // Try to find an active custom rotation pattern for this user
+        const activePattern = await prisma.rotationPattern.findFirst({
+            where: { userId, isActive: true },
+            orderBy: { createdAt: "desc" },
+        });
+
+        if (activePattern) {
+            const daysDiff = Math.floor(
+                (date.getTime() - new Date(activePattern.startDate).getTime()) / (24 * 60 * 60 * 1000)
+            );
+            const cycleIndex = Math.floor(daysDiff / activePattern.cycleLengthDays);
+            const patternIndex = ((cycleIndex % activePattern.pattern.length) + activePattern.pattern.length) % activePattern.pattern.length;
+            return activePattern.pattern[patternIndex]!;
+        }
+
+        // Fallback: algorithmic A/B based on even/odd week of year
         const startOfYear = new Date(date.getFullYear(), 0, 1);
         const pastDays = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
         const weekNumber = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
@@ -22,7 +37,7 @@ export class TimetableService {
      */
     async getDailySchedule(userId: string, date: Date) {
         const dayOfWeek = date.getDay(); // 0 is Sunday
-        const rotation = this.getRotationForDate(date);
+        const rotation = await this.getRotationForDate(userId, date);
 
         // Fetch timetable entries matching the day and current rotation (or general entries)
         const entries = await prisma.timetable.findMany({

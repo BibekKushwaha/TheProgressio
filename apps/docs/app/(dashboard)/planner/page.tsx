@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { KanbanBoard } from '@/components/planner/KanbanBoard';
 import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
+import { SubjectCardsSidebar } from '@/components/planner/SubjectCardsSidebar';
 import { useGetTasksQuery } from '@repo/store';
 
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +19,10 @@ export default function TasksPage() {
 
     const { data: allTasks, isLoading } = useGetTasksQuery();
     const tasks = allTasks || [];
+
+    const handleSidebarCategory = (id: string | undefined) => {
+        setSelectedCategory(id || 'all');
+    };
 
     if (isLoading) {
         return (
@@ -53,27 +58,39 @@ export default function TasksPage() {
                         view={view}
                         setView={setView}
                     />
-                    <main className="flex-1 p-4 md:p-8 overflow-auto">
-                        {view === 'kanban' ? (
-                            <KanbanBoard
-                                searchQuery={searchQuery}
-                                status={status}
-                                priority={priority}
-                                category={selectedCategory}
-                                tasks={tasks}
-                            />
-                        ) : view === 'list' ? (
-                            <TaskList
-                                searchQuery={searchQuery}
-                                status={status}
-                                priority={priority}
-                                category={selectedCategory}
-                                tasks={tasks}
-                            />
-                        ) : (
-                            <TimetableView />
-                        )}
-                    </main>
+                    <div className="flex flex-1">
+                        {/* Subject Cards Sidebar — visible on xl screens */}
+                        <aside className="hidden xl:block w-64 shrink-0 p-4 pl-8 pt-0">
+                            <div className="sticky top-6">
+                                <SubjectCardsSidebar
+                                    selectedCategoryId={selectedCategory === 'all' ? undefined : selectedCategory}
+                                    onSelectCategory={handleSidebarCategory}
+                                />
+                            </div>
+                        </aside>
+
+                        <main className="flex-1 p-4 md:p-8 overflow-auto">
+                            {view === 'kanban' ? (
+                                <KanbanBoard
+                                    searchQuery={searchQuery}
+                                    status={status}
+                                    priority={priority}
+                                    category={selectedCategory}
+                                    tasks={tasks}
+                                />
+                            ) : view === 'list' ? (
+                                <TaskList
+                                    searchQuery={searchQuery}
+                                    status={status}
+                                    priority={priority}
+                                    category={selectedCategory}
+                                    tasks={tasks}
+                                />
+                            ) : (
+                                <TimetableView />
+                            )}
+                        </main>
+                    </div>
                 </div>
             </div>
         </div>

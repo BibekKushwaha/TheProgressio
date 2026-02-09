@@ -1,0 +1,63 @@
+// This is the Analytics Service's own Prisma schema (Database-per-Service pattern).
+// userId and taskId are opaque strings — no FK to User/Task tables (owned by other services).
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ActivityLog {
+  id              String      @id @default(uuid())
+  startTime       DateTime    @default(now())
+  endTime         DateTime?
+  durationMinutes Int?        
+  sessionType     SessionType @default(DEEP_WORK)
+  
+  taskId          String      // references planner-service Task.id
+  userId          String      // references auth-service User.id
+}
+
+model TaskCompletionStat {
+  id            String   @id @default(uuid())
+  taskId        String   @unique
+  userId        String   // references auth-service User.id
+  totalMinutes  Int
+  completedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, completedAt])
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String
+  icon        String
+  type        String   // "STREAK", "TASK", "FOCUS"
+  goalValue   Int
+  createdAt   DateTime @default(now())
+  
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(uuid())
+  userId        String      // references auth-service User.id
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+enum SessionType {
+  DEEP_WORK
+  POMODORO
+  BREAK
+}
