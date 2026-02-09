@@ -80,12 +80,21 @@ export function ScheduleItemCard({ item }: ScheduleItemCardProps) {
                         <span className="text-xs text-slate-400">Progress</span>
                         <span className="text-xs font-semibold text-orange-400">{item.progress}% Complete</span>
                     </div>
-                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-3">
                         <div
                             className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all duration-500"
                             style={{ width: `${item.progress}%` }}
                         ></div>
                     </div>
+
+                    {/* Focus Button */}
+                    <a
+                        href={`/focus-session?task=${encodeURIComponent(item.title)}&duration=25`}
+                        className="flex items-center justify-center gap-2 w-full py-1.5 text-xs font-bold uppercase tracking-wider bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg transition-colors text-slate-300 hover:text-white"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <span>Start Focus</span>
+                    </a>
                 </div>
             )}
         </div>

@@ -1,9 +1,9 @@
 'use client';
 
-import { Play, Square, Target } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
-import { useLogSessionMutation, SessionType, useGetTasksQuery } from '@repo/store';
+import { Play, Focus, Target } from 'lucide-react';
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useGetTasksQuery, TaskStatus, Task } from '@repo/store';
 
 interface StartFocusButtonProps {
     taskId?: string;
@@ -12,68 +12,29 @@ interface StartFocusButtonProps {
 
 export function StartFocusButton({ taskId: propTaskId, isInline = false }: StartFocusButtonProps) {
     const params = useParams();
+    const router = useRouter();
     const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
     const taskId = propTaskId || activeTaskId || params?.id as string;
-
-    const [isActive, setIsActive] = useState(false);
-    const [seconds, setSeconds] = useState(25 * 60);
-    const [startTime, setStartTime] = useState<string | null>(null);
     const [showTaskSelector, setShowTaskSelector] = useState(false);
 
-    const [logSession] = useLogSessionMutation();
-    const { data: tasks } = useGetTasksQuery({ date: new Date().toISOString().split('T')[0] });
+    const { data: tasks } = useGetTasksQuery({ status: TaskStatus.PENDING });
 
     const handleStart = () => {
         if (!taskId) {
             setShowTaskSelector(true);
             return;
         }
-        setIsActive(true);
-        setStartTime(new Date().toISOString());
+
+        // Find task title if possible
+        const task = tasks?.find((t: Task) => t.id === taskId);
+        const taskTitle = task ? task.title : 'Focus Session';
+
+        router.push(`/focus-session?taskId=${taskId}&task=${encodeURIComponent(taskTitle)}&duration=25`);
     };
 
-    const handleStop = useCallback(async () => {
-        setIsActive(false);
-        const endTime = new Date().toISOString();
-        const duration = Math.round((25 * 60 - seconds) / 60);
-
-        if (duration >= 1 && taskId) {
-            try {
-                await logSession({
-                    taskId,
-                    startTime: startTime!,
-                    endTime,
-                    durationMinutes: duration,
-                    sessionType: SessionType.POMODORO
-                }).unwrap();
-            } catch (err) {
-                console.error("Failed to log session", err);
-            }
-        }
-        setSeconds(25 * 60);
-        setStartTime(null);
-        setActiveTaskId(null);
-    }, [seconds, startTime, taskId, logSession]);
-
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (isActive && seconds > 0) {
-            interval = setInterval(() => setSeconds((prev) => prev - 1), 1000);
-        } else if (seconds === 0 && isActive) {
-            handleStop();
-        }
-        return () => clearInterval(interval);
-    }, [isActive, seconds, handleStop]);
-
-    const formatTime = (totalSeconds: number) => {
-        const mins = Math.floor(totalSeconds / 60);
-        const secs = totalSeconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    // If no taskId and we're in the floating/fixed mode, we usually hide
-    // But if we're inline, we want to show the "Start" state
-    if (!taskId && !isInline && !showTaskSelector) return null;
+    // If no taskId and we're in the floating/fixed mode, we usually hide? 
+    // Actually, let's keep it visible so users can select a task from anywhere.
+    // if (!taskId && !isInline && !showTaskSelector) return null;
 
     const buttonClass = isInline
         ? "w-full focus:outline-none"
@@ -92,16 +53,13 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
                     SELECT TASK TO FOCUS
                 </h3>
                 <div className="max-h-48 overflow-auto space-y-1 pr-1 custom-scrollbar">
-                    {tasks?.filter(t => t.status !== 'COMPLETED').map(task => (
+                    {tasks?.filter((t: Task) => t.status !== 'COMPLETED').map((task: Task) => (
                         <button
                             key={task.id}
                             onClick={() => {
                                 setActiveTaskId(task.id);
                                 setShowTaskSelector(false);
-                                // The handleStart logic will now pick up the taskId in the next render
-                                // but we want to start it immediately.
-                                setIsActive(true);
-                                setStartTime(new Date().toISOString());
+                                router.push(`/focus-session?taskId=${task.id}&task=${encodeURIComponent(task.title)}&duration=25`);
                             }}
                             className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-500/20 text-xs truncate transition-colors text-slate-300 hover:text-white border border-transparent hover:border-purple-500/30"
                         >
@@ -124,18 +82,18 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
 
     return (
         <button
-            onClick={isActive ? handleStop : handleStart}
-            className={isInline ? `${baseStyles} ${isActive ? activeColors : inactiveColors}` : `${buttonClass} ${isActive ? activeColors : inactiveColors}`}
+            onClick={handleStart}
+            className={isInline ? `${baseStyles} ${inactiveColors}` : `${buttonClass} ${inactiveColors}`}
         >
             <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 bg-white/20 rounded-full flex items-center justify-center ${isActive ? 'animate-pulse' : ''}`}>
-                    {isActive ? <Square className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
+                <div className={`w-10 h-10 bg-white/20 rounded-full flex items-center justify-center`}>
+                    <Play className="w-5 h-5 fill-current ml-1" />
                 </div>
                 <div className="flex flex-col items-start">
-                    <span className={isInline ? "text-base font-bold" : "text-lg font-mono"}>{isActive ? formatTime(seconds) : "Start Focus Session"}</span>
+                    <span className={isInline ? "text-base font-bold" : "text-lg font-mono"}>Start Focus Session</span>
                     {!isInline && (
-                        <span className={`text-xs uppercase tracking-wider ${isActive ? 'text-red-100' : 'text-indigo-200'}`}>
-                            {isActive ? "Stop Focusing" : "25:00 • Pomodoro"}
+                        <span className="text-xs uppercase tracking-wider text-indigo-200">
+                            25:00 • Pomodoro
                         </span>
                     )}
                 </div>

@@ -30,10 +30,57 @@ const colorStyles: Record<string, { border: string; bg: string; badge: string }>
         bg: 'from-purple-900/20 to-purple-800/10',
         badge: 'bg-purple-500/20 text-purple-400',
     },
+    red: {
+        border: 'border-l-red-500',
+        bg: 'from-red-900/20 to-red-800/10',
+        badge: 'bg-red-500/20 text-red-400',
+    },
+    blue: {
+        border: 'border-l-blue-500',
+        bg: 'from-blue-900/20 to-blue-800/10',
+        badge: 'bg-blue-500/20 text-blue-400',
+    },
+    indigo: {
+        border: 'border-l-indigo-500',
+        bg: 'from-indigo-900/20 to-indigo-800/10',
+        badge: 'bg-indigo-500/20 text-indigo-400',
+    },
+    green: {
+        border: 'border-l-green-500',
+        bg: 'from-green-900/20 to-green-800/10',
+        badge: 'bg-green-500/20 text-green-400',
+    },
+    yellow: {
+        border: 'border-l-yellow-500',
+        bg: 'from-yellow-900/20 to-yellow-800/10',
+        badge: 'bg-yellow-500/20 text-yellow-400',
+    },
+    pink: {
+        border: 'border-l-pink-500',
+        bg: 'from-pink-900/20 to-pink-800/10',
+        badge: 'bg-pink-500/20 text-pink-400',
+    },
 };
 
 export function EventCard({ event }: EventCardProps) {
-    const styles = colorStyles[event.color];
+    let styles = colorStyles[event.color];
+
+    // Handle unknown colors
+    if (!styles) {
+        if (event.color === '#EF4444') {
+            styles = colorStyles['red'];
+        } else if (event.color?.includes('from-')) {
+            // It's a tailwind gradient string
+            styles = {
+                border: 'border-l-indigo-500', // Default border
+                bg: event.color,
+                badge: 'bg-white/10 text-white',
+            };
+        } else {
+            // Default fallback
+            styles = colorStyles['indigo'];
+        }
+    }
 
     return (
         <div className="relative h-full mr-4">

@@ -45,14 +45,14 @@ export const calendarApi = createApi({
                 url: '/month',
                 params: { month, year }
             }),
-            providesTags: ['Calendar']
+            providesTags: ['Calendar', { type: 'Calendar', id: 'LIST' }]
         }),
         getCalendarDailySchedule: builder.query<DailyScheduleResponse, { date: string }>({
             query: ({ date }) => ({
                 url: '/day',
                 params: { date }
             }),
-            providesTags: (_result, _error, { date }) => [{ type: 'Calendar', id: date }]
+            providesTags: (_result, _error, { date }) => [{ type: 'Calendar', id: date }, { type: 'Calendar', id: 'LIST' }]
         })
     })
 });

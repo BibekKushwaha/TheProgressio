@@ -1,7 +1,7 @@
 // app/create-task/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TaskInputCard } from '@/components/createtask/TaskInputCard';
 import { MetaChips } from '@/components/createtask/MetaChips';
@@ -28,7 +28,7 @@ import {
     useAppDispatch
 } from '@repo/store';
 
-export default function CreateTaskPage() {
+function CreateTaskPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const taskId = searchParams.get('id');
@@ -226,6 +226,7 @@ export default function CreateTaskPage() {
             <div className="relative max-w-6xl mx-auto p-6 md:p-12 space-y-8">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-8">
+                        <div className="text-white text-2xl font-bold text-center">Create New Task</div>
                         <div>
                             <h2 className="text-sm font-bold text-purple-400 uppercase tracking-wider mb-4">
                                 {taskId ? 'EDITING TASK' : "WHAT'S ON YOUR MIND?"}
@@ -319,5 +320,17 @@ export default function CreateTaskPage() {
                 />
             </div>
         </div>
+    );
+}
+
+export default function CreateTaskPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+            </div>
+        }>
+            <CreateTaskPageContent />
+        </Suspense>
     );
 }

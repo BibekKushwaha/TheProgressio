@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { calendarApi } from './calendarApi';
 
 const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
 
@@ -118,6 +119,8 @@ export const tasksApi = createApi({
                             }
                         })
                     );
+                    // Invalidate all calendar queries to show new task
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
                 } catch { }
             },
         }),
@@ -144,6 +147,8 @@ export const tasksApi = createApi({
                 );
                 try {
                     await queryFulfilled;
+                    // Invalidate calendar when task is updated (e.g., status change, date change)
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
                 } catch {
                     patchResult.undo();
                 }
@@ -163,6 +168,8 @@ export const tasksApi = createApi({
                 );
                 try {
                     await queryFulfilled;
+                    // Invalidate calendar when task is deleted
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
                 } catch {
                     patchResult.undo();
                 }
@@ -190,6 +197,8 @@ export const tasksApi = createApi({
                             Object.assign(draft, updatedTask);
                         })
                     );
+                    // Invalidate calendar when task status is toggled
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
                 } catch { }
             },
         }),

@@ -17,7 +17,22 @@ import { SessionLengthSelector } from "./SessionLengthSelector"
 import { Slider } from "../ui/slider"
 import { SmartConstraints } from "./SmartConstraints"
 
+
+import { useRouter } from 'next/navigation';
+import { useGetTasksQuery, TaskStatus } from '@repo/store';
+
 export function AiSuggestedDialog() {
+    const router = useRouter();
+    const { data: tasks, isLoading } = useGetTasksQuery({ status: TaskStatus.PENDING });
+
+    const handleGenerate = (e: React.FormEvent) => {
+        e.preventDefault();
+        // Extract form data if needed, for now just redirect
+        const focusGoalElement = (document.getElementById('focusGoal') as HTMLSelectElement);
+        const focusGoal = focusGoalElement?.value || 'Study Session';
+        router.push(`/focus-session?goal=${encodeURIComponent(focusGoal)}&duration=45`);
+    };
+
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -27,39 +42,48 @@ export function AiSuggestedDialog() {
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-sm bg-slate-900 border-white/10 text-white">
-                <DialogHeader>
-                    <DialogTitle>Configure AI Study Blocks</DialogTitle>
-                    <DialogDescription className="text-slate-400">
-                        Let AI find the perfect time for your deep work based on your habits.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4 space-y-4">
-                    <div>
-                        <Label htmlFor="focusGoal" className="text-sm font-medium text-slate-300 mb-2 block">Focus Goal</Label>
-                        <Select name="focusGoal" id="focusGoal">
-                            <option value="Assignment" className="bg-slate-900">Assignment</option>
-                            <option value="Exam" className="bg-slate-900">Exam</option>
-                            <option value="Project" className="bg-slate-900">Project</option>
-                        </Select>
+                <form onSubmit={handleGenerate}>
+                    <DialogHeader>
+                        <DialogTitle>Configure AI Study Blocks</DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            Let AI find the perfect time for your deep work based on your habits.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div>
+                            <Label htmlFor="focusGoal" className="text-sm font-medium text-slate-300 mb-2 block">Focus Goal</Label>
+                            <Select name="focusGoal" id="focusGoal" defaultValue="">
+                                <option value="" disabled className="bg-slate-900">Select a task</option>
+                                {isLoading ? (
+                                    <option value="" disabled className="bg-slate-900">Loading tasks...</option>
+                                ) : (
+                                    tasks?.map(task => (
+                                        <option key={task.id} value={task.title} className="bg-slate-900">
+                                            {task.title}
+                                        </option>
+                                    ))
+                                )}
+                            </Select>
+                        </div>
+                        {/* SessionLengthSelector placeholder */}
+                        <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium text-slate-300 mb-2 block">Intensity</Label>
+                            <Slider
+                                defaultValue={[75]}
+                                max={100}
+                                step={1}
+                                className="flex-1"
+                            />
+                        </div>
+                        {/* SmartConstraints placeholder */}
                     </div>
-                    {/* SessionLengthSelector placeholder */}
-                    <div className="flex items-center gap-2">
-                        <Label className="text-sm font-medium text-slate-300 mb-2 block">Intensity</Label>
-                        <Slider
-                            defaultValue={[75]}
-                            max={100}
-                            step={1}
-                            className="flex-1"
-                        />
-                    </div>
-                    {/* SmartConstraints placeholder */}
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild>
-                        <Button variant="outline" className="bg-transparent border-white/10 text-white hover:bg-white/5">Cancel</Button>
-                    </DialogClose>
-                    <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white">Generate and Apply</Button>
-                </DialogFooter>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="outline" className="bg-transparent border-white/10 text-white hover:bg-white/5">Cancel</Button>
+                        </DialogClose>
+                        <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white">Generate and Apply</Button>
+                    </DialogFooter>
+                </form>
             </DialogContent>
         </Dialog>
     )
