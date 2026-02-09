@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
-import { SubTask, useCreateSubTaskMutation, useUpdateSubTaskMutation, useDeleteSubTaskMutation } from '@repo/store';
+import { SubTask, useCreateSubTaskMutation, useUpdateSubTaskMutation, useDeleteSubTaskMutation, useGenerateSubtasksMutation } from '@repo/store';
 
 interface SubTaskListProps {
     taskId: string;
@@ -14,6 +14,7 @@ export function SubTaskList({ taskId, subtasks }: SubTaskListProps) {
     const [createSubTask] = useCreateSubTaskMutation();
     const [updateSubTask] = useUpdateSubTaskMutation();
     const [deleteSubTask] = useDeleteSubTaskMutation();
+    const [generateSubtasks, { isLoading: isGenerating }] = useGenerateSubtasksMutation();
 
     const [isAdding, setIsAdding] = useState(false);
     const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
@@ -87,13 +88,22 @@ export function SubTaskList({ taskId, subtasks }: SubTaskListProps) {
                     <button type="button" onClick={() => setIsAdding(false)} className="p-2 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
                 </form>
             ) : (
-                <button
-                    onClick={() => setIsAdding(true)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-all duration-300"
-                >
-                    <Plus className="w-4 h-4" />
-                    Add sub-task
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setIsAdding(true)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-all duration-300"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add sub-task
+                    </button>
+                    <button
+                        onClick={() => generateSubtasks(taskId)}
+                        disabled={isGenerating}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-purple-400 hover:text-purple-300 transition-all duration-300 disabled:opacity-50"
+                    >
+                        {isGenerating ? 'Generating...' : '✨ AI Suggestions'}
+                    </button>
+                </div>
             )}
         </div>
     );

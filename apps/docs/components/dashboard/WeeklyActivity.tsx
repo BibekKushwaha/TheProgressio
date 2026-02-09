@@ -1,31 +1,81 @@
-// components/dashboard/WeeklyActivity.tsx
+"use client";
+
+import React from 'react';
+import { useGetWeeklyTrendsQuery } from '@repo/store';
+import { Sparkles } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
 export function WeeklyActivity() {
-    const data = [
-        { day: 'Mon', hours: 3.2, percentage: 64 },
-        { day: 'Tue', hours: 4.5, percentage: 90 },
-        { day: 'Wed', hours: 2.8, percentage: 56 },
-        { day: 'Thu', hours: 3.9, percentage: 78 },
-        { day: 'Fri', hours: 4.2, percentage: 84 },
-        { day: 'Sat', hours: 2.5, percentage: 50 },
-        { day: 'Sun', hours: 3.5, percentage: 70 },
-    ];
+    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
+
+    const rawData = trendsData?.data || [];
+
+    // Map dates to short day names
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const data = rawData.map(d => {
+        const date = new Date(d.date);
+        return {
+            ...d,
+            day: days[date.getDay()],
+            // Calculate percentage based on a 4-hour max for visualization
+            // Using 4 as it matches standard daily goal in the app
+            percentage: Math.min(100, Math.round((d.hours / 4) * 100))
+        };
+    });
+
+    if (isLoading) {
+        return (
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 h-[400px]">
+                <Skeleton className="h-10 w-1/3 mb-10 bg-white/5" />
+                <Skeleton className="h-64 w-full bg-white/5" />
+            </div>
+        );
+    }
+
+    // Generate SVG path for the line and gradient area
+    // Scale X to fit 600 width (6 intervals of 100)
+    const points = data.map((d, i) => `${i * 100} ${256 - (d.percentage * 2)}`).join(' L ');
+    const areaPath = `M 0 256 L ${points} L 600 256 Z`;
+    const linePath = `M ${points}`;
 
     return (
-        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Weekly Activity</h2>
+        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 relative overflow-hidden group/container">
+            <div className="absolute -top-24 -left-24 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full group-hover/container:bg-purple-500/10 transition-all duration-1000"></div>
+
+            <div className="flex items-center justify-between mb-10 relative z-10">
+                <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        Weekly Activity
+                        <Sparkles className="w-4 h-4 text-purple-400 opacity-50" />
+                    </h2>
+                    <p className="text-sm text-slate-400 mt-1">Consistency check over last 7 days</p>
+                </div>
                 <div className="flex gap-2 bg-white/5 border border-white/10 rounded-xl p-1">
-                    <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600/40 to-pink-600/40 border border-purple-500/50 text-sm font-semibold transition-all duration-300">
+                    <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-purple-500/20">
                         Week
                     </button>
-                    <button className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-300">
+                    <button className="px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">
                         Month
                     </button>
                 </div>
             </div>
 
-            <div className="relative h-64 mb-4">
-                <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 700 256">
+            <div className="relative h-64 mb-8 group pl-8">
+                {/* Y-Axis Goal Line */}
+                <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-[10px] font-bold text-slate-600 pr-2 pointer-events-none">
+                    <span>4h</span>
+                    <span>3h</span>
+                    <span>2h</span>
+                    <span>1h</span>
+                    <span className="opacity-0">0h</span>
+                </div>
+
+                {/* Horizontal Grid Lines */}
+                <div className="absolute inset-0 flex flex-col justify-between opacity-5 pointer-events-none">
+                    {[0, 1, 2, 3, 4].map(i => <div key={i} className="border-t border-white w-full h-0"></div>)}
+                </div>
+
+                <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 600 256">
                     <defs>
                         <linearGradient id="activityGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                             <stop offset="0%" stopColor="rgb(168, 85, 247)" stopOpacity="0.4" />
@@ -37,38 +87,84 @@ export function WeeklyActivity() {
                         </linearGradient>
                     </defs>
 
+                    {/* Background Area Gradient */}
                     <path
-                        d="M 0 256 L 0 154 L 100 51 L 200 113 L 300 123 L 400 41 L 500 128 L 600 77 L 700 77 L 700 256 Z"
+                        d={areaPath}
                         fill="url(#activityGradient)"
+                        className="transition-all duration-700 ease-out animate-in fade-in slide-in-from-bottom-4"
                     />
 
+                    {/* Top Line */}
                     <path
-                        d="M 0 154 L 100 51 L 200 113 L 300 123 L 400 41 L 500 128 L 600 77 L 700 77"
+                        d={linePath}
                         fill="none"
                         stroke="url(#activityLine)"
-                        strokeWidth="3"
+                        strokeWidth="4"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+                        className="animate-in fade-in duration-1000"
                     />
 
+                    {/* Interaction Points */}
                     {data.map((point, index) => (
-                        <circle
-                            key={point.day}
-                            cx={index * 100}
-                            cy={256 - point.percentage * 2.05}
-                            r="6"
-                            fill="rgb(168, 85, 247)"
-                            className="hover:r-8 transition-all cursor-pointer"
-                        />
+                        <g key={point.date} className="cursor-pointer group/point">
+                            <circle
+                                cx={index * 100}
+                                cy={256 - (point.percentage * 2)}
+                                r="10"
+                                fill="rgb(168, 85, 247)"
+                                className="opacity-0 group-hover/point:opacity-20 transition-all duration-300"
+                            />
+                            <circle
+                                cx={index * 100}
+                                cy={256 - (point.percentage * 2)}
+                                r="4"
+                                fill="white"
+                                className="transition-transform duration-300 group-hover/point:scale-150"
+                            />
+                            <circle
+                                cx={index * 100}
+                                cy={256 - (point.percentage * 2)}
+                                r="2"
+                                fill="rgb(168, 85, 247)"
+                                className="group-hover/point:opacity-0 transition-opacity"
+                            />
+
+                            {/* Simple tooltip simulation using SVG text - more reliable in standard SVG */}
+                            <g className="opacity-0 group-hover/point:opacity-100 transition-opacity duration-300">
+                                <rect
+                                    x={index * 100 - 30}
+                                    y={256 - (point.percentage * 2) - 45}
+                                    width="60"
+                                    height="30"
+                                    rx="6"
+                                    fill="black"
+                                    fillOpacity="0.8"
+                                    className="backdrop-blur-md"
+                                />
+                                <text
+                                    x={index * 100}
+                                    y={256 - (point.percentage * 2) - 25}
+                                    textAnchor="middle"
+                                    fill="white"
+                                    className="text-[10px] font-black"
+                                >
+                                    {point.hours}h
+                                </text>
+                            </g>
+                        </g>
                     ))}
                 </svg>
             </div>
 
-            <div className="flex justify-between px-2">
+            <div className="flex justify-between px-2 pl-8 border-t border-white/5 pt-6">
                 {data.map((point) => (
-                    <div key={point.day} className="flex flex-col items-center">
-                        <span className="text-sm text-slate-400 mb-1">{point.day}</span>
-                        <span className="text-sm font-semibold text-purple-400">{point.hours}h</span>
+                    <div key={point.date} className="flex flex-col items-center">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{point.day}</span>
+                        <div className={`w-1 h-1 rounded-full mb-1 ${point.hours > 0 ? 'bg-purple-500' : 'bg-slate-800'}`}></div>
+                        <span className={`text-xs font-bold ${point.hours > 0 ? 'text-white' : 'text-slate-600'}`}>
+                            {point.hours}h
+                        </span>
                     </div>
                 ))}
             </div>

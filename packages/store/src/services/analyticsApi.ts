@@ -28,6 +28,7 @@ export interface LogSessionRequest {
 export interface DailyStats {
     totalMinutes: number;
     totalHours: number;
+    totalTasksCompleted: number;
     dailyGoalHours: number;
     remainingHours: number;
     breakdown: Array<{
@@ -35,6 +36,34 @@ export interface DailyStats {
         minutes: number;
         percentage: number;
     }>;
+}
+
+export interface FocusScoreBreakdown {
+    consistency: number;
+    intensity: number;
+    depth: number;
+}
+
+export interface FocusScoreStats {
+    score: number;
+    breakdown: FocusScoreBreakdown;
+    totalSessions: number;
+    totalMinutes: number;
+    activeDays: number;
+    avgHoursPerDay: number;
+}
+
+export interface Achievement {
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+    icon: string;
+    type: string;
+    goalValue: number;
+    unlocked: boolean;
+    progress: number;
+    unlockedAt?: string;
 }
 
 export const analyticsApi = createApi({
@@ -64,16 +93,27 @@ export const analyticsApi = createApi({
             }),
             providesTags: ['Stats'],
         }),
-        getWeeklyTrends: builder.query<{ message: string; data: any[] }, void>({
-            query: () => '/stats/weekly',
+        getWeeklyTrends: builder.query<{ message: string; data: any[] }, string | void>({
+            query: (taskId) => ({
+                url: '/stats/weekly',
+                params: taskId ? { taskId } : {},
+            }),
             providesTags: ['Stats'],
         }),
         getTaskEfficiency: builder.query<any, string>({
             query: (taskId) => `/stats/task/${taskId}`,
             providesTags: ['Stats'],
         }),
-        getFocusScore: builder.query<any, void>({
+        getFocusScore: builder.query<{ message: string; stats: FocusScoreStats }, void>({
             query: () => '/stats/focus',
+            providesTags: ['Stats'],
+        }),
+        getUserStreak: builder.query<{ streak: number; activeDates: string[] }, void>({
+            query: () => '/stats/streak',
+            providesTags: ['Stats'],
+        }),
+        getAchievements: builder.query<{ message: string; achievements: Achievement[] }, void>({
+            query: () => '/stats/achievements',
             providesTags: ['Stats'],
         }),
     }),
@@ -85,4 +125,6 @@ export const {
     useGetWeeklyTrendsQuery,
     useGetTaskEfficiencyQuery,
     useGetFocusScoreQuery,
+    useGetUserStreakQuery,
+    useGetAchievementsQuery,
 } = analyticsApi;

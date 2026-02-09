@@ -1,35 +1,35 @@
 'use client';
 
-import { Play, Square } from 'lucide-react';
+import { Play, Square, Target } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useLogSessionMutation, SessionType } from '@repo/store';
+import { useLogSessionMutation, SessionType, useGetTasksQuery } from '@repo/store';
 
-export function StartFocusButton() {
-    const { id: taskId } = useParams();
+interface StartFocusButtonProps {
+    taskId?: string;
+    isInline?: boolean;
+}
+
+export function StartFocusButton({ taskId: propTaskId, isInline = false }: StartFocusButtonProps) {
+    const params = useParams();
+    const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+    const taskId = propTaskId || activeTaskId || params?.id as string;
+
     const [isActive, setIsActive] = useState(false);
-    const [seconds, setSeconds] = useState(25 * 60); // 25 minutes default
+    const [seconds, setSeconds] = useState(25 * 60);
     const [startTime, setStartTime] = useState<string | null>(null);
+    const [showTaskSelector, setShowTaskSelector] = useState(false);
+
     const [logSession] = useLogSessionMutation();
-
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-
-        if (isActive && seconds > 0) {
-            interval = setInterval(() => {
-                setSeconds((prev) => prev - 1);
-            }, 1000);
-        } else if (seconds === 0 && isActive) {
-            handleStop();
-        }
-
-        return () => clearInterval(interval);
-    }, [isActive, seconds]);
+    const { data: tasks } = useGetTasksQuery({ date: new Date().toISOString().split('T')[0] });
 
     const handleStart = () => {
+        if (!taskId) {
+            setShowTaskSelector(true);
+            return;
+        }
         setIsActive(true);
         setStartTime(new Date().toISOString());
-        console.log("Focus session started!");
     };
 
     const handleStop = useCallback(async () => {
@@ -40,21 +40,30 @@ export function StartFocusButton() {
         if (duration >= 1 && taskId) {
             try {
                 await logSession({
-                    taskId: taskId as string,
+                    taskId,
                     startTime: startTime!,
                     endTime,
                     durationMinutes: duration,
                     sessionType: SessionType.POMODORO
                 }).unwrap();
-                console.log(`Session logged: ${duration} minutes`);
             } catch (err) {
                 console.error("Failed to log session", err);
             }
         }
-
         setSeconds(25 * 60);
         setStartTime(null);
+        setActiveTaskId(null);
     }, [seconds, startTime, taskId, logSession]);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isActive && seconds > 0) {
+            interval = setInterval(() => setSeconds((prev) => prev - 1), 1000);
+        } else if (seconds === 0 && isActive) {
+            handleStop();
+        }
+        return () => clearInterval(interval);
+    }, [isActive, seconds, handleStop]);
 
     const formatTime = (totalSeconds: number) => {
         const mins = Math.floor(totalSeconds / 60);
@@ -62,41 +71,75 @@ export function StartFocusButton() {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    if (!taskId) return null;
+    // If no taskId and we're in the floating/fixed mode, we usually hide
+    // But if we're inline, we want to show the "Start" state
+    if (!taskId && !isInline && !showTaskSelector) return null;
+
+    const buttonClass = isInline
+        ? "w-full focus:outline-none"
+        : "fixed bottom-8 right-8 z-50 flex flex-col items-center gap-2 px-8 py-4 rounded-2xl font-semibold shadow-2xl transition-all duration-300 hover:-translate-y-1";
+
+    const activeColors = "bg-gradient-to-r from-red-600 to-orange-600 shadow-red-500/30 hover:shadow-red-500/50";
+    const inactiveColors = "bg-gradient-to-r from-purple-600 to-pink-600 shadow-purple-500/50";
+
+    const baseStyles = "w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg active:scale-95 hover:-translate-y-1";
+
+    if (showTaskSelector && !taskId) {
+        return (
+            <div className={isInline ? "w-full bg-white/5 border border-white/10 p-4 rounded-xl" : "fixed bottom-8 right-8 z-50 w-72 bg-slate-900 border border-white/10 p-4 rounded-2xl shadow-2xl"}>
+                <h3 className="text-xs font-bold mb-3 flex items-center gap-2 text-slate-300">
+                    <Target className="w-4 h-4 text-purple-400" />
+                    SELECT TASK TO FOCUS
+                </h3>
+                <div className="max-h-48 overflow-auto space-y-1 pr-1 custom-scrollbar">
+                    {tasks?.filter(t => t.status !== 'COMPLETED').map(task => (
+                        <button
+                            key={task.id}
+                            onClick={() => {
+                                setActiveTaskId(task.id);
+                                setShowTaskSelector(false);
+                                // The handleStart logic will now pick up the taskId in the next render
+                                // but we want to start it immediately.
+                                setIsActive(true);
+                                setStartTime(new Date().toISOString());
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-500/20 text-xs truncate transition-colors text-slate-300 hover:text-white border border-transparent hover:border-purple-500/30"
+                        >
+                            {task.title}
+                        </button>
+                    ))}
+                    {(!tasks || tasks.length === 0) && (
+                        <p className="text-[10px] text-slate-500 italic p-2">No active tasks today</p>
+                    )}
+                </div>
+                <button
+                    onClick={() => setShowTaskSelector(false)}
+                    className="w-full mt-3 text-[10px] uppercase tracking-widest font-black text-slate-500 hover:text-white transition-colors"
+                >
+                    Cancel
+                </button>
+            </div>
+        );
+    }
 
     return (
-        <div className="fixed bottom-8 right-8 z-50">
-            {isActive ? (
-                <button
-                    onClick={handleStop}
-                    className="group flex flex-col items-center gap-2 px-8 py-4 bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl font-semibold shadow-2xl shadow-red-500/30 hover:shadow-red-500/50 transition-all duration-300 hover:-translate-y-1"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
-                            <Square className="w-5 h-5 fill-current" />
-                        </div>
-                        <div className="flex flex-col items-start">
-                            <span className="text-lg font-mono">{formatTime(seconds)}</span>
-                            <span className="text-xs text-red-100 uppercase tracking-wider">Stop Focusing</span>
-                        </div>
-                    </div>
-                </button>
-            ) : (
-                <button
-                    onClick={handleStart}
-                    className="group flex flex-col items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl font-semibold shadow-2xl shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all duration-300 hover:-translate-y-1 hover:scale-105"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                            <Play className="w-5 h-5 fill-current" />
-                        </div>
-                        <div className="flex flex-col items-start">
-                            <span className="text-lg">Start Focusing</span>
-                            <span className="text-xs text-indigo-200 uppercase tracking-wider">25:00 • Pomodoro</span>
-                        </div>
-                    </div>
-                </button>
-            )}
-        </div>
+        <button
+            onClick={isActive ? handleStop : handleStart}
+            className={isInline ? `${baseStyles} ${isActive ? activeColors : inactiveColors}` : `${buttonClass} ${isActive ? activeColors : inactiveColors}`}
+        >
+            <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 bg-white/20 rounded-full flex items-center justify-center ${isActive ? 'animate-pulse' : ''}`}>
+                    {isActive ? <Square className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
+                </div>
+                <div className="flex flex-col items-start">
+                    <span className={isInline ? "text-base font-bold" : "text-lg font-mono"}>{isActive ? formatTime(seconds) : "Start Focus Session"}</span>
+                    {!isInline && (
+                        <span className={`text-xs uppercase tracking-wider ${isActive ? 'text-red-100' : 'text-indigo-200'}`}>
+                            {isActive ? "Stop Focusing" : "25:00 • Pomodoro"}
+                        </span>
+                    )}
+                </div>
+            </div>
+        </button>
     );
 }

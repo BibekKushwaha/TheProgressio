@@ -2,13 +2,11 @@
 "use client"
 import { ChevronRight, Edit, Flag, Tag } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
-import { TaskDialog } from '../TaskDialog';
 import { useGetTaskByIdQuery } from '@repo/store';
-import { useParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 export function SingleTaskHeader() {
-    const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+    const router = useRouter();
     const { id } = useParams()
     if (!id) return null
     const { data: task } = useGetTaskByIdQuery(id as string)
@@ -44,9 +42,8 @@ export function SingleTaskHeader() {
                         </Link>
                     </div>
                 </div>
-                {isTaskDialogOpen && <TaskDialog task={task} onClose={() => setIsTaskDialogOpen(false)} onSubmit={async () => { }} />}
                 <button
-                    onClick={() => setIsTaskDialogOpen(true)}
+                    onClick={() => router.push(`/createtask?id=${id}`)}
                     className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-all duration-300">
                     <Edit className="w-4 h-4" />
                     Edit Task

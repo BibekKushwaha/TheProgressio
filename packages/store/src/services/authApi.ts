@@ -93,6 +93,24 @@ export const authApi = createApi({
         } catch { }
       },
     }),
+    updateProfile: builder.mutation<AuthResponse, Partial<User>>({
+      query: (body) => ({
+        url: '/profile',
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['User'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            authApi.util.updateQueryData('getProfile', undefined, (draft) => {
+              draft.user = data.user;
+            })
+          );
+        } catch { }
+      },
+    }),
   }),
 });
 
@@ -101,4 +119,5 @@ export const {
   useLoginMutation,
   useGetProfileQuery,
   useLogoutMutation,
+  useUpdateProfileMutation,
 } = authApi;

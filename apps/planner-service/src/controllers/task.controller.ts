@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { prisma, Status, Priority } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { aiService } from "../services/ai.service.js";
+import { producer } from "../services/producer.service.js";
 
 export const createTask = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -271,4 +273,131 @@ export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
 export const taskCategories = async (_req: Request, res: Response) => {
     // Placeholder for category logic if needed, user had it in routes
     return res.status(501).json({ message: "Not implemented" });
+};
+
+export const smartCreateTask = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const { text } = req.body;
+        if (!text || typeof text !== "string") {
+            return res.status(400).json({ message: "Text input is required" });
+        }
+
+        // 1. Parse intent using Gemini
+        const parsedData = await aiService.parseTaskIntent(text);
+
+        // 2. Create Task in DB
+        const task = await prisma.task.create({
+            data: {
+                title: parsedData.title || text, // Fallback to raw text if title missing
+                description: parsedData.description || `Generated from: "${text}"`,
+                priority: (parsedData.priority as Priority) || Priority.MEDIUM,
+                status: Status.PENDING,
+                dueDate: parsedData.dueDate || null,
+                userId: req.user.id,
+                // If subject exists, could link it here logic to find Subject ID by name would be needed
+            }
+        });
+
+        // 3. Emit Event
+        await producer.send("task-created", [{
+            taskId: task.id,
+            userId: task.userId,
+            title: task.title,
+            timestamp: new Date()
+        }]);
+
+        return res.status(201).json({
+            message: "Smart task created successfully",
+            task,
+            parsedMeta: parsedData
+        });
+
+    } catch (error) {
+        console.error("Smart create error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const generateSubtasks = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const { id } = req.params;
+        if (!id || typeof id !== 'string') return res.status(400).json({ message: "Task ID required" });
+
+        const task = await prisma.task.findUnique({ where: { id } });
+        if (!task) return res.status(404).json({ message: "Task not found" });
+
+        // 1. Generate subtasks using Gemini
+        const subtaskTitles = await aiService.generateSubtasks(task.title, task.description || "");
+
+        // 2. Save to DB
+        if (subtaskTitles.length > 0) {
+            await prisma.subTask.createMany({
+                data: subtaskTitles.map(title => ({
+                    title,
+                    taskId: id,
+                    completed: false
+                }))
+            });
+        }
+
+        const updatedTask = await prisma.task.findUnique({
+            where: { id },
+            include: { subtasks: true }
+        });
+
+        return res.status(200).json(updatedTask);
+
+    } catch (error) {
+        console.error("Generate subtasks error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const previewSubtasks = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const { title, description } = req.body;
+        if (!title || typeof title !== "string") {
+            return res.status(400).json({ message: "Title is required" });
+        }
+
+        const subtaskTitles = await aiService.generateSubtasks(title, description || "");
+
+        return res.status(200).json({ subtasks: subtaskTitles });
+
+    } catch (error) {
+        console.error("Preview subtasks error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+export const parseTaskIntent = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const { text } = req.body;
+        if (!text || typeof text !== "string") {
+            return res.status(400).json({ message: "Text input is required" });
+        }
+
+        const parsedData = await aiService.parseTaskIntent(text);
+
+        return res.status(200).json(parsedData);
+
+    } catch (error) {
+        console.error("Parse task error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
 };

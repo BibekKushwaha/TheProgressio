@@ -1,4 +1,5 @@
 import { useGetDailySummaryQuery, SessionType } from '@repo/store';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function SessionBreakdown({ pastDays }: { pastDays: string }) {
     const { data: summaryData, isLoading } = useGetDailySummaryQuery(pastDays);
@@ -15,7 +16,7 @@ export function SessionBreakdown({ pastDays }: { pastDays: string }) {
         [SessionType.BREAK]: 'Break',
     };
 
-    const rawBreakdown = summaryData?.stats.breakdown || [];
+    const rawBreakdown = summaryData?.stats?.breakdown || [];
     let currentOffset = 0;
 
     const segments = rawBreakdown.map(item => {
@@ -42,7 +43,9 @@ export function SessionBreakdown({ pastDays }: { pastDays: string }) {
             <div className="flex flex-col items-center">
                 <div className="relative w-64 h-64 mb-6">
                     {isLoading ? (
-                        <div className="absolute inset-0 flex items-center justify-center text-slate-500">Loading...</div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <Skeleton className="w-full h-full rounded-full bg-white/5" />
+                        </div>
                     ) : (
                         <svg className="w-full h-full -rotate-90" viewBox="0 0 200 200">
                             {segments.length > 0 ? segments.map((segment) => {

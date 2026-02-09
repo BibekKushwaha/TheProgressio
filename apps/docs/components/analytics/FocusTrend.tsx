@@ -1,4 +1,5 @@
 import { useGetWeeklyTrendsQuery } from '@repo/store';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function FocusTrends({ pastDays }: { pastDays: string }) {
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
@@ -41,7 +42,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
 
             <div className="relative h-64">
                 {isLoading ? (
-                    <div className="flex items-center justify-center h-full text-slate-500">Loading trends...</div>
+                    <Skeleton className="w-full h-full bg-white/5" />
                 ) : (
                     <>
                         <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 600 256">

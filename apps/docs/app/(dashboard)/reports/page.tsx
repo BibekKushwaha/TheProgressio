@@ -4,24 +4,46 @@ import React from "react";
 import { TrendingUp, Clock, Target, Award } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 
-export default function ReportsPage() {
-    const weeklyData = [
-        { day: "Mon", hours: 3.5, tasks: 5 },
-        { day: "Tue", hours: 4.2, tasks: 7 },
-        { day: "Wed", hours: 2.8, tasks: 4 },
-        { day: "Thu", hours: 5.1, tasks: 8 },
-        { day: "Fri", hours: 4.0, tasks: 6 },
-        { day: "Sat", hours: 6.2, tasks: 9 },
-        { day: "Sun", hours: 3.5, tasks: 5 },
-    ];
+import { useGetDailySummaryQuery, useGetWeeklyTrendsQuery, useGetFocusScoreQuery, useGetUserStreakQuery } from "@repo/store";
+import { Skeleton } from "@/components/ui/skeleton";
 
-    const categoryData = [
-        { category: "Focus", value: 85 },
-        { category: "Consistency", value: 72 },
-        { category: "Completion", value: 90 },
-        { category: "Efficiency", value: 78 },
-        { category: "Balance", value: 65 },
-    ];
+export default function ReportsPage() {
+    const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery('7');
+    const { data: trendsData, isLoading: isTrendsLoading } = useGetWeeklyTrendsQuery();
+    const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery();
+    const { data: streakData, isLoading: isStreakLoading } = useGetUserStreakQuery();
+
+    const weeklyData = trendsData?.data || [];
+
+    const categoryData = focusScoreData?.stats?.breakdown ? [
+        { category: "Consistency", value: focusScoreData.stats.breakdown.consistency * 2.5 }, // Normalize to 100-ish if needed, or just use raw points
+        { category: "Intensity", value: focusScoreData.stats.breakdown.intensity * 3.3 },
+        { category: "Depth", value: focusScoreData.stats.breakdown.depth * 3.3 },
+        { category: "Efficiency", value: focusScoreData.stats.score },
+        { category: "Balance", value: 75 }, // Mocked as not available in current API
+    ] : [];
+
+    if (isSummaryLoading || isTrendsLoading || isFocusLoading || isStreakLoading) {
+        return (
+            <div className="space-y-6 p-6">
+                <Skeleton className="h-10 w-1/3 bg-white/5" />
+                <Skeleton className="h-6 w-1/2 bg-white/5" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-xl bg-white/5" />)}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                    {[1, 2].map(i => <Skeleton key={i} className="h-80 rounded-xl bg-white/5" />)}
+                </div>
+            </div>
+        );
+    }
+
+    const stats = {
+        totalHours: summaryData?.stats?.totalHours || 0,
+        tasksCompleted: summaryData?.stats?.totalTasksCompleted || 0,
+        avgFocus: focusScoreData?.stats?.avgHoursPerDay || 0,
+        streak: streakData?.streak || 0
+    };
 
     return (
         <div className="space-y-6">
@@ -38,7 +60,7 @@ export default function ReportsPage() {
                         <Clock className="w-5 h-5 text-indigo-400" />
                         <div className="text-sm text-slate-400">Total Hours</div>
                     </div>
-                    <div className="text-3xl font-bold text-white">29.3h</div>
+                    <div className="text-3xl font-bold text-white">{stats.totalHours}h</div>
                     <div className="text-xs text-green-400 mt-1">+12% from last week</div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
@@ -46,7 +68,7 @@ export default function ReportsPage() {
                         <Target className="w-5 h-5 text-violet-400" />
                         <div className="text-sm text-slate-400">Tasks Completed</div>
                     </div>
-                    <div className="text-3xl font-bold text-white">44</div>
+                    <div className="text-3xl font-bold text-white">{stats.tasksCompleted}</div>
                     <div className="text-xs text-green-400 mt-1">+8% from last week</div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
@@ -54,7 +76,7 @@ export default function ReportsPage() {
                         <TrendingUp className="w-5 h-5 text-green-400" />
                         <div className="text-sm text-slate-400">Avg Daily Focus</div>
                     </div>
-                    <div className="text-3xl font-bold text-white">4.2h</div>
+                    <div className="text-3xl font-bold text-white">{stats.avgFocus}h</div>
                     <div className="text-xs text-slate-400 mt-1">Per day</div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
@@ -62,8 +84,8 @@ export default function ReportsPage() {
                         <Award className="w-5 h-5 text-orange-400" />
                         <div className="text-sm text-slate-400">Streak Maintained</div>
                     </div>
-                    <div className="text-3xl font-bold text-white">7 Days</div>
-                    <div className="text-xs text-orange-400 mt-1">Perfect week!</div>
+                    <div className="text-3xl font-bold text-white">{stats.streak} Days</div>
+                    <div className="text-xs text-orange-400 mt-1">{stats.streak > 0 ? 'Keep it up!' : 'Start your streak today!'}</div>
                 </div>
             </div>
 
@@ -140,24 +162,28 @@ export default function ReportsPage() {
                     <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
                         <div className="flex items-center gap-2 text-green-400 font-bold mb-1">
                             <TrendingUp className="w-4 h-4" />
-                            Great Progress!
+                            Good Work!
                         </div>
-                        <p className="text-sm text-slate-300">You've increased your focus time by 12% compared to last week.</p>
+                        <p className="text-sm text-slate-300">You've logged {stats.totalHours} hours of focused work this week. Keep maintaining your momentum!</p>
                     </div>
-                    <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-                        <div className="flex items-center gap-2 text-indigo-400 font-bold mb-1">
-                            <Target className="w-4 h-4" />
-                            Peak Performance
+                    {stats.tasksCompleted > 0 && (
+                        <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                            <div className="flex items-center gap-2 text-indigo-400 font-bold mb-1">
+                                <Target className="w-4 h-4" />
+                                Peak Productivity
+                            </div>
+                            <p className="text-sm text-slate-300">You've completed {stats.tasksCompleted} tasks successfully. Great job on finishing your goals!</p>
                         </div>
-                        <p className="text-sm text-slate-300">Saturday was your most productive day with 6.2 hours of focused work.</p>
-                    </div>
-                    <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-                        <div className="flex items-center gap-2 text-orange-400 font-bold mb-1">
-                            <Award className="w-4 h-4" />
-                            Streak Maintained
+                    )}
+                    {stats.streak > 0 && (
+                        <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                            <div className="flex items-center gap-2 text-orange-400 font-bold mb-1">
+                                <Award className="w-4 h-4" />
+                                Consistency is Key
+                            </div>
+                            <p className="text-sm text-slate-300">You've maintained a {stats.streak}-day streak. Consistency is the secret to success!</p>
                         </div>
-                        <p className="text-sm text-slate-300">You've maintained a perfect 7-day streak this week. Keep it up!</p>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>

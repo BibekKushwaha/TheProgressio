@@ -1,31 +1,47 @@
 "use client"
 import { useState } from 'react';
-import { Sidebar } from '@/components/planner/Sidebar';
-import { TaskHeader } from '@/components/planner/TaskHeader';
 import { KanbanBoard } from '@/components/planner/KanbanBoard';
 import { TaskList } from '@/components/planner/TaskList';
+import { TimetableView } from '@/components/planner/TimetableView';
 import { useGetTasksQuery } from '@repo/store';
+
+import { Skeleton } from '@/components/ui/skeleton';
+import { Navbar } from '@/components/Navbar';
+import { SearchBar } from '@/components/SearchBar';
 
 export default function TasksPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [status, setStatus] = useState('all');
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [view, setView] = useState<'kanban' | 'list'>('kanban');
+    const [view, setView] = useState<'kanban' | 'list' | 'timetable'>('kanban');
 
     const { data: allTasks, isLoading } = useGetTasksQuery();
     const tasks = allTasks || [];
 
     if (isLoading) {
-        return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Loading...</div>;
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-8 space-y-8">
+                <Skeleton className="h-10 w-1/3 bg-white/5" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="space-y-4">
+                            <Skeleton className="h-8 w-32 bg-white/5" />
+                            <Skeleton className="h-48 w-full rounded-2xl bg-white/5" />
+                            <Skeleton className="h-48 w-full rounded-2xl bg-white/5" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white">
             <div className="flex">
-                {/* <Sidebar /> */}
                 <div className="flex-1 flex flex-col">
-                    <TaskHeader
+                    <Navbar navLinks={['Overview', 'Calendar', 'Achievements']} buttonText="New Task" />
+                    <SearchBar
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
                         status={status}
@@ -46,7 +62,7 @@ export default function TasksPage() {
                                 category={selectedCategory}
                                 tasks={tasks}
                             />
-                        ) : (
+                        ) : view === 'list' ? (
                             <TaskList
                                 searchQuery={searchQuery}
                                 status={status}
@@ -54,6 +70,8 @@ export default function TasksPage() {
                                 category={selectedCategory}
                                 tasks={tasks}
                             />
+                        ) : (
+                            <TimetableView />
                         )}
                     </main>
                 </div>

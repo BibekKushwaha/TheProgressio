@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
-import GlassCard from "../../../components/auth/glass-card";
+import GlassCard from "../../../components/ui/glass-card";
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
 

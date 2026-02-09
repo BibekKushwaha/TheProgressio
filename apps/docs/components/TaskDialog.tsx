@@ -12,7 +12,7 @@ import { Field, FieldGroup } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
-import { useAppDispatch, useCreateTaskMutation, useUpdateTaskMutation, useCreateCategoryMutation, useGetCategoriesQuery, PriorityEnum, addCategory, addTask, updateTask as updateTaskAction, type Priority, TaskStatus, type Task, type Status } from "@repo/store"
+import { useAppDispatch, useCreateTaskMutation, useUpdateTaskMutation, useSmartCreateTaskMutation, useCreateCategoryMutation, useGetCategoriesQuery, PriorityEnum, addCategory, addTask, updateTask as updateTaskAction, type Priority, TaskStatus, type Task, type Status } from "@repo/store"
 import { categorySchema, taskSchema } from "@repo/schemas"
 
 interface TaskDialogProps {
@@ -45,7 +45,11 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
     const dispatch = useAppDispatch();
     const [createTaskApi] = useCreateTaskMutation();
     const [updateTaskApi] = useUpdateTaskMutation();
+    const [smartCreateTaskApi] = useSmartCreateTaskMutation();
     const [createCategoryApi] = useCreateCategoryMutation();
+
+    const [mode, setMode] = useState<'manual' | 'smart'>('manual');
+    const [smartInput, setSmartInput] = useState('');
     const { data: categories } = useGetCategoriesQuery();
 
     const handleFormSubmit = async (e: React.FormEvent) => {
@@ -54,6 +58,28 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
         setErrors({});
 
         try {
+            if (mode === 'smart') {
+                if (!smartInput.trim()) {
+                    setErrors({ smart: 'Please enter a task description' });
+                    setIsLoading(false);
+                    return;
+                }
+
+                try {
+                    const response = await smartCreateTaskApi({ text: smartInput }).unwrap();
+                    if (response.task) {
+                        dispatch(addTask(response.task));
+                        await onSubmit();
+                        onClose();
+                    }
+                } catch (err: any) {
+                    setErrors({ smart: err.data?.message || 'Failed to create smart task' });
+                } finally {
+                    setIsLoading(false);
+                }
+                return;
+            }
+
             // Find or create category
             const catColor = CATEGORY_OPTIONS.find(c => c.label.toLowerCase() === categoryName.toLowerCase())?.color || '#6B7280';
             const existingCategory = categories?.find(c => c.name.toLowerCase() === categoryName.trim().toLowerCase());
@@ -136,77 +162,119 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                         <DialogDescription className="text-slate-400">
                             {isEdit ? 'Update your task details.' : 'Add a new task to your planner.'}
                         </DialogDescription>
+
+                        {!isEdit && (
+                            <div className="flex gap-2 mt-4 bg-white/5 p-1 rounded-lg">
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('manual')}
+                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${mode === 'manual' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Manual
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('smart')}
+                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${mode === 'smart' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    ✨ Smart AI
+                                </button>
+                            </div>
+                        )}
                     </DialogHeader>
-                    <FieldGroup className="py-4">
-                        <Field>
-                            <Label htmlFor="taskName">Task Name</Label>
-                            <Input
-                                id="taskName"
-                                value={taskName}
-                                onChange={(e) => setTaskName(e.target.value)}
-                                placeholder="What needs to be done?"
-                                className="bg-white/5 border-white/10 focus:ring-purple-500/50"
-                                required
-                            />
-                            {errors.title && <p className="text-red-400 text-xs mt-1">{errors.title}</p>}
-                        </Field>
 
-                        <Field>
-                            <Label htmlFor="description">Description (Optional)</Label>
-                            <textarea
-                                id="description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Add more details..."
-                                className="flex min-h-[80px] w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                            />
-                            {errors.description && <p className="text-red-400 text-xs mt-1">{errors.description}</p>}
-                        </Field>
-
-                        <Field>
-                            <Label htmlFor="dueDate">Due Date</Label>
-                            <Input
-                                id="dueDate"
-                                type="date"
-                                value={dueDate}
-                                onChange={(e) => setDueDate(e.target.value)}
-                                className="bg-white/5 border-white/10 focus:ring-purple-500/50"
-                            />
-                        </Field>
-
-                        <div className="grid grid-cols-2 gap-4">
+                    {mode === 'smart' ? (
+                        <div className="py-6 space-y-4">
+                            <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
+                                <p className="text-xs text-purple-200">
+                                    <strong>Tip:</strong> Try "Physics exam next Friday at 2pm" or "Buy groceries tomorrow high priority"
+                                </p>
+                            </div>
                             <Field>
-                                <Label htmlFor="categoryName">Category</Label>
-                                <select
-                                    id="categoryName"
-                                    value={categoryName}
-                                    onChange={(e) => setCategoryName(e.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                >
-                                    <option value="">Select Category</option>
-                                    {CATEGORY_OPTIONS.map((cat) => (
-                                        <option key={cat.value} value={cat.label}>
-                                            {cat.label}
-                                        </option>
-                                    ))}
-                                    <option value="Other">Other</option>
-                                </select>
-                            </Field>
-                            <Field>
-                                <Label htmlFor="priority">Priority</Label>
-                                <select
-                                    id="priority"
-                                    value={priority}
-                                    onChange={(e) => setPriority(e.target.value as Priority)}
-                                    className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                >
-                                    <option value={PriorityEnum.LOW}>Low</option>
-                                    <option value={PriorityEnum.MEDIUM}>Medium</option>
-                                    <option value={PriorityEnum.HIGH}>High</option>
-                                </select>
+                                <Label htmlFor="smartInput">What's on your mind?</Label>
+                                <textarea
+                                    id="smartInput"
+                                    value={smartInput}
+                                    onChange={(e) => setSmartInput(e.target.value)}
+                                    placeholder="Describe your task naturally..."
+                                    className="flex min-h-[120px] w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-medium"
+                                    autoFocus
+                                />
+                                {errors.smart && <p className="text-red-400 text-xs mt-1">{errors.smart}</p>}
                             </Field>
                         </div>
-                    </FieldGroup>
+                    ) : (
+                        <FieldGroup className="py-4">
+                            <Field>
+                                <Label htmlFor="taskName">Task Name</Label>
+                                <Input
+                                    id="taskName"
+                                    value={taskName}
+                                    onChange={(e) => setTaskName(e.target.value)}
+                                    placeholder="What needs to be done?"
+                                    className="bg-white/5 border-white/10 focus:ring-purple-500/50"
+                                    required
+                                />
+                                {errors.title && <p className="text-red-400 text-xs mt-1">{errors.title}</p>}
+                            </Field>
+
+                            <Field>
+                                <Label htmlFor="description">Description (Optional)</Label>
+                                <textarea
+                                    id="description"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    placeholder="Add more details..."
+                                    className="flex min-h-[80px] w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                                />
+                                {errors.description && <p className="text-red-400 text-xs mt-1">{errors.description}</p>}
+                            </Field>
+
+                            <Field>
+                                <Label htmlFor="dueDate">Due Date</Label>
+                                <Input
+                                    id="dueDate"
+                                    type="date"
+                                    value={dueDate}
+                                    onChange={(e) => setDueDate(e.target.value)}
+                                    className="bg-white/5 border-white/10 focus:ring-purple-500/50"
+                                />
+                            </Field>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Field>
+                                    <Label htmlFor="categoryName">Category</Label>
+                                    <select
+                                        id="categoryName"
+                                        value={categoryName}
+                                        onChange={(e) => setCategoryName(e.target.value)}
+                                        className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    >
+                                        <option value="">Select Category</option>
+                                        {CATEGORY_OPTIONS.map((cat) => (
+                                            <option key={cat.value} value={cat.label}>
+                                                {cat.label}
+                                            </option>
+                                        ))}
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </Field>
+                                <Field>
+                                    <Label htmlFor="priority">Priority</Label>
+                                    <select
+                                        id="priority"
+                                        value={priority}
+                                        onChange={(e) => setPriority(e.target.value as Priority)}
+                                        className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    >
+                                        <option value={PriorityEnum.LOW}>Low</option>
+                                        <option value={PriorityEnum.MEDIUM}>Medium</option>
+                                        <option value={PriorityEnum.HIGH}>High</option>
+                                    </select>
+                                </Field>
+                            </div>
+                        </FieldGroup>
+                    )}
                     {errors.form && <p className="text-red-400 text-sm mb-4">{errors.form}</p>}
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} className="border-white/10 hover:bg-white/5 text-white">

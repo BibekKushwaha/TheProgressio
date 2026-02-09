@@ -4,10 +4,13 @@ import { tasksApi } from './services/tasksApi';
 import { categoriesApi } from './services/categoriesApi';
 import { habitsApi } from './services/habitsApi';
 import { analyticsApi } from './services/analyticsApi';
+import { timetableApi } from './services/timetableApi';
+import { calendarApi } from './services/calendarApi';
 import authReducer from './slices/authSlice';
 import tasksReducer from './slices/tasksSlice';
 import categoriesReducer from './slices/categoriesSlice';
 import habitsReducer from './slices/habitsSlice';
+import analyticsReducer from './slices/analyticsSlice';
 
 export const makeStore = () => {
   return configureStore({
@@ -16,11 +19,14 @@ export const makeStore = () => {
       tasks: tasksReducer,
       categories: categoriesReducer,
       habits: habitsReducer,
+      analytics: analyticsReducer,
       [authApi.reducerPath]: authApi.reducer,
       [tasksApi.reducerPath]: tasksApi.reducer,
       [categoriesApi.reducerPath]: categoriesApi.reducer,
       [habitsApi.reducerPath]: habitsApi.reducer,
       [analyticsApi.reducerPath]: analyticsApi.reducer,
+      [timetableApi.reducerPath]: timetableApi.reducer,
+      [calendarApi.reducerPath]: calendarApi.reducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(
@@ -28,7 +34,9 @@ export const makeStore = () => {
         tasksApi.middleware,
         categoriesApi.middleware,
         habitsApi.middleware,
-        analyticsApi.middleware
+        analyticsApi.middleware,
+        timetableApi.middleware,
+        calendarApi.middleware
       ),
   });
 };

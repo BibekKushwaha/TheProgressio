@@ -1,5 +1,5 @@
 
-import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Calendar } from 'lucide-react';
+import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Calendar, Edit } from 'lucide-react';
 import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation } from '@repo/store';
 import {
     DropdownMenu,
@@ -10,8 +10,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { TaskDialog } from '../TaskDialog';
 
 interface TaskListCardProps {
     task: Task;
@@ -32,7 +30,6 @@ const STATUS_COLOR = {
 
 export function TaskListCard({ task, completed }: TaskListCardProps) {
     const router = useRouter();
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [deleteTask] = useDeleteTaskMutation();
     const [toggleTask] = useToggleTaskMutation();
 
@@ -58,7 +55,7 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
 
     const handleEdit = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setIsEditDialogOpen(true);
+        router.push(`/createtask?id=${task.id}`);
     };
 
     const handleCardClick = () => {
@@ -107,8 +104,12 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                         <DropdownMenuSeparator className="bg-white/10" />
                         <DropdownMenuSeparator className="bg-white/10" />
                         <DropdownMenuItem onClick={handleEdit} className="focus:bg-white/10 focus:text-white cursor-pointer">
-                            <Clock className="w-4 h-4 mr-2" />
+                            <Edit className="w-4 h-4 mr-2" />
                             Edit Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleCardClick} className="focus:bg-white/10 focus:text-white cursor-pointer">
+                            <Clock className="w-4 h-4 mr-2 text-indigo-400" />
+                            Focus
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleToggle} className="focus:bg-white/10 focus:text-white cursor-pointer">
                             {task.status === TaskStatus.PENDING && (
@@ -137,13 +138,6 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                {isEditDialogOpen && (
-                    <TaskDialog
-                        task={task}
-                        onClose={() => setIsEditDialogOpen(false)}
-                        onSubmit={async () => { }}
-                    />
-                )}
             </div>
 
             <div
@@ -153,3 +147,5 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
         </div>
     );
 }
+
+const TaskListCardImportFix = () => null;

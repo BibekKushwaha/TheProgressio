@@ -194,6 +194,49 @@ export const getCurrentUser = TryCatch(async (req, res) => {
   return res.json({ success: true, user });
 });
 
+export const updateProfile = TryCatch(async (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) {
+    return res.status(401).json({ message: 'Not authenticated' });
+  }
+
+  let decoded: any;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SEC as string);
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
+
+  const userId = decoded?.id;
+  if (!userId) {
+    return res.status(401).json({ message: 'Invalid token payload' });
+  }
+
+  const { dailyGoalHours, username, email } = req.body;
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(dailyGoalHours !== undefined && { dailyGoalHours: parseFloat(dailyGoalHours) }),
+      ...(username && { username }),
+      ...(email && { email }),
+    },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      dailyGoalHours: true,
+      createdAt: true
+    },
+  });
+
+  return res.json({
+    success: true,
+    message: "Profile updated successfully",
+    user: updatedUser
+  });
+});
+
 // export const forgotPassword = TryCatch(async (req, res, next) => {
 //   const { email } = req.body;
 

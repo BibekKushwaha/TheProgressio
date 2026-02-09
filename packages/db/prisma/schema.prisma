@@ -26,6 +26,37 @@ model User {
   tasks            Task[]
   habits           Habit[]
   taskCompletionStats TaskCompletionStat[]
+  achievements     UserAchievement[]
+  
+  // Academic Relations
+  subjects         Subject[]
+  exams            Exam[]
+  studyGoals       StudyGoal[]
+  timetable        Timetable[]
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  key         String   @unique // e.g., "FIRST_TASK", "STREAK_7"
+  name        String
+  description String
+  icon        String   // Lucide icon name or emoji
+  type        String   // "STREAK", "TASK", "FOCUS"
+  goalValue   Int
+  createdAt   DateTime @default(now())
+  
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime @default(now())
+
+  @@unique([userId, achievementId])
 }
 
 model Category {
@@ -52,6 +83,9 @@ model Task {
   
   categoryId   String?
   category     Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  subjectId    String?
+  subject      Subject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   
   description  String?
   subtasks     SubTask[]
@@ -173,4 +207,80 @@ enum SessionType {
   DEEP_WORK
   POMODORO
   BREAK
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  code        String?  // e.g., "MATH101"
+  teacher     String?
+  room        String?
+  color       String   @default("#3B82F6")
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  tasks       Task[]
+  exams       Exam[]
+  goals       StudyGoal[]
+  timetable   Timetable[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
+model Exam {
+  id          String   @id @default(uuid())
+  title       String
+  date        DateTime
+  durationMinutes Int
+  location    String?
+  topics      String?  // simple detailed text for now
+  priority    Priority @default(HIGH)
+  
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StudyGoal {
+  id          String   @id @default(uuid())
+  title       String
+  targetDate  DateTime?
+  isAchieved  Boolean  @default(false)
+  
+  subjectId   String?
+  subject     Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Timetable {
+  id          String   @id @default(uuid())
+  dayOfWeek   Int      // 0-6 (Sun-Sat) or 1-5 (Mon-Fri)
+  startTime   String   // "09:00"
+  endTime     String   // "10:30"
+  
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // For rotation support (e.g., Week A/B)
+  rotation    String?  // "A", "B", "1", "2" etc.
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

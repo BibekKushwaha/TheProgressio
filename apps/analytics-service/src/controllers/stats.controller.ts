@@ -54,12 +54,19 @@ export const getDailySummary = async (
 
         const totalMinutes = summary._sum.durationMinutes ?? 0;
         const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+        const totalTasksCompleted = await prisma.taskCompletionStat.count({
+            where: {
+                userId,
+                completedAt: { gte: start, lte: end },
+            },
+        });
 
         res.status(200).json({
             message: "Summary fetched successfully",
             stats: {
                 totalMinutes,
                 totalHours,
+                totalTasksCompleted,
                 dailyGoalHours: dailyGoalHours * daysNum,
                 remainingHours: Math.max(0, (dailyGoalHours * daysNum) - totalHours),
                 breakdown: breakdown.map(item => ({
@@ -91,23 +98,38 @@ export const getWeeklyTrends = async (
             return;
         }
 
+        const { taskId } = req.query;
         const today = startOfDay(new Date());
         const start = new Date(today);
         start.setDate(today.getDate() - 6);
 
         const logs = await prisma.activityLog.findMany({
             where: {
-                task: { userId },
+                task: {
+                    userId,
+                    ...(taskId ? { id: taskId as string } : {}),
+                },
                 startTime: { gte: start },
             },
             select: { startTime: true, durationMinutes: true },
         });
 
+        const taskStats = await prisma.taskCompletionStat.findMany({
+            where: {
+                userId,
+                completedAt: { gte: start },
+            },
+            select: { completedAt: true },
+        });
+
+        const taskCounts = new Map<string, number>();
         const totals = new Map<string, number>();
         for (let i = 0; i < 7; i++) {
             const day = new Date(start);
             day.setDate(start.getDate() + i);
-            totals.set(formatDateKey(day), 0);
+            const key = formatDateKey(day);
+            totals.set(key, 0);
+            taskCounts.set(key, 0);
         }
 
         for (const log of logs) {
@@ -116,10 +138,18 @@ export const getWeeklyTrends = async (
             totals.set(key, current + (log.durationMinutes ?? 0));
         }
 
+        for (const stat of taskStats) {
+            const key = formatDateKey(startOfDay(stat.completedAt));
+            const current = taskCounts.get(key) ?? 0;
+            taskCounts.set(key, current + 1);
+        }
+
         const data = Array.from(totals.entries()).map(([date, minutes]) => ({
             date,
+            day: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
             minutes,
             hours: Math.round((minutes / 60) * 10) / 10,
+            tasks: taskCounts.get(date) ?? 0,
         }));
 
         res.status(200).json({
@@ -219,6 +249,7 @@ export const getFocusScore = async (
 ): Promise<void> => {
     try {
         const userId = req.user?.id;
+        const dailyGoalHours = req.user?.dailyGoalHours ?? 4;
 
         if (!userId) {
             res.status(401).json({ message: "Unauthorized" });
@@ -228,43 +259,232 @@ export const getFocusScore = async (
         const end = new Date();
         const start = new Date();
         start.setDate(end.getDate() - 7);
+        start.setHours(0, 0, 0, 0);
 
         const sessions = await prisma.activityLog.findMany({
             where: {
                 task: { userId },
                 startTime: { gte: start, lt: end },
             },
-            select: { durationMinutes: true },
+            select: {
+                durationMinutes: true,
+                sessionType: true,
+                startTime: true
+            },
         });
 
         const totalSessions = sessions.length;
-        const totalMinutes = sessions.reduce(
-            (sum, s) => sum + (s.durationMinutes ?? 0),
-            0
-        );
+        if (totalSessions === 0) {
+            res.status(200).json({
+                message: "No data found for focus score",
+                stats: { score: 0, totalSessions: 0, totalMinutes: 0, activeDays: 0 }
+            });
+            return;
+        }
 
-        const sessionsPerDay = totalSessions / 7;
-        const hoursPerDay = totalMinutes / 60 / 7;
+        const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0);
 
-        const score = Math.min(
-            100,
-            Math.round(sessionsPerDay * 15 + hoursPerDay * 10)
-        );
+        // 1. Consistency (40 points) - Days active in last 7 days
+        const activeDaysSet = new Set(sessions.map(s => formatDateKey(s.startTime)));
+        const activeDaysCount = activeDaysSet.size;
+        const consistencyScore = (activeDaysCount / 7) * 40;
+
+        // 2. Intensity (30 points) - Avg hours vs Daily Goal
+        const avgHoursPerDay = (totalMinutes / 60) / 7;
+        const intensityScore = Math.min(30, (avgHoursPerDay / dailyGoalHours) * 30);
+
+        // 3. Depth (30 points) - Percentage of sessions that are DEEP_WORK
+        const deepWorkSessionsCount = sessions.filter(s => s.sessionType === 'DEEP_WORK').length;
+        const depthScore = (deepWorkSessionsCount / totalSessions) * 30;
+
+        const finalScore = Math.min(100, Math.round(consistencyScore + intensityScore + depthScore));
 
         res.status(200).json({
             message: "Focus score calculated successfully",
             stats: {
-                score,
+                score: finalScore,
+                breakdown: {
+                    consistency: Math.round(consistencyScore),
+                    intensity: Math.round(intensityScore),
+                    depth: Math.round(depthScore)
+                },
                 totalSessions,
                 totalMinutes,
-                sessionsPerDay: Math.round(sessionsPerDay * 10) / 10,
-                hoursPerDay: Math.round(hoursPerDay * 10) / 10,
+                activeDays: activeDaysCount,
+                avgHoursPerDay: Math.round(avgHoursPerDay * 10) / 10
             },
         });
     } catch (error) {
         console.error("Error calculating focus score:", error);
         res.status(500).json({
             message: "Failed to calculate focus score",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+
+// User Streak - GET /stats/streak
+export const getUserStreak = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const activityLogs = await prisma.activityLog.findMany({
+            where: {
+                task: { userId }
+            },
+            select: { startTime: true },
+            orderBy: { startTime: 'desc' }
+        });
+
+        if (activityLogs.length === 0) {
+            res.status(200).json({ streak: 0, activeDates: [] });
+            return;
+        }
+
+        // Get unique dates in YYYY-MM-DD format
+        const distinctDates = Array.from(new Set(activityLogs.map(log => formatDateKey(log.startTime))));
+
+        const today = formatDateKey(new Date());
+        const yesterday = formatDateKey(new Date(Date.now() - 86400000));
+
+        // If the latest activity isn't today or yesterday, the streak is broken
+        if (distinctDates[0] !== today && distinctDates[0] !== yesterday) {
+            res.status(200).json({ streak: 0, activeDates: distinctDates.slice(0, 14) });
+            return;
+        }
+
+        let streak = 0;
+        let checkDate = new Date(distinctDates[0]!); // Start from the most recent activity date
+
+        for (const dateStr of distinctDates) {
+            const expectedDateStr = formatDateKey(checkDate);
+            if (dateStr === expectedDateStr) {
+                streak++;
+                checkDate.setDate(checkDate.getDate() - 1);
+            } else {
+                break;
+            }
+        }
+
+        res.status(200).json({
+            streak,
+            activeDates: distinctDates.slice(0, 14)
+        });
+    } catch (error) {
+        console.error("Error calculating user streak:", error);
+        res.status(500).json({
+            message: "Failed to calculate streak",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+
+// Achievements - GET /stats/achievements
+export const getAchievements = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        // 1. Fetch user data for calculation
+        const sessions = await prisma.activityLog.findMany({
+            where: { task: { userId } },
+            select: { durationMinutes: true, startTime: true }
+        });
+
+        // Get current streak (reusing logic or simplified)
+        const distinctDates = Array.from(new Set(sessions.map(s => formatDateKey(s.startTime!))));
+        let streak = 0;
+        if (distinctDates.length > 0) {
+            const today = formatDateKey(new Date());
+            const yesterday = formatDateKey(new Date(Date.now() - 86400000));
+            if (distinctDates[0] === today || distinctDates[0] === yesterday) {
+                let checkDate = new Date(distinctDates[0]!);
+                for (const dateStr of distinctDates) {
+                    if (dateStr === formatDateKey(checkDate)) {
+                        streak++;
+                        checkDate.setDate(checkDate.getDate() - 1);
+                    } else break;
+                }
+            }
+        }
+
+        const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0);
+        const maxSessionTime = sessions.reduce((max, s) => Math.max(max, s.durationMinutes ?? 0), 0);
+        const totalSessions = sessions.length;
+
+        // 2. Fetch all achievement definitions
+        const definitions = await prisma.achievement.findMany();
+
+        // 3. Fetch already unlocked achievements
+        const unlocked = await prisma.userAchievement.findMany({
+            where: { userId },
+            select: { achievementId: true, unlockedAt: true }
+        });
+        const unlockedIds = new Set(unlocked.map((u: { achievementId: string }) => u.achievementId));
+
+        // 4. Check for new unlocks
+        const results = definitions.map((def: any) => {
+            const isUnlocked = unlockedIds.has(def.id);
+            let progress = 0;
+            let currentUnlocked = isUnlocked;
+
+            switch (def.type) {
+                case 'FOCUS': progress = (totalSessions / def.goalValue) * 100; break;
+                case 'STREAK': progress = (streak / def.goalValue) * 100; break;
+                case 'TIME': progress = (totalMinutes / def.goalValue) * 100; break;
+                case 'SESSION': progress = (maxSessionTime / def.goalValue) * 100; break;
+            }
+
+            progress = Math.min(100, Math.round(progress));
+
+            if (!isUnlocked && progress >= 100) {
+                // This could be moved to a separate "check" step or done here
+                // For now, we'll return it as "just unlocked" logic
+                currentUnlocked = true;
+            }
+
+            const unlockedInfo = unlocked.find((u: { achievementId: string; unlockedAt: Date }) => u.achievementId === def.id);
+
+            return {
+                ...def,
+                unlocked: currentUnlocked,
+                progress,
+                unlockedAt: unlockedInfo?.unlockedAt
+            };
+        });
+
+        // Sync with DB for newly unlocked ones
+        const newlyUnlocked = results.filter((r: any) => r.unlocked && !unlockedIds.has(r.id));
+        if (newlyUnlocked.length > 0) {
+            await prisma.userAchievement.createMany({
+                data: newlyUnlocked.map((a: any) => ({
+                    userId,
+                    achievementId: a.id
+                }))
+            });
+        }
+
+        res.status(200).json({
+            message: "Achievements retrieved successfully",
+            achievements: results
+        });
+    } catch (error) {
+        console.error("Error fetching achievements:", error);
+        res.status(500).json({
+            message: "Failed to fetch achievements",
             error: error instanceof Error ? error.message : "Unknown error",
         });
     }

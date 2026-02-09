@@ -1,10 +1,12 @@
 "use client"
 import { useState } from "react";
 import { HabitCard } from "../../../components/habit/Habitcard";
-import { Header } from "../../../components/habit/Header";
 import HabitDialog from "@/components/habit/HabitDialog";
 import { useGetHabitsQuery } from "@repo/store";
 
+
+import { Skeleton } from "@/components/ui/skeleton";
+import { SearchBar } from "@/components/SearchBar";
 
 export default function HabitsPage() {
     const [searchQuery, setSearchQuery] = useState("");
@@ -22,7 +24,10 @@ export default function HabitsPage() {
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-white">
             <div className="flex">
                 <div className="flex-1 flex flex-col">
-                    <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+                    <SearchBar
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                    />
                     <main className="flex-1 p-4 md:p-8 overflow-auto">
                         <div className="max-w-7xl mx-auto">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
@@ -43,9 +48,9 @@ export default function HabitsPage() {
                             <HabitDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
 
                             {isLoading ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {[1, 2, 3].map(i => (
-                                        <div key={i} className="h-64 bg-white/5 rounded-2xl border border-white/10" />
+                                        <Skeleton key={i} className="h-64 rounded-2xl bg-white/5 border border-white/10" />
                                     ))}
                                 </div>
                             ) : habits.length === 0 ? (

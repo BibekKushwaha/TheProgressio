@@ -1,5 +1,5 @@
 // app/page.tsx
-import { Navbar } from '../../../components/dashboard/Navbar';
+import { Navbar } from '../../../components/Navbar';
 import { WelcomeHeader } from '../../../components/dashboard/WelcomeHeader';
 import { TopStats } from '../../../components/dashboard/TopStats';
 import { WeeklyActivity } from '../../../components/dashboard/WeeklyActivity';
@@ -10,7 +10,7 @@ import { HabitStreaks } from '../../../components/dashboard/HabitStreaks';
 export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white">
-            <Navbar />
+            <Navbar navLinks={['Dashboard', 'Courses', 'Calendar', 'Reports']} />
             <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
                 <WelcomeHeader />
                 <TopStats />

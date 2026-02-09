@@ -7,6 +7,8 @@ import taskRouter from "./routes/task.route.js";
 import categoryRouter from "./routes/category.route.js";
 import subtaskRouter from "./routes/subtask.route.js";
 import attachmentRouter from "./routes/attachment.route.js";
+import timetableRouter from "./routes/timetable.route.js";
+import calendarRouter from "./routes/calendar.routes.js";
 
 export const app = express();
 
@@ -29,6 +31,8 @@ app.use("/api/tasks", isAuth, taskRouter);
 app.use("/api/categories", isAuth, categoryRouter);
 app.use("/api/subtasks", isAuth, subtaskRouter);
 app.use("/api/attachments", isAuth, attachmentRouter);
+app.use("/api/timetable", isAuth, timetableRouter);
+app.use("/api/calendar", isAuth, calendarRouter);
 
 const PORT = process.env.PORT || 4001;
 

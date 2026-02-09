@@ -4,7 +4,7 @@ import React, { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, User, Check, X } from "lucide-react";
-import GlassCard from "../../../components/auth/glass-card";
+import GlassCard from "../../../components/ui/glass-card";
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
 import { setCredentials, useAppDispatch, useRegisterMutation } from "@repo/store";

@@ -45,6 +45,8 @@ export const createSubTask = async (req: AuthenticatedRequest, res: Response) =>
 export const updateSubTask = async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { id } = req.params;
+        if (!id || typeof id !== 'string') return res.status(400).json({ message: "Invalid ID" });
+
         const { title, completed } = req.body;
 
         if (!req.user || !req.user.id) {
@@ -82,6 +84,7 @@ export const updateSubTask = async (req: AuthenticatedRequest, res: Response) =>
 export const deleteSubTask = async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { id } = req.params;
+        if (!id || typeof id !== 'string') return res.status(400).json({ message: "Invalid ID" });
 
         if (!req.user || !req.user.id) {
             return res.status(401).json({ message: "Unauthorized" });

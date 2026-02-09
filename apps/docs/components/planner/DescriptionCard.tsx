@@ -18,7 +18,6 @@ export function DescriptionCard() {
             </p>
 
 
-
             {task && <SubTaskList taskId={task.id} subtasks={task.subtasks || []} />}
         </div>
     );

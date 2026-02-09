@@ -1,15 +1,23 @@
 // components/dashboard/WelcomeHeader.tsx
+"use client";
 import { CalendarDays } from 'lucide-react';
+import { useAppSelector } from '@repo/store';
 
 export function WelcomeHeader() {
+    const user = useAppSelector((state) => state.auth.user);
     return (
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
                 <h1 className="text-3xl md:text-4xl font-bold mb-2">
-                    Welcome back, Alex! 👋
+                    Welcome back, {user?.username} 👋
                 </h1>
                 <p className="text-slate-400">
-                    Let's make today productive. It's Tuesday, October 24.
+                    Let's make today productive. It's {new Date().toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                    })}
                 </p>
             </div>
 

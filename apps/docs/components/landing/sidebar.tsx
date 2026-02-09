@@ -14,7 +14,7 @@ import {
     Calendar
 } from "lucide-react";
 import { cn } from "../../lib/utils";
-import GlassCard from "../auth/glass-card";
+import GlassCard from "../ui/glass-card";
 
 const Sidebar = () => {
     const pathname = usePathname();
@@ -24,7 +24,7 @@ const Sidebar = () => {
         { name: "Analytics", icon: BarChart2, href: "/analytics" },
         { name: "Habits", icon: Trophy, href: "/habits" },
         { name: "Planner", icon: Calendar, href: "/planner" },
-        { name: "Achievements", icon: Trophy, href: "/achievements" },
+        { name: "Achievements", icon: Trophy, href: "/achievement" },
         { name: "Reports", icon: BarChart2, href: "/reports" },
     ];
 

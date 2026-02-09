@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, ArrowRight } from "lucide-react";
-import GlassCard from "../../../components/auth/glass-card";
+import GlassCard from "../../../components/ui/glass-card";
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
 import { hydrateAuth, useAppDispatch, useLoginMutation } from "@repo/store";

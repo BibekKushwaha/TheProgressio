@@ -37,6 +37,8 @@ export {
   useRegisterMutation,
   useLoginMutation,
   useLogoutMutation,
+  useGetProfileQuery,
+  useUpdateProfileMutation,
 } from './services/authApi';
 export type {
   RegisterRequest,
@@ -58,6 +60,10 @@ export {
   useDeleteSubTaskMutation,
   useCreateAttachmentMutation,
   useDeleteAttachmentMutation,
+  useSmartCreateTaskMutation,
+  useGenerateSubtasksMutation,
+  usePreviewSubtasksMutation,
+  useParseTaskMutation,
 } from './services/tasksApi';
 export type {
   Task,
@@ -126,11 +132,47 @@ export {
   useGetWeeklyTrendsQuery,
   useGetTaskEfficiencyQuery,
   useGetFocusScoreQuery,
+  useGetUserStreakQuery,
+  useGetAchievementsQuery,
 } from './services/analyticsApi';
 export type {
   ActivityLog,
   LogSessionRequest,
   DailyStats,
+  Achievement,
 } from './services/analyticsApi';
 export { SessionType } from './services/analyticsApi';
+export * from './services/timetableApi';
+export * from './services/calendarApi';
 
+// Timetable API
+export {
+  timetableApi,
+  useGetDailyScheduleQuery,
+} from './services/timetableApi';
+export type {
+  DailySchedule,
+  TimetableEntry,
+  Subject,
+  Rotation,
+} from './services/timetableApi';
+
+
+// Analytics slice
+export type { AnalyticsState } from './slices/analyticsSlice';
+export {
+  setDailyStats,
+  setFocusScore,
+  setStreak,
+  setAchievements,
+  setPastDays,
+  setAnalyticsLoading,
+  setAnalyticsError,
+  selectDailyStats,
+  selectFocusScore,
+  selectStreak,
+  selectAchievements,
+  selectPastDays,
+  selectAnalyticsLoading,
+  selectAnalyticsError,
+} from './slices/analyticsSlice';

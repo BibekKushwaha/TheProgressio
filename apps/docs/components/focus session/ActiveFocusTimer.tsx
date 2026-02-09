@@ -1,0 +1,102 @@
+// components/focus-session/ActiveFocusTimer.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { SkipForward, Pause, Play, Square } from 'lucide-react';
+import { CircularProgress } from './CircularProgess';
+import { AmbiencePanel } from './AmbinencePanel';
+import { StrictModeToggle } from './StrictModeToggle';
+
+interface ActiveFocusTimerProps {
+    onComplete: () => void;
+}
+
+export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
+    const [timeLeft, setTimeLeft] = useState(25 * 60);
+    const [isPaused, setIsPaused] = useState(false);
+    const totalTime = 25 * 60;
+
+    useEffect(() => {
+        if (isPaused) return;
+
+        const interval = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isPaused]);
+
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    const progress = ((totalTime - timeLeft) / totalTime) * 100;
+
+    return (
+        <div className="relative min-h-screen flex flex-col items-center justify-center p-6">
+            <div className="mb-12">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm">
+                        Currently Focusing on: <span className="font-semibold">Calculus Assignment</span>
+                    </span>
+                </div>
+            </div>
+
+            <div className="mb-12">
+                <CircularProgress progress={progress}>
+                    <div className="text-8xl font-bold tabular-nums">
+                        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+                    </div>
+                </CircularProgress>
+            </div>
+
+            <div className="flex items-center gap-4 mb-16">
+                <button
+                    className="w-16 h-16 bg-white/5 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-300 shadow-lg"
+                    aria-label="Skip"
+                >
+                    <SkipForward className="w-6 h-6" />
+                </button>
+
+                <button
+                    onClick={() => setIsPaused(!isPaused)}
+                    className="w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center hover:scale-110 transition-all duration-300 shadow-xl shadow-purple-500/30"
+                    aria-label={isPaused ? 'Play' : 'Pause'}
+                >
+                    {isPaused ? (
+                        <Play className="w-8 h-8 ml-1" />
+                    ) : (
+                        <Pause className="w-8 h-8" />
+                    )}
+                </button>
+
+                <button
+                    onClick={onComplete}
+                    className="w-16 h-16 bg-white/5 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-300 shadow-lg"
+                    aria-label="Stop"
+                >
+                    <Square className="w-6 h-6" />
+                </button>
+            </div>
+
+            <div className="absolute bottom-8 left-8">
+                <AmbiencePanel />
+            </div>
+
+            <div className="absolute bottom-8 right-8">
+                <StrictModeToggle />
+            </div>
+
+            <div className="absolute bottom-8 text-center">
+                <p className="text-slate-400 italic">
+                    "Focus is a superpower. You are doing great."
+                </p>
+            </div>
+        </div>
+    );
+}

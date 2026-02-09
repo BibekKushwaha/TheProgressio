@@ -260,6 +260,45 @@ export const tasksApi = createApi({
             }),
             invalidatesTags: (_result, _error, { taskId }) => [{ type: 'Tasks', id: taskId }],
         }),
+        smartCreateTask: builder.mutation<{ message: string; task: Task; parsedMeta: any }, { text: string }>({
+            query: (body) => ({
+                url: '/smart-create',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [{ type: 'Tasks', id: 'LIST' }],
+        }),
+        generateSubtasks: builder.mutation<Task, string>({
+            query: (id) => ({
+                url: `/${id}/subtasks`,
+                method: 'POST',
+            }),
+            invalidatesTags: (_result, _error, id) => [{ type: 'Tasks', id }],
+        }),
+        previewSubtasks: builder.mutation<{ subtasks: string[] }, { title: string; description?: string }>({
+            query: (body) => ({
+                url: '/preview-subtasks',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [],
+        }),
+        parseTask: builder.mutation<{
+            title: string;
+            description?: string;
+            dueDate?: string;
+            priority?: Priority;
+            subject?: string;
+            effort?: string;
+            type?: string;
+        }, { text: string }>({
+            query: (body) => ({
+                url: '/parse',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [],
+        }),
     }),
 });
 
@@ -275,4 +314,8 @@ export const {
     useDeleteSubTaskMutation,
     useCreateAttachmentMutation,
     useDeleteAttachmentMutation,
+    useSmartCreateTaskMutation,
+    useGenerateSubtasksMutation,
+    usePreviewSubtasksMutation,
+    useParseTaskMutation,
 } = tasksApi;
