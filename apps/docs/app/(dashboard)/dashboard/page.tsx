@@ -6,8 +6,9 @@ import { WeeklyActivity } from '../../../components/dashboard/WeeklyActivity';
 import { QuickActions } from '../../../components/dashboard/QuickAction';
 import { TodaysTasks } from '../../../components/dashboard/TodayTask';
 import { HabitStreaks } from '../../../components/dashboard/HabitStreaks';
-
-import { QuietHoursPanel } from '../../../components/settings/QuietHoursPanel';
+import { UserLevelCard } from '../../../components/habit/UserLevelCard';
+import { MorningBriefing } from '../../../components/dashboard/MorningBriefing';
+import { LiveActivityWidget } from '../../../components/dashboard/LiveActivityWidget';
 
 export default function DashboardPage() {
     return (
@@ -15,6 +16,7 @@ export default function DashboardPage() {
             <Navbar navLinks={['Dashboard', 'Courses', 'Calendar', 'Reports']} />
             <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
                 <WelcomeHeader />
+                <LiveActivityWidget />
                 <TopStats />
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-6">
@@ -22,9 +24,10 @@ export default function DashboardPage() {
                         <TodaysTasks />
                     </div>
                     <div className="space-y-6">
+                        <MorningBriefing />
+                        <UserLevelCard />
                         <QuickActions />
                         <HabitStreaks />
-                        <QuietHoursPanel />
                     </div>
                 </div>
             </main>

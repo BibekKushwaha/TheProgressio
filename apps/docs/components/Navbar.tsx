@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, Calendar, Trophy, Settings, User as UserIcon, LogOut, Search, Plus, Sparkles } from 'lucide-react';
 import { SyncStatusIndicator } from '@/components/ui/SyncStatusIndicator';
+import { NotificationBell } from '@/components/NotificationBell';
 
 type NavbarProps = {
     navLinks: string[];
@@ -75,6 +76,7 @@ export function Navbar({ navLinks, buttonText, onClick }: NavbarProps) {
 
                     <div className="flex items-center gap-4">
                         <SyncStatusIndicator />
+                        <NotificationBell />
 
                         {buttonText && (
                             <button

@@ -1,7 +1,8 @@
-import { Flame, Trophy } from 'lucide-react';
+import { Flame, Trophy, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Habit, useLogHabitMutation } from '@repo/store';
 import { HabitActionMenu } from './HabitActionMenu';
+import { useToast } from '@/components/ui/toast-provider';
 
 export function HabitCard({ habit }: { habit: Habit }) {
     // Determine the color theme. If the habit has an RTK-saved color (gradient), use it.
@@ -9,12 +10,17 @@ export function HabitCard({ habit }: { habit: Habit }) {
     const colorTheme = habit.color || "from-purple-600 to-pink-600";
 
     const [logHabit, { isLoading }] = useLogHabitMutation();
+    const { toast } = useToast();
 
     const handleCheckIn = async () => {
         try {
             await logHabit({ id: habit.id, completedValue: 1 }).unwrap();
+
+            // Show success toast
+            toast('✅ Habit logged successfully!', 'success');
         } catch (error) {
             console.error("Failed to check in habit:", error);
+            toast('Failed to check in habit', 'error');
         }
     };
 

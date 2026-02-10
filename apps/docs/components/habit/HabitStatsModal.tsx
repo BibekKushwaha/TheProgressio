@@ -61,22 +61,40 @@ export function HabitStatsModal({ open, onOpenChange, habitId }: HabitStatsModal
                             </div>
                         </div>
 
-                        {/* Calendar Heatmap Placeholder - To be implemented with a real calendar if needed */}
+                        {/* Calendar Heatmap */}
                         {stats.heatmapData && stats.heatmapData.length > 0 && (
                             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                                 <div className="flex items-center gap-2 mb-4 text-slate-400">
                                     <Calendar className="w-4 h-4" />
-                                    <span className="text-sm">Activity History</span>
+                                    <span className="text-sm">Activity Heatmap (Last 7 Weeks)</span>
                                 </div>
-                                <div className="flex flex-wrap gap-1">
-                                    {stats.heatmapData.slice(-30).map((day, i) => (
-                                        <div
-                                            key={i}
-                                            title={`${day.date}: ${day.value}`}
-                                            className={`w-3 h-3 rounded-sm ${day.value > 0 ? "bg-green-500" : "bg-white/10"
-                                                }`}
-                                        />
-                                    ))}
+                                <div className="grid grid-cols-7 gap-1.5">
+                                    {stats.heatmapData.slice(-49).map((day, i) => {
+                                        const intensity = day.value > 0 ? Math.min(Math.ceil(day.value / 2), 4) : 0;
+                                        const colors = [
+                                            'bg-white/5',
+                                            'bg-green-500/20',
+                                            'bg-green-500/40',
+                                            'bg-green-500/60',
+                                            'bg-green-500/80',
+                                        ];
+                                        return (
+                                            <div
+                                                key={i}
+                                                title={`${day.date}: ${day.value} completions`}
+                                                className={`aspect-square rounded ${colors[intensity]} border border-white/10 hover:scale-110 transition-transform cursor-pointer`}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex items-center gap-2 mt-3 text-xs text-slate-500">
+                                    <span>Less</span>
+                                    <div className="flex gap-1">
+                                        {[0, 1, 2, 3, 4].map((i) => (
+                                            <div key={i} className={`w-3 h-3 rounded ${['bg-white/5', 'bg-green-500/20', 'bg-green-500/40', 'bg-green-500/60', 'bg-green-500/80'][i]}`} />
+                                        ))}
+                                    </div>
+                                    <span>More</span>
                                 </div>
                             </div>
                         )}

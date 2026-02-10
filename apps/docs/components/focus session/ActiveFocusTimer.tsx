@@ -1,12 +1,13 @@
 // components/focus-session/ActiveFocusTimer.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { SkipForward, Pause, Play, Square } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CircularProgress } from './CircularProgess';
 import { AmbiencePanel } from './AmbinencePanel';
 import { StrictModeToggle } from './StrictModeToggle';
+import { useLogSessionMutation, SessionType } from '@repo/store';
 
 interface ActiveFocusTimerProps {
     onComplete: () => void;
@@ -16,6 +17,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
     const taskTitle = searchParams.get('task') || searchParams.get('goal') || 'Deep Work Session';
+    const taskId = searchParams.get('taskId') || '';
     const durationParam = Number(searchParams.get('duration')) || 25;
 
     // Check if duration is a valid number
@@ -24,6 +26,27 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const [timeLeft, setTimeLeft] = useState(initialMinutes * 60);
     const [isPaused, setIsPaused] = useState(false);
     const totalTime = initialMinutes * 60;
+    const startTimeRef = useRef(new Date().toISOString());
+    const [logSession] = useLogSessionMutation();
+
+    const handleSessionEnd = useCallback(async () => {
+        if (taskId) {
+            const elapsedMinutes = Math.round((totalTime - timeLeft) / 60);
+            try {
+                await logSession({
+                    taskId,
+                    startTime: startTimeRef.current,
+                    endTime: new Date().toISOString(),
+                    durationMinutes: elapsedMinutes,
+                    sessionType: SessionType.DEEP_WORK,
+                });
+            } catch (e) {
+                // Session logging is best-effort; don't block completion
+                console.error('Failed to log focus session:', e);
+            }
+        }
+        onComplete();
+    }, [taskId, totalTime, timeLeft, logSession, onComplete]);
 
     useEffect(() => {
         if (isPaused) return;
@@ -32,7 +55,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
                     clearInterval(interval);
-                    onComplete(); // Call onComplete when timer finishes
+                    handleSessionEnd();
                     return 0;
                 }
                 return prev - 1;
@@ -40,7 +63,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [isPaused, onComplete]);
+    }, [isPaused, handleSessionEnd]);
 
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
@@ -69,7 +92,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                 <button
                     className="w-16 h-16 bg-white/5 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-300 shadow-lg"
                     aria-label="Skip"
-                    onClick={onComplete}
+                    onClick={handleSessionEnd}
                 >
                     <SkipForward className="w-6 h-6" />
                 </button>

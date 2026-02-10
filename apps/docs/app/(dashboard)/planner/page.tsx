@@ -4,6 +4,8 @@ import { KanbanBoard } from '@/components/planner/KanbanBoard';
 import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
 import { SubjectCardsSidebar } from '@/components/planner/SubjectCardsSidebar';
+import { NLPCommandBar } from '@/components/planner/NLPCommandBar';
+import { SyllabusDigitizer } from '@/components/planner/SyllabusDigitizer';
 import { useGetTasksQuery } from '@repo/store';
 
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,6 +48,10 @@ export default function TasksPage() {
             <div className="flex">
                 <div className="flex-1 flex flex-col">
                     <Navbar navLinks={['Overview', 'Calendar', 'Achievements']} buttonText="New Task" />
+                    <div className="px-4 md:px-8 pt-4">
+                        <NLPCommandBar />
+                        <SyllabusDigitizer />
+                    </div>
                     <SearchBar
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}

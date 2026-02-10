@@ -19,7 +19,7 @@ export function HabitStreaks() {
     }
 
     return (
-        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 h-full flex flex-col">
+        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 h-60 flex flex-col">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                     Habit Streaks

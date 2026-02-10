@@ -7,7 +7,7 @@ import habitRouter from "./routes/habit.route.js";
 import { handleHabitEvent } from "./controllers/habit.controller.js";
 
 
-const app = express();
+export const app = express();
 
 app.use(cors({
     origin: "http://localhost:3000",
@@ -26,7 +26,7 @@ app.get("/", (_req, res) => {
 app.post("/api/habits/events", handleHabitEvent);
 app.use("/api/habits", isAuth, habitRouter);
 
-const PORT = process.env.PORT || 4001;
+const PORT = process.env.PORT || 4002;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });

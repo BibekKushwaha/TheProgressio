@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 import activityRouter from "./routes/activity.route.js";
 import statsRouter from "./routes/stats.route.js";
 
-const app = express();
+export const app = express();
 
 app.use(cors({
     origin: "http://localhost:3000",

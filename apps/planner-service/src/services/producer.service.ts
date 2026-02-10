@@ -1,4 +1,5 @@
-import { Kafka, Producer, logLevel, CompressionTypes } from "kafkajs";
+import { Kafka, logLevel, CompressionTypes } from "kafkajs";
+import type { Producer } from "kafkajs";
 
 // ─── Event Types ────────────────────────────────────────────────────────────────
 export enum TaskEventType {
@@ -88,7 +89,7 @@ class RealKafkaProducer {
                 topic,
                 compression: CompressionTypes.GZIP,
                 messages: messages.map((msg) => ({
-                    key: msg.key || undefined,
+                    key: msg.key || null,
                     value: msg.value,
                     timestamp: Date.now().toString(),
                 })),

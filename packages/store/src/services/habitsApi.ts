@@ -244,7 +244,7 @@ export const habitsApi = createApi({
         }),
 
         // ── Phase 2: 365-Day Contribution Heatmap ─────────────────────────
-        getContributionHeatmap: builder.query<{ message: string; heatmap: HeatmapDay[] }, void>({
+        getContributionHeatmap: builder.query<{ message: string; heatmap: HeatmapDay[]; summary: { totalContributions: number; activeDays: number; totalDays: number; consistencyRate: number } }, void>({
             query: () => '/heatmap',
             providesTags: [{ type: 'Habits', id: 'HEATMAP' }],
         }),

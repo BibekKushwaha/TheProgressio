@@ -110,16 +110,28 @@ export {
   habitsApi,
   useGetHabitsQuery,
   useGetHabitStatsQuery,
+  useGetUserXPQuery,
   useCreateHabitMutation,
   useUpdateHabitMutation,
   useDeleteHabitMutation,
   useLogHabitMutation,
   useResetHabitMutation,
+  // Phase 2: Heatmap & Gamification
+  useGetContributionHeatmapQuery,
+  // Nudges & Notifications
+  useGetNudgesQuery,
+  useMarkNudgeAsReadMutation,
+  useMarkAllNudgesAsReadMutation,
+  useGetMorningBriefingQuery,
 } from './services/habitsApi';
 export type {
   Habit,
   HabitLog,
   HabitStats,
+  UserXP,
+  HeatmapDay,
+  Nudge,
+  MorningBriefing,
   CreateHabitRequest,
   UpdateHabitRequest,
 } from './services/habitsApi';
@@ -134,12 +146,38 @@ export {
   useGetFocusScoreQuery,
   useGetUserStreakQuery,
   useGetAchievementsQuery,
+  // Phase 3: Advanced Analytics
+  useGetPredictionQuery,
+  useGetCycleTimeQuery,
+  useGetSWOTAnalysisQuery,
+  useGetSubjectPerformanceQuery,
+  useGetGPAQuery,
+  useAddCourseGradeMutation,
+  useUpdateCourseGradeMutation,
+  useDeleteCourseGradeMutation,
+  useWhatIfGPAMutation,
+  useGetGradeEntriesQuery,
+  useAddGradeEntryMutation,
+  useDeleteGradeEntryMutation,
+  useGetTimeLeakageQuery,
+  useGetPeakWindowQuery,
+  useGetPredictivePerformanceQuery,
 } from './services/analyticsApi';
 export type {
   ActivityLog,
   LogSessionRequest,
   DailyStats,
   Achievement,
+  // Phase 3 Types
+  CGPAResult,
+  WhatIfResult,
+  FullSWOT,
+  DurationPrediction,
+  TimeLeakageReport,
+  PeakProductivityResult,
+  LearningPace,
+  CourseGrade,
+  GradeEntry,
 } from './services/analyticsApi';
 export { SessionType } from './services/analyticsApi';
 export * from './services/timetableApi';

@@ -6,12 +6,15 @@ import { usePathname } from "next/navigation";
 import {
     LayoutDashboard,
     CheckSquare,
-    Trophy,
     BarChart2,
     Settings,
     LogOut,
     Menu,
-    Calendar
+    Calendar,
+    Flame,
+    Swords,
+    BookOpen,
+    Users
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import GlassCard from "../ui/glass-card";
@@ -20,19 +23,21 @@ const Sidebar = () => {
     const pathname = usePathname();
 
     const navItems = [
-        { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+        { name: "Command Center", icon: LayoutDashboard, href: "/dashboard" },
+        { name: "Tasks & Planning", icon: CheckSquare, href: "/planner" },
+        { name: "Timetable", icon: Calendar, href: "/calendar" },
+        { name: "Habit Gallery", icon: Flame, href: "/habits" },
         { name: "Analytics", icon: BarChart2, href: "/analytics" },
-        { name: "Habits", icon: Trophy, href: "/habits" },
-        { name: "Planner", icon: Calendar, href: "/planner" },
-        { name: "Achievements", icon: Trophy, href: "/achievement" },
-        { name: "Reports", icon: BarChart2, href: "/reports" },
+        { name: "Exam War Room", icon: Swords, href: "/exam-warroom" },
+        { name: "Subject Library", icon: BookOpen, href: "/subjects" },
+        { name: "Family Connect", icon: Users, href: "/family-connect" },
     ];
 
 
     return (
         <>
             {/* Desktop Sidebar */}
-            <div className="hidden lg:flex w-85 flex-col h-screen fixed left-0 top-0 p-4 z-50">
+            <div className="hidden lg:flex w-80 flex-col h-screen fixed left-0 top-0 p-4 z-50">
                 <GlassCard className="h-full flex flex-col p-4" gradient>
                     <div className="flex items-center gap-2 px-2 mb-8 mt-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-xl">

@@ -5,6 +5,7 @@ import { TaskInfoPanel } from '@/components/planner/TaskInfoPanel';
 import { FocusHistory } from '@/components/planner/FocusHistory';
 import { AttachmentsList } from '@/components/planner/Attachment';
 import { StartFocusButton } from '@/components/planner/StatFocusButton';
+import { TaskEfficiencyPanel } from '@/components/planner/TaskEfficiencyPanel';
 
 export default function TaskDetailsPage() {
     return (
@@ -23,6 +24,7 @@ export default function TaskDetailsPage() {
 
                                 <div className="space-y-6">
                                     <TaskInfoPanel />
+                                    <TaskEfficiencyPanel />
                                     <FocusHistory />
                                 </div>
                             </div>

@@ -1,5 +1,5 @@
-import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Edit } from 'lucide-react';
-import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation } from '@repo/store';
+import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Edit, Paperclip, Sparkles } from 'lucide-react';
+import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation, useGenerateSubtasksMutation } from '@repo/store';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,36 +22,23 @@ const PRIORITY_COLORS = {
 };
 
 function formatDueDate(dueDate?: string | null) {
-    if (!dueDate) return "No due date";
-
+    if (!dueDate) return 'No due date';
     const date = new Date(dueDate);
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const target = new Date(date);
-    target.setHours(0, 0, 0, 0);
-
-    const diffDays =
-        (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
-
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Tomorrow";
-    if (diffDays === -1) return "Yesterday";
-    if (diffDays > 1 && diffDays <= 7) return "Next week";
-
-    // fallback
-    return target.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-    });
+    const now = new Date();
+    const diff = date.getTime() - now.getTime();
+    const daysUntil = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (daysUntil < 0) return `${Math.abs(daysUntil)}d overdue`;
+    if (daysUntil === 0) return 'Due today';
+    if (daysUntil === 1) return 'Due tomorrow';
+    if (daysUntil <= 7) return `${daysUntil}d left`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function TaskCard({ task, completed }: TaskCardProps) {
     const router = useRouter();
     const [deleteTask] = useDeleteTaskMutation();
     const [toggleTask] = useToggleTaskMutation();
+    const [generateSubtasks, { isLoading: isBreakingDown }] = useGenerateSubtasksMutation();
 
     const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[PriorityEnum.LOW];
     const categoryColor = task.category?.colorCode || '#6B7280'; // Default gray
@@ -77,6 +64,11 @@ export function TaskCard({ task, completed }: TaskCardProps) {
 
     const handleCardClick = () => {
         router.push(`/planner/${task.id}`);
+    };
+
+    const handleBreakDown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        generateSubtasks(task.id);
     };
 
     return (
@@ -182,11 +174,29 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                     );
                 })()}
 
+                {/* ✨ Break it down — AI decomposition button */}
+                {!completed && (!task.subtasks || task.subtasks.length === 0) && (
+                    <button
+                        onClick={handleBreakDown}
+                        disabled={isBreakingDown}
+                        className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg transition-all disabled:opacity-50"
+                    >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {isBreakingDown ? 'Breaking down...' : '✨ Break it down'}
+                    </button>
+                )}
+
                 <div className="flex items-center justify-between mt-4">
                     <div className="flex items-center gap-2 text-sm text-slate-400">
                         <Clock className="w-4 h-4" />
                         <span>{formatDueDate(task.dueDate)}</span>
                     </div>
+                    {task.attachments && task.attachments.length > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-1 rounded-lg">
+                            <Paperclip className="w-3 h-3" />
+                            <span>{task.attachments.length}</span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
