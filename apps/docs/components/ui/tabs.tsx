@@ -2,24 +2,24 @@
 
 import * as React from "react"
 
-function Tabs({ className, ...props }: React.ComponentProps<"div"> & { value?: string; onValueChange?: (value: string) => void; defaultValue?: string }) {
-    const [activeTab, setActiveTab] = React.useState(props.defaultValue || props.value || '');
+function Tabs({ className, value, onValueChange, defaultValue, ...props }: React.ComponentProps<"div"> & { value?: string; onValueChange?: (value: string) => void; defaultValue?: string }) {
+    const [activeTab, setActiveTab] = React.useState(defaultValue || value || '');
 
     React.useEffect(() => {
-        if (props.value !== undefined) setActiveTab(props.value);
-    }, [props.value]);
+        if (value !== undefined) setActiveTab(value);
+    }, [value]);
 
     const contextValue = React.useMemo(() => ({
         activeTab,
-        setActiveTab: (value: string) => {
-            setActiveTab(value);
-            props.onValueChange?.(value);
+        setActiveTab: (val: string) => {
+            setActiveTab(val);
+            onValueChange?.(val);
         }
-    }), [activeTab, props.onValueChange]);
+    }), [activeTab, onValueChange]);
 
     return (
         <TabsContext.Provider value={contextValue}>
-            <div className={className} {...{ ...props, value: undefined, onValueChange: undefined, defaultValue: undefined }} />
+            <div className={className} {...props} />
         </TabsContext.Provider>
     );
 }

@@ -27,6 +27,9 @@ app.post("/api/habits/events", handleHabitEvent);
 app.use("/api/habits", isAuth, habitRouter);
 
 const PORT = process.env.PORT || 4002;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}

@@ -568,8 +568,8 @@ export const getPrediction = async (req: AuthenticatedRequest, res: Response): P
         const { categoryId, subject, taskId } = req.query;
         const prediction = await predictTaskDuration(userId, {
             categoryId: categoryId as string | undefined,
-            subject: subject as string | undefined,
-            taskId: taskId as string | undefined,
+            subjectId: subject as string | undefined,
+            taskTitle: taskId as string | undefined,
         });
 
         res.status(200).json({ message: "Prediction generated", prediction });
@@ -588,7 +588,7 @@ export const getCycleTime = async (req: AuthenticatedRequest, res: Response): Pr
         const { categoryId, subject } = req.query;
         const data = await getCycleTimePercentiles(userId, {
             categoryId: categoryId as string | undefined,
-            subject: subject as string | undefined,
+            subjectId: subject as string | undefined,
         });
 
         res.status(200).json({ message: "Cycle time percentiles", data });
@@ -704,7 +704,7 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response): Pr
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const { id } = req.params;
-        const course = await updateCourseGrade(id!, req.body);
+        const course = await updateCourseGrade(id!, userId, req.body);
         res.status(200).json({ message: "Course updated", course });
     } catch (error) {
         console.error("Error updating course:", error);
@@ -719,7 +719,7 @@ export const deleteCourse = async (req: AuthenticatedRequest, res: Response): Pr
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const { id } = req.params;
-        await deleteCourseGrade(id!);
+        await deleteCourseGrade(id!, userId);
         res.status(200).json({ message: "Course deleted" });
     } catch (error) {
         console.error("Error deleting course:", error);
@@ -785,7 +785,7 @@ export const deleteGradeEntry = async (req: AuthenticatedRequest, res: Response)
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const { id } = req.params;
-        await prisma.gradeEntry.delete({ where: { id: id! } });
+        await prisma.gradeEntry.deleteMany({ where: { id: id!, userId } });
         res.status(200).json({ message: "Grade entry deleted" });
     } catch (error) {
         console.error("Error deleting grade entry:", error);

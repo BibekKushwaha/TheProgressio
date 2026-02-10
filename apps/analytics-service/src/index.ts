@@ -25,6 +25,9 @@ app.use("/api/activity", activityRouter);
 app.use("/api/stats", statsRouter);
 
 const PORT = process.env.PORT || 4003;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}

@@ -9,7 +9,6 @@ export default function Navbar() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectCurrentUser);
-  console.log(user);
   const router = useRouter();
   const [logoutApi] = useLogoutMutation();
 

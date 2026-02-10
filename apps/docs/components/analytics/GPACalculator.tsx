@@ -131,21 +131,21 @@ export function GPACalculator() {
                                 <Award className="w-5 h-5 text-indigo-400" />
                                 <span className="text-sm text-slate-400">CGPA</span>
                             </div>
-                            <div className="text-3xl font-bold text-indigo-400">{gpaData.cgpa.toFixed(2)}</div>
+                            <div className="text-3xl font-bold text-indigo-400">{(gpaData.cgpa ?? 0).toFixed(2)}</div>
                         </div>
                         <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-2">
                                 <TrendingUp className="w-5 h-5 text-purple-400" />
                                 <span className="text-sm text-slate-400">Total Credits</span>
                             </div>
-                            <div className="text-3xl font-bold text-purple-400">{gpaData.totalCredits}</div>
+                            <div className="text-3xl font-bold text-purple-400">{gpaData.totalCredits ?? 0}</div>
                         </div>
                         <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-2">
                                 <GraduationCap className="w-5 h-5 text-blue-400" />
                                 <span className="text-sm text-slate-400">Courses</span>
                             </div>
-                            <div className="text-3xl font-bold text-blue-400">{gpaData.courses.length}</div>
+                            <div className="text-3xl font-bold text-blue-400">{gpaData.courses?.length ?? 0}</div>
                         </div>
                     </div>
                 ) : (
@@ -163,8 +163,8 @@ export function GPACalculator() {
                         {gpaData.semesterBreakdown.map((sem: any) => (
                             <div key={sem.semester} className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <div className="text-sm text-slate-400 mb-1">Semester {sem.semester}</div>
-                                <div className="text-2xl font-bold text-white">{sem.gpa.toFixed(2)}</div>
-                                <div className="text-xs text-slate-500 mt-1">{sem.credits} credits</div>
+                                <div className="text-2xl font-bold text-white">{(sem.gpa ?? 0).toFixed(2)}</div>
+                                <div className="text-xs text-slate-500 mt-1">{sem.credits ?? 0} credits</div>
                             </div>
                         ))}
                     </div>
@@ -189,8 +189,8 @@ export function GPACalculator() {
                                         </div>
                                     )}
                                     <div className="text-right">
-                                        <div className="text-sm font-semibold text-white">{course.gradePoint.toFixed(1)}</div>
-                                        <div className="text-xs text-slate-500">{course.credits} credits</div>
+                                        <div className="text-sm font-semibold text-white">{(course.gradePoint ?? 0).toFixed(1)}</div>
+                                        <div className="text-xs text-slate-500">{course.credits ?? 0} credits</div>
                                     </div>
                                 </div>
                             </div>

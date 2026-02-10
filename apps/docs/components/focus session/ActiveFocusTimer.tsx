@@ -4,8 +4,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { SkipForward, Pause, Play, Square } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { CircularProgress } from './CircularProgess';
-import { AmbiencePanel } from './AmbinencePanel';
+import { CircularProgress } from './CircularProgress';
+import { AmbiencePanel } from './AmbiencePanel';
 import { StrictModeToggle } from './StrictModeToggle';
 import { useLogSessionMutation, SessionType } from '@repo/store';
 

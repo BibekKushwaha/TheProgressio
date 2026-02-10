@@ -1,41 +1,58 @@
 // components/focus-session/StatsGrid.tsx
 import { Star, CheckCircle2, Target, Flame } from 'lucide-react';
+import { useGetDailySummaryQuery, useGetFocusScoreQuery, useGetUserStreakQuery } from '@repo/store';
 
-const stats = [
-    {
-        id: 1,
-        title: 'Focus Quality',
-        value: '98%',
-        subtitle: 'Top 5% of users today',
-        icon: Star,
-        color: 'yellow',
-    },
-    {
-        id: 2,
-        title: 'Tasks Finished',
-        value: 'Calculus Problems',
-        subtitle: '#1-10 Completed',
-        icon: CheckCircle2,
-        color: 'green',
-    },
-    {
-        id: 3,
-        title: 'Daily Goal',
-        value: '3.5h',
-        subtitle: 'of 4h target',
-        progress: 87,
-        icon: Target,
-        color: 'blue',
-    },
-    {
-        id: 4,
-        title: 'Total Streak',
-        value: '15 Days',
-        subtitle: "Don't break the chain!",
-        icon: Flame,
-        color: 'orange',
-    },
-];
+interface StatsGridProps {
+    taskTitle?: string;
+}
+
+export function StatsGrid({ taskTitle }: StatsGridProps = {}) {
+    const { data: summaryData } = useGetDailySummaryQuery('1');
+    const { data: focusData } = useGetFocusScoreQuery();
+    const { data: streakData } = useGetUserStreakQuery();
+
+    const focusScore = focusData?.stats?.score ?? 0;
+    const dailyHours = summaryData?.stats?.totalHours ?? 0;
+    const dailyGoal = summaryData?.stats?.dailyGoalHours ?? 4;
+    const goalProgress = dailyGoal > 0 ? Math.min(100, Math.round((dailyHours / dailyGoal) * 100)) : 0;
+    const streak = streakData?.streak ?? 0;
+    const tasksCompleted = summaryData?.stats?.totalTasksCompleted ?? 0;
+
+    const stats = [
+        {
+            id: 1,
+            title: 'Focus Quality',
+            value: `${focusScore}%`,
+            subtitle: focusScore >= 80 ? 'Excellent focus today' : 'Keep improving!',
+            icon: Star,
+            color: 'yellow',
+        },
+        {
+            id: 2,
+            title: 'Tasks Finished',
+            value: taskTitle || `${tasksCompleted} tasks`,
+            subtitle: tasksCompleted > 0 ? `${tasksCompleted} completed today` : 'No tasks yet',
+            icon: CheckCircle2,
+            color: 'green',
+        },
+        {
+            id: 3,
+            title: 'Daily Goal',
+            value: `${dailyHours}h`,
+            subtitle: `of ${dailyGoal}h target`,
+            progress: goalProgress,
+            icon: Target,
+            color: 'blue',
+        },
+        {
+            id: 4,
+            title: 'Total Streak',
+            value: `${streak} Days`,
+            subtitle: streak > 0 ? "Don't break the chain!" : 'Start your streak today!',
+            icon: Flame,
+            color: 'orange',
+        },
+    ];
 
 export function StatsGrid() {
     return (

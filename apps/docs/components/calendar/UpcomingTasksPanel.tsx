@@ -1,5 +1,5 @@
 "use client";
-import { ScheduleItemCard } from './SheduelItemCard';
+import { ScheduleItemCard } from './ScheduleItemCard';
 import { useGetTasksQuery, TaskStatus } from '@repo/store';
 
 export function UpcomingTasksPanel() {

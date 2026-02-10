@@ -1,6 +1,7 @@
 // components/tasks/KanbanBoard.tsx
 import { useGetTasksQuery, TaskStatus, Task } from "@repo/store";
 import { BoardColumn } from "./BoardColumn";
+import { filterTasks } from "@/lib/filterTasks";
 
 interface KanbanBoardProps {
     searchQuery: string;
@@ -11,25 +12,6 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ searchQuery, status, priority, category, tasks }: KanbanBoardProps) {
-    // const { data: allTasks, isLoading } = useGetTasksQuery(); // Removed
-    // const tasks = allTasks || []; // Removed
-
-    const filterTasks = (taskList: Task[]) => {
-        return taskList.filter(task => {
-            const searchLower = searchQuery.toLowerCase();
-            const matchesSearch = !searchQuery ||
-                task.title.toLowerCase().includes(searchLower);
-
-            const matchesPriority = priority === 'all' || task.priority.toLowerCase() === priority.toLowerCase();
-
-            // Assuming category filter is by name for now, or ID if passed. The props say 'category' (string).
-            // The TaskHeader passes 'selectedCategory' which is a name (e.g. "Personal") or "all".
-            const taskCategoryName = task.category?.name || 'No Category';
-            const matchesCategory = category === 'all' || taskCategoryName.toLowerCase() === category.toLowerCase();
-
-            return matchesSearch && matchesPriority && matchesCategory;
-        });
-    };
 
     // Filter by status for columns
     // Note: API returns TaskStatus enum (PENDING, IN_PROGRESS, COMPLETED)
@@ -37,9 +19,10 @@ export function KanbanBoard({ searchQuery, status, priority, category, tasks }: 
     const inProgressTasks = tasks.filter(t => t.status === TaskStatus.IN_PROGRESS);
     const completedTasks = tasks.filter(t => t.status === TaskStatus.COMPLETED);
 
-    const filteredTodo = filterTasks(todoTasks);
-    const filteredInProgress = filterTasks(inProgressTasks);
-    const filteredCompleted = filterTasks(completedTasks);
+    const filters = { searchQuery, priority, category };
+    const filteredTodo = filterTasks(todoTasks, filters);
+    const filteredInProgress = filterTasks(inProgressTasks, filters);
+    const filteredCompleted = filterTasks(completedTasks, filters);
 
 
 

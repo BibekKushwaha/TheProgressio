@@ -103,6 +103,7 @@ vi.mock('@repo/db', () => ({
             }),
             findMany: vi.fn().mockResolvedValue([]),
             delete: vi.fn().mockResolvedValue({ id: 'ge1' }),
+            deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
     },
 }));

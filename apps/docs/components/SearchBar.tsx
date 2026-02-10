@@ -3,12 +3,6 @@ import { Search, Filter, Tag, LayoutGrid, Calendar } from 'lucide-react';
 import { TaskStatus, PriorityEnum } from '@repo/store';
 import { FilterDropdown } from './planner/FilterDropdown';
 
-const STATUS_OPTIONS = [
-    { label: "Status", value: "all" },
-    { label: "Pending", value: TaskStatus.PENDING },
-    { label: "In Progress", value: TaskStatus.IN_PROGRESS },
-    { label: "Completed", value: TaskStatus.COMPLETED },
-] as const;
 
 const PRIORITY_OPTIONS = [
     { label: "Priority", value: "all" },
@@ -45,8 +39,6 @@ interface SearchBarProps {
 export function SearchBar({
     searchQuery,
     setSearchQuery,
-    status,
-    setStatus,
     priority,
     setPriority,
     selectedCategory,
@@ -58,15 +50,14 @@ export function SearchBar({
     CATEGORY_OPTIONS: propCategoryOptions
 }: SearchBarProps) {
 
-    const currentStatusOptions = propStatusOptions || STATUS_OPTIONS;
     const currentPriorityOptions = propPriorityOptions || PRIORITY_OPTIONS;
     const currentCategoryOptions = propCategoryOptions || CATEGORY_OPTIONS;
 
     return (
-        <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-3 md:p-4">
+        <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-3 md:p-4 ml-0.5">
             <div className="max-w-7xl mx-auto">
                 <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 relative">
+                    <div className="flex-1 relative ml-3">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         <input
                             type="text"
@@ -78,15 +69,6 @@ export function SearchBar({
                     </div>
 
                     <div className="flex gap-2">
-                        {status && setStatus && (
-                            <FilterDropdown
-                                value={status}
-                                options={currentStatusOptions}
-                                onChange={setStatus}
-                                placeholder="Status"
-                                icon={<Filter className="w-4 h-4" />}
-                            />
-                        )}
                         {priority && setPriority && (
                             <FilterDropdown
                                 value={priority}

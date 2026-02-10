@@ -70,6 +70,15 @@ const PAYMENT_METHODS = [
 export function PricingSection() {
     const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+    const [upiId, setUpiId] = useState('');
+    const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+
+    const handlePayment = () => {
+        // TODO: Integrate with Razorpay/Stripe payment gateway.
+        // For now, show a coming-soon message.
+        setPaymentStatus('Payment integration coming soon. You are on the Free plan.');
+        setTimeout(() => setPaymentStatus(null), 4000);
+    };
 
     return (
         <div className="space-y-6">
@@ -155,20 +164,33 @@ export function PricingSection() {
 
                     {selectedMethod && (
                         <div className="mt-4 animate-in slide-in-from-bottom-2 duration-200">
+                            {paymentStatus && (
+                                <div className="mb-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-sm text-yellow-300 text-center">
+                                    {paymentStatus}
+                                </div>
+                            )}
                             {selectedMethod === 'upi' ? (
                                 <div className="flex items-center gap-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
                                     <input
                                         type="text"
                                         placeholder="Enter UPI ID (e.g., name@paytm)"
+                                        value={upiId}
+                                        onChange={(e) => setUpiId(e.target.value)}
                                         className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                                     />
-                                    <button className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center gap-2">
+                                    <button
+                                        onClick={handlePayment}
+                                        className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center gap-2"
+                                    >
                                         Pay {selectedPlan === 'Pro' ? '₹149' : '₹999'}
                                         <ArrowRight className="w-4 h-4" />
                                     </button>
                                 </div>
                             ) : (
-                                <button className="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2">
+                                <button
+                                    onClick={handlePayment}
+                                    className="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2"
+                                >
                                     Continue to {selectedMethod === 'netbanking' ? 'Net Banking' : 'Card Payment'}
                                     <ArrowRight className="w-4 h-4" />
                                 </button>

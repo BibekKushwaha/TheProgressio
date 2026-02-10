@@ -205,7 +205,7 @@ export async function whatIfGPA(
 
 export async function addCourseGrade(
     userId: string,
-    data: { courseName: string; credits: number; gradePoint?: number; grade?: string; semester: number }
+    data: { courseName: string; credits: number; gradePoint?: number; grade?: string; semester?: number }
 ) {
     return prisma.courseGrade.create({
         data: { userId, ...data },

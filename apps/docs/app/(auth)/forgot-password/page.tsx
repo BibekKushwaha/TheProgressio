@@ -6,23 +6,24 @@ import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
 import GlassCard from "../../../components/ui/glass-card";
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
+import { useForgotPasswordMutation } from "@repo/store";
 
-// Note: Forgot Password API not fully implemented in backend/auth.controller.ts yet (commented out),
-// but implementing frontend for completeness.
 const ForgotPasswordPage = () => {
     const [email, setEmail] = useState("");
     const [isSubmitted, setIsSubmitted] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
+        setError(null);
 
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            await forgotPassword({ email }).unwrap();
             setIsSubmitted(true);
-            setIsLoading(false);
-        }, 1500);
+        } catch (err: any) {
+            setError(err?.data?.message || "Something went wrong. Please try again.");
+        }
     };
 
     return (
@@ -56,6 +57,10 @@ const ForgotPasswordPage = () => {
                                 startIcon={<Mail className="h-4 w-4" />}
                                 required
                             />
+
+                            {error && (
+                                <p className="text-sm text-red-400 text-center">{error}</p>
+                            )}
 
                             <GradientButton
                                 type="submit"

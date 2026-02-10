@@ -1,10 +1,9 @@
 import { Router } from "express";
 import { getMonthlyEvents, getDailySchedule } from "../controllers/calendar.controller.js";
-import { isAuth } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.get("/month", isAuth, getMonthlyEvents);
-router.get("/day", isAuth, getDailySchedule);
+router.get("/month", getMonthlyEvents);
+router.get("/day", getDailySchedule);
 
 export default router;

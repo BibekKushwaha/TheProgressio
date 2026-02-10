@@ -1,16 +1,16 @@
 // app/schedule/page.tsx
 'use client';
-import { CalendarHeader } from '@/components/clander/ClanderHeader';
-import { MonthGrid } from '@/components/clander/MonthGrid';
-import { ScheduleDetailPanel } from '@/components/clander/SheduleDetailPannel';
-import { UpcomingTasksPanel } from '@/components/clander/UpcomingTasksPanel';
-import { DayGrid } from '@/components/clander/DayGrid';
+import { CalendarHeader } from '@/components/calendar/CalendarHeader';
+import { MonthGrid } from '@/components/calendar/MonthGrid';
+import { ScheduleDetailPanel } from '@/components/calendar/ScheduleDetailPanel';
+import { UpcomingTasksPanel } from '@/components/calendar/UpcomingTasksPanel';
+import { DayGrid } from '@/components/calendar/DayGrid';
 import { useState } from 'react';
 import { useResolveRotationQuery } from '@repo/store';
 import { RotateCcw, Calendar } from 'lucide-react';
 import Link from 'next/link';
 
-export default function ClandarPage() {
+export default function CalendarPage() {
     const [selectedView, setSelectedView] = useState('Month');
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showDailyDetail, setShowDailyDetail] = useState(false);
@@ -29,7 +29,12 @@ export default function ClandarPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 text-white p-6 md:p-8">
             <div className="max-w-[1600px] mx-auto">
-                <CalendarHeader selectedView={selectedView} setSelectedView={handleViewChange} />
+                <CalendarHeader
+                    selectedView={selectedView}
+                    setSelectedView={handleViewChange}
+                    currentDate={selectedDate}
+                    onDateChange={setSelectedDate}
+                />
 
                 {/* Rotation Indicator + Filter Toggle */}
                 {rotation && (

@@ -1,20 +1,39 @@
 // components/analytics/ActivityHeatmap.tsx
+import { useGetWeeklyTrendsQuery } from '@repo/store';
+import { useMemo } from 'react';
+
 export function ActivityHeatmap({ pastDays }: { pastDays: string }) {
     const weeks = 12;
     const daysPerWeek = 7;
 
-    const generateHeatmapData = () => {
+    const { data: trendsResponse } = useGetWeeklyTrendsQuery();
+    const trendsByDate = useMemo(() => {
+        const map = new Map<string, number>();
+        if (trendsResponse?.data) {
+            for (const entry of trendsResponse.data) {
+                map.set(entry.date, entry.minutes ?? 0);
+            }
+        }
+        return map;
+    }, [trendsResponse]);
+
+    const heatmapData = useMemo(() => {
         const data = [];
+        const now = new Date();
         for (let week = 0; week < weeks; week++) {
             for (let day = 0; day < daysPerWeek; day++) {
-                const intensity = Math.floor(Math.random() * 5);
+                const daysAgo = (weeks - 1 - week) * 7 + (6 - day);
+                const cellDate = new Date(now);
+                cellDate.setDate(now.getDate() - daysAgo);
+                const dateKey = cellDate.toISOString().split('T')[0]!;
+                const minutes = trendsByDate.get(dateKey) ?? 0;
+                // Map minutes to 0-4 intensity: 0=none, 1=<30m, 2=<60m, 3=<120m, 4=120m+
+                const intensity = minutes === 0 ? 0 : minutes < 30 ? 1 : minutes < 60 ? 2 : minutes < 120 ? 3 : 4;
                 data.push({ week, day, intensity });
             }
         }
         return data;
-    };
-
-    const heatmapData = generateHeatmapData();
+    }, [trendsByDate]);
 
     const getColor = (intensity: number) => {
         const colors = [

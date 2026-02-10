@@ -39,6 +39,8 @@ export {
   useLogoutMutation,
   useGetProfileQuery,
   useUpdateProfileMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
 } from './services/authApi';
 export type {
   RegisterRequest,

@@ -14,7 +14,6 @@ import { SearchBar } from '@/components/SearchBar';
 
 export default function TasksPage() {
     const [searchQuery, setSearchQuery] = useState('');
-    const [status, setStatus] = useState('all');
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [view, setView] = useState<'kanban' | 'list' | 'timetable'>('kanban');
@@ -22,9 +21,6 @@ export default function TasksPage() {
     const { data: allTasks, isLoading } = useGetTasksQuery();
     const tasks = allTasks || [];
 
-    const handleSidebarCategory = (id: string | undefined) => {
-        setSelectedCategory(id || 'all');
-    };
 
     if (isLoading) {
         return (
@@ -48,15 +44,13 @@ export default function TasksPage() {
             <div className="flex">
                 <div className="flex-1 flex flex-col">
                     <Navbar navLinks={['Overview', 'Calendar', 'Achievements']} buttonText="New Task" />
-                    <div className="px-4 md:px-8 pt-4">
+                    <div className="px-4 md:px-8 pt-4 flex gap-4">
                         <NLPCommandBar />
                         <SyllabusDigitizer />
                     </div>
                     <SearchBar
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
-                        status={status}
-                        setStatus={setStatus}
                         priority={priority}
                         setPriority={setPriority}
                         selectedCategory={selectedCategory}
@@ -65,16 +59,6 @@ export default function TasksPage() {
                         setView={setView}
                     />
                     <div className="flex flex-1">
-                        {/* Subject Cards Sidebar — visible on xl screens */}
-                        <aside className="hidden xl:block w-64 shrink-0 p-4 pl-8 pt-0">
-                            <div className="sticky top-6">
-                                <SubjectCardsSidebar
-                                    selectedCategoryId={selectedCategory === 'all' ? undefined : selectedCategory}
-                                    onSelectCategory={handleSidebarCategory}
-                                />
-                            </div>
-                        </aside>
-
                         <main className="flex-1 p-4 md:p-8 overflow-auto">
                             {view === 'kanban' ? (
                                 <KanbanBoard

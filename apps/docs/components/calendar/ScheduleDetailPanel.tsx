@@ -1,7 +1,7 @@
 "use client";
 import React from 'react';
 import { Sparkles, Calendar } from 'lucide-react';
-import { ScheduleItemCard } from './SheduelItemCard';
+import { ScheduleItemCard } from './ScheduleItemCard';
 import { AiSuggestedDialog } from './AiSuggestedDialog';
 import { useGetCalendarDailyScheduleQuery } from '@repo/store';
 

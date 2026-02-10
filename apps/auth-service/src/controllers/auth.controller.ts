@@ -87,7 +87,9 @@ export const loginUser = TryCatch(async (req, res) => {
   const result = loginSchema.safeParse(req.body);
 
   if (!result.success) {
+    console.error('[LOGIN] Validation error:', result.error.flatten());
     return res.status(400).json({
+      message: 'Invalid email or password format',
       errors: result.error.flatten(),
     });
   }
@@ -237,93 +239,72 @@ export const updateProfile = TryCatch(async (req, res) => {
   });
 });
 
-// export const forgotPassword = TryCatch(async (req, res, next) => {
-//   const { email } = req.body;
+// ── Forgot Password (JWT-based, no Redis/Kafka required) ──────────────
 
-//   if (!email) {
-//     throw new ErrorHandler(400, "email is required");
-//   }
+export const forgotPassword = TryCatch(async (req, res) => {
+  const { email } = req.body;
 
-//   const users =
-//     await sql`SELECT user_id, email FROM users WHERE email = ${email}`;
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ message: "Email is required" });
+  }
 
-//   if (users.length === 0) {
-//     return res.json({
-//       message: "If that email exists, we have sent a reset link",
-//     });
-//   }
-//   const user = users[0]!;
+  const user = await prisma.user.findUnique({ where: { email } });
 
-//   const resetToken = jwt.sign(
-//     {
-//       email: user.email,
-//       type: "reset",
-//     },
-//     process.env.JWT_SEC as string,
-//     { expiresIn: "15m" }
-//   );
+  // Always return success to prevent email enumeration
+  if (!user) {
+    return res.json({ message: "If that email exists, we have sent a reset link" });
+  }
 
-//   const resetLink = `${process.env.Frontend_Url}/reset/${resetToken}`;
+  const resetToken = jwt.sign(
+    { email: user.email, userId: user.id, type: "reset" },
+    process.env.JWT_SEC as string,
+    { expiresIn: "15m" }
+  );
 
-//   await redisClient.set(`forgot:${email}`, resetToken, {
-//     EX: 900,
-//   });
+  const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset/${resetToken}`;
 
-//   const message = {
-//     to: email,
-//     subject: "RESET Your Password - Job Portal",
-//     html: forgotPasswordTemplate(resetLink),
-//   };
+  // TODO: Integrate with email service (Kafka/SMTP) to send resetLink.
+  // For now, log it for development purposes.
+  console.log(`[DEV] Password reset link for ${email}: ${resetLink}`);
 
-//   publishToTopic("send-mail", message).catch((error) => {
-//     console.error("failed to send message", error);
-//   });
+  return res.json({ message: "If that email exists, we have sent a reset link" });
+});
 
-//   res.json({
-//     message: "If that email exists, we have sent a reset link",
-//   });
-// });
+export const resetPassword = TryCatch(async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
 
-// export const resetPassword = TryCatch(async (req, res, next) => {
-//   const { token } = req.params;
-//   const { password } = req.body;
+  if (!token) {
+    return res.status(400).json({ message: "Reset token is required" });
+  }
 
-//   let decoded: any;
-//   if(!token){
-//     throw new ErrorHandler(400, "Token has Expired");
-//   }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters" });
+  }
 
-//   try {
-//     decoded = jwt.verify(token, process.env.JWT_SEC as string);
-//   } catch (error) {
-//     throw new ErrorHandler(400, "Expired token");
-//   }
+  let decoded: any;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SEC as string);
+  } catch {
+    return res.status(400).json({ message: "Invalid or expired reset token" });
+  }
 
-//   if (decoded.type !== "reset") {
-//     throw new ErrorHandler(400, "Invalid token type");
-//   }
+  if (decoded.type !== "reset" || !decoded.email) {
+    return res.status(400).json({ message: "Invalid token type" });
+  }
 
-//   const email = decoded.email;
+  const user = await prisma.user.findUnique({ where: { email: decoded.email } });
 
-//   const stroredToken = await redisClient.get(`forgot:${email}`);
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
 
-//   if (!stroredToken || stroredToken !== token) {
-//     throw new ErrorHandler(400, "token has been expired");
-//   }
+  const hashPassword = await bcrypt.hash(password, 10);
 
-//   const users = await sql`SELECT user_id FROM users WHERE email = ${email}`;
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { password: hashPassword },
+  });
 
-//   if (users.length === 0) {
-//     throw new ErrorHandler(404, "User not found");
-//   }
-
-//   const user = users[0]!;
-
-//   const hashPassword = await bcrypt.hash(password, 10);
-
-//   await sql`UPDATE users SET password = ${hashPassword} WHERE user_id = ${user.user_id}`;
-
-//   await redisClient.del(`forgot:${email}`);
-
-//   res.json({ message: "Password changed successfully" });
-// });
+  return res.json({ message: "Password changed successfully" });
+});
