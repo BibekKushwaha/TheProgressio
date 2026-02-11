@@ -10,12 +10,9 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 // import { Field, FieldGroup } from "@/components/ui/field" // removing unused/complex for now
-import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { SessionLengthSelector } from "./SessionLengthSelector"
 import { Slider } from "../ui/slider"
-import { SmartConstraints } from "./SmartConstraints"
 
 
 import { useRouter } from 'next/navigation';

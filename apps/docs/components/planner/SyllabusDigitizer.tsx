@@ -20,6 +20,7 @@ export function SyllabusDigitizer() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [parseTask] = useParseTaskMutation();
     const [createTask] = useCreateTaskMutation();
+    type CreateTaskInput = Parameters<typeof createTask>[0];
 
     const handleParse = async () => {
         if (!textInput.trim()) return;
@@ -71,12 +72,13 @@ export function SyllabusDigitizer() {
         setIsCreating(true);
         try {
             for (const item of selected) {
-                await createTask({
+                const payload: CreateTaskInput = {
                     title: item.title,
                     dueDate: item.dueDate || null,
-                    priority: (item.priority as any) || 'MEDIUM',
+                    priority: item.priority || 'MEDIUM',
                     status: 'PENDING',
-                } as any).unwrap();
+                };
+                await createTask(payload).unwrap();
             }
             setParsedItems([]);
             setTextInput('');

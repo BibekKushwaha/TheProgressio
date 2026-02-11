@@ -1,7 +1,7 @@
 // components/create-task/SubjectSelector.tsx
 'use client';
 
-import { BookOpen, Clock, Code, Calculator, Globe, Plus, Check, Hash } from 'lucide-react';
+import { Plus, Check, Hash } from 'lucide-react';
 import { Category } from '@repo/store';
 
 interface SubjectSelectorProps {

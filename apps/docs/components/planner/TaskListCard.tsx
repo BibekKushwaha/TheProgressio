@@ -1,5 +1,5 @@
 
-import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Calendar, Edit } from 'lucide-react';
+import { Clock, MoreVertical, Trash2, CheckCircle, XCircle, Calendar, Edit } from 'lucide-react';
 import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation } from '@repo/store';
 import {
     DropdownMenu,
@@ -170,4 +170,3 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
     );
 }
 
-const TaskListCardImportFix = () => null;

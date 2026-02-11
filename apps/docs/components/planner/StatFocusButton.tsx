@@ -1,6 +1,6 @@
 'use client';
 
-import { Play, Focus, Target } from 'lucide-react';
+import { Play, Target } from 'lucide-react';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useGetTasksQuery, TaskStatus, Task } from '@repo/store';
@@ -40,7 +40,6 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
         ? "w-full focus:outline-none"
         : "fixed bottom-8 right-8 z-50 flex flex-col items-center gap-2 px-8 py-4 rounded-2xl font-semibold shadow-2xl transition-all duration-300 hover:-translate-y-1";
 
-    const activeColors = "bg-gradient-to-r from-red-600 to-orange-600 shadow-red-500/30 hover:shadow-red-500/50";
     const inactiveColors = "bg-gradient-to-r from-purple-600 to-pink-600 shadow-purple-500/50";
 
     const baseStyles = "w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg active:scale-95 hover:-translate-y-1";

@@ -8,8 +8,9 @@ import { useRouter, useParams } from 'next/navigation';
 export function SingleTaskHeader() {
     const router = useRouter();
     const { id } = useParams()
-    if (!id) return null
-    const { data: task } = useGetTaskByIdQuery(id as string)
+    const taskId = typeof id === 'string' ? id : undefined
+    const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId })
+    if (!taskId) return null
 
     return (
         <div>
@@ -43,7 +44,7 @@ export function SingleTaskHeader() {
                     </div>
                 </div>
                 <button
-                    onClick={() => router.push(`/createtask?id=${id}`)}
+                    onClick={() => router.push(`/createtask?id=${taskId}`)}
                     className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-all duration-300">
                     <Edit className="w-4 h-4" />
                     Edit Task

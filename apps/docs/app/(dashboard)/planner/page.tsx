@@ -14,6 +14,7 @@ import { SearchBar } from '@/components/SearchBar';
 
 export default function TasksPage() {
     const [searchQuery, setSearchQuery] = useState('');
+    const [status, setStatus] = useState('all');
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [view, setView] = useState<'kanban' | 'list' | 'timetable'>('kanban');
@@ -51,6 +52,8 @@ export default function TasksPage() {
                     <SearchBar
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
+                        status={status}
+                        setStatus={setStatus}
                         priority={priority}
                         setPriority={setPriority}
                         selectedCategory={selectedCategory}
@@ -59,6 +62,12 @@ export default function TasksPage() {
                         setView={setView}
                     />
                     <div className="flex flex-1">
+                        <aside className="hidden xl:block w-72 p-4 md:p-8 pr-0">
+                            <SubjectCardsSidebar
+                                selectedCategoryId={selectedCategory === 'all' ? undefined : selectedCategory}
+                                onSelectCategory={(id) => setSelectedCategory(id || 'all')}
+                            />
+                        </aside>
                         <main className="flex-1 p-4 md:p-8 overflow-auto">
                             {view === 'kanban' ? (
                                 <KanbanBoard

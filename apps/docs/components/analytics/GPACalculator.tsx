@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useGetGPAQuery, useAddCourseGradeMutation, CourseGrade } from '@repo/store';
+import { useGetGPAQuery, useAddCourseGradeMutation } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,9 @@ export function GPACalculator() {
         semester: '',
     });
 
+    type SemesterBreakdown = { semester: number; gpa?: number; credits?: number };
+    type CourseItem = { courseName: string; semester?: number; grade?: string; gradePoint?: number; credits?: number };
+
     const handleAddCourse = async () => {
         try {
             await addCourse({
@@ -36,7 +39,7 @@ export function GPACalculator() {
             toast('Course added successfully!', 'success');
             setIsAddOpen(false);
             setNewCourse({ courseName: '', credits: '', gradePoint: '', grade: '', semester: '' });
-        } catch (error) {
+        } catch {
             toast('Failed to add course', 'error');
         }
     };
@@ -51,6 +54,8 @@ export function GPACalculator() {
     }
 
     const gpaData = data?.result;
+    const semesterBreakdown = (gpaData?.semesterBreakdown ?? []) as SemesterBreakdown[];
+    const courses = (gpaData?.courses ?? []) as CourseItem[];
 
     return (
         <div className="space-y-6">
@@ -156,11 +161,11 @@ export function GPACalculator() {
             </Card>
 
             {/* Semester Breakdown */}
-            {gpaData && gpaData.semesterBreakdown && gpaData.semesterBreakdown.length > 0 && (
+            {gpaData && semesterBreakdown.length > 0 && (
                 <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">Semester Breakdown</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {gpaData.semesterBreakdown.map((sem: any) => (
+                        {semesterBreakdown.map((sem) => (
                             <div key={sem.semester} className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <div className="text-sm text-slate-400 mb-1">Semester {sem.semester}</div>
                                 <div className="text-2xl font-bold text-white">{(sem.gpa ?? 0).toFixed(2)}</div>
@@ -172,11 +177,11 @@ export function GPACalculator() {
             )}
 
             {/* Course List */}
-            {gpaData && gpaData.courses && gpaData.courses.length > 0 && (
+            {gpaData && courses.length > 0 && (
                 <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">All Courses</h3>
                     <div className="space-y-2">
-                        {gpaData.courses.map((course: any, idx: number) => (
+                        {courses.map((course, idx) => (
                             <div key={idx} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
                                 <div className="flex-1">
                                     <div className="font-semibold text-white">{course.courseName}</div>

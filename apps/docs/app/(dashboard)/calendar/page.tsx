@@ -7,7 +7,7 @@ import { UpcomingTasksPanel } from '@/components/calendar/UpcomingTasksPanel';
 import { DayGrid } from '@/components/calendar/DayGrid';
 import { useState } from 'react';
 import { useResolveRotationQuery } from '@repo/store';
-import { RotateCcw, Calendar } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CalendarPage() {

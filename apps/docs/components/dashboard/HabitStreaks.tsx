@@ -42,7 +42,6 @@ export function HabitStreaks() {
                         </motion.div>
                     ) : (
                         habitsList.slice(0, 5).map((habit, index) => {
-                            const isCompletedToday = habit.streakStatus === 'active';
                             const streak = habit.currentStreak;
 
                             return (
@@ -123,7 +122,7 @@ export function HabitStreaks() {
                 </motion.button>
             </Link>
 
-            <style jsx>{`
+            <style>{`
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 4px;
                 }

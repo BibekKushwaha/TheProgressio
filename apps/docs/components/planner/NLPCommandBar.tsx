@@ -7,7 +7,14 @@ import { useParseTaskMutation, useCreateTaskMutation, TaskStatus } from '@repo/s
 export function NLPCommandBar() {
     const [input, setInput] = useState('');
     const [isOpen, setIsOpen] = useState(false);
-    const [parsedResult, setParsedResult] = useState<any>(null);
+    type ParsedTask = {
+        title: string;
+        description?: string;
+        dueDate?: string;
+        priority?: string;
+        subject?: string;
+    };
+    const [parsedResult, setParsedResult] = useState<ParsedTask | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const [parseTask, { isLoading: isParsing }] = useParseTaskMutation();
     const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();

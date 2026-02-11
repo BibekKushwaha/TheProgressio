@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, ArrowRight } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 import GlassCard from "../../../components/ui/glass-card";
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
@@ -40,8 +40,12 @@ const LoginPage = () => {
                 // Assuming cookie is set by backend, just redirect
                 router.push("/dashboard");
             }
-        } catch (err: any) {
-            setError(err.data?.message || err.message || "Something went wrong");
+        } catch (err: unknown) {
+            const message =
+                typeof err === "object" && err !== null && "data" in err
+                    ? (err as { data?: { message?: string } }).data?.message
+                    : undefined;
+            setError(message || (err instanceof Error ? err.message : "Something went wrong"));
         } finally {
             setIsLoading(false);
         }
@@ -126,7 +130,7 @@ const LoginPage = () => {
                         </GradientButton>
 
                         <div className="text-center text-sm text-gray-500 mt-6">
-                            Don't have an account?{" "}
+                            Don&apos;t have an account?{" "}
                             <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium hover:underline">
                                 Sign up
                             </Link>

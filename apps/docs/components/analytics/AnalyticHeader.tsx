@@ -1,7 +1,6 @@
 // components/analytics/AnalyticsHeader.tsx
 "use client"
 import { Calendar, Download } from 'lucide-react';
-import { useState } from 'react';
 import { FilterDropdown } from '../planner/FilterDropdown';
 
 interface AnalyticsHeaderProps {

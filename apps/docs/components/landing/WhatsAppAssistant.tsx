@@ -2,7 +2,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { MessageCircle, Check } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 
 export function WhatsAppAssistant() {
   const messages = [

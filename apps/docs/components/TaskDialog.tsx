@@ -11,8 +11,8 @@ import {
 import { Field, FieldGroup } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState, useEffect } from "react"
-import { useAppDispatch, useCreateTaskMutation, useUpdateTaskMutation, useSmartCreateTaskMutation, useCreateCategoryMutation, useGetCategoriesQuery, PriorityEnum, addCategory, addTask, updateTask as updateTaskAction, type Priority, TaskStatus, type Task, type Status } from "@repo/store"
+import { useState } from "react"
+import { useAppDispatch, useCreateTaskMutation, useUpdateTaskMutation, useSmartCreateTaskMutation, useCreateCategoryMutation, useGetCategoriesQuery, PriorityEnum, addCategory, addTask, updateTask as updateTaskAction, type Priority, type Task, type Status } from "@repo/store"
 import { categorySchema, taskSchema } from "@repo/schemas"
 
 interface TaskDialogProps {
@@ -72,8 +72,12 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                         await onSubmit();
                         onClose();
                     }
-                } catch (err: any) {
-                    setErrors({ smart: err.data?.message || 'Failed to create smart task' });
+                } catch (err: unknown) {
+                    const message =
+                        typeof err === 'object' && err !== null && 'data' in err
+                            ? (err as { data?: { message?: string } }).data?.message
+                            : undefined;
+                    setErrors({ smart: message || 'Failed to create smart task' });
                 } finally {
                     setIsLoading(false);
                 }
@@ -95,7 +99,7 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                             dispatch(addCategory(catResp));
                             categoryId = catResp.id;
                         }
-                    } catch (err) {
+                    } catch {
                         setErrors(prev => ({ ...prev, category: 'Failed to create category' }));
                         setIsLoading(false);
                         return;
@@ -144,8 +148,12 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
 
             await onSubmit(); // Notify parent
             onClose();
-        } catch (error: any) {
-            setErrors(prev => ({ ...prev, form: error.data?.message || `Failed to ${isEdit ? 'update' : 'create'} task` }));
+        } catch (error: unknown) {
+            const message =
+                typeof error === 'object' && error !== null && 'data' in error
+                    ? (error as { data?: { message?: string } }).data?.message
+                    : undefined;
+            setErrors(prev => ({ ...prev, form: message || `Failed to ${isEdit ? 'update' : 'create'} task` }));
         } finally {
             setIsLoading(false);
         }
@@ -187,11 +195,11 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                         <div className="py-6 space-y-4">
                             <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
                                 <p className="text-xs text-purple-200">
-                                    <strong>Tip:</strong> Try "Physics exam next Friday at 2pm" or "Buy groceries tomorrow high priority"
+                                    <strong>Tip:</strong> Try &quot;Physics exam next Friday at 2pm&quot; or &quot;Buy groceries tomorrow high priority&quot;
                                 </p>
                             </div>
                             <Field>
-                                <Label htmlFor="smartInput">What's on your mind?</Label>
+                                <Label htmlFor="smartInput">What&apos;s on your mind?</Label>
                                 <textarea
                                     id="smartInput"
                                     value={smartInput}

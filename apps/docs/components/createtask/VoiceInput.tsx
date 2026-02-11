@@ -12,19 +12,36 @@ interface VoiceInputProps {
 
 export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
     const [isActive, setIsActive] = useState(false);
-    const [recognition, setRecognition] = useState<any>(null);
+    type SpeechRecognitionResultEvent = {
+        results: ArrayLike<ArrayLike<{ transcript: string }>>;
+    };
+    type SpeechRecognitionErrorEvent = { error: string };
+    type SpeechRecognitionLike = {
+        start: () => void;
+        stop: () => void;
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+        onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+        onend: (() => void) | null;
+    };
+
+    const [recognition, setRecognition] = useState<SpeechRecognitionLike | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            const SpeechRecognition =
+                (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ||
+                (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
             if (SpeechRecognition) {
                 const recognitionInstance = new SpeechRecognition();
                 recognitionInstance.continuous = false;
                 recognitionInstance.interimResults = false;
                 recognitionInstance.lang = 'en-US';
 
-                recognitionInstance.onresult = (event: any) => {
+                recognitionInstance.onresult = (event) => {
                     const transcript = event.results[0][0].transcript;
                     onResult(transcript);
                     toast('🎤 Voice captured!', 'success');
@@ -32,7 +49,7 @@ export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
                     setIsActive(false);
                 };
 
-                recognitionInstance.onerror = (event: any) => {
+                recognitionInstance.onerror = (event) => {
                     console.error('Speech recognition error', event.error);
                     setIsActive(false);
                 };
@@ -44,7 +61,7 @@ export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
                 setRecognition(recognitionInstance);
             }
         }
-    }, [onResult]);
+    }, [onResult, toast]);
 
     const toggleRecording = () => {
         if (!recognition) return;

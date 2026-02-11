@@ -3,7 +3,7 @@
 import { useGetTimeLeakageQuery, useGetPeakWindowQuery, useGetPredictivePerformanceQuery } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Clock, Zap, TrendingUp, AlertCircle, Sun, Moon } from 'lucide-react';
+import { Clock, TrendingUp, AlertCircle, Sun } from 'lucide-react';
 
 export function ProductivityInsights() {
     const { data: leakageData, isLoading: leakageLoading } = useGetTimeLeakageQuery(7);
@@ -21,9 +21,27 @@ export function ProductivityInsights() {
         );
     }
 
+    type EfficiencyHour = { hour: number; avgMinutes: number };
+    type PeakWindow = { startHour: number; endHour: number; label?: string };
+    type PeakData = {
+        peakWindow: PeakWindow;
+        efficiencyBoostPercent: number;
+        recommendation?: string;
+        efficiencyByHour?: EfficiencyHour[];
+    };
+    type PerformanceItem = {
+        subjectName: string;
+        recentScoreAvg: number;
+        historicalScoreAvg: number;
+        improvementRate: number;
+        pace: string;
+        estimatedExamScore: number;
+        estimatedPercentile: number;
+    };
+
     const leakage = leakageData?.report;
-    const peak = peakData?.data;
-    const performance = performanceData?.data;
+    const peak = peakData?.data as PeakData | undefined;
+    const performance = (performanceData?.data || []) as PerformanceItem[];
 
     return (
         <div className="space-y-6">
@@ -117,7 +135,7 @@ export function ProductivityInsights() {
                         <div className="mt-6">
                             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Hourly Efficiency</h3>
                             <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
-                                {peak.efficiencyByHour.map((hour: any) => {
+                                {peak.efficiencyByHour.map((hour) => {
                                     const isPeak = hour.hour >= peak.peakWindow.startHour && hour.hour < peak.peakWindow.endHour;
                                     return (
                                         <div
@@ -152,7 +170,7 @@ export function ProductivityInsights() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {performance.map((subject: any) => (
+                        {performance.map((subject) => (
                             <div key={subject.subjectName} className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <h3 className="font-semibold text-white mb-3">{subject.subjectName}</h3>
 

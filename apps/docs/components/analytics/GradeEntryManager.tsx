@@ -6,7 +6,7 @@ import {
     useGetGradeEntriesQuery,
 } from '@repo/store';
 import type { GradeEntry } from '@repo/store';
-import { Plus, Trash2, GraduationCap } from 'lucide-react';
+import { Plus, GraduationCap } from 'lucide-react';
 
 export function GradeEntryManager() {
     const [examType, setExamType] = useState('');
