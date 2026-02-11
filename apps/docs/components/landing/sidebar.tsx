@@ -43,7 +43,7 @@ const Sidebar = () => {
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-xl">
                             T
                         </div>
-                        <span className="text-xl font-bold text-white tracking-tight">Transition</span>
+                        <Link href="/" className="text-xl font-bold text-white tracking-tight">Transition</Link>
                     </div>
 
                     <nav className="flex-1 space-y-1">

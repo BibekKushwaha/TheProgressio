@@ -3,7 +3,6 @@ import { useAppSelector, selectIsAuthenticated, logout, useAppDispatch, useLogou
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Divider from './divider';
 
 export default function Navbar() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -84,7 +83,6 @@ export default function Navbar() {
                     >
                       Dashboard
                     </button>
-                    <Divider />
                     <button
                       onClick={() => {
                         router.push("/profile");
@@ -94,7 +92,6 @@ export default function Navbar() {
                     >
                       Profile
                     </button>
-                    <Divider />
                     <button
                       onClick={handleLogout}
                       className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 rounded-b-xl"
@@ -165,7 +162,6 @@ export default function Navbar() {
               >
                 Dashboard
               </button>
-              <Divider />
               <button
                 onClick={() => {
                   router.push("/profile");
@@ -175,7 +171,6 @@ export default function Navbar() {
               >
                 Profile
               </button>
-              <Divider />
 
               <button
                 onClick={handleLogout}

@@ -1,39 +1,35 @@
 "use client";
-import Navbar from '../components/landing/navbar'
-import React from 'react'
-import AnimatedGradientBackground from '../components/landing/animated-gradient-background';
-import GlassCardGrid from '../components/landing/glassgridcard';
-import { cards } from '../constant';
-import Footer from '../components/landing/footer';
+import { Navbar } from '@/components/landing/LandingNavbar';
+import { HeroSection } from '@/components/landing/HeroSection';
+import { ComparisonSection } from '@/components/landing/ComparisionSection';
+import { WhatsAppAssistant } from '@/components/landing/WhatsAppAssistant';
+import { InsightsSection } from '@/components/landing/InsightsSection';
+import { LanguageSection } from '@/components/landing/LanguageSection';
+import { BreakdownSection } from '@/components/landing/BreakdownSection';
+import { ProgressSection } from '@/components/landing/ProgressSection';
+import { Footer } from '@/components/landing/footer';
 
 const HomePage = () => {
-
   return (
-    <div>
+    <div className="min-h-screen bg-[#0a0a0f] text-white overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 text-white overflow-hidden relative">
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent pointer-events-none"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent pointer-events-none"></div>
+      
       <Navbar />
-      <div className="h-16" />
-      <AnimatedGradientBackground>
-        <div className="min-h-screen py-20">
-          <div className="text-center mb-10 md:mb-16 px-4">
-            <h1 className="text-2xl md:text-5xl font-extrabold text-gray-900 mb-4">
-              Welcome to{' '}
-              <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
-                transition
-              </span>
-            </h1>
-            <p className="text-base md:text-xl text-gray-700 max-w-2xl mx-auto">
-              Discover our powerful features designed to transform your workflow
-            </p>
-          </div>
-
-          <GlassCardGrid cards={cards} />
-        </div>
-      </AnimatedGradientBackground>
+        <main className="relative">
+      <HeroSection />
+      <ComparisonSection />
+      <WhatsAppAssistant />
+      <InsightsSection />
+      <LanguageSection />
+      <BreakdownSection />
+      <ProgressSection />
+        </main>
       <Footer />
-    </div >
+    </div>
+    </div>
   );
 }
-
-
 
 export default HomePage;

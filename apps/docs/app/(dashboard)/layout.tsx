@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import Sidebar from "../../components/landing/sidebar";
-import { selectIsAuthenticated, useAppSelector } from "@repo/store";
+import { selectIsAuthenticated, useAppSelector, useGetProfileQuery } from "@repo/store";
 import { useRouter } from "next/navigation";
 
 export default function DashboardLayout({
@@ -10,15 +10,18 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const router = useRouter();
-
+    const router = useRouter();
+    
+    // Fetch user profile on mount to restore auth state from JWT cookie
+    useGetProfileQuery();
     useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-    }
+
+        if (isAuthenticated === false) {
+            router.push('/login');
+        }
   }, [isAuthenticated, router]);
 
-  if (!isAuthenticated) return null;
+    if (isAuthenticated === undefined || isAuthenticated === null) return null;
 
     return (
         <div className="min-h-screen bg-slate-950 text-white selection:bg-indigo-500/30">
