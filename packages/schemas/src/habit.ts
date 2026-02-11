@@ -7,6 +7,11 @@ export const habitSchema = z.object({
   targetValue: z.number().int().positive().default(1),
   // Category linking to the Planner Service
   categoryId: z.string().uuid().optional(),
+  // Customization
+  icon: z.string().optional(),
+  color: z.string().optional(),
+  // Gentle Streak: how many skips before streak breaks
+  mercyDaysAllowed: z.number().int().min(0).default(1),
   // For notifications
   reminderTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:mm)").optional(),
 });
