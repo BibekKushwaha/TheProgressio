@@ -13,7 +13,7 @@ interface VoiceInputProps {
 export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
     const [isActive, setIsActive] = useState(false);
     type SpeechRecognitionResultEvent = {
-        results: ArrayLike<ArrayLike<{ transcript: string }>>;
+        results: ArrayLike<ArrayLike<{ transcript?: string }>>;
     };
     type SpeechRecognitionErrorEvent = { error: string };
     type SpeechRecognitionLike = {
@@ -42,7 +42,11 @@ export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
                 recognitionInstance.lang = 'en-US';
 
                 recognitionInstance.onresult = (event) => {
-                    const transcript = event.results[0][0].transcript;
+                    const transcript = event.results[0]?.[0]?.transcript?.trim();
+                    if (!transcript) {
+                        setIsActive(false);
+                        return;
+                    }
                     onResult(transcript);
                     toast('🎤 Voice captured!', 'success');
                     if (window.navigator?.vibrate) window.navigator.vibrate(200);

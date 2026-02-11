@@ -2,12 +2,12 @@
 
 import { useState, useRef } from 'react';
 import { Camera, Upload, FileText, Sparkles, Check, X, Loader2, Plus } from 'lucide-react';
-import { useParseTaskMutation, useCreateTaskMutation } from '@repo/store';
+import { useParseTaskMutation, useCreateTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
 
 interface ParsedItem {
     title: string;
     dueDate?: string;
-    priority?: string;
+    priority?: PriorityEnum;
     selected: boolean;
 }
 
@@ -74,9 +74,9 @@ export function SyllabusDigitizer() {
             for (const item of selected) {
                 const payload: CreateTaskInput = {
                     title: item.title,
-                    dueDate: item.dueDate || null,
-                    priority: item.priority || 'MEDIUM',
-                    status: 'PENDING',
+                    dueDate: item.dueDate,
+                    priority: item.priority ?? PriorityEnum.MEDIUM,
+                    status: TaskStatus.PENDING,
                 };
                 await createTask(payload).unwrap();
             }

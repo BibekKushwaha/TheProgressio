@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Sparkles, Loader2, ArrowRight, X } from 'lucide-react';
-import { useParseTaskMutation, useCreateTaskMutation, TaskStatus } from '@repo/store';
+import { useParseTaskMutation, useCreateTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
 
 export function NLPCommandBar() {
     const [input, setInput] = useState('');
@@ -11,7 +11,7 @@ export function NLPCommandBar() {
         title: string;
         description?: string;
         dueDate?: string;
-        priority?: string;
+        priority?: PriorityEnum;
         subject?: string;
     };
     const [parsedResult, setParsedResult] = useState<ParsedTask | null>(null);
@@ -41,7 +41,7 @@ export function NLPCommandBar() {
                 title: parsedResult.title,
                 description: parsedResult.description || '',
                 dueDate: parsedResult.dueDate,
-                priority: parsedResult.priority || 'MEDIUM',
+                priority: parsedResult.priority ?? PriorityEnum.MEDIUM,
                 status: TaskStatus.PENDING,
             }).unwrap();
             setParsedResult(null);
@@ -122,9 +122,8 @@ export function NLPCommandBar() {
                         {parsedResult.priority && (
                             <div>
                                 <span className="text-slate-500 text-xs">Priority:</span>
-                                <p className={`font-semibold ${parsedResult.priority === 'URGENT' ? 'text-red-400' :
-                                    parsedResult.priority === 'HIGH' ? 'text-orange-400' :
-                                        parsedResult.priority === 'MEDIUM' ? 'text-yellow-400' : 'text-green-400'
+                                <p className={`font-semibold ${parsedResult.priority === PriorityEnum.HIGH ? 'text-orange-400' :
+                                    parsedResult.priority === PriorityEnum.MEDIUM ? 'text-yellow-400' : 'text-green-400'
                                     }`}>{parsedResult.priority}</p>
                             </div>
                         )}

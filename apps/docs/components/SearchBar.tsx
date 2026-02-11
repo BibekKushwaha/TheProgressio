@@ -45,6 +45,8 @@ interface SearchBarProps {
 export function SearchBar({
     searchQuery,
     setSearchQuery,
+    status,
+    setStatus,
     priority,
     setPriority,
     selectedCategory,
