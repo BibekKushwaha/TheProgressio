@@ -76,7 +76,9 @@ export const getRotationPatternById = async (req: AuthenticatedRequest, res: Res
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { id } = req.params;
+        const rawId = req.params.id;
+        const id = Array.isArray(rawId) ? rawId[0] : rawId;
+        if (!id) return res.status(400).json({ message: "Invalid rotation pattern id" });
         const pattern = await prisma.rotationPattern.findUnique({ where: { id } });
 
         if (!pattern) return res.status(404).json({ message: "Rotation pattern not found" });
@@ -98,7 +100,9 @@ export const updateRotationPattern = async (req: AuthenticatedRequest, res: Resp
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { id } = req.params;
+        const rawId = req.params.id;
+        const id = Array.isArray(rawId) ? rawId[0] : rawId;
+        if (!id) return res.status(400).json({ message: "Invalid rotation pattern id" });
         const { name, pattern, startDate, cycleLengthDays, isActive } = req.body;
 
         const existing = await prisma.rotationPattern.findUnique({ where: { id } });
@@ -135,7 +139,9 @@ export const deleteRotationPattern = async (req: AuthenticatedRequest, res: Resp
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { id } = req.params;
+        const rawId = req.params.id;
+        const id = Array.isArray(rawId) ? rawId[0] : rawId;
+        if (!id) return res.status(400).json({ message: "Invalid rotation pattern id" });
 
         const existing = await prisma.rotationPattern.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ message: "Rotation pattern not found" });

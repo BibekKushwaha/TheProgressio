@@ -209,7 +209,8 @@ export async function detectSlipPatterns(userId: string): Promise<{ atRisk: bool
     // Count completions by day of week
     const dayCount = new Array(7).fill(0) as number[];
     for (const log of logs) {
-        dayCount[log.loggedAt.getDay()]++;
+        const dayIndex = log.loggedAt.getDay();
+        dayCount[dayIndex] = (dayCount[dayIndex] ?? 0) + 1;
     }
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -255,14 +256,14 @@ export async function getUserNudges(userId: string, unreadOnly: boolean = false)
     });
 }
 
-export async function markNudgeRead(nudgeId: string, userId: string) {
+export async function markNudgeRead(nudgeId: string, userId: string): Promise<{ count: number }> {
     return prisma.nudge.updateMany({
         where: { id: nudgeId, userId },
         data: { isRead: true },
     });
 }
 
-export async function markAllNudgesRead(userId: string) {
+export async function markAllNudgesRead(userId: string): Promise<{ count: number }> {
     return prisma.nudge.updateMany({
         where: { userId, isRead: false },
         data: { isRead: true },
