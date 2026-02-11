@@ -284,7 +284,7 @@ export const resetPassword = TryCatch(async (req, res) => {
 
   let decoded: any;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SEC as string);
+    decoded = jwt.verify(token as string, process.env.JWT_SEC as string);
   } catch {
     return res.status(400).json({ message: "Invalid or expired reset token" });
   }
