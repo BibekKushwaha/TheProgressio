@@ -4,7 +4,6 @@ import React, { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGetAchievementsQuery } from '@repo/store';
 import AchievementDetailModal from '../../../../components/modals/achievement-detail-modal';
-import { Loader2 } from 'lucide-react';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -50,7 +49,7 @@ const AchievementDetailPage = ({ params }: PageProps) => {
                 <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl max-w-md">
                     <h1 className="text-2xl font-bold text-red-400 mb-2">Achievement Not Found</h1>
                     <p className="text-slate-400 mb-6">
-                        We couldn't find the achievement you're looking for. It might have been removed or the ID is incorrect.
+                        We couldn&apos;t find the achievement you&apos;re looking for. It might have been removed or the ID is incorrect.
                     </p>
                     <button
                         onClick={() => router.push('/achievement')}

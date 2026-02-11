@@ -1,9 +1,8 @@
 // components/dashboard/Navbar.tsx
 "use client";
-import { useAppSelector } from '@repo/store';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, Calendar, Trophy, Settings, User as UserIcon, LogOut, Search, Plus, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Calendar, Trophy, Plus, Sparkles, type LucideIcon } from 'lucide-react';
 import { SyncStatusIndicator } from '@/components/ui/SyncStatusIndicator';
 import { NotificationBell } from '@/components/NotificationBell';
 
@@ -23,7 +22,7 @@ const linkMapping: Record<string, string> = {
     'Planner': '/planner'
 };
 
-const linkIcons: Record<string, any> = {
+const linkIcons: Record<string, LucideIcon> = {
     'Dashboard': LayoutDashboard,
     'Overview': Sparkles,
     'Calendar': Calendar,
@@ -33,7 +32,6 @@ const linkIcons: Record<string, any> = {
 };
 
 export function Navbar({ navLinks, buttonText, onClick }: NavbarProps) {
-    const user = useAppSelector((state) => state.auth.user);
     const router = useRouter();
     const pathname = usePathname();
 

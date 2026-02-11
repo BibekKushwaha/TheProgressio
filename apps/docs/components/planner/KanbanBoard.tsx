@@ -1,5 +1,5 @@
 // components/tasks/KanbanBoard.tsx
-import { useGetTasksQuery, TaskStatus, Task } from "@repo/store";
+import { TaskStatus, Task } from "@repo/store";
 import { BoardColumn } from "./BoardColumn";
 import { filterTasks } from "@/lib/filterTasks";
 
@@ -19,7 +19,7 @@ export function KanbanBoard({ searchQuery, status, priority, category, tasks }: 
     const inProgressTasks = tasks.filter(t => t.status === TaskStatus.IN_PROGRESS);
     const completedTasks = tasks.filter(t => t.status === TaskStatus.COMPLETED);
 
-    const filters = { searchQuery, priority, category };
+    const filters = { searchQuery, priority, category, status };
     const filteredTodo = filterTasks(todoTasks, filters);
     const filteredInProgress = filterTasks(inProgressTasks, filters);
     const filteredCompleted = filterTasks(completedTasks, filters);

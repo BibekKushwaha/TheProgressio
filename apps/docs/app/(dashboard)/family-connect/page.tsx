@@ -5,15 +5,44 @@ import { Eye, Shield, Heart, TrendingUp, CheckCircle, Flame, Clock, AlertTriangl
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function FamilyConnectPage() {
+    type Task = {
+        id: string;
+        title: string;
+        status: string;
+        dueDate?: string | null;
+        priority?: string | null;
+        category?: { name: string } | null;
+    };
+
+    type Habit = {
+        id: string;
+        name: string;
+        icon?: string | null;
+        currentStreak?: number | null;
+    };
+
+    type Summary = {
+        totalFocusMinutes?: number;
+        tasksCompleted?: number;
+        avgFocusMinutes?: number;
+        consistencyScore?: number;
+    };
+
     const { data: profileData } = useGetProfileQuery();
     const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery();
     const { data: habitsData, isLoading: habitsLoading } = useGetHabitsQuery();
     const { data: summaryData, isLoading: summaryLoading } = useGetDailySummaryQuery('7');
 
     const user = profileData?.user;
-    const tasks = allTasks || [];
-    const habits = (habitsData as any)?.habits || [];
-    const summary = (summaryData as any)?.summary;
+    const tasks = ((allTasks || []) as Task[]).filter(Boolean);
+    const habits =
+        typeof habitsData === 'object' && habitsData !== null && 'habits' in habitsData
+            ? ((habitsData as { habits?: Habit[] }).habits || [])
+            : [];
+    const summary =
+        typeof summaryData === 'object' && summaryData !== null && 'summary' in summaryData
+            ? (summaryData as { summary?: Summary }).summary
+            : undefined;
 
     const completedTasks = tasks.filter(t => t.status === 'COMPLETED').length;
     const totalTasks = tasks.length;
@@ -28,7 +57,6 @@ export default function FamilyConnectPage() {
         return due >= now && due <= threeDaysLater;
     });
     const workloadIntensity = upcomingTasks.length >= 5 ? 'High' : upcomingTasks.length >= 3 ? 'Medium' : 'Low';
-    const workloadColor = workloadIntensity === 'High' ? 'text-red-400 bg-red-500/20' : workloadIntensity === 'Medium' ? 'text-yellow-400 bg-yellow-500/20' : 'text-green-400 bg-green-500/20';
 
     const isLoading = tasksLoading || habitsLoading || summaryLoading;
 
@@ -156,7 +184,7 @@ export default function FamilyConnectPage() {
                         <p className="text-slate-500 text-center py-8">No habits tracked yet.</p>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {habits.map((habit: any) => (
+                            {habits.map((habit) => (
                                 <div key={habit.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
                                     <div className="text-2xl">{habit.icon || '📌'}</div>
                                     <div className="flex-1 min-w-0">

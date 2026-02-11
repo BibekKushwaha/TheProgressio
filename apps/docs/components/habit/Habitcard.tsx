@@ -1,10 +1,11 @@
-import { Flame, Trophy, Sparkles } from 'lucide-react';
+import { Flame, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Habit, useLogHabitMutation } from '@repo/store';
 import { HabitActionMenu } from './HabitActionMenu';
 import { useToast } from '@/components/ui/toast-provider';
 
 export function HabitCard({ habit }: { habit: Habit }) {
+        const hasNewTrophy = Boolean((habit as { newTrophy?: boolean }).newTrophy);
     // Determine the color theme. If the habit has an RTK-saved color (gradient), use it.
     // Otherwise fallback to a default purple gradient.
     const colorTheme = habit.color || "from-purple-600 to-pink-600";
@@ -33,7 +34,7 @@ export function HabitCard({ habit }: { habit: Habit }) {
             )} />
 
             <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
-                {(habit as any).newTrophy && (
+                {hasNewTrophy && (
                     <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                         <Trophy className="w-3 h-3" />
                         <span>New Trophy</span>

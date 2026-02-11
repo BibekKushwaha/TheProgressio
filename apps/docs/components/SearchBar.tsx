@@ -19,16 +19,22 @@ const CATEGORY_OPTIONS = [
     { label: "Coding", value: "coding", color: "#F97316" },
 ] as const;
 
+const STATUS_OPTIONS = [
+    { label: "Status", value: "all" },
+    { label: "Pending", value: TaskStatus.PENDING },
+    { label: "Completed", value: TaskStatus.COMPLETED },
+] as const;
+
 
 interface SearchBarProps {
     searchQuery: string;
     setSearchQuery: (query: string) => void;
     status?: string;
-    setStatus?: (status: any) => void;
+    setStatus?: (status: string) => void;
     priority?: string;
-    setPriority?: (priority: any) => void;
+    setPriority?: (priority: string) => void;
     selectedCategory?: string;
-    setSelectedCategory?: (category: any) => void;
+    setSelectedCategory?: (category: string) => void;
     view?: 'kanban' | 'list' | 'timetable';
     setView?: (view: 'kanban' | 'list' | 'timetable') => void;
     STATUS_OPTIONS?: readonly { label: string; value: string }[];
@@ -39,6 +45,8 @@ interface SearchBarProps {
 export function SearchBar({
     searchQuery,
     setSearchQuery,
+    status,
+    setStatus,
     priority,
     setPriority,
     selectedCategory,
@@ -52,6 +60,7 @@ export function SearchBar({
 
     const currentPriorityOptions = propPriorityOptions || PRIORITY_OPTIONS;
     const currentCategoryOptions = propCategoryOptions || CATEGORY_OPTIONS;
+    const currentStatusOptions = propStatusOptions || STATUS_OPTIONS;
 
     return (
         <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-3 md:p-4 ml-0.5">
@@ -69,6 +78,15 @@ export function SearchBar({
                     </div>
 
                     <div className="flex gap-2">
+                        {status && setStatus && (
+                            <FilterDropdown
+                                value={status}
+                                options={currentStatusOptions}
+                                onChange={setStatus}
+                                placeholder="Status"
+                                icon={<Filter className="w-4 h-4" />}
+                            />
+                        )}
                         {priority && setPriority && (
                             <FilterDropdown
                                 value={priority}

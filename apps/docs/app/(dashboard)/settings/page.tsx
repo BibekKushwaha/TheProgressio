@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { User, Bell, Lock, Palette, Globe, Loader2, Moon, Wifi, MessageSquare, Smartphone, CreditCard, Clock, QrCode, Languages } from "lucide-react";
+import { User, Bell, Lock, Palette, Loader2, Moon, Wifi, MessageSquare, Smartphone, CreditCard, Clock, QrCode, Languages } from "lucide-react";
 import { useGetProfileQuery, useUpdateProfileMutation } from "@repo/store";
 import { QuietHoursPanel } from "@/components/settings/QuietHoursPanel";
 import { PricingSection } from "@/components/settings/PricingSection";

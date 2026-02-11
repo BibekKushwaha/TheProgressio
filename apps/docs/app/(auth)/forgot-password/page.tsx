@@ -21,8 +21,12 @@ const ForgotPasswordPage = () => {
         try {
             await forgotPassword({ email }).unwrap();
             setIsSubmitted(true);
-        } catch (err: any) {
-            setError(err?.data?.message || "Something went wrong. Please try again.");
+        } catch (err: unknown) {
+            const message =
+                typeof err === "object" && err !== null && "data" in err
+                    ? (err as { data?: { message?: string } }).data?.message
+                    : undefined;
+            setError(message || "Something went wrong. Please try again.");
         }
     };
 
@@ -43,7 +47,7 @@ const ForgotPasswordPage = () => {
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">Forgot Password?</h2>
                             <p className="text-gray-400 text-sm">
-                                Enter your email address and we'll send you a link to reset your password.
+                                Enter your email address and we&apos;ll send you a link to reset your password.
                             </p>
                         </div>
 
@@ -85,7 +89,7 @@ const ForgotPasswordPage = () => {
                         </div>
                         <h2 className="text-2xl font-bold text-white mb-2">Check your inbox</h2>
                         <p className="text-gray-400 mb-8">
-                            We've sent a password reset link to <span className="text-white font-medium">{email}</span>. Please check your email.
+                            We&apos;ve sent a password reset link to <span className="text-white font-medium">{email}</span>. Please check your email.
                         </p>
                         <Link href="/login">
                             <GradientButton variant="outline" fullWidth>

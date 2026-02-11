@@ -1,11 +1,11 @@
 // app/focus-session/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { ActiveFocusTimer } from '@/components/focus session/ActiveFocusTimer';
 import { SessionComplete } from '@/components/focus session/SessionComplete';
 
-export default function FocusSessionPage() {
+function FocusSessionContent() {
     const [isComplete, setIsComplete] = useState(false);
 
     return (
@@ -18,5 +18,13 @@ export default function FocusSessionPage() {
                 <SessionComplete />
             )}
         </div>
+    );
+}
+
+export default function FocusSessionPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+            <FocusSessionContent />
+        </Suspense>
     );
 }

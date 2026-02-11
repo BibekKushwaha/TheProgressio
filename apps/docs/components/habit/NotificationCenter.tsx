@@ -5,7 +5,7 @@ import { useGetNudgesQuery, useMarkNudgeAsReadMutation, Nudge } from '@repo/stor
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, CheckCircle, AlertCircle, Info, TrendingUp, X } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, Info, TrendingUp } from 'lucide-react';
 
 export function NotificationCenter() {
     const { data, isLoading } = useGetNudgesQuery();

@@ -164,7 +164,7 @@ export default function ReportsPage() {
                             <TrendingUp className="w-4 h-4" />
                             Good Work!
                         </div>
-                        <p className="text-sm text-slate-300">You've logged {stats.totalHours} hours of focused work this week. Keep maintaining your momentum!</p>
+                        <p className="text-sm text-slate-300">You&apos;ve logged {stats.totalHours} hours of focused work this week. Keep maintaining your momentum!</p>
                     </div>
                     {stats.tasksCompleted > 0 && (
                         <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
@@ -172,7 +172,7 @@ export default function ReportsPage() {
                                 <Target className="w-4 h-4" />
                                 Peak Productivity
                             </div>
-                            <p className="text-sm text-slate-300">You've completed {stats.tasksCompleted} tasks successfully. Great job on finishing your goals!</p>
+                            <p className="text-sm text-slate-300">You&apos;ve completed {stats.tasksCompleted} tasks successfully. Great job on finishing your goals!</p>
                         </div>
                     )}
                     {stats.streak > 0 && (
@@ -181,7 +181,7 @@ export default function ReportsPage() {
                                 <Award className="w-4 h-4" />
                                 Consistency is Key
                             </div>
-                            <p className="text-sm text-slate-300">You've maintained a {stats.streak}-day streak. Consistency is the secret to success!</p>
+                            <p className="text-sm text-slate-300">You&apos;ve maintained a {stats.streak}-day streak. Consistency is the secret to success!</p>
                         </div>
                     )}
                 </div>

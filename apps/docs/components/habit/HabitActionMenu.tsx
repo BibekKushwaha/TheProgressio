@@ -13,7 +13,6 @@ import {
 import { Habit, useDeleteHabitMutation, useResetHabitMutation } from "@repo/store"
 import HabitDialog from "./HabitDialog"
 import { HabitStatsModal } from "./HabitStatsModal";
-import { useAppDispatch } from "@repo/store";
 
 interface HabitActionMenuProps {
     habit: Habit
@@ -22,7 +21,6 @@ interface HabitActionMenuProps {
 export function HabitActionMenu({ habit }: HabitActionMenuProps) {
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isStatsOpen, setIsStatsOpen] = useState(false)
-    const dispatch = useAppDispatch();
 
     const [deleteHabit] = useDeleteHabitMutation()
     const [resetHabit] = useResetHabitMutation()

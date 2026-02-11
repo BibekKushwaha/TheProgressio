@@ -37,7 +37,7 @@ export default function HabitsPage() {
                                     <h1 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                                         Habit Gallery
                                     </h1>
-                                    <p className="text-slate-400">Keep up the streak! You're doing great.</p>
+                                    <p className="text-slate-400">Keep up the streak! You&apos;re doing great.</p>
                                 </div>
                                 <button
                                     className="mt-4 md:mt-0 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:-translate-y-0.5"

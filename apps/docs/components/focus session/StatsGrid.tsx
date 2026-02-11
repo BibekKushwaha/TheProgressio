@@ -54,7 +54,6 @@ export function StatsGrid({ taskTitle }: StatsGridProps = {}) {
         },
     ];
 
-export function StatsGrid() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {stats.map((stat) => (
@@ -65,9 +64,9 @@ export function StatsGrid() {
                     <div className="flex items-start justify-between mb-4">
                         <div className="text-sm text-slate-400">{stat.title}</div>
                         <stat.icon className={`w-5 h-5 ${stat.color === 'yellow' ? 'text-yellow-400' :
-                                stat.color === 'green' ? 'text-green-400' :
-                                    stat.color === 'orange' ? 'text-orange-400' :
-                                        'text-blue-400'
+                            stat.color === 'green' ? 'text-green-400' :
+                                stat.color === 'orange' ? 'text-orange-400' :
+                                    'text-blue-400'
                             }`} />
                     </div>
 

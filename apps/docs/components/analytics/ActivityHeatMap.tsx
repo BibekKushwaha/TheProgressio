@@ -3,7 +3,8 @@ import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { useMemo } from 'react';
 
 export function ActivityHeatmap({ pastDays }: { pastDays: string }) {
-    const weeks = 12;
+    const parsedDays = Number.parseInt(pastDays, 10);
+    const weeks = Number.isFinite(parsedDays) && parsedDays > 0 ? Math.ceil(parsedDays / 7) : 12;
     const daysPerWeek = 7;
 
     const { data: trendsResponse } = useGetWeeklyTrendsQuery();
@@ -33,7 +34,7 @@ export function ActivityHeatmap({ pastDays }: { pastDays: string }) {
             }
         }
         return data;
-    }, [trendsByDate]);
+    }, [daysPerWeek, trendsByDate, weeks]);
 
     const getColor = (intensity: number) => {
         const colors = [

@@ -134,7 +134,11 @@ export class AIService {
         const effortMatch = text.match(effortRegex);
         let effort: string | undefined;
         if (effortMatch) {
-            effort = `${effortMatch[1]}${effortMatch[2].startsWith('h') ? 'h' : 'm'}`;
+            const amount = effortMatch[1];
+            const unit = effortMatch[2]?.toLowerCase();
+            if (amount) {
+                effort = `${amount}${unit?.startsWith("h") ? "h" : "m"}`;
+            }
         }
 
         // Date & Time Detection
@@ -161,15 +165,17 @@ export class AIService {
             if (dayMatch) {
                 const modifier = dayMatch[1]; // "this" or "next"
                 const dayName = dayMatch[2];
-                const dayIndex = days.indexOf(dayName);
-                const currentDayIndex = now.getDay();
+                if (dayName) {
+                    const dayIndex = days.indexOf(dayName);
+                    const currentDayIndex = now.getDay();
 
-                let daysToAdd = (dayIndex - currentDayIndex + 7) % 7;
-                if (daysToAdd === 0 && !modifier) daysToAdd = 7; // If today is Monday and user says "Monday", assume next Monday unless specified
-                if (modifier === 'next') daysToAdd += 7;
+                    let daysToAdd = (dayIndex - currentDayIndex + 7) % 7;
+                    if (daysToAdd === 0 && !modifier) daysToAdd = 7; // If today is Monday and user says "Monday", assume next Monday unless specified
+                    if (modifier === 'next') daysToAdd += 7;
 
-                dueDate = new Date(now);
-                dueDate.setDate(now.getDate() + daysToAdd);
+                    dueDate = new Date(now);
+                    dueDate.setDate(now.getDate() + daysToAdd);
+                }
             }
         }
 
@@ -178,14 +184,19 @@ export class AIService {
         const timeMatch = lowerText.match(timeRegex);
 
         if (dueDate && timeMatch) {
-            let hours = parseInt(timeMatch[1]);
-            const minutes = parseInt(timeMatch[2] || "0");
-            const meridiem = timeMatch[3];
+            const hourMatch = timeMatch[1];
+            if (!hourMatch) {
+                dueDate.setHours(23, 59, 0, 0);
+            } else {
+                let hours = parseInt(hourMatch, 10);
+                const minutes = parseInt(timeMatch[2] || "0");
+                const meridiem = timeMatch[3];
 
-            if (meridiem === 'pm' && hours < 12) hours += 12;
-            if (meridiem === 'am' && hours === 12) hours = 0;
+                if (meridiem === 'pm' && hours < 12) hours += 12;
+                if (meridiem === 'am' && hours === 12) hours = 0;
 
-            dueDate.setHours(hours, minutes, 0, 0);
+                dueDate.setHours(hours, minutes, 0, 0);
+            }
         } else if (dueDate) {
             // Default to end of day if no time specified
             dueDate.setHours(23, 59, 0, 0);

@@ -55,7 +55,7 @@ export function RotationManager() {
             toast('Rotation pattern created successfully!', 'success');
             setIsCreateOpen(false);
             resetForm();
-        } catch (error) {
+        } catch {
             toast('Failed to create rotation pattern', 'error');
         }
     };
@@ -76,7 +76,7 @@ export function RotationManager() {
             toast('Rotation pattern updated successfully!', 'success');
             setIsEditOpen(false);
             resetForm();
-        } catch (error) {
+        } catch {
             toast('Failed to update rotation pattern', 'error');
         }
     };
@@ -87,7 +87,7 @@ export function RotationManager() {
         try {
             await deletePattern(id).unwrap();
             toast('Rotation pattern deleted successfully!', 'success');
-        } catch (error) {
+        } catch {
             toast('Failed to delete rotation pattern', 'error');
         }
     };
@@ -100,7 +100,7 @@ export function RotationManager() {
             }).unwrap();
 
             toast(`Rotation pattern ${!pattern.isActive ? 'activated' : 'deactivated'}!`, 'success');
-        } catch (error) {
+        } catch {
             toast('Failed to update rotation pattern', 'error');
         }
     };
@@ -190,7 +190,7 @@ export function RotationManager() {
                     <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <div className="text-sm text-slate-400 mb-1">Today's Rotation</div>
+                                <div className="text-sm text-slate-400 mb-1">Today&apos;s Rotation</div>
                                 <div className="text-3xl font-bold text-cyan-400">{todayRotation.rotation}</div>
                                 {todayRotation.pattern && (
                                     <div className="text-xs text-slate-500 mt-1">{todayRotation.pattern.name}</div>

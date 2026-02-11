@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [],
   "author": "",

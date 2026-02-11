@@ -7,7 +7,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 export function PredictiveScoreCard() {
     const { data, isLoading } = useGetPredictivePerformanceQuery('');
 
-    const subjects = data?.data || [];
+    type SubjectPrediction = {
+        subjectName?: string;
+        subject?: string;
+        predictedScore?: number;
+        avgScore?: number;
+        trend?: string;
+        entryCount?: number;
+    };
+
+    const subjects = (data?.data || []) as SubjectPrediction[];
 
     if (isLoading) {
         return (
@@ -45,7 +54,7 @@ export function PredictiveScoreCard() {
             </div>
 
             <div className="space-y-3">
-                {subjects.map((subject: any) => {
+                {subjects.map((subject) => {
                     const predicted = subject.predictedScore ?? subject.avgScore ?? 0;
                     const trend = subject.trend || 'stable';
                     const TrendIcon = trend === 'improving' ? TrendingUp : trend === 'declining' ? TrendingDown : Minus;

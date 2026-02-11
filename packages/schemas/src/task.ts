@@ -7,6 +7,8 @@ export const taskSchema = z.object({
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
   dueDate: z.coerce.date().optional(),
   categoryId: z.string().uuid().optional(),
+  subjectId: z.string().uuid().optional(),
+  isRecurring: z.boolean().default(false),
 });
 
 export type TaskInput = z.infer<typeof taskSchema>;

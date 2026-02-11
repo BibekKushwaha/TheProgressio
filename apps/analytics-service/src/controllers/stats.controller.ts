@@ -567,9 +567,9 @@ export const getPrediction = async (req: AuthenticatedRequest, res: Response): P
 
         const { categoryId, subject, taskId } = req.query;
         const prediction = await predictTaskDuration(userId, {
-            categoryId: categoryId as string | undefined,
-            subjectId: subject as string | undefined,
-            taskTitle: taskId as string | undefined,
+            ...(categoryId ? { categoryId: categoryId as string } : {}),
+            ...(subject ? { subjectId: subject as string } : {}),
+            ...(taskId ? { taskTitle: taskId as string } : {}),
         });
 
         res.status(200).json({ message: "Prediction generated", prediction });
@@ -587,8 +587,8 @@ export const getCycleTime = async (req: AuthenticatedRequest, res: Response): Pr
 
         const { categoryId, subject } = req.query;
         const data = await getCycleTimePercentiles(userId, {
-            categoryId: categoryId as string | undefined,
-            subjectId: subject as string | undefined,
+            ...(categoryId ? { categoryId: categoryId as string } : {}),
+            ...(subject ? { subjectId: subject as string } : {}),
         });
 
         res.status(200).json({ message: "Cycle time percentiles", data });
@@ -611,7 +611,7 @@ export const getSWOTAnalysis = async (req: AuthenticatedRequest, res: Response):
         const { examType } = req.params;
         if (!examType) { res.status(400).json({ message: "examType is required" }); return; }
 
-        const swot = await generateSWOT(userId, examType);
+        const swot = await generateSWOT(userId, examType as string);
         res.status(200).json({ message: "SWOT analysis generated", swot });
     } catch (error) {
         console.error("Error generating SWOT:", error);
@@ -628,7 +628,7 @@ export const getSubjectStats = async (req: AuthenticatedRequest, res: Response):
         const { name } = req.params;
         if (!name) { res.status(400).json({ message: "Subject name is required" }); return; }
 
-        const data = await getSubjectPerformance(userId, decodeURIComponent(name));
+        const data = await getSubjectPerformance(userId, decodeURIComponent(name as string));
         res.status(200).json({ message: "Subject performance fetched", data });
     } catch (error) {
         console.error("Error fetching subject stats:", error);
@@ -647,7 +647,7 @@ export const getGPA = async (req: AuthenticatedRequest, res: Response): Promise<
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const scale = (req.query.scale as string) || "INDIA_10";
-        const result = await calculateCGPA(userId, scale);
+        const result = await calculateCGPA(userId, scale as "INDIA_10" | "US_4" | "PERCENTAGE");
         res.status(200).json({ message: "CGPA calculated", result });
     } catch (error) {
         console.error("Error calculating GPA:", error);
@@ -688,7 +688,11 @@ export const addCourse = async (req: AuthenticatedRequest, res: Response): Promi
         }
 
         const course = await addCourseGrade(userId, {
-            courseName, credits: parseFloat(credits), gradePoint: parseFloat(gradePoint), grade, semester: semester ? parseInt(semester) : undefined,
+            courseName,
+            credits: parseFloat(credits),
+            gradePoint: parseFloat(gradePoint),
+            grade,
+            ...(semester ? { semester: parseInt(semester) } : {}),
         });
         res.status(201).json({ message: "Course added", course });
     } catch (error) {
@@ -704,7 +708,7 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response): Pr
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const { id } = req.params;
-        const course = await updateCourseGrade(id!, userId, req.body);
+        const course = await updateCourseGrade((id as string)!, userId, req.body);
         res.status(200).json({ message: "Course updated", course });
     } catch (error) {
         console.error("Error updating course:", error);
@@ -719,7 +723,7 @@ export const deleteCourse = async (req: AuthenticatedRequest, res: Response): Pr
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const { id } = req.params;
-        await deleteCourseGrade(id!, userId);
+        await deleteCourseGrade((id as string)!, userId);
         res.status(200).json({ message: "Course deleted" });
     } catch (error) {
         console.error("Error deleting course:", error);
@@ -785,7 +789,7 @@ export const deleteGradeEntry = async (req: AuthenticatedRequest, res: Response)
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const { id } = req.params;
-        await prisma.gradeEntry.deleteMany({ where: { id: id!, userId } });
+        await prisma.gradeEntry.deleteMany({ where: { id: (id as string)!, userId } });
         res.status(200).json({ message: "Grade entry deleted" });
     } catch (error) {
         console.error("Error deleting grade entry:", error);
@@ -836,7 +840,7 @@ export const getPredictivePerformanceEndpoint = async (req: AuthenticatedRequest
         const { examType } = req.params;
         if (!examType) { res.status(400).json({ message: "examType is required" }); return; }
 
-        const data = await getPredictivePerformance(userId, examType);
+        const data = await getPredictivePerformance(userId, examType as string);
         res.status(200).json({ message: "Predictive performance", data });
     } catch (error) {
         console.error("Error fetching predictive performance:", error);

@@ -1,37 +1,5 @@
 // components/analytics/StatCards.tsx
 import { Clock, CheckCircle, Target, TrendingUp } from 'lucide-react';
-
-const stats = [
-    {
-        label: 'Total Focus Time',
-        value: '12h 30m',
-        trend: '+12%',
-        icon: Clock,
-        gradient: 'from-cyan-500 to-blue-500',
-    },
-    {
-        label: 'Sessions Completed',
-        value: '15',
-        trend: '+2',
-        icon: CheckCircle,
-        gradient: 'from-purple-500 to-pink-500',
-    },
-    {
-        label: 'Focus Score',
-        value: '88 / 100',
-        trend: '+5pts',
-        icon: Target,
-        gradient: 'from-green-500 to-emerald-500',
-    },
-    {
-        label: 'Most Productive Day',
-        value: 'Tuesday',
-        trend: 'Consistent',
-        icon: TrendingUp,
-        gradient: 'from-orange-500 to-red-500',
-    },
-];
-
 import { useGetDailySummaryQuery, useGetFocusScoreQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 

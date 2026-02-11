@@ -16,6 +16,21 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./auth": "./src/auth.ts"
+    "./auth": "./src/auth.ts",
+    "./task": "./src/task.ts",
+    "./habit": "./src/habit.ts",
+    "./activity": "./src/activity.ts",
+    "./category": "./src/category.ts",
+    "./subject": "./src/subject.ts",
+    "./exam": "./src/exam.ts",
+    "./studyGoal": "./src/studyGoal.ts",
+    "./timetable": "./src/timetable.ts",
+    "./rotationPattern": "./src/rotationPattern.ts",
+    "./nudge": "./src/nudge.ts",
+    "./courseGrade": "./src/courseGrade.ts",
+    "./gradeEntry": "./src/gradeEntry.ts",
+    "./subtask": "./src/subtask.ts",
+    "./attachment": "./src/attachment.ts",
+    "./reminder": "./src/reminder.ts"
   }
 }

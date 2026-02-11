@@ -85,8 +85,12 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                 }).unwrap()
             }
             onClose()
-        } catch (err: any) {
-            setErrors({ form: err.data?.message || `Failed to ${habit ? 'update' : 'create'} habit` })
+        } catch (err: unknown) {
+            const message =
+                typeof err === 'object' && err !== null && 'data' in err
+                    ? (err as { data?: { message?: string } }).data?.message
+                    : undefined
+            setErrors({ form: message || `Failed to ${habit ? 'update' : 'create'} habit` })
         }
     }
 

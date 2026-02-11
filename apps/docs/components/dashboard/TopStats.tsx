@@ -1,7 +1,7 @@
 "use client";
 
 // components/dashboard/TopStats.tsx
-import { Target, TrendingUp, Flame } from 'lucide-react';
+import { Target, Flame } from 'lucide-react';
 import { useGetDailySummaryQuery, useGetFocusScoreQuery, useGetUserStreakQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 

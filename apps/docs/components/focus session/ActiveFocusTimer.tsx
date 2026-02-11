@@ -128,7 +128,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
 
             <div className="absolute bottom-8 text-center">
                 <p className="text-slate-400 italic">
-                    "Focus is a superpower. You are doing great."
+                    &quot;Focus is a superpower. You are doing great.&quot;
                 </p>
             </div>
         </div>

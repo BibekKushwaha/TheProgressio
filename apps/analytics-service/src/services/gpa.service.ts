@@ -6,7 +6,7 @@
  * 2. "What-If" simulation: what grades do I need to hit target CGPA?
  * 3. Custom weighted grading scales (10-point, 4-point, percentage)
  */
-import { prisma } from "@repo/db";
+import { prisma, type CourseGrade, type Prisma } from "@repo/db";
 
 // ── Grading Scales ─────────────────────────────────────────────────────
 
@@ -206,7 +206,7 @@ export async function whatIfGPA(
 export async function addCourseGrade(
     userId: string,
     data: { courseName: string; credits: number; gradePoint?: number; grade?: string; semester?: number }
-) {
+): Promise<CourseGrade> {
     return prisma.courseGrade.create({
         data: { userId, ...data },
     });
@@ -216,14 +216,14 @@ export async function updateCourseGrade(
     id: string,
     userId: string,
     data: Partial<{ courseName: string; credits: number; gradePoint: number; grade: string; semester: number }>
-) {
+): Promise<Prisma.BatchPayload> {
     return prisma.courseGrade.updateMany({
         where: { id, userId },
         data,
     });
 }
 
-export async function deleteCourseGrade(id: string, userId: string) {
+export async function deleteCourseGrade(id: string, userId: string): Promise<Prisma.BatchPayload> {
     return prisma.courseGrade.deleteMany({
         where: { id, userId },
     });

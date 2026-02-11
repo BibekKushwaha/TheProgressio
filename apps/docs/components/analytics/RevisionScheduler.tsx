@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CalendarDays, BookOpen, Clock, Target, Plus, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
+import { CalendarDays, Clock, Target, CheckCircle, Sparkles } from 'lucide-react';
 
 type ExamType = 'JEE' | 'NEET' | 'UPSC' | 'CUSTOM';
 type ProblemType = 'DPP' | 'PYQ' | 'REVISION';

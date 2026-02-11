@@ -37,7 +37,7 @@ export function TimetableView() {
                 <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                         <Calendar className="w-6 h-6 text-purple-400" />
-                        Today's Schedule
+                        Today&apos;s Schedule
                     </h2>
                     <p className="text-slate-400 mt-1">
                         {new Date(schedule.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
