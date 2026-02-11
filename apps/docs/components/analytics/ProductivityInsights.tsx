@@ -8,7 +8,7 @@ import { Clock, Zap, TrendingUp, AlertCircle, Sun, Moon } from 'lucide-react';
 export function ProductivityInsights() {
     const { data: leakageData, isLoading: leakageLoading } = useGetTimeLeakageQuery(7);
     const { data: peakData, isLoading: peakLoading } = useGetPeakWindowQuery();
-    const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery('');
+    const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery('midterm');
 
     const isLoading = leakageLoading || peakLoading || performanceLoading;
 

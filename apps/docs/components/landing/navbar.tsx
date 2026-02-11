@@ -19,6 +19,9 @@ export default function Navbar() {
     } catch (error) {
       console.error('Logout failed:', error);
     }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth:hasSession');
+    }
     dispatch(logout());
     setIsOpen(false);
     router.replace('/login');

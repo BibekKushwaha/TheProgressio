@@ -15,7 +15,7 @@ const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 export class AIService {
     private model = genAI ? genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-3-flash-preview",
         safetySettings: [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -26,7 +26,7 @@ export class AIService {
 
     // Using flash-8b as fallback or same flash model as it has better limits/availability than pro-1.0
     private fallbackModel = genAI ? genAI.getGenerativeModel({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-3-flash-preview",
         safetySettings: [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -134,7 +134,7 @@ export class AIService {
         const effortMatch = text.match(effortRegex);
         let effort: string | undefined;
         if (effortMatch) {
-            effort = `${effortMatch[1]}${effortMatch[2].startsWith('h') ? 'h' : 'm'}`;
+            effort = `${effortMatch[1]}${effortMatch[2]?.startsWith('h') ? 'h' : 'm'}`;
         }
 
         // Date & Time Detection
@@ -161,7 +161,7 @@ export class AIService {
             if (dayMatch) {
                 const modifier = dayMatch[1]; // "this" or "next"
                 const dayName = dayMatch[2];
-                const dayIndex = days.indexOf(dayName);
+                const dayIndex = days.indexOf(dayName!);
                 const currentDayIndex = now.getDay();
 
                 let daysToAdd = (dayIndex - currentDayIndex + 7) % 7;
@@ -178,7 +178,7 @@ export class AIService {
         const timeMatch = lowerText.match(timeRegex);
 
         if (dueDate && timeMatch) {
-            let hours = parseInt(timeMatch[1]);
+            let hours = parseInt(timeMatch[1]!);
             const minutes = parseInt(timeMatch[2] || "0");
             const meridiem = timeMatch[3];
 

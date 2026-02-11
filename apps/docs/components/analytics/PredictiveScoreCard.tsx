@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Minus, Trophy, Target } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function PredictiveScoreCard() {
-    const { data, isLoading } = useGetPredictivePerformanceQuery('');
+    const { data, isLoading } = useGetPredictivePerformanceQuery('midterm');
 
     const subjects = data?.data || [];
 

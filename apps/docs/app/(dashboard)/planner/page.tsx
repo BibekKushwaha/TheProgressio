@@ -17,9 +17,25 @@ export default function TasksPage() {
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [view, setView] = useState<'kanban' | 'list' | 'timetable'>('kanban');
+    const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
 
     const { data: allTasks, isLoading } = useGetTasksQuery();
     const tasks = allTasks || [];
+
+    const getTodayDateString = () => {
+        const now = new Date();
+        const offsetMs = now.getTimezoneOffset() * 60 * 1000;
+        return new Date(now.getTime() - offsetMs).toISOString().split('T')[0];
+    };
+
+    const handleViewChange = (nextView: 'kanban' | 'list' | 'timetable') => {
+        setView(nextView);
+        if (nextView === 'timetable') {
+            setDateFilter(getTodayDateString());
+        } else {
+            setDateFilter(undefined);
+        }
+    };
 
 
     if (isLoading) {
@@ -44,7 +60,7 @@ export default function TasksPage() {
             <div className="flex">
                 <div className="flex-1 flex flex-col">
                     <Navbar navLinks={['Overview', 'Calendar', 'Achievements']} buttonText="New Task" />
-                    <div className="px-4 md:px-8 pt-4 flex gap-4">
+                    <div className="px-4 md:px-8 pt-4">
                         <NLPCommandBar />
                         <SyllabusDigitizer />
                     </div>
@@ -56,7 +72,7 @@ export default function TasksPage() {
                         selectedCategory={selectedCategory}
                         setSelectedCategory={setSelectedCategory}
                         view={view}
-                        setView={setView}
+                        setView={handleViewChange}
                     />
                     <div className="flex flex-1">
                         <main className="flex-1 p-4 md:p-8 overflow-auto">
@@ -77,7 +93,7 @@ export default function TasksPage() {
                                     tasks={tasks}
                                 />
                             ) : (
-                                <TimetableView />
+                                <TimetableView tasks={tasks} date={dateFilter} />
                             )}
                         </main>
                     </div>

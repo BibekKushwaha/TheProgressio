@@ -79,6 +79,7 @@ export function NLPCommandBar() {
                     className="flex-1 bg-transparent text-white placeholder-slate-500 text-sm focus:outline-none"
                     autoFocus
                 />
+               
                 {isParsing ? (
                     <Loader2 className="w-5 h-5 text-indigo-400 animate-spin shrink-0" />
                 ) : (
@@ -96,7 +97,7 @@ export function NLPCommandBar() {
                     </div>
                 )}
             </div>
-
+            
             {/* Parsed Result Preview */}
             {parsedResult && (
                 <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3 space-y-2">

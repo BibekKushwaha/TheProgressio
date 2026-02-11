@@ -3,14 +3,13 @@
 import { useRef, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { makeStore, AppStore } from './store';
-import { useGetProfileQuery, useLogoutMutation } from './services/authApi';
+import { useGetProfileQuery } from './services/authApi';
 import { useAppDispatch } from './hooks';
 import { hydrateAuth, logout } from './slices/authSlice';
 
 function AuthHydrator() {
   const dispatch = useAppDispatch();
   const [shouldFetch, setShouldFetch] = useState(false);
-  const [logoutApi] = useLogoutMutation();
   const { data, isSuccess, error } = useGetProfileQuery(undefined, {
     skip: !shouldFetch,
   });
@@ -23,6 +22,9 @@ function AuthHydrator() {
 
   useEffect(() => {
     if (isSuccess && data?.user) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth:hasSession', '1');
+      }
       dispatch(hydrateAuth({ user: data.user }));
     }
   }, [isSuccess, data, dispatch]);
@@ -35,9 +37,9 @@ function AuthHydrator() {
         localStorage.removeItem('auth:hasSession');
       }
       dispatch(logout());
-      logoutApi();
+      setShouldFetch(false);
     }
-  }, [error, dispatch, logoutApi]);
+  }, [error, dispatch]);
 
   return null;
 }

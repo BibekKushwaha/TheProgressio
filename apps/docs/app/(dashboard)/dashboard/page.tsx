@@ -13,7 +13,7 @@ import { LiveActivityWidget } from '../../../components/dashboard/LiveActivityWi
 export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white">
-            <Navbar navLinks={['Dashboard', 'Courses', 'Calendar', 'Reports']} />
+            <Navbar navLinks={['Dashboard']} />
             <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
                 <WelcomeHeader />
                 <LiveActivityWidget />

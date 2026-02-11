@@ -112,7 +112,7 @@ export function HabitStreaks() {
                 </AnimatePresence>
             </div>
 
-            <Link href="/dashboard/habits" className="mt-6">
+            <Link href="/habits" className="mt-6">
                 <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}

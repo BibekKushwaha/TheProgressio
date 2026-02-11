@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ExamWarRoomPage() {
     const [activeTab, setActiveTab] = useState('swot');
-    const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('');
+    const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('Mathematics');
     const { data: gradeData } = useGetGradeEntriesQuery();
 
     const grades = gradeData?.entries || [];
