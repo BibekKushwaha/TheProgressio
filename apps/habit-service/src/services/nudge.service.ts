@@ -256,22 +256,14 @@ export async function getUserNudges(userId: string, unreadOnly: boolean = false)
     });
 }
 
-<<<<<<< HEAD
 export async function markNudgeRead(nudgeId: string, userId: string): Promise<Prisma.BatchPayload> {
-=======
-export async function markNudgeRead(nudgeId: string, userId: string): Promise<{ count: number }> {
->>>>>>> origin/main
     return prisma.nudge.updateMany({
         where: { id: nudgeId, userId },
         data: { isRead: true },
     });
 }
 
-<<<<<<< HEAD
 export async function markAllNudgesRead(userId: string): Promise<Prisma.BatchPayload> {
-=======
-export async function markAllNudgesRead(userId: string): Promise<{ count: number }> {
->>>>>>> origin/main
     return prisma.nudge.updateMany({
         where: { userId, isRead: false },
         data: { isRead: true },

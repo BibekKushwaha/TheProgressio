@@ -39,15 +39,8 @@
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
-<<<<<<< HEAD
     "skipLibCheck": true,
   },
   "include": ["src/**/*.ts"],
   "exclude": ["tests", "dist", "vitest.config.ts"]
-=======
-    "skipLibCheck": true
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["dist", "node_modules", "tests", "vitest.config.ts"]
->>>>>>> origin/main
 }
