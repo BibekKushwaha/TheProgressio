@@ -39,7 +39,7 @@ export function HeroSection() {
           transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
           className="text-xl text-slate-300 mb-10"
         >
-          India's most advanced AI Academic Advisor for high-stakes exams like
+          India&apos;s most advanced AI Academic Advisor for high-stakes exams like
           <br />
           <span className="text-purple-400 font-semibold">JEE, NEET, and UPSC.</span>
         </motion.p>

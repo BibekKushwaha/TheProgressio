@@ -11,7 +11,6 @@ export function ProgressCard() {
 
     // Default to 0 if totalBadges is 0 to avoid NaN
     const progress = totalBadges > 0 ? (unlockedCount / totalBadges) * 100 : 0;
-    const remainingToNext = 5; // This could be more dynamic
     const nextLevel = Math.floor(unlockedCount / 5) + 1;
 
     if (isLoading) {

@@ -2,7 +2,6 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
-import { useState } from 'react';
 
 const views = ['Day', 'Month'];
 
@@ -29,11 +28,6 @@ export function CalendarHeader({ selectedView, setSelectedView, currentDate, onD
     const handleToday = () => {
         onDateChange(new Date());
     };
-
-    const monthYear = currentDate.toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric'
-    });
 
     return (
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">

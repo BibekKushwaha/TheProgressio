@@ -1,7 +1,6 @@
 // components/schedule/MonthGrid.tsx
 'use client';
 
-import { useState } from 'react';
 import { DayCell } from './Daycell';
 import { useGetMonthlyEventsQuery } from '@repo/store';
 

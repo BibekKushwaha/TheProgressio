@@ -43,7 +43,7 @@ export function Footer() {
               <span className="text-xl font-bold">Aura</span>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
-              India's most advanced AI Academic Advisor for high-stakes exams. 
+              India&apos;s most advanced AI Academic Advisor for high-stakes exams. 
               Helping 1 Lakh+ students conquer the impossible.
             </p>
           </div>

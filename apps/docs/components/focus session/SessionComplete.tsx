@@ -1,5 +1,5 @@
 // components/focus-session/SessionComplete.tsx
-import { Timer, Star, CheckCircle2, Flame, Award, ArrowRight } from 'lucide-react';
+import { Timer, ArrowRight } from 'lucide-react';
 import { StatsGrid } from './StatsGrid';
 import { RewardCard } from './RewardCard';
 import { useSearchParams } from 'next/navigation';

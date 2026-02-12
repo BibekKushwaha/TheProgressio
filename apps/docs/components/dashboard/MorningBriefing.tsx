@@ -113,7 +113,7 @@ export function MorningBriefing() {
             {briefing.upcomingExams?.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-white/10">
                     <p className="text-xs text-slate-500 uppercase tracking-wider mb-1.5">Upcoming Exams</p>
-                    {briefing.upcomingExams.slice(0, 3).map((exam: any, i: number) => (
+                    {briefing.upcomingExams.slice(0, 3).map((exam: { title: string; daysUntil: number }, i: number) => (
                         <Link key={i} href="/exam-warroom" className="flex justify-between text-xs text-slate-400 py-0.5 hover:text-slate-300 transition-colors">
                             <span>{exam.title}</span>
                             <span className={exam.daysUntil <= 3 ? 'text-red-400 font-bold' : ''}>

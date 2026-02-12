@@ -30,7 +30,7 @@ export function HabitStreaks() {
                 </span>
             </div>
 
-            <div className="space-y-6 flex-1 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="space-y-6 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(168,85,247,0.3)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-purple-500/20 hover:[&::-webkit-scrollbar-thumb]:bg-purple-500/40">
                 <AnimatePresence mode="popLayout">
                     {habitsList.length === 0 ? (
                         <motion.div
@@ -42,7 +42,6 @@ export function HabitStreaks() {
                         </motion.div>
                     ) : (
                         habitsList.slice(0, 5).map((habit, index) => {
-                            const isCompletedToday = habit.streakStatus === 'active';
                             const streak = habit.currentStreak;
 
                             return (
@@ -123,21 +122,6 @@ export function HabitStreaks() {
                 </motion.button>
             </Link>
 
-            <style jsx>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 4px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: rgba(168, 85, 247, 0.1);
-                    border-radius: 10px;
-                }
-                .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-                    background: rgba(168, 85, 247, 0.3);
-                }
-            `}</style>
         </div>
     );
 }

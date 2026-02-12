@@ -19,7 +19,6 @@ export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
   const userlog = useAppSelector(selectIsAuthenticated);
   const dispatch = useAppDispatch();
-  console.log(user);
   
   const [logoutApi] = useLogoutMutation();
   const navLinks = ['Features', 'How it Works', 'Pricing'];
@@ -29,7 +28,9 @@ export function Navbar() {
   const handleLogout = async () => {
     try {
       await logoutApi().unwrap();
-    } catch { }
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth:hasSession');
     }

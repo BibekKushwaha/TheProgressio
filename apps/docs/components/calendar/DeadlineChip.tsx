@@ -1,5 +1,4 @@
 // components/calendar/DeadlineChip.tsx
-import { Check } from 'lucide-react';
 
 interface DeadlineChipProps {
     label: string;

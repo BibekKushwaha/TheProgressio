@@ -19,7 +19,7 @@ export function WelcomeHeader() {
                     Welcome back, {user?.username} 👋
                 </h1>
                 <p className="text-slate-400">
-                    Let's make today productive. It's {new Date().toLocaleDateString('en-US', {
+                    Let&apos;s make today productive. It&apos;s {new Date().toLocaleDateString('en-US', {
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',

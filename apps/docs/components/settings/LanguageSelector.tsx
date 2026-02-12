@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Globe, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 interface Language {
     code: string;

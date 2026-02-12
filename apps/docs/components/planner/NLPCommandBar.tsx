@@ -2,12 +2,32 @@
 
 import { useState, useRef } from 'react';
 import { Sparkles, Loader2, ArrowRight, X } from 'lucide-react';
-import { useParseTaskMutation, useCreateTaskMutation, TaskStatus } from '@repo/store';
+import { useParseTaskMutation, useCreateTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
+
+interface ParsedTaskResult {
+    title: string;
+    description?: string;
+    dueDate?: string;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    subject?: string;
+}
+
+function toPriority(value?: ParsedTaskResult["priority"]): PriorityEnum {
+    switch (value) {
+        case 'LOW':
+            return PriorityEnum.LOW;
+        case 'HIGH':
+        case 'URGENT':
+            return PriorityEnum.HIGH;
+        default:
+            return PriorityEnum.MEDIUM;
+    }
+}
 
 export function NLPCommandBar() {
     const [input, setInput] = useState('');
     const [isOpen, setIsOpen] = useState(false);
-    const [parsedResult, setParsedResult] = useState<any>(null);
+    const [parsedResult, setParsedResult] = useState<ParsedTaskResult | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const [parseTask, { isLoading: isParsing }] = useParseTaskMutation();
     const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
@@ -34,7 +54,7 @@ export function NLPCommandBar() {
                 title: parsedResult.title,
                 description: parsedResult.description || '',
                 dueDate: parsedResult.dueDate,
-                priority: parsedResult.priority || 'MEDIUM',
+                priority: toPriority(parsedResult.priority),
                 status: TaskStatus.PENDING,
             }).unwrap();
             setParsedResult(null);

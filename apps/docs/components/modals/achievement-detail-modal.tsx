@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { X, Share2, Award, LucideIcon, Target, Zap, Flame, Star, Trophy, Rocket } from "lucide-react";
 
 const iconMap: Record<string, LucideIcon> = {

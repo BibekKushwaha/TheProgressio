@@ -1,5 +1,5 @@
 // components/tasks/KanbanBoard.tsx
-import { useGetTasksQuery, TaskStatus, Task } from "@repo/store";
+import { TaskStatus, Task } from "@repo/store";
 import { BoardColumn } from "./BoardColumn";
 import { filterTasks } from "@/lib/filterTasks";
 
@@ -12,6 +12,7 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ searchQuery, status, priority, category, tasks }: KanbanBoardProps) {
+    void status;
 
     // Filter by status for columns
     // Note: API returns TaskStatus enum (PENDING, IN_PROGRESS, COMPLETED)

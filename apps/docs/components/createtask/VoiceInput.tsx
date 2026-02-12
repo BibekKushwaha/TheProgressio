@@ -10,29 +10,68 @@ interface VoiceInputProps {
     isCompact?: boolean;
 }
 
+interface SpeechRecognitionResultLike {
+    [index: number]: {
+        transcript: string;
+    };
+}
+
+interface SpeechRecognitionEventLike {
+    results: {
+        [index: number]: SpeechRecognitionResultLike;
+    };
+}
+
+interface SpeechRecognitionErrorEventLike {
+    error: string;
+}
+
+interface SpeechRecognitionInstance {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+    onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+    onend: (() => void) | null;
+    start: () => void;
+    stop: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+interface WindowWithSpeechRecognition extends Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+}
+
 export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
     const [isActive, setIsActive] = useState(false);
-    const [recognition, setRecognition] = useState<any>(null);
+    const [recognition, setRecognition] = useState<SpeechRecognitionInstance | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            const speechWindow = window as WindowWithSpeechRecognition;
+            const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
             if (SpeechRecognition) {
                 const recognitionInstance = new SpeechRecognition();
                 recognitionInstance.continuous = false;
                 recognitionInstance.interimResults = false;
                 recognitionInstance.lang = 'en-US';
 
-                recognitionInstance.onresult = (event: any) => {
-                    const transcript = event.results[0][0].transcript;
+                recognitionInstance.onresult = (event: SpeechRecognitionEventLike) => {
+                    const transcript = event.results[0]?.[0]?.transcript;
+                    if (!transcript) {
+                        setIsActive(false);
+                        return;
+                    }
                     onResult(transcript);
                     toast('🎤 Voice captured!', 'success');
                     if (window.navigator?.vibrate) window.navigator.vibrate(200);
                     setIsActive(false);
                 };
 
-                recognitionInstance.onerror = (event: any) => {
+                recognitionInstance.onerror = (event: SpeechRecognitionErrorEventLike) => {
                     console.error('Speech recognition error', event.error);
                     setIsActive(false);
                 };
@@ -44,7 +83,7 @@ export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
                 setRecognition(recognitionInstance);
             }
         }
-    }, [onResult]);
+    }, [onResult, toast]);
 
     const toggleRecording = () => {
         if (!recognition) return;

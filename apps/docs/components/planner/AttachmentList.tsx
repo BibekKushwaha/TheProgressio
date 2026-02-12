@@ -1,6 +1,6 @@
 'use client';
 
-import { Paperclip, Download, Trash2, ExternalLink } from 'lucide-react';
+import { Paperclip, Trash2, ExternalLink } from 'lucide-react';
 import { Attachment, useDeleteAttachmentMutation } from '@repo/store';
 import { useState } from 'react';
 
