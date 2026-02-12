@@ -1,18 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGetSWOTAnalysisQuery } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Target, TrendingUp, AlertTriangle, Lightbulb, Search } from 'lucide-react';
 
-export function SWOTAnalysis() {
-    const [examType, setExamType] = useState('midterm');
+interface SWOTAnalysisProps {
+    examType?: string;
+    allowExamTypeChange?: boolean;
+}
+
+const EXAM_TYPE_OPTIONS = ['JEE', 'NEET', 'UPSC', 'midterm', 'final', 'quiz'] as const;
+
+export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange = true }: SWOTAnalysisProps) {
+    const [examType, setExamType] = useState(controlledExamType || 'midterm');
     const [searchQuery, setSearchQuery] = useState('');
-    const { data, isLoading } = useGetSWOTAnalysisQuery(examType);
+
+    useEffect(() => {
+        if (controlledExamType) {
+            setExamType(controlledExamType);
+        }
+    }, [controlledExamType]);
+
+    const activeExamType = controlledExamType || examType;
+    const { data, isLoading } = useGetSWOTAnalysisQuery(activeExamType);
 
     const swotData = data?.swot;
+    const filteredSubjects =
+        swotData?.subjects.filter(subject =>
+            subject.subject.toLowerCase().includes(searchQuery.toLowerCase())
+        ) || [];
 
     if (isLoading) {
         return (
@@ -22,10 +41,6 @@ export function SWOTAnalysis() {
             </Card>
         );
     }
-
-    const filteredSubjects = swotData?.subjects.filter(subject =>
-        subject.subject.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || [];
 
     return (
         <div className="space-y-6">
@@ -48,15 +63,19 @@ export function SWOTAnalysis() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="bg-white/5 border-white/10 w-64"
                         />
-                        <select
-                            value={examType}
-                            onChange={(e) => setExamType(e.target.value)}
-                            className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
-                        >
-                            <option value="midterm">Midterm</option>
-                            <option value="final">Final</option>
-                            <option value="quiz">Quiz</option>
-                        </select>
+                        {allowExamTypeChange && !controlledExamType && (
+                            <select
+                                value={examType}
+                                onChange={(e) => setExamType(e.target.value)}
+                                className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                            >
+                                {EXAM_TYPE_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                 </div>
 

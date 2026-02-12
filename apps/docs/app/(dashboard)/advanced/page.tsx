@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import type { ComponentType } from 'react';
+import { useMemo, useState } from 'react';
 import { GPACalculator } from '@/components/analytics/GPACalculator';
 import { SWOTAnalysis } from '@/components/analytics/SWOTAnalysis';
 import { ProductivityInsights } from '@/components/analytics/ProductivityInsights';
@@ -8,107 +9,135 @@ import { NotificationCenter } from '@/components/habit/NotificationCenter';
 import { RotationManager } from '@/components/planner/RotationManager';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GraduationCap, Target, TrendingUp, Bell, RotateCw } from 'lucide-react';
+import {
+    Bell,
+    GraduationCap,
+    RotateCw,
+    Sparkles,
+    Target,
+    TrendingUp,
+} from 'lucide-react';
+
+type TabId = 'gpa' | 'swot' | 'insights' | 'notifications' | 'rotations';
+
+const TAB_ITEMS: Array<{
+    id: TabId;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+    tone: string;
+}> = [
+    { id: 'gpa', label: 'GPA Lab', icon: GraduationCap, tone: 'from-indigo-500/20 to-violet-500/10 border-indigo-400/20' },
+    { id: 'swot', label: 'SWOT Matrix', icon: Target, tone: 'from-blue-500/20 to-cyan-500/10 border-blue-400/20' },
+    { id: 'insights', label: 'Productivity AI', icon: TrendingUp, tone: 'from-fuchsia-500/20 to-purple-500/10 border-fuchsia-400/20' },
+    { id: 'notifications', label: 'Nudge Center', icon: Bell, tone: 'from-pink-500/20 to-rose-500/10 border-pink-400/20' },
+    { id: 'rotations', label: 'Rotation Ops', icon: RotateCw, tone: 'from-cyan-500/20 to-sky-500/10 border-cyan-400/20' },
+];
 
 export default function AdvancedFeaturesPage() {
-    const [activeTab, setActiveTab] = useState('gpa');
+    const [activeTab, setActiveTab] = useState<TabId>('gpa');
+
+    const currentTabMeta = useMemo(
+        () => TAB_ITEMS.find((item) => item.id === activeTab) ?? TAB_ITEMS[0]!,
+        [activeTab]
+    );
+    const ActiveTabIcon = currentTabMeta.icon;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-white mb-2">Advanced Features</h1>
-                    <p className="text-slate-400">Powerful tools to enhance your productivity</p>
+        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_36%),linear-gradient(135deg,_#020617_0%,_#111827_40%,_#0f172a_100%)] p-4 md:p-8">
+            <div className="max-w-7xl mx-auto space-y-7">
+                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/[0.10] via-indigo-500/[0.08] to-fuchsia-500/[0.10] p-6 md:p-8">
+                    <div className="absolute -top-16 -right-10 h-60 w-60 rounded-full bg-cyan-500/20 blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-16 -left-10 h-60 w-60 rounded-full bg-violet-500/15 blur-3xl pointer-events-none" />
+
+                    <div className="relative grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-6">
+                        <div>
+                            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-xs text-cyan-100 mb-4">
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Advanced Command Center
+                            </div>
+                            <h1 className="text-3xl md:text-4xl font-bold text-white">
+                                High-Leverage Productivity Toolkit
+                            </h1>
+                            <p className="mt-3 text-slate-300 max-w-2xl">
+                                Use deep analytics, smart nudges, and rotation controls to run your
+                                study workflow with precision.
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-white/20 bg-black/20 backdrop-blur-md p-4">
+                            <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
+                                Active Module
+                            </p>
+                            <div className={`rounded-xl border p-3 bg-gradient-to-br ${currentTabMeta.tone}`}>
+                                <div className="flex items-center gap-2 text-white font-semibold">
+                                    <ActiveTabIcon className="w-4 h-4" />
+                                    {currentTabMeta.label}
+                                </div>
+                                <p className="mt-1 text-xs text-slate-200">
+                                    Configure and execute this module to improve planning quality and output.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Tabs Navigation */}
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid grid-cols-5 w-full bg-white/5 border border-white/10 p-1">
-                        <TabsTrigger
-                            value="gpa"
-                            className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-                        >
-                            <GraduationCap className="w-4 h-4 mr-2" />
-                            GPA
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="swot"
-                            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white"
-                        >
-                            <Target className="w-4 h-4 mr-2" />
-                            SWOT
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="insights"
-                            className="data-[state=active]:bg-purple-500 data-[state=active]:text-white"
-                        >
-                            <TrendingUp className="w-4 h-4 mr-2" />
-                            Insights
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="notifications"
-                            className="data-[state=active]:bg-pink-500 data-[state=active]:text-white"
-                        >
-                            <Bell className="w-4 h-4 mr-2" />
-                            Notifications
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="rotations"
-                            className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white"
-                        >
-                            <RotateCw className="w-4 h-4 mr-2" />
-                            Rotations
-                        </TabsTrigger>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabId)} className="w-full space-y-6">
+                    <TabsList className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 h-auto w-full bg-white/5 border border-white/10 p-1.5 rounded-2xl">
+                        {TAB_ITEMS.map((item) => (
+                            <TabsTrigger
+                                key={item.id}
+                                value={item.id}
+                                className="rounded-xl px-3 py-2.5 text-sm data-[state=active]:bg-white/15 data-[state=active]:text-white"
+                            >
+                                <item.icon className="w-4 h-4 mr-2" />
+                                {item.label}
+                            </TabsTrigger>
+                        ))}
                     </TabsList>
 
-                    {/* GPA Calculator */}
-                    <TabsContent value="gpa" className="mt-6">
+                    <TabsContent value="gpa" className="space-y-6">
                         <GPACalculator />
                     </TabsContent>
 
-                    {/* SWOT Analysis */}
-                    <TabsContent value="swot" className="mt-6">
+                    <TabsContent value="swot" className="space-y-6">
                         <SWOTAnalysis />
                     </TabsContent>
 
-                    {/* Productivity Insights */}
-                    <TabsContent value="insights" className="mt-6">
+                    <TabsContent value="insights" className="space-y-6">
                         <ProductivityInsights />
                     </TabsContent>
 
-                    {/* Notifications */}
-                    <TabsContent value="notifications" className="mt-6">
+                    <TabsContent value="notifications" className="space-y-6">
                         <NotificationCenter />
                     </TabsContent>
 
-                    {/* Rotation Manager */}
-                    <TabsContent value="rotations" className="mt-6">
+                    <TabsContent value="rotations" className="space-y-6">
                         <RotationManager />
                     </TabsContent>
                 </Tabs>
 
-                {/* Feature Overview Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
-                    <Card className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-500/20 p-6">
-                        <GraduationCap className="w-8 h-8 text-indigo-400 mb-3" />
-                        <h3 className="text-lg font-semibold text-white mb-2">Academic Analytics</h3>
-                        <p className="text-sm text-slate-400">
-                            Track your GPA, analyze strengths & weaknesses, and get personalized study recommendations.
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="border border-indigo-400/20 bg-gradient-to-br from-indigo-500/20 to-violet-500/10 p-5">
+                        <GraduationCap className="w-7 h-7 text-indigo-200 mb-3" />
+                        <h3 className="font-semibold text-white">Academic Diagnostics</h3>
+                        <p className="text-sm text-slate-300 mt-1">
+                            Use GPA + SWOT modules to identify weak zones and rebalance effort.
                         </p>
                     </Card>
-                    <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20 p-6">
-                        <TrendingUp className="w-8 h-8 text-purple-400 mb-3" />
-                        <h3 className="text-lg font-semibold text-white mb-2">Productivity Insights</h3>
-                        <p className="text-sm text-slate-400">
-                            Discover your peak hours, identify time leaks, and optimize your study schedule.
+
+                    <Card className="border border-fuchsia-400/20 bg-gradient-to-br from-fuchsia-500/20 to-purple-500/10 p-5">
+                        <TrendingUp className="w-7 h-7 text-fuchsia-200 mb-3" />
+                        <h3 className="font-semibold text-white">Behavior Intelligence</h3>
+                        <p className="text-sm text-slate-300 mt-1">
+                            Read time leakage and peak-window recommendations to tighten your routine.
                         </p>
                     </Card>
-                    <Card className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-cyan-500/20 p-6">
-                        <RotateCw className="w-8 h-8 text-cyan-400 mb-3" />
-                        <h3 className="text-lg font-semibold text-white mb-2">Smart Scheduling</h3>
-                        <p className="text-sm text-slate-400">
-                            Manage rotation patterns, get habit nudges, and stay on top of your timetable.
+
+                    <Card className="border border-cyan-400/20 bg-gradient-to-br from-cyan-500/20 to-sky-500/10 p-5">
+                        <RotateCw className="w-7 h-7 text-cyan-200 mb-3" />
+                        <h3 className="font-semibold text-white">Execution Controls</h3>
+                        <p className="text-sm text-slate-300 mt-1">
+                            Apply rotation patterns and nudges to keep daily operations aligned.
                         </p>
                     </Card>
                 </div>

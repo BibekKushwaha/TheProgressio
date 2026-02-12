@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle } from 'lucide-react';
 
 export function ComparisonSection() {
   return (
-    <section className="relative pt-16 px-6">
+    <section className="relative px-6">
       <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

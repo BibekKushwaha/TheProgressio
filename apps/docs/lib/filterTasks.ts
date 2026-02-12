@@ -15,14 +15,18 @@ export function filterTasks(taskList: Task[], filters: TaskFilterOptions): Task[
     return taskList.filter(task => {
         const searchLower = filters.searchQuery.toLowerCase();
         const matchesSearch = !filters.searchQuery ||
-            task.title.toLowerCase().includes(searchLower);
+            task.title.toLowerCase().includes(searchLower) ||
+            task.description?.toLowerCase().includes(searchLower);
 
         const matchesPriority = filters.priority === 'all' ||
             task.priority.toLowerCase() === filters.priority.toLowerCase();
 
-        const taskCategoryName = task.category?.name || 'No Category';
+        const normalizedFilterCategory = filters.category.toLowerCase();
+        const taskCategoryName = task.category?.name?.toLowerCase() || '';
+        const taskCategoryId = task.categoryId?.toLowerCase() || '';
         const matchesCategory = filters.category === 'all' ||
-            taskCategoryName.toLowerCase() === filters.category.toLowerCase();
+            taskCategoryName === normalizedFilterCategory ||
+            taskCategoryId === normalizedFilterCategory;
 
         const matchesStatus = !filters.status || filters.status === 'all' ||
             task.status === filters.status;

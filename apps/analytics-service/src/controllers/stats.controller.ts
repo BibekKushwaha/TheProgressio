@@ -611,7 +611,40 @@ export const getSWOTAnalysis = async (req: AuthenticatedRequest, res: Response):
         const { examType } = req.params;
         if (!examType) { res.status(400).json({ message: "examType is required" }); return; }
 
-        const swot = await generateSWOT(userId, examType as string);
+        const raw = await generateSWOT(userId, examType as string);
+
+        // Normalize service response to UI/store contract shape.
+        const swot = {
+            examType: raw.examType,
+            overallReadiness: raw.overallReadiness,
+            topPriorityChapters: raw.topPriorityChapters.map((chapter) => chapter.chapter),
+            subjects: raw.subjects.map((subject) => ({
+                subject: subject.subjectName,
+                strengths: subject.strengths.map((item) => ({
+                    chapter: item.chapter,
+                    score: item.successRate,
+                })),
+                weaknesses: subject.weaknesses.map((item) => ({
+                    chapter: item.chapter,
+                    score: item.successRate,
+                })),
+                opportunities: subject.opportunities.map((item) => ({
+                    chapter: item.chapter,
+                    score: item.successRate,
+                    reason: item.avgTimePerQuestion > 0
+                        ? `Avg time/question: ${item.avgTimePerQuestion} mins`
+                        : "Moderate score with room for improvement",
+                })),
+                threats: subject.threats.map((item) => ({
+                    chapter: item.chapter,
+                    score: item.successRate,
+                    reason: item.avgTimePerQuestion > 0
+                        ? `Low score and avg time/question: ${item.avgTimePerQuestion} mins`
+                        : "Low score needs immediate attention",
+                })),
+            })),
+        };
+
         res.status(200).json({ message: "SWOT analysis generated", swot });
     } catch (error) {
         console.error("Error generating SWOT:", error);
@@ -647,7 +680,45 @@ export const getGPA = async (req: AuthenticatedRequest, res: Response): Promise<
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const scale = (req.query.scale as string) || "INDIA_10";
-        const result = await calculateCGPA(userId, scale as "INDIA_10" | "US_4" | "PERCENTAGE");
+        const raw = await calculateCGPA(userId, scale as "INDIA_10" | "US_4" | "PERCENTAGE");
+        const normalizedRaw = raw as typeof raw & {
+            cgpa?: number;
+            semesterBreakdown?: Array<{ semester: number; gpa: number; credits?: number; totalCredits?: number }>;
+            courses?: Array<{ courseName: string; credits: number; gradePoint: number; grade?: string | null; semester?: number }>;
+        };
+
+        const semesterBreakdown = normalizedRaw.semesters
+            ? normalizedRaw.semesters.map((sem) => ({
+                semester: sem.semester,
+                gpa: sem.gpa,
+                credits: sem.totalCredits,
+            }))
+            : (normalizedRaw.semesterBreakdown ?? []).map((sem) => ({
+                semester: sem.semester,
+                gpa: sem.gpa,
+                credits: sem.credits ?? sem.totalCredits ?? 0,
+            }));
+
+        const courses = normalizedRaw.courses
+            ? normalizedRaw.courses
+            : (normalizedRaw.semesters ?? []).flatMap((sem) =>
+                sem.courses.map((course) => ({
+                    courseName: course.courseName,
+                    credits: course.credits,
+                    gradePoint: course.gradePoint,
+                    grade: course.grade ?? undefined,
+                    semester: sem.semester,
+                }))
+            );
+
+        // Normalize service response to UI/store contract shape.
+        const result = {
+            cgpa: normalizedRaw.currentCGPA ?? normalizedRaw.cgpa ?? 0,
+            totalCredits: normalizedRaw.totalCredits ?? 0,
+            semesterBreakdown,
+            courses,
+        };
+
         res.status(200).json({ message: "CGPA calculated", result });
     } catch (error) {
         console.error("Error calculating GPA:", error);

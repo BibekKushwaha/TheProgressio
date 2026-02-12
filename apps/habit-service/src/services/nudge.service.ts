@@ -7,7 +7,7 @@
  * 3. Morning briefings with conflict detection
  * 4. Slip detection (pattern-based)
  */
-import { prisma } from "@repo/db";
+import { prisma, type Nudge, type Prisma } from "@repo/db";
 
 // ── Nudge Types ────────────────────────────────────────────────────────
 
@@ -241,7 +241,7 @@ export async function detectSlipPatterns(userId: string): Promise<{ atRisk: bool
 
 // ── Fetch User Nudges ──────────────────────────────────────────────────
 
-export async function getUserNudges(userId: string, unreadOnly: boolean = false) {
+export async function getUserNudges(userId: string, unreadOnly: boolean = false): Promise<Nudge[]> {
     return prisma.nudge.findMany({
         where: {
             userId,
@@ -256,14 +256,14 @@ export async function getUserNudges(userId: string, unreadOnly: boolean = false)
     });
 }
 
-export async function markNudgeRead(nudgeId: string, userId: string): Promise<{ count: number }> {
+export async function markNudgeRead(nudgeId: string, userId: string): Promise<Prisma.BatchPayload> {
     return prisma.nudge.updateMany({
         where: { id: nudgeId, userId },
         data: { isRead: true },
     });
 }
 
-export async function markAllNudgesRead(userId: string): Promise<{ count: number }> {
+export async function markAllNudgesRead(userId: string): Promise<Prisma.BatchPayload> {
     return prisma.nudge.updateMany({
         where: { userId, isRead: false },
         data: { isRead: true },

@@ -4,6 +4,7 @@
 import { Target, Flame } from 'lucide-react';
 import { useGetDailySummaryQuery, useGetFocusScoreQuery, useGetUserStreakQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toLocalDateKey } from '@/lib/date';
 
 export function TopStats() {
     const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery("1");
@@ -26,8 +27,7 @@ export function TopStats() {
     const isActiveDate = (daysAgo: number) => {
         const date = new Date();
         date.setDate(date.getDate() - daysAgo);
-        const dateStr = date.toISOString().split('T')[0];
-        return activeDates.includes(dateStr!);
+        return activeDates.includes(toLocalDateKey(date));
     };
 
     return (

@@ -236,7 +236,10 @@ export const analyticsApi = createApi({
             providesTags: ['Stats'],
         }),
         getSubjectPerformance: builder.query<{ message: string; data: any }, string>({
-            query: (name) => `/stats/subject/${encodeURIComponent(name)}`,
+            query: (name) => {
+                const safeName = name?.trim() || 'Mathematics';
+                return `/stats/subject/${encodeURIComponent(safeName)}`;
+            },
             providesTags: ['Stats'],
         }),
 
@@ -319,7 +322,10 @@ export const analyticsApi = createApi({
             providesTags: ['Stats'],
         }),
         getPredictivePerformance: builder.query<{ message: string; data: LearningPace[] }, string>({
-            query: (examType) => `/stats/performance/${examType}`,
+            query: (examType) => {
+                const safeExamType = examType?.trim() || 'midterm';
+                return `/stats/performance/${encodeURIComponent(safeExamType)}`;
+            },
             providesTags: ['Stats'],
         }),
     }),

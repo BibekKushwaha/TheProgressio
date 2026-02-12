@@ -1,16 +1,23 @@
 import { useRef, useEffect } from 'react';
 import { TimeSlot } from './TimeSlot';
 import { EventCard } from './EventCard';
-import { useGetCalendarDailyScheduleQuery } from '@repo/store';
+import { useGetCalendarDailyScheduleQuery, ResolvedRotation } from '@repo/store';
+import { toLocalDateKey } from '@/lib/date';
+import { matchesRotationFilter } from '@/lib/rotation';
 
 interface DayGridProps {
     date: Date;
+    rotationFilter?: boolean;
+    rotation?: ResolvedRotation;
 }
 
-export function DayGrid({ date }: DayGridProps) {
+export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const dateString = date.toISOString().split('T')[0] || '';
-    const { data: schedule } = useGetCalendarDailyScheduleQuery({ date: dateString });
+    const dateString = toLocalDateKey(date);
+    const { data: schedule } = useGetCalendarDailyScheduleQuery(
+        { date: dateString },
+        { refetchOnMountOrArgChange: true }
+    );
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -23,8 +30,13 @@ export function DayGrid({ date }: DayGridProps) {
     return (
         <div className="bg-gradient-to-br from-white/5 to-white/2 backdrop-blur-md border border-white/10 rounded-2xl h-[calc(100vh-12rem)] flex flex-col overflow-hidden">
             <div className="p-4 border-b border-white/10 flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-white">Daily Schedule</h2>
-                <div className="text-sm text-slate-400">
+                <div>
+                    <h2 className="text-lg font-semibold text-white">Daily Schedule</h2>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                        {rotationFilter ? 'Rotation filtered view' : 'All schedule items'}
+                    </div>
+                </div>
+                <div className="text-sm text-slate-400 text-right">
                     {date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                 </div>
             </div>
@@ -39,7 +51,15 @@ export function DayGrid({ date }: DayGridProps) {
                     ))}
 
                     {/* Events */}
-                    {schedule?.items.map((item) => {
+                    {schedule?.items
+                        .filter((it) =>
+                            matchesRotationFilter({
+                                rotationFilter,
+                                rotation,
+                                itemRotation: it.rotation,
+                            })
+                        )
+                        .map((item) => {
                         // Calculate position
                         const [startHourStr, startMinStr] = item.startTime.split(':');
                         const startHour = Number(startHourStr) || 0;

@@ -18,6 +18,11 @@ export interface Habit {
     longestStreak: number;
     lastLogDate: string | null;
     userId: string;
+    mercyDaysAllowed?: number;
+    mercyDaysUsed?: number;
+    streakHealth?: 'strong' | 'at_risk' | 'recovering' | 'broken';
+    isMercyActive?: boolean;
+    linkedCategoryId?: string | null;
     createdAt: string;
     updatedAt: string;
     streakStatus: 'inactive' | 'active' | 'broken';
@@ -37,6 +42,8 @@ export interface CreateHabitRequest {
     icon?: string;
     color?: string;
     targetValue?: number;
+    mercyDaysAllowed?: number;
+    linkedCategoryId?: string | null;
 }
 
 export interface UpdateHabitRequest {
@@ -46,6 +53,8 @@ export interface UpdateHabitRequest {
     icon?: string;
     color?: string;
     targetValue?: number;
+    mercyDaysAllowed?: number;
+    linkedCategoryId?: string | null;
 }
 
 export interface HabitStats {
@@ -73,6 +82,8 @@ export interface UserXP {
     levelName: string;
     xpToNextLevel: number;
     progress: number;
+    currentLevelXP?: number;
+    nextLevelXP?: number;
 }
 
 export interface HeatmapDay {
@@ -192,12 +203,15 @@ export const habitsApi = createApi({
                 }
             },
         }),
-        logHabit: builder.mutation<{ message: string; log: HabitLog; habit: Habit; streakStatus: string }, { id: string; completedValue?: number }>({
-            query: ({ id, ...body }) => ({
-                url: `/${id}/log`,
-                method: 'POST',
-                body,
-            }),
+        logHabit: builder.mutation<{ message: string; log?: HabitLog; habit: Habit; streakStatus: string; alreadyLogged?: boolean }, { id: string; completedValue?: number }>({
+            query: ({ id, ...body }) => {
+                const payload = Object.keys(body).length > 0 ? body : undefined;
+                return {
+                    url: `/${id}/log`,
+                    method: 'POST',
+                    ...(payload ? { body: payload } : {}),
+                };
+            },
             invalidatesTags: (_result, _error, { id }) => [{ type: 'Habits', id }],
             async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
                 try {
@@ -253,7 +267,7 @@ export const habitsApi = createApi({
         getNudges: builder.query<{ message: string; nudges: Nudge[] }, boolean | void>({
             query: (unreadOnly) => ({
                 url: '/nudges',
-                params: unreadOnly ? { unreadOnly: 'true' } : {},
+                params: unreadOnly ? { unread: 'true' } : {},
             }),
             providesTags: [{ type: 'Habits', id: 'NUDGES' }],
         }),

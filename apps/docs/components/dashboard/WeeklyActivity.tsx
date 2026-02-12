@@ -1,11 +1,12 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function WeeklyActivity() {
+    const [viewType, setViewType] = useState<'week' | 'month'>('week');
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
 
     const rawData = trendsData?.data || [];
@@ -45,16 +46,32 @@ export function WeeklyActivity() {
             <div className="flex items-center justify-between mb-10 relative z-10">
                 <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                        Weekly Activity
+                        {viewType === 'week' ? 'Weekly' : 'Monthly'} Activity
                         <Sparkles className="w-4 h-4 text-purple-400 opacity-50" />
                     </h2>
-                    <p className="text-sm text-slate-400 mt-1">Consistency check over last 7 days</p>
+                    <p className="text-sm text-slate-400 mt-1">
+                        {viewType === 'week' ? 'Consistency check over last 7 days' : 'Consistency check over last 30 days'}
+                    </p>
                 </div>
                 <div className="flex gap-2 bg-white/5 border border-white/10 rounded-xl p-1">
-                    <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-purple-500/20">
+                    <button 
+                        onClick={() => setViewType('week')}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                            viewType === 'week'
+                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
+                                : 'text-slate-500 hover:text-white'
+                        }`}
+                    >
                         Week
                     </button>
-                    <button className="px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">
+                    <button 
+                        onClick={() => setViewType('month')}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                            viewType === 'month'
+                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
+                                : 'text-slate-500 hover:text-white'
+                        }`}
+                    >
                         Month
                     </button>
                 </div>

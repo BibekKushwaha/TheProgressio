@@ -18,15 +18,15 @@ export function DayCell({ date, events, isCurrentMonth, isToday, isSelected, onC
     return (
         <button
             onClick={onClick}
-            className={`relative aspect-[3/4] rounded-xl border transition-all duration-300 ${!isCurrentMonth
+            className={`relative aspect-[4/3] rounded-xl border transition-all duration-300 ${!isCurrentMonth
                     ? 'bg-white/0 border-white/5 text-slate-600'
                     : isToday || isSelected
                         ? 'bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-purple-500 shadow-lg shadow-purple-500/20'
                         : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10'
                 }`}
         >
-            <div className="absolute top-3 left-3">
-                <span className={`text-lg font-semibold ${!isCurrentMonth ? 'text-slate-600' : 'text-white'}`}>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className={`text-xl font-semibold ${!isCurrentMonth ? 'text-slate-600' : 'text-white'}`}>
                     {date}
                 </span>
             </div>

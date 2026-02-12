@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 const constraints = [
     {
@@ -18,18 +19,34 @@ const constraints = [
     },
 ];
 
-export function SmartConstraints() {
-    const [enabled, setEnabled] = useState<Record<string, boolean>>({
-        'avoid-back-to-back': true,
-        'prioritize-morning': true,
-    });
+export type SmartConstraintId = typeof constraints[number]['id'];
+export type SmartConstraintsValue = Record<SmartConstraintId, boolean>;
 
-    const toggle = (id: string) => {
-        setEnabled((prev) => ({ ...prev, [id]: !prev[id] }));
+const defaultConstraintsState: SmartConstraintsValue = {
+    'avoid-back-to-back': true,
+    'prioritize-morning': true,
+};
+
+interface SmartConstraintsProps {
+    value?: SmartConstraintsValue;
+    onChange?: (value: SmartConstraintsValue) => void;
+    className?: string;
+}
+
+export function SmartConstraints({ value, onChange, className }: SmartConstraintsProps) {
+    const [enabled, setEnabled] = useState<SmartConstraintsValue>(defaultConstraintsState);
+    const current = value ?? enabled;
+
+    const toggle = (id: SmartConstraintId) => {
+        const next: SmartConstraintsValue = { ...current, [id]: !current[id] };
+        if (value === undefined) {
+            setEnabled(next);
+        }
+        onChange?.(next);
     };
 
     return (
-        <div>
+        <div className={className}>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
                 Smart Constraints
             </label>
@@ -50,16 +67,19 @@ export function SmartConstraints() {
                         </div>
 
                         <button
+                            type="button"
                             onClick={() => toggle(constraint.id)}
-                            className={`relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0 ml-4 ${enabled[constraint.id]
-                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600'
-                                    : 'bg-slate-700'
-                                }`}
+                            className={cn(
+                                "relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0 ml-4",
+                                current[constraint.id] ? 'bg-gradient-to-r from-purple-600 to-indigo-600' : 'bg-slate-700'
+                            )}
                             aria-label={`Toggle ${constraint.title}`}
                         >
                             <div
-                                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ${enabled[constraint.id] ? 'left-6.5' : 'left-0.5'
-                                    }`}
+                                className={cn(
+                                    "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-300",
+                                    current[constraint.id] ? 'translate-x-6' : 'translate-x-0'
+                                )}
                             ></div>
                         </button>
                     </div>

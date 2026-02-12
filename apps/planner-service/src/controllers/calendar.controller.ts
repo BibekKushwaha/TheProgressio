@@ -150,7 +150,8 @@ export const getDailySchedule = async (req: AuthenticatedRequest, res: Response)
                 subject: entry.subject.name,
                 // Add useful metadata
                 category: 'Academic',
-                isRecurring: true
+                isRecurring: true,
+                rotation: entry.rotation
             })),
 
             // Tasks

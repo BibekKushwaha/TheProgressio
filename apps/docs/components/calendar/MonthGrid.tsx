@@ -11,6 +11,8 @@ interface MonthGridProps {
     onDateSelect: (date: number) => void;
     currentMonth: number;
     currentYear: number;
+    rotationFilter?: boolean;
+    rotation?: unknown;
 }
 
 export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYear }: MonthGridProps) {

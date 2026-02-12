@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useGetNudgesQuery, useMarkNudgeAsReadMutation, Nudge } from '@repo/store';
+import { useGetNudgesQuery, useMarkNudgeAsReadMutation, useMarkAllNudgesAsReadMutation } from '@repo/store';
+import type { Nudge } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,6 +11,7 @@ import { Bell, CheckCircle, AlertCircle, Info, TrendingUp } from 'lucide-react';
 export function NotificationCenter() {
     const { data, isLoading } = useGetNudgesQuery();
     const [markRead] = useMarkNudgeAsReadMutation();
+    const [markAllRead, { isLoading: isMarkingAllRead }] = useMarkAllNudgesAsReadMutation();
     const [filter, setFilter] = useState<'all' | 'unread'>('unread');
 
     const nudges = data?.nudges || [];
@@ -27,8 +29,16 @@ export function NotificationCenter() {
         }
     };
 
+    const handleMarkAllRead = async () => {
+        try {
+            await markAllRead().unwrap();
+        } catch (error) {
+            console.error('Failed to mark all nudges as read:', error);
+        }
+    };
+
     const getPriorityColor = (priority: string) => {
-        switch (priority.toLowerCase()) {
+        switch ((priority || '').toLowerCase()) {
             case 'high': return 'border-red-500/30 bg-red-500/10';
             case 'medium': return 'border-yellow-500/30 bg-yellow-500/10';
             case 'low': return 'border-blue-500/30 bg-blue-500/10';
@@ -37,12 +47,17 @@ export function NotificationCenter() {
     };
 
     const getTypeIcon = (type: string) => {
-        switch (type.toLowerCase()) {
+        switch ((type || '').toLowerCase()) {
             case 'streak_reminder': return <AlertCircle className="w-5 h-5 text-orange-400" />;
             case 'achievement': return <TrendingUp className="w-5 h-5 text-green-400" />;
             case 'suggestion': return <Info className="w-5 h-5 text-blue-400" />;
             default: return <Bell className="w-5 h-5 text-purple-400" />;
         }
+    };
+
+    const formatScheduledAt = (value: string) => {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? 'Unknown time' : date.toLocaleString();
     };
 
     if (isLoading) {
@@ -73,6 +88,17 @@ export function NotificationCenter() {
                     </div>
                 </div>
                 <div className="flex gap-2">
+                    {unreadCount > 0 && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isMarkingAllRead}
+                            onClick={handleMarkAllRead}
+                            className="bg-white/5 border-white/10 hover:bg-white/10"
+                        >
+                            {isMarkingAllRead ? 'Marking...' : 'Mark all read'}
+                        </Button>
+                    )}
                     <Button
                         variant={filter === 'unread' ? 'default' : 'outline'}
                         size="sm"
@@ -116,7 +142,7 @@ export function NotificationCenter() {
                                         <div className="flex items-center gap-3 text-xs text-slate-500">
                                             <span className="capitalize">{nudge.type.replace('_', ' ')}</span>
                                             <span>•</span>
-                                            <span>{new Date(nudge.scheduledAt).toLocaleString()}</span>
+                                            <span>{formatScheduledAt(nudge.scheduledAt)}</span>
                                             {nudge.priority && (
                                                 <>
                                                     <span>•</span>

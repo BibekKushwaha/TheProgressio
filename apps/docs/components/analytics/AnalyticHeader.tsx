@@ -6,9 +6,10 @@ import { FilterDropdown } from '../planner/FilterDropdown';
 interface AnalyticsHeaderProps {
     pastDays: string;
     setPastDays: (value: string) => void;
+    onExport?: () => void;
 }
 
-export function AnalyticsHeader({ pastDays, setPastDays }: AnalyticsHeaderProps) {
+export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHeaderProps) {
     const PAST_DAYS_OPTIONS = [
         { label: "Daily", value: "1" },
         { label: "Weekly", value: "7" },
@@ -32,7 +33,10 @@ export function AnalyticsHeader({ pastDays, setPastDays }: AnalyticsHeaderProps)
                             icon={<Calendar className="w-4 h-4" />}
                             placeholder={'Select'}
                         />
-                        <button className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 hover:-translate-y-0.5">
+                        <button
+                            onClick={onExport}
+                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 hover:-translate-y-0.5"
+                        >
                             <Download className="w-4 h-4" />
                             <span>Export Report</span>
                         </button>

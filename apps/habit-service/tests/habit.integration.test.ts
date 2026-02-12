@@ -77,7 +77,9 @@ vi.mock('@repo/db', () => {
                 create: vi.fn(),
                 findFirst: vi.fn(),
                 findMany: vi.fn(),
+                deleteMany: vi.fn(),
             },
+            $transaction: vi.fn(async (actions: unknown[]) => Promise.all(actions as Promise<unknown>[])),
             user: {
                 findUnique: vi.fn(),
                 update: vi.fn(),
@@ -229,22 +231,56 @@ describe('Habit endpoints — Log Completion', () => {
         expect(res.body).toHaveProperty('log');
     });
 
-    it('POST /api/habits/:id/log — returns 400 if already logged', async () => {
+    it('POST /api/habits/:id/log — returns 200 if already logged in this period', async () => {
         (prisma.habit.findUnique as any).mockResolvedValue({
-            id: 'h1', name: 'Run', frequency: 'DAILY', userId: 'user-1',
+            id: 'h1', name: 'Run', frequency: 'DAILY', userId: 'user-1', lastLogDate: new Date(),
         });
         (prisma.habit.findFirst as any).mockResolvedValue({
-            id: 'h1', name: 'Run', frequency: 'DAILY', userId: 'user-1',
+            id: 'h1', name: 'Run', frequency: 'DAILY', userId: 'user-1', lastLogDate: new Date(),
         });
         (prisma.habitLog.findFirst as any).mockResolvedValue({
-            id: 'existing-log', habitId: 'h1',
+            id: 'existing-log', habitId: 'h1', completedValue: 1, loggedAt: new Date(),
         });
 
         const res = await request(app)
             .post('/api/habits/h1/log')
             .send({});
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(200);
+        expect(res.body.message).toBe('Habit already logged for this period');
+        expect(res.body.alreadyLogged).toBe(true);
+    });
+
+    it('POST /api/habits/:id/log — self-heals stale period log after reset', async () => {
+        (prisma.habit.findFirst as any).mockResolvedValue({
+            id: 'h1', name: 'Run', frequency: 'DAILY', userId: 'user-1', lastLogDate: null,
+            currentStreak: 0, longestStreak: 0, mercyDaysUsed: 0,
+        });
+        (prisma.habit.findUnique as any).mockResolvedValue({
+            id: 'h1', name: 'Run', frequency: 'DAILY', userId: 'user-1', lastLogDate: null,
+            currentStreak: 0, longestStreak: 0, mercyDaysUsed: 0,
+        });
+        (prisma.habitLog.findFirst as any).mockResolvedValue({
+            id: 'stale-log', habitId: 'h1', completedValue: 1, loggedAt: new Date(),
+        });
+        (prisma.habitLog.deleteMany as any).mockResolvedValue({ count: 1 });
+        (prisma.habitLog.create as any).mockResolvedValue({
+            id: 'l2', habitId: 'h1', completedValue: 1, loggedAt: new Date(),
+        });
+        (prisma.habit.update as any).mockResolvedValue({
+            id: 'h1', name: 'Run', frequency: 'DAILY', currentStreak: 1, longestStreak: 1,
+            mercyDaysUsed: 0, lastLogDate: new Date(),
+        });
+
+        const res = await request(app)
+            .post('/api/habits/h1/log')
+            .send({});
+
+        expect(res.status).toBe(201);
+        expect(prisma.habitLog.deleteMany).toHaveBeenCalledWith({
+            where: { habitId: 'h1' },
+        });
+        expect(res.body).toHaveProperty('log');
     });
 });
 
@@ -325,7 +361,7 @@ describe('Habit endpoints — Reset', () => {
 
     it('POST /api/habits/:id/reset — resets a habit', async () => {
         (prisma.habit.findFirst as any).mockResolvedValue({ id: 'h1', userId: 'user-1' });
-        (prisma.habitLog.findMany as any).mockResolvedValue([]);
+        (prisma.habitLog.deleteMany as any).mockResolvedValue({ count: 2 });
         (prisma.habit.update as any).mockResolvedValue({
             id: 'h1', currentStreak: 0, longestStreak: 0, mercyDaysUsed: 0, lastLogDate: null,
         });
