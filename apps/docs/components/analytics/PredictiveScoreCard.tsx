@@ -4,10 +4,24 @@ import { useGetPredictivePerformanceQuery } from '@repo/store';
 import { TrendingUp, TrendingDown, Minus, Trophy, Target } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function PredictiveScoreCard() {
-    const { data, isLoading } = useGetPredictivePerformanceQuery('midterm');
+type PredictiveSubject = {
+    subjectName?: string;
+    subject?: string;
+    predictedScore?: number;
+    avgScore?: number;
+    trend?: 'improving' | 'declining' | 'stable';
+    entryCount?: number;
+};
 
-    const subjects = data?.data || [];
+interface PredictiveScoreCardProps {
+    examType?: string;
+    title?: string;
+}
+
+export function PredictiveScoreCard({ examType = 'midterm', title = 'Predictive Score Indicator' }: PredictiveScoreCardProps) {
+    const { data, isLoading } = useGetPredictivePerformanceQuery(examType);
+
+    const subjects: PredictiveSubject[] = data?.data || [];
 
     if (isLoading) {
         return (
@@ -39,13 +53,13 @@ export function PredictiveScoreCard() {
                     <Trophy className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                    <h3 className="text-lg font-bold text-white">Predictive Score Indicator</h3>
+                    <h3 className="text-lg font-bold text-white">{title}</h3>
                     <p className="text-xs text-slate-400">Based on your learning pace and historical performance</p>
                 </div>
             </div>
 
             <div className="space-y-3">
-                {subjects.map((subject: any) => {
+                {subjects.map((subject) => {
                     const predicted = subject.predictedScore ?? subject.avgScore ?? 0;
                     const trend = subject.trend || 'stable';
                     const TrendIcon = trend === 'improving' ? TrendingUp : trend === 'declining' ? TrendingDown : Minus;

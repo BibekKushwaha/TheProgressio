@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useGetGPAQuery, useAddCourseGradeMutation, CourseGrade } from '@repo/store';
+import { useMemo, useState } from 'react';
+import { useGetGPAQuery, useAddCourseGradeMutation, CGPAResult } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Skeleton } from '@/components/ui/skeleton';
 import { GraduationCap, Plus, TrendingUp, Award } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-provider';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 export function GPACalculator() {
-    const { data, isLoading } = useGetGPAQuery();
+    const { data, isLoading, isError } = useGetGPAQuery();
     const [addCourse] = useAddCourseGradeMutation();
     const { toast } = useToast();
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -22,24 +23,84 @@ export function GPACalculator() {
         grade: '',
         semester: '',
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleAddCourse = async () => {
+        // Client-side validation to avoid sending NaN to the API
+        const courseName = (newCourse.courseName || '').trim();
+        const creditsNum = parseFloat(newCourse.credits);
+        const gradePointNum = parseFloat(newCourse.gradePoint);
+        const semesterNum = newCourse.semester ? parseInt(newCourse.semester) : undefined;
+
+        if (!courseName) {
+            toast('Please enter a course name', 'error');
+            return;
+        }
+        if (isNaN(creditsNum) || creditsNum <= 0) {
+            toast('Please enter valid credits (number > 0)', 'error');
+            return;
+        }
+        if (isNaN(gradePointNum) || gradePointNum < 0 || gradePointNum > 10) {
+            toast('Please enter a valid grade point (0 - 10)', 'error');
+            return;
+        }
+
+        setIsSubmitting(true);
         try {
             await addCourse({
-                courseName: newCourse.courseName,
-                credits: parseFloat(newCourse.credits),
-                gradePoint: parseFloat(newCourse.gradePoint),
-                grade: newCourse.grade || undefined,
-                semester: newCourse.semester ? parseInt(newCourse.semester) : undefined,
+                courseName,
+                credits: creditsNum,
+                gradePoint: gradePointNum,
+                grade: newCourse.grade ? newCourse.grade.trim() : undefined,
+                semester: semesterNum,
             }).unwrap();
 
             toast('Course added successfully!', 'success');
             setIsAddOpen(false);
             setNewCourse({ courseName: '', credits: '', gradePoint: '', grade: '', semester: '' });
-        } catch (error) {
-            toast('Failed to add course', 'error');
+        } catch (error: unknown) {
+            toast(getApiErrorMessage(error, 'Failed to add course'), 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
+
+    const gpaData: CGPAResult | undefined = useMemo(() => {
+        const root = data as
+            | (CGPAResult & { result?: CGPAResult; stats?: CGPAResult; semesters?: Array<{ semester: number; gpa: number; totalCredits: number; courses: Array<{ courseName: string; credits: number; gradePoint: number; grade?: string; id?: string }> }>; currentCGPA?: number; courseGrades?: Array<{ courseName: string; credits: number; gradePoint: number; grade?: string; semester?: number }> })
+            | undefined;
+        if (!root) return undefined;
+
+        const source = root.result ?? root.stats ?? root;
+        const coursesFromSource = source.courses ?? root.courseGrades ?? [];
+        const normalizedCourses = coursesFromSource.map((course) => ({
+            courseName: course.courseName,
+            credits: Number(course.credits ?? 0),
+            gradePoint: Number(course.gradePoint ?? 0),
+            grade: course.grade ?? undefined,
+            semester: course.semester ?? undefined,
+        }));
+
+        const semesterBreakdown =
+            source.semesterBreakdown ??
+            root.semesters?.map((semester) => ({
+                semester: semester.semester,
+                gpa: semester.gpa,
+                credits: semester.totalCredits,
+            })) ??
+            [];
+
+        const totalCredits =
+            Number(source.totalCredits ?? 0) ||
+            normalizedCourses.reduce((sum, course) => sum + course.credits, 0);
+
+        return {
+            cgpa: Number(source.cgpa ?? root.currentCGPA ?? 0),
+            totalCredits,
+            semesterBreakdown,
+            courses: normalizedCourses,
+        };
+    }, [data]);
 
     if (isLoading) {
         return (
@@ -49,8 +110,6 @@ export function GPACalculator() {
             </Card>
         );
     }
-
-    const gpaData = data?.result;
 
     return (
         <div className="space-y-6">
@@ -116,15 +175,22 @@ export function GPACalculator() {
                                         className="bg-white/5 border-white/10"
                                     />
                                 </div>
-                                <Button onClick={handleAddCourse} className="w-full bg-indigo-500 hover:bg-indigo-600">
-                                    Add Course
+                                <Button
+                                    onClick={handleAddCourse}
+                                    disabled={isSubmitting}
+                                    className={`w-full ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600'}`}>
+                                    {isSubmitting ? 'Adding…' : 'Add Course'}
                                 </Button>
                             </div>
                         </DialogContent>
                     </Dialog>
                 </div>
 
-                {gpaData ? (
+                {isError ? (
+                    <div className="text-center py-8 text-red-300">
+                        Unable to load GPA data right now. Please refresh in a moment.
+                    </div>
+                ) : gpaData ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-2">
@@ -160,7 +226,7 @@ export function GPACalculator() {
                 <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">Semester Breakdown</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {gpaData.semesterBreakdown.map((sem: any) => (
+                        {gpaData.semesterBreakdown.map((sem) => (
                             <div key={sem.semester} className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <div className="text-sm text-slate-400 mb-1">Semester {sem.semester}</div>
                                 <div className="text-2xl font-bold text-white">{(sem.gpa ?? 0).toFixed(2)}</div>
@@ -176,8 +242,8 @@ export function GPACalculator() {
                 <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">All Courses</h3>
                     <div className="space-y-2">
-                        {gpaData.courses.map((course: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
+                        {gpaData.courses.map((course, idx) => (
+                            <div key={`${course.courseName}-${course.semester ?? idx}-${idx}`} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
                                 <div className="flex-1">
                                     <div className="font-semibold text-white">{course.courseName}</div>
                                     {course.semester && <div className="text-xs text-slate-500">Semester {course.semester}</div>}

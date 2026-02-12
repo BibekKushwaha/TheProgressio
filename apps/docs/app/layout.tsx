@@ -8,8 +8,11 @@ import { ToastProvider } from "@/components/ui/toast-provider";
 const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Student Activity Tracker",
-  description: "Frictionless task management for students",
+  title: {
+    default: "Transition",
+    template: "%s | Transition",
+  },
+  description: "AI-powered student operating system for tasks, habits, calendar, analytics, and exam prep.",
 };
 
 export default function RootLayout({
@@ -18,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={geist.className}>
+    <html lang="en" className="dark">
+      <body className={`${geist.className} antialiased bg-slate-950 text-slate-100`}>
         <StoreProvider>
           <ToastProvider>{children}</ToastProvider>
         </StoreProvider>

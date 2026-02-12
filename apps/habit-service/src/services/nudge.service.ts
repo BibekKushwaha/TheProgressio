@@ -7,7 +7,7 @@
  * 3. Morning briefings with conflict detection
  * 4. Slip detection (pattern-based)
  */
-import { prisma } from "@repo/db";
+import { prisma, type Nudge, type Prisma } from "@repo/db";
 
 // ── Nudge Types ────────────────────────────────────────────────────────
 
@@ -209,7 +209,8 @@ export async function detectSlipPatterns(userId: string): Promise<{ atRisk: bool
     // Count completions by day of week
     const dayCount = new Array(7).fill(0) as number[];
     for (const log of logs) {
-        dayCount[log.loggedAt.getDay()]++;
+        const dayIndex = log.loggedAt.getDay();
+        dayCount[dayIndex] = (dayCount[dayIndex] ?? 0) + 1;
     }
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -240,7 +241,7 @@ export async function detectSlipPatterns(userId: string): Promise<{ atRisk: bool
 
 // ── Fetch User Nudges ──────────────────────────────────────────────────
 
-export async function getUserNudges(userId: string, unreadOnly: boolean = false) {
+export async function getUserNudges(userId: string, unreadOnly: boolean = false): Promise<Nudge[]> {
     return prisma.nudge.findMany({
         where: {
             userId,
@@ -255,14 +256,14 @@ export async function getUserNudges(userId: string, unreadOnly: boolean = false)
     });
 }
 
-export async function markNudgeRead(nudgeId: string, userId: string) {
+export async function markNudgeRead(nudgeId: string, userId: string): Promise<Prisma.BatchPayload> {
     return prisma.nudge.updateMany({
         where: { id: nudgeId, userId },
         data: { isRead: true },
     });
 }
 
-export async function markAllNudgesRead(userId: string) {
+export async function markAllNudgesRead(userId: string): Promise<Prisma.BatchPayload> {
     return prisma.nudge.updateMany({
         where: { userId, isRead: false },
         data: { isRead: true },

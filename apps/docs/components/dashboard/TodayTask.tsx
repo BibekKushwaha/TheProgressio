@@ -5,9 +5,10 @@ import { ChevronRight, Clock, CheckCircle2, Circle } from 'lucide-react';
 import { useGetTasksQuery, useToggleTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getTodayDateKey } from '@/lib/date';
 
 export function TodaysTasks() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDateKey();
     const { data: tasks, isLoading } = useGetTasksQuery({ date: today });
     const [toggleTask] = useToggleTaskMutation();
 
@@ -108,10 +109,16 @@ export function TodaysTasks() {
         <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5">
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-white">Today's Tasks</h2>
-                    <p className="text-sm text-slate-400 mt-1">
-                        {isLoading ? <Skeleton className="h-4 w-32 bg-white/5" /> : (tasks?.length ? `${tasks.filter(t => t.status === TaskStatus.COMPLETED).length}/${tasks.length} completed` : 'Get started with your goals')}
-                    </p>
+                    <h2 className="text-2xl font-bold text-white">Today&apos;s Tasks</h2>
+                    <div className="text-sm text-slate-400 mt-1">
+                        {isLoading ? (
+                            <Skeleton className="h-4 w-32 bg-white/5" />
+                        ) : (
+                            tasks?.length
+                                ? `${tasks.filter(t => t.status === TaskStatus.COMPLETED).length}/${tasks.length} completed`
+                                : 'Get started with your goals'
+                        )}
+                    </div>
                 </div>
                 <Link href="/planner" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-all duration-300 font-semibold group">
                     Planner

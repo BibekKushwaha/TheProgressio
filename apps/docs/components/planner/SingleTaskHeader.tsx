@@ -7,9 +7,10 @@ import { useRouter, useParams } from 'next/navigation';
 
 export function SingleTaskHeader() {
     const router = useRouter();
-    const { id } = useParams()
-    if (!id) return null
-    const { data: task } = useGetTaskByIdQuery(id as string)
+    const params = useParams();
+    const id = typeof params?.id === 'string' ? params.id : '';
+    const { data: task } = useGetTaskByIdQuery(id, { skip: !id });
+    if (!id) return null;
 
     return (
         <div>

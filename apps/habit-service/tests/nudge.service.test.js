@@ -1,0 +1,182 @@
+/**
+ * Unit tests for nudge.service.ts
+ *
+ * Tests streak risk detection, exam warnings, morning briefing generation,
+ * slip pattern detection, and nudge CRUD with mocked Prisma.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+// ─── Mock Prisma ────────────────────────────────────────────────────────────────
+const { mockPrisma } = vi.hoisted(() => ({
+    mockPrisma: {
+        habit: { findMany: vi.fn() },
+        nudge: { findFirst: vi.fn(), create: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+        exam: { findMany: vi.fn() },
+        task: { count: vi.fn() },
+        habitLog: { findMany: vi.fn(), groupBy: vi.fn() },
+        user: { findUnique: vi.fn() },
+        timetable: { findMany: vi.fn() },
+    },
+}));
+vi.mock('@repo/db', () => ({
+    prisma: mockPrisma,
+}));
+import { NUDGE_TYPES, detectStreakRisks, detectExamWarnings, generateMorningBriefing, detectSlipPatterns, getUserNudges, markNudgeRead, markAllNudgesRead, } from '../src/services/nudge.service';
+// ─── Helpers ────────────────────────────────────────────────────────────────────
+const hoursAgo = (h) => new Date(Date.now() - h * 3600_000);
+// ─── Tests ──────────────────────────────────────────────────────────────────────
+describe('Nudge Service — NUDGE_TYPES', () => {
+    it('exports all expected nudge types', () => {
+        expect(NUDGE_TYPES.STREAK_RISK).toBe('STREAK_RISK');
+        expect(NUDGE_TYPES.EXAM_WARNING).toBe('EXAM_WARNING');
+        expect(NUDGE_TYPES.MORNING_BRIEFING).toBe('MORNING_BRIEFING');
+        expect(NUDGE_TYPES.SLIP_DETECTION).toBe('SLIP_DETECTION');
+        expect(NUDGE_TYPES.RECOVERY_SUGGESTION).toBe('RECOVERY_SUGGESTION');
+    });
+});
+describe('Nudge Service — detectStreakRisks', () => {
+    beforeEach(() => vi.clearAllMocks());
+    it('does nothing when no habits exist', async () => {
+        mockPrisma.habit.findMany.mockResolvedValue([]);
+        await detectStreakRisks('u1');
+        expect(mockPrisma.nudge.create).not.toHaveBeenCalled();
+    });
+    it('does nothing when habit was just logged', async () => {
+        mockPrisma.habit.findMany.mockResolvedValue([{
+                id: 'h1',
+                name: 'Read',
+                frequency: 'DAILY',
+                currentStreak: 5,
+                logs: [{ loggedAt: hoursAgo(2) }],
+            }]);
+        await detectStreakRisks('u1');
+        expect(mockPrisma.nudge.create).not.toHaveBeenCalled();
+    });
+    it('creates a STREAK_RISK nudge when daily habit is overdue >20h', async () => {
+        mockPrisma.habit.findMany.mockResolvedValue([{
+                id: 'h1',
+                name: 'Read',
+                frequency: 'DAILY',
+                currentStreak: 5,
+                logs: [{ loggedAt: hoursAgo(22) }],
+            }]);
+        mockPrisma.nudge.findFirst.mockResolvedValue(null); // no existing nudge today
+        mockPrisma.nudge.create.mockResolvedValue({ id: 'n1' });
+        await detectStreakRisks('u1');
+        expect(mockPrisma.nudge.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({
+                userId: 'u1',
+                type: 'STREAK_RISK',
+            }),
+        }));
+    });
+    it('does not duplicate nudge if one already exists today', async () => {
+        mockPrisma.habit.findMany.mockResolvedValue([{
+                id: 'h1',
+                name: 'Read',
+                frequency: 'DAILY',
+                currentStreak: 5,
+                logs: [{ loggedAt: hoursAgo(22) }],
+            }]);
+        mockPrisma.nudge.findFirst.mockResolvedValue({ id: 'existing-nudge' });
+        await detectStreakRisks('u1');
+        expect(mockPrisma.nudge.create).not.toHaveBeenCalled();
+    });
+});
+describe('Nudge Service — detectExamWarnings', () => {
+    beforeEach(() => vi.clearAllMocks());
+    it('does nothing when no exams are upcoming', async () => {
+        mockPrisma.exam.findMany.mockResolvedValue([]);
+        await detectExamWarnings('u1');
+        expect(mockPrisma.nudge.create).not.toHaveBeenCalled();
+    });
+    it('creates EXAM_WARNING nudge for an exam 7 days away', async () => {
+        const examDate = new Date();
+        examDate.setDate(examDate.getDate() + 7);
+        mockPrisma.exam.findMany.mockResolvedValue([{
+                id: 'e1',
+                title: 'Physics Final',
+                date: examDate,
+                subjectId: 's1',
+                subject: { name: 'Physics' },
+            }]);
+        mockPrisma.nudge.findFirst.mockResolvedValue(null);
+        mockPrisma.nudge.create.mockResolvedValue({ id: 'n1' });
+        await detectExamWarnings('u1');
+        expect(mockPrisma.nudge.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({
+                userId: 'u1',
+                type: 'EXAM_WARNING',
+            }),
+        }));
+    });
+});
+describe('Nudge Service — generateMorningBriefing', () => {
+    beforeEach(() => vi.clearAllMocks());
+    it('returns a morning briefing with all fields', async () => {
+        mockPrisma.task.count.mockResolvedValue(3);
+        mockPrisma.habit.findMany.mockResolvedValue([
+            { id: 'h1', name: 'Read', frequency: 'DAILY', currentStreak: 5, lastLogDate: hoursAgo(30), logs: [] },
+        ]);
+        mockPrisma.exam.findMany.mockResolvedValue([]);
+        mockPrisma.user.findUnique.mockResolvedValue({ dailyGoalHours: 4 });
+        mockPrisma.timetable.findMany.mockResolvedValue([]);
+        const briefing = await generateMorningBriefing('u1');
+        expect(briefing).toHaveProperty('dueTasks');
+        expect(briefing).toHaveProperty('habitsToComplete');
+        expect(briefing).toHaveProperty('upcomingExams');
+        expect(briefing).toHaveProperty('streaksAtRisk');
+        expect(briefing).toHaveProperty('conflicts');
+        expect(typeof briefing.dueTasks).toBe('number');
+    });
+    it('detects streaks at risk in briefing', async () => {
+        mockPrisma.task.count.mockResolvedValue(0);
+        mockPrisma.habit.findMany.mockResolvedValue([
+            { id: 'h1', name: 'Meditate', frequency: 'DAILY', currentStreak: 10, lastLogDate: hoursAgo(25), logs: [] },
+        ]);
+        mockPrisma.exam.findMany.mockResolvedValue([]);
+        mockPrisma.user.findUnique.mockResolvedValue({ dailyGoalHours: 4 });
+        mockPrisma.timetable.findMany.mockResolvedValue([]);
+        const briefing = await generateMorningBriefing('u1');
+        expect(briefing.streaksAtRisk.length).toBeGreaterThanOrEqual(1);
+        expect(briefing.streaksAtRisk[0]).toHaveProperty('habitName', 'Meditate');
+    });
+});
+describe('Nudge Service — getUserNudges / markRead', () => {
+    beforeEach(() => vi.clearAllMocks());
+    it('returns all nudges for a user', async () => {
+        const nudges = [
+            { id: 'n1', type: 'STREAK_RISK', isRead: false },
+            { id: 'n2', type: 'EXAM_WARNING', isRead: true },
+        ];
+        mockPrisma.nudge.findMany.mockResolvedValue(nudges);
+        const result = await getUserNudges('u1');
+        expect(result).toHaveLength(2);
+        expect(mockPrisma.nudge.findMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({ userId: 'u1' }),
+        }));
+    });
+    it('filters unread nudges when requested', async () => {
+        mockPrisma.nudge.findMany.mockResolvedValue([]);
+        await getUserNudges('u1', true);
+        expect(mockPrisma.nudge.findMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({ userId: 'u1', isRead: false }),
+        }));
+    });
+    it('markNudgeRead updates nudges for a user', async () => {
+        mockPrisma.nudge.updateMany.mockResolvedValue({ count: 1 });
+        await markNudgeRead('n1', 'u1');
+        expect(mockPrisma.nudge.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: { id: 'n1', userId: 'u1' },
+            data: { isRead: true },
+        }));
+    });
+    it('markAllNudgesRead marks all for user', async () => {
+        mockPrisma.nudge.updateMany.mockResolvedValue({ count: 5 });
+        await markAllNudgesRead('u1');
+        expect(mockPrisma.nudge.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: { userId: 'u1', isRead: false },
+            data: { isRead: true },
+        }));
+    });
+});
+//# sourceMappingURL=nudge.service.test.js.map

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     LayoutDashboard,
     CheckSquare,
@@ -19,9 +19,15 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import GlassCard from "../ui/glass-card";
+import { logout as logoutAction, useAppDispatch, useLogoutMutation } from "@repo/store";
+import { useToast } from "@/components/ui/toast-provider";
 
 const Sidebar = () => {
     const pathname = usePathname();
+    const router = useRouter();
+    const dispatch = useAppDispatch();
+    const { toast } = useToast();
+    const [logoutApi, { isLoading: isLoggingOut }] = useLogoutMutation();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const navItems = [
@@ -34,6 +40,22 @@ const Sidebar = () => {
         { name: "Subject Library", icon: BookOpen, href: "/subjects" },
         { name: "Family Connect", icon: Users, href: "/family-connect" },
     ];
+
+    const isActiveRoute = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+    const handleLogout = async () => {
+        try {
+            await logoutApi().unwrap();
+            dispatch(logoutAction());
+            if (typeof window !== "undefined") {
+                localStorage.removeItem("auth:hasSession");
+            }
+            toast("Logged out successfully", "success");
+            router.push("/login");
+        } catch {
+            toast("Failed to logout. Please try again.", "error");
+        }
+    };
 
 
     return (
@@ -53,16 +75,16 @@ const Sidebar = () => {
                             <Link key={item.href} href={item.href}>
                                 <div className={cn(
                                     "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative",
-                                    pathname === item.href
+                                    isActiveRoute(item.href)
                                         ? "bg-white/10 text-white shadow-lg shadow-indigo-500/10"
                                         : "text-gray-400 hover:bg-white/5 hover:text-white"
                                 )}>
-                                    {pathname === item.href && (
+                                    {isActiveRoute(item.href) && (
                                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full" />
                                     )}
                                     <item.icon className={cn(
                                         "w-5 h-5 transition-colors",
-                                        pathname === item.href ? "text-indigo-400" : "group-hover:text-indigo-400"
+                                        isActiveRoute(item.href) ? "text-indigo-400" : "group-hover:text-indigo-400"
                                     )} />
                                     <span className="font-medium">{item.name}</span>
                                 </div>
@@ -74,15 +96,19 @@ const Sidebar = () => {
                         <Link href="/settings">
                             <div className={cn(
                                 "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group text-gray-400 hover:bg-white/5 hover:text-white",
-                                pathname === "/settings" && "bg-white/10 text-white"
+                                isActiveRoute("/settings") && "bg-white/10 text-white"
                             )}>
                                 <Settings className="w-5 h-5 group-hover:text-indigo-400" />
                                 <span className="font-medium">Settings</span>
                             </div>
                         </Link>
-                        <button className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group">
+                        <button
+                            onClick={handleLogout}
+                            disabled={isLoggingOut}
+                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group disabled:opacity-60"
+                        >
                             <LogOut className="w-5 h-5 group-hover:text-red-400" />
-                            <span className="font-medium">Logout</span>
+                            <span className="font-medium">{isLoggingOut ? "Logging out..." : "Logout"}</span>
                         </button>
                     </div>
                 </GlassCard>
@@ -131,16 +157,16 @@ const Sidebar = () => {
                             >
                                 <div className={cn(
                                     "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative",
-                                    pathname === item.href
+                                    isActiveRoute(item.href)
                                         ? "bg-white/10 text-white shadow-lg shadow-indigo-500/10"
                                         : "text-gray-400 hover:bg-white/5 hover:text-white"
                                 )}>
-                                    {pathname === item.href && (
+                                    {isActiveRoute(item.href) && (
                                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full" />
                                     )}
                                     <item.icon className={cn(
                                         "w-5 h-5 transition-colors",
-                                        pathname === item.href ? "text-indigo-400" : "group-hover:text-indigo-400"
+                                        isActiveRoute(item.href) ? "text-indigo-400" : "group-hover:text-indigo-400"
                                     )} />
                                     <span className="font-medium">{item.name}</span>
                                 </div>
@@ -152,15 +178,19 @@ const Sidebar = () => {
                         <Link href="/settings" onClick={() => setMobileMenuOpen(false)}>
                             <div className={cn(
                                 "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group text-gray-400 hover:bg-white/5 hover:text-white",
-                                pathname === "/settings" && "bg-white/10 text-white"
+                                isActiveRoute("/settings") && "bg-white/10 text-white"
                             )}>
                                 <Settings className="w-5 h-5 group-hover:text-indigo-400" />
                                 <span className="font-medium">Settings</span>
                             </div>
                         </Link>
-                        <button className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group">
+                        <button
+                            onClick={handleLogout}
+                            disabled={isLoggingOut}
+                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group disabled:opacity-60"
+                        >
                             <LogOut className="w-5 h-5 group-hover:text-red-400" />
-                            <span className="font-medium">Logout</span>
+                            <span className="font-medium">{isLoggingOut ? "Logging out..." : "Logout"}</span>
                         </button>
                     </div>
                 </GlassCard>

@@ -15,18 +15,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toast-provider';
 import {
-    useSmartCreateTaskMutation,
     usePreviewSubtasksMutation,
     useCreateTaskMutation,
     useUpdateTaskMutation,
     useGetTaskByIdQuery,
     useParseTaskMutation,
     PriorityEnum,
-    TaskStatus,
-    addTask,
     useGetCategoriesQuery,
     useCreateCategoryMutation,
-    useAppDispatch
 } from '@repo/store';
 
 function CreateTaskPageContent() {
@@ -37,7 +33,7 @@ function CreateTaskPageContent() {
 
     const [taskDescription, setTaskDescription] = useState('');
     const [description, setDescription] = useState('');
-    const [selectedSubjectId, setSelectedSubjectId] = useState<string | number>(1);
+    const [selectedSubjectId, setSelectedSubjectId] = useState<string | number>('');
     const [selectedPriority, setSelectedPriority] = useState('Routine');
     const [selectedEffort, setSelectedEffort] = useState('1h');
     const [subtasks, setSubtasks] = useState<{ id: string | number; text: string; completed: boolean; loading?: boolean }[]>([]);
@@ -46,7 +42,6 @@ function CreateTaskPageContent() {
         skip: !taskId,
     });
 
-    const [smartCreateTask, { isLoading: isSmartCreating }] = useSmartCreateTaskMutation();
     const [previewSubtasks, { isLoading: isGeneratingSubtasks }] = usePreviewSubtasksMutation();
     const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
     const [updateTask, { isLoading: isUpdating }] = useUpdateTaskMutation();
@@ -109,7 +104,7 @@ function CreateTaskPageContent() {
                         if (result.subject && categories) {
                             const matchedCategory = categories.find(c => c.name.toLowerCase() === result.subject?.toLowerCase());
                             if (matchedCategory) {
-                                setSelectedSubjectId(matchedCategory.id);
+                                setSelectedSubjectId(String(matchedCategory.id));
                             }
                         }
                     }
@@ -127,22 +122,22 @@ function CreateTaskPageContent() {
 
     const handleSaveTask = async () => {
         try {
-
-
             // Map string priority to Enum
             let priorityEnum = PriorityEnum.LOW;
             if (selectedPriority === 'Medium') priorityEnum = PriorityEnum.MEDIUM;
             if (selectedPriority === 'Urgent') priorityEnum = PriorityEnum.HIGH;
 
-            let categoryIdToUse = typeof selectedSubjectId === 'string' ? selectedSubjectId : undefined;
+            let categoryIdToUse = typeof selectedSubjectId === 'string' && selectedSubjectId.trim()
+                ? selectedSubjectId.trim()
+                : undefined;
 
-            // Check if we need to create a new category
-            if (parsedMeta.subject) {
+            // Fallback to parsed subject only if no manual category is currently selected.
+            if (!categoryIdToUse && parsedMeta.subject) {
                 const subject = parsedMeta.subject;
                 const existingCategory = categories?.find(c => c.name.toLowerCase() === subject.toLowerCase());
 
                 if (existingCategory) {
-                    categoryIdToUse = existingCategory.id;
+                    categoryIdToUse = String(existingCategory.id);
                 } else {
                     // Create new category
                     try {
@@ -150,26 +145,13 @@ function CreateTaskPageContent() {
                             name: subject,
                             colorCode: 'from-blue-600/40 to-blue-500/40', // Default color
                         }).unwrap();
-                        categoryIdToUse = newCategory.id;
-                        console.log('Created new category:', newCategory);
-                    } catch (error) {
-                        console.error('Failed to create new category:', error);
+                        categoryIdToUse = String(newCategory.id);
+                    } catch {
                         // Fallback: don't use category if creation failed
                         categoryIdToUse = undefined;
                     }
                 }
-            } else {
-                // If no parsed subject, rely on what's selected visually (if it's a valid string ID)
-                // Or if selectedSubjectId is still default 1 (number), map it to undefined
-                if (typeof selectedSubjectId === 'number') {
-                    categoryIdToUse = undefined;
-                }
             }
-            console.log("title", taskDescription);
-            console.log("description", description);
-            console.log("priority", priorityEnum);
-            console.log("categoryId", categoryIdToUse);
-            console.log("dueDate", parsedDueDate);
 
             if (taskId) {
                 await updateTask({
@@ -239,7 +221,7 @@ function CreateTaskPageContent() {
                             <TaskInputCard
                                 value={taskDescription}
                                 onChange={setTaskDescription}
-                                isParsing={isSmartCreating || isParsingTask}
+                                isParsing={isParsingTask}
                                 highlights={[
                                     ...(parsedMeta.subject ? [{ text: parsedMeta.subject, type: 'subject' as const }] : []),
                                     ...(parsedMeta.date ? [{ text: parsedMeta.date, type: 'date' as const }] : []),
@@ -324,7 +306,7 @@ function CreateTaskPageContent() {
                 <PageActions
                     onSubmit={handleSaveTask}
                     onCancel={() => router.back()}
-                    isSubmitting={isCreating || isSmartCreating || isUpdating}
+                    isSubmitting={isCreating || isUpdating}
                     submitLabel={taskId ? "Update Task" : "Add to My Gateway"}
                     SubmitIcon={taskId ? Edit : undefined}
                 />

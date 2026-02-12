@@ -9,10 +9,11 @@ export function UserLevelCard() {
 
     if (isLoading) {
         return (
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6">
+            <div className="bg-gradient-to-br from-white/[0.06] via-amber-500/[0.05] to-white/[0.02] backdrop-blur-md border border-white/20 rounded-2xl p-6">
                 <Skeleton className="h-6 w-32 bg-white/5 mb-4" />
-                <Skeleton className="h-12 w-full bg-white/5 mb-2" />
-                <Skeleton className="h-4 w-24 bg-white/5" />
+                <Skeleton className="h-16 w-full bg-white/5 mb-3" />
+                <Skeleton className="h-3 w-full bg-white/5 mb-2" />
+                <Skeleton className="h-4 w-28 bg-white/5" />
             </div>
         );
     }
@@ -22,14 +23,14 @@ export function UserLevelCard() {
     const { level, levelName, xp, xpToNextLevel, progress } = xpData.xp;
 
     return (
-        <div className="group bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-md border border-amber-500/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-300 relative overflow-hidden">
-            {/* Animated background glow */}
-            <div className="absolute -top-20 -right-20 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-500" />
+        <div className="group relative overflow-hidden bg-gradient-to-br from-white/[0.06] via-amber-500/[0.06] to-white/[0.02] backdrop-blur-md border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-300">
+            <div className="absolute -top-20 -right-20 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-500" />
+            <div className="absolute -left-16 -bottom-16 w-40 h-40 bg-orange-400/10 rounded-full blur-2xl pointer-events-none" />
 
             <div className="relative z-10">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl">
+                        <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl shadow-lg shadow-amber-500/30">
                             <Trophy className="w-6 h-6 text-white" />
                         </div>
                         <div>
@@ -45,6 +46,21 @@ export function UserLevelCard() {
                     </div>
                 </div>
 
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wide text-slate-400">Current XP</div>
+                        <div className="mt-1 text-sm font-semibold text-white">{xp}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wide text-slate-400">To Next</div>
+                        <div className="mt-1 text-sm font-semibold text-white">{xpToNextLevel}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wide text-slate-400">Progress</div>
+                        <div className="mt-1 text-sm font-semibold text-white">{Math.round(progress)}%</div>
+                    </div>
+                </div>
+
                 {/* XP Progress Bar */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -57,12 +73,12 @@ export function UserLevelCard() {
                         </div>
                     </div>
 
-                    <div className="relative h-3 bg-white/10 rounded-full overflow-hidden">
+                    <div className="relative h-3 bg-white/10 rounded-full overflow-hidden border border-white/10">
                         <div
                             className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500 ease-out"
                             style={{ width: `${progress}%` }}
                         >
-                            <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                            <div className="absolute inset-0 bg-white/20" />
                         </div>
                     </div>
 

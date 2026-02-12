@@ -110,15 +110,33 @@ const logHabitCompletionInternal = async (params: {
     const occurredAt = params.occurredAt ?? new Date();
     const { start, end } = getPeriodBounds(habit.frequency, occurredAt);
 
-    const existingLog = await prisma.habitLog.findFirst({
+    let existingLog = await prisma.habitLog.findFirst({
         where: {
             habitId: params.habitId,
             loggedAt: { gte: start, lt: end },
         },
     });
 
+    const appearsResetState =
+        habit.lastLogDate === null ||
+        (
+            habit.currentStreak === 0 &&
+            habit.longestStreak === 0 &&
+            habit.mercyDaysUsed === 0 &&
+            habit.lastLogDate !== null &&
+            habit.lastLogDate < start
+        );
+
+    // Self-heal: if habit was reset but stale period logs still exist, clear logs and allow check-in.
+    if (existingLog && appearsResetState) {
+        await prisma.habitLog.deleteMany({
+            where: { habitId: params.habitId },
+        });
+        existingLog = null;
+    }
+
     if (existingLog) {
-        return { status: "already_logged" as const, habit };
+        return { status: "already_logged" as const, habit, log: existingLog };
     }
 
     const log = await prisma.habitLog.create({
@@ -184,7 +202,13 @@ export const createHabit = async (
 
         res.status(201).json({
             message: "Habit created successfully",
-            habit,
+            habit: {
+                ...habit,
+                streakStatus: "inactive",
+                streakHealth: "broken",
+                mercyDaysUsed: 0,
+                isMercyActive: false,
+            },
         });
     } catch (error) {
         console.error("Error creating habit:", error);
@@ -229,8 +253,12 @@ export const logHabitCompletion = async (
         });
 
         if (result.status === "already_logged") {
-            res.status(400).json({
+            res.status(200).json({
                 message: "Habit already logged for this period",
+                log: result.log,
+                habit: result.habit,
+                streakStatus: getStreakStatus(result.habit.lastLogDate, result.habit.frequency),
+                alreadyLogged: true,
             });
             return;
         }
@@ -244,7 +272,8 @@ export const logHabitCompletion = async (
             message: "Habit logged successfully",
             log: result.log,
             habit: result.habit,
-            streakStatus: "extended",
+            streakStatus: getStreakStatus(result.habit.lastLogDate, result.habit.frequency),
+            streakHealth: result.streakResult?.streakHealth ?? "strong",
         });
     } catch (error) {
         console.error("Error logging habit:", error);
@@ -286,7 +315,7 @@ export const getAllHabits = async (
                 return {
                     ...habit,
                     currentStreak: streakResult.currentStreak,
-                    streakStatus: streakResult.streakHealth,
+                    streakStatus: getStreakStatus(habit.lastLogDate, habit.frequency),
                     streakHealth: streakResult.streakHealth,
                     mercyDaysUsed: streakResult.mercyDaysUsed,
                     isMercyActive: streakResult.isMercyActive,
@@ -389,7 +418,7 @@ export const getHabitStats = async (
                 totalCompletions,
                 completionRate: Math.round(completionRate * 1000) / 1000,
                 lastLogDate: habit.lastLogDate,
-                streakStatus: streakResult.streakHealth,
+                streakStatus: getStreakStatus(habit.lastLogDate, habit.frequency),
                 heatmapData,
             },
         });
@@ -451,8 +480,10 @@ export const updateHabit = async (
             habit: {
                 ...updatedHabit,
                 currentStreak: streakResult.currentStreak,
-                streakStatus: streakResult.streakHealth,
+                streakStatus: getStreakStatus(updatedHabit.lastLogDate, updatedHabit.frequency),
                 streakHealth: streakResult.streakHealth,
+                mercyDaysUsed: streakResult.mercyDaysUsed,
+                isMercyActive: streakResult.isMercyActive,
             },
         });
     } catch (error) {
@@ -583,18 +614,30 @@ export const resetHabit = async (
             return;
         }
 
-        const updatedHabit = await prisma.habit.update({
-            where: { id: id as string },
-            data: {
-                currentStreak: 0,
-                mercyDaysUsed: 0,
-                lastLogDate: null,
-            },
-        });
+        const [, updatedHabit] = await prisma.$transaction([
+            prisma.habitLog.deleteMany({
+                where: { habitId: id as string },
+            }),
+            prisma.habit.update({
+                where: { id: id as string },
+                data: {
+                    currentStreak: 0,
+                    longestStreak: 0,
+                    mercyDaysUsed: 0,
+                    lastLogDate: null,
+                },
+            }),
+        ]);
 
         res.status(200).json({
             message: "Habit streak reset successfully",
-            habit: updatedHabit,
+            habit: {
+                ...updatedHabit,
+                streakStatus: "inactive",
+                streakHealth: "broken",
+                mercyDaysUsed: 0,
+                isMercyActive: false,
+            },
         });
     } catch (error) {
         console.error("Error resetting habit:", error);
@@ -625,13 +668,31 @@ export const getUserXP = async (
         const xp = user.xp ?? 0;
         const level = calculateLevel(xp);
         const progress = xpToNextLevel(xp);
+        const LEVEL_NAMES = [
+            "Novice",
+            "Apprentice",
+            "Disciplined",
+            "Focused",
+            "Consistent",
+            "Performer",
+            "Strategist",
+            "Achiever",
+            "Master",
+            "Legend",
+        ];
+        const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)] ?? "Novice";
 
         res.status(200).json({
-            xp,
-            level,
-            nextLevelXP: progress.next,
-            currentLevelXP: progress.current,
-            progressPercent: progress.progress,
+            message: "XP fetched successfully",
+            xp: {
+                xp,
+                level,
+                levelName,
+                xpToNextLevel: Math.max(0, progress.next - xp),
+                progress: progress.progress,
+                currentLevelXP: progress.current,
+                nextLevelXP: progress.next,
+            },
         });
     } catch (error) {
         console.error("Error fetching XP:", error);

@@ -4,6 +4,7 @@
 import { useGetDailyScheduleQuery, TimetableEntry, Task } from "@repo/store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Clock, MapPin, User } from "lucide-react";
+import { getTodayDateKey, toLocalDateKey } from "@/lib/date";
 
 type TimetableViewProps = {
     tasks?: Task[];
@@ -12,16 +13,10 @@ type TimetableViewProps = {
 
 export function TimetableView({ tasks = [], date }: TimetableViewProps) {
     const { data: schedule, isLoading, error } = useGetDailyScheduleQuery(date ? { date } : undefined);
-
-    const getLocalDateString = (value: Date) => {
-        const offsetMs = value.getTimezoneOffset() * 60 * 1000;
-        return new Date(value.getTime() - offsetMs).toISOString().split('T')[0];
-    };
-
-    const selectedDateString = date || getLocalDateString(new Date());
+    const selectedDateString = date || getTodayDateKey();
     const todaysTasks = tasks.filter((task) => {
         if (!task.dueDate) return false;
-        return getLocalDateString(new Date(task.dueDate)) === selectedDateString;
+        return toLocalDateKey(new Date(task.dueDate)) === selectedDateString;
     });
 
     const scheduleContent = (() => {
@@ -53,7 +48,7 @@ export function TimetableView({ tasks = [], date }: TimetableViewProps) {
                     <div>
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                             <Calendar className="w-6 h-6 text-purple-400" />
-                            Today's Schedule
+                            Today&apos;s Schedule
                         </h2>
                         <p className="text-slate-400 mt-1">
                             {new Date(schedule.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -83,7 +78,7 @@ export function TimetableView({ tasks = [], date }: TimetableViewProps) {
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-white">Today's Tasks</h3>
+                    <h3 className="text-lg font-semibold text-white">Today&apos;s Tasks</h3>
                     <span className="text-xs text-slate-400">{todaysTasks.length} tasks</span>
                 </div>
                 {todaysTasks.length > 0 ? (

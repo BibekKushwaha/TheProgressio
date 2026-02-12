@@ -19,9 +19,15 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const taskTitle = searchParams.get('task') || searchParams.get('goal') || 'Deep Work Session';
     const taskId = searchParams.get('taskId') || '';
     const durationParam = Number(searchParams.get('duration')) || 25;
+    const intensityParam = Number(searchParams.get('intensity')) || 75;
+    const avoidBackToBack = searchParams.get('avoidBackToBack') !== '0';
+    const prioritizeMorning = searchParams.get('prioritizeMorning') !== '0';
+    const recommendedStart = searchParams.get('recommendedStart') || '';
+    const recommendedEnd = searchParams.get('recommendedEnd') || '';
 
     // Check if duration is a valid number
     const initialMinutes = isNaN(durationParam) ? 25 : durationParam;
+    const sessionIntensity = Math.max(0, Math.min(100, isNaN(intensityParam) ? 75 : intensityParam));
 
     const [timeLeft, setTimeLeft] = useState(initialMinutes * 60);
     const [isPaused, setIsPaused] = useState(false);
@@ -78,6 +84,14 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                         Currently Focusing on: <span className="font-semibold">{taskTitle}</span>
                     </span>
                 </div>
+                <div className="mt-2 text-center text-xs text-slate-400">
+                    Intensity {sessionIntensity}% • {avoidBackToBack ? 'Break-friendly' : 'Back-to-back allowed'} • {prioritizeMorning ? 'Morning priority' : 'Flexible timing'}
+                </div>
+                {recommendedStart && recommendedEnd && (
+                    <div className="mt-1 text-center text-xs text-cyan-300">
+                        Suggested slot: {recommendedStart} - {recommendedEnd}
+                    </div>
+                )}
             </div>
 
             <div className="mb-12">
@@ -128,7 +142,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
 
             <div className="absolute bottom-8 text-center">
                 <p className="text-slate-400 italic">
-                    "Focus is a superpower. You are doing great."
+                    &quot;Focus is a superpower. You are doing great.&quot;
                 </p>
             </div>
         </div>

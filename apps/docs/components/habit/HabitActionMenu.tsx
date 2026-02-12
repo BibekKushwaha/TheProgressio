@@ -13,7 +13,7 @@ import {
 import { Habit, useDeleteHabitMutation, useResetHabitMutation } from "@repo/store"
 import HabitDialog from "./HabitDialog"
 import { HabitStatsModal } from "./HabitStatsModal";
-import { useAppDispatch } from "@repo/store";
+import { useToast } from "@/components/ui/toast-provider";
 
 interface HabitActionMenuProps {
     habit: Habit
@@ -22,20 +22,30 @@ interface HabitActionMenuProps {
 export function HabitActionMenu({ habit }: HabitActionMenuProps) {
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isStatsOpen, setIsStatsOpen] = useState(false)
-    const dispatch = useAppDispatch();
+    const { toast } = useToast();
 
     const [deleteHabit] = useDeleteHabitMutation()
     const [resetHabit] = useResetHabitMutation()
 
     const handleDelete = async () => {
         if (confirm("Are you sure you want to delete this habit?")) {
-            await deleteHabit(habit.id);
+            try {
+                await deleteHabit(habit.id).unwrap();
+                toast("Habit deleted successfully", "success");
+            } catch {
+                toast("Failed to delete habit", "error");
+            }
         }
     }
 
     const handleReset = async () => {
         if (confirm("Are you sure you want to reset this habit's progress?")) {
-            await resetHabit(habit.id)
+            try {
+                await resetHabit(habit.id).unwrap();
+                toast("Habit progress reset", "success");
+            } catch {
+                toast("Failed to reset habit", "error");
+            }
         }
     }
 

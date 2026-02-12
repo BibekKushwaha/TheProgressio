@@ -24,6 +24,7 @@ export interface ScheduleItem {
     status?: string;
     isCompleted?: boolean;
     isRecurring?: boolean;
+    rotation?: string | null;
 }
 
 export interface DailyScheduleResponse {

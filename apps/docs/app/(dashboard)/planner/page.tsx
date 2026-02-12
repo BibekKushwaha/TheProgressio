@@ -1,37 +1,72 @@
 "use client"
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { KanbanBoard } from '@/components/planner/KanbanBoard';
 import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
-import { SubjectCardsSidebar } from '@/components/planner/SubjectCardsSidebar';
 import { NLPCommandBar } from '@/components/planner/NLPCommandBar';
 import { SyllabusDigitizer } from '@/components/planner/SyllabusDigitizer';
-import { useGetTasksQuery } from '@repo/store';
+import { TaskStatus, useGetCategoriesQuery, useGetTasksQuery } from '@repo/store';
+import { useSearchParams } from 'next/navigation';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Navbar } from '@/components/Navbar';
 import { SearchBar } from '@/components/SearchBar';
+import { getTodayDateKey } from '@/lib/date';
 
 export default function TasksPage() {
+    const searchParams = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
+    const [status, setStatus] = useState('all');
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [view, setView] = useState<'kanban' | 'list' | 'timetable'>('kanban');
     const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
 
-    const { data: allTasks, isLoading } = useGetTasksQuery();
+    const { data: categories } = useGetCategoriesQuery();
+    const { data: allTasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
     const tasks = allTasks || [];
 
-    const getTodayDateString = () => {
-        const now = new Date();
-        const offsetMs = now.getTimezoneOffset() * 60 * 1000;
-        return new Date(now.getTime() - offsetMs).toISOString().split('T')[0];
-    };
+    useEffect(() => {
+        const queryCategoryId = searchParams.get('categoryId');
+        const queryCategoryName = searchParams.get('category');
+        const queryStatus = searchParams.get('status');
+
+        if (queryCategoryId) {
+            setSelectedCategory(queryCategoryId);
+        } else if (queryCategoryName) {
+            const matchedCategory = categories?.find(
+                category => category.name.toLowerCase() === queryCategoryName.toLowerCase()
+            );
+            setSelectedCategory(matchedCategory?.id || queryCategoryName);
+        }
+
+        if (
+            queryStatus &&
+            (queryStatus === TaskStatus.PENDING ||
+                queryStatus === TaskStatus.IN_PROGRESS ||
+                queryStatus === TaskStatus.COMPLETED ||
+                queryStatus === 'all')
+        ) {
+            setStatus(queryStatus);
+        }
+    }, [searchParams, categories]);
+
+    const categoryOptions = useMemo(
+        () => [
+            { label: 'Category', value: 'all', color: '#6B7280' },
+            ...(categories || []).map((category) => ({
+                label: category.name,
+                value: category.id,
+                color: category.colorCode,
+            })),
+        ],
+        [categories]
+    );
 
     const handleViewChange = (nextView: 'kanban' | 'list' | 'timetable') => {
         setView(nextView);
         if (nextView === 'timetable') {
-            setDateFilter(getTodayDateString());
+            setDateFilter(getTodayDateKey());
         } else {
             setDateFilter(undefined);
         }
@@ -67,12 +102,15 @@ export default function TasksPage() {
                     <SearchBar
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
+                        status={status}
+                        setStatus={setStatus}
                         priority={priority}
                         setPriority={setPriority}
                         selectedCategory={selectedCategory}
                         setSelectedCategory={setSelectedCategory}
                         view={view}
                         setView={handleViewChange}
+                        CATEGORY_OPTIONS={categoryOptions}
                     />
                     <div className="flex flex-1">
                         <main className="flex-1 p-4 md:p-8 overflow-auto">

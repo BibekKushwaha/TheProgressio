@@ -11,9 +11,12 @@ import {
 import { Field, FieldGroup } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState, useEffect } from "react"
-import { useAppDispatch, useCreateTaskMutation, useUpdateTaskMutation, useSmartCreateTaskMutation, useCreateCategoryMutation, useGetCategoriesQuery, PriorityEnum, addCategory, addTask, updateTask as updateTaskAction, type Priority, TaskStatus, type Task, type Status } from "@repo/store"
+import { useState } from "react"
+import { useAppDispatch, useCreateTaskMutation, useUpdateTaskMutation, useSmartCreateTaskMutation, useCreateCategoryMutation, useGetCategoriesQuery, PriorityEnum, addCategory, addTask, updateTask as updateTaskAction, type Priority, type Task, type Status } from "@repo/store"
 import { categorySchema, taskSchema } from "@repo/schemas"
+import { getApiErrorMessage } from "@/lib/api-error"
+import { getTodayDateKey, toLocalDateKey } from "@/lib/date"
+import { type FormErrors, zodErrorToFormErrors } from "@/lib/form"
 
 interface TaskDialogProps {
     onClose: () => void;
@@ -28,6 +31,8 @@ const CATEGORY_OPTIONS = [
     { label: "Coding", value: "coding", color: "#F97316" },
 ] as const;
 
+type TaskDialogField = "title" | "description" | "dueDate" | "category" | "priority" | "smart" | "form";
+
 export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
     const isEdit = !!task;
     const [taskName, setTaskName] = useState(task?.title || '');
@@ -35,12 +40,12 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
     const [categoryName, setCategoryName] = useState(task?.category?.name || '');
     const [dueDate, setDueDate] = useState<string>(
         (task?.dueDate
-            ? new Date(task.dueDate).toISOString().split('T')[0]
-            : new Date().toISOString().split('T')[0]) || ""
+            ? toLocalDateKey(new Date(task.dueDate))
+            : getTodayDateKey()) || ""
     );
     const [priority, setPriority] = useState<Priority>(task?.priority || PriorityEnum.MEDIUM);
     const [isLoading, setIsLoading] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+    const [errors, setErrors] = useState<FormErrors<TaskDialogField>>({});
 
     const dispatch = useAppDispatch();
     const [createTaskApi] = useCreateTaskMutation();
@@ -52,100 +57,132 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
     const [smartInput, setSmartInput] = useState('');
     const { data: categories } = useGetCategoriesQuery();
 
+    const submitSmartTask = async (): Promise<boolean> => {
+        if (!smartInput.trim()) {
+            setErrors({ smart: "Please enter a task description" });
+            return false;
+        }
+
+        try {
+            const response = await smartCreateTaskApi({ text: smartInput.trim() }).unwrap();
+            if (!response.task) {
+                setErrors({ smart: "Unable to create task from your input" });
+                return false;
+            }
+
+            dispatch(addTask(response.task));
+            return true;
+        } catch (error: unknown) {
+            setErrors({ smart: getApiErrorMessage(error, "Failed to create smart task") });
+            return false;
+        }
+    };
+
+    const resolveCategoryId = async (): Promise<string | null | undefined> => {
+        const trimmedCategory = categoryName.trim();
+        if (!trimmedCategory) return undefined;
+
+        const normalizedCategory = trimmedCategory.toLowerCase();
+        const existingCategory = categories?.find(
+            (category) => category.name.toLowerCase() === normalizedCategory
+        );
+        if (existingCategory?.id) return existingCategory.id;
+
+        const selectedCategory = CATEGORY_OPTIONS.find(
+            (option) => option.label.toLowerCase() === normalizedCategory
+        );
+        const colorCode = selectedCategory?.color || '#6B7280';
+        const categoryValidation = categorySchema.safeParse({ name: trimmedCategory, colorCode });
+
+        if (!categoryValidation.success) {
+            setErrors({
+                category: categoryValidation.error.issues[0]?.message || "Category is invalid",
+            });
+            return null;
+        }
+
+        try {
+            const categoryResponse = await createCategoryApi({
+                name: categoryValidation.data.name,
+                colorCode: categoryValidation.data.colorCode,
+            }).unwrap();
+            if (categoryResponse.id) {
+                dispatch(addCategory(categoryResponse));
+                return categoryResponse.id;
+            }
+
+            return undefined;
+        } catch (error: unknown) {
+            setErrors({ category: getApiErrorMessage(error, "Failed to create category") });
+            return null;
+        }
+    };
+
+    const submitManualTask = async (): Promise<boolean> => {
+        const categoryId = await resolveCategoryId();
+        if (categoryId === null) return false;
+
+        const validationResult = taskSchema.safeParse({
+            title: taskName.trim(),
+            description: description.trim() || undefined,
+            dueDate: new Date(dueDate),
+            categoryId: categoryId || undefined,
+            priority,
+        });
+
+        if (!validationResult.success) {
+            const validationErrors = zodErrorToFormErrors(validationResult.error);
+            setErrors({
+                title: validationErrors.title,
+                description: validationErrors.description,
+                dueDate: validationErrors.dueDate,
+                priority: validationErrors.priority,
+                category: validationErrors.categoryId,
+            });
+            return false;
+        }
+
+        if (isEdit && task) {
+            const updatedTask = await updateTaskApi({
+                id: task.id,
+                ...validationResult.data,
+                status: validationResult.data.status as Status,
+                priority: validationResult.data.priority as Priority,
+                dueDate: validationResult.data.dueDate?.toISOString(),
+            }).unwrap();
+            dispatch(updateTaskAction(updatedTask));
+            return true;
+        }
+
+        const createdTask = await createTaskApi({
+            ...validationResult.data,
+            priority: validationResult.data.priority as Priority,
+            status: validationResult.data.status as Status,
+            dueDate: validationResult.data.dueDate?.toISOString(),
+        }).unwrap();
+        dispatch(addTask(createdTask));
+        return true;
+    };
+
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setErrors({});
 
         try {
-            if (mode === 'smart') {
-                if (!smartInput.trim()) {
-                    setErrors({ smart: 'Please enter a task description' });
-                    setIsLoading(false);
-                    return;
-                }
+            const submissionSucceeded = mode === 'smart'
+                ? await submitSmartTask()
+                : await submitManualTask();
 
-                try {
-                    const response = await smartCreateTaskApi({ text: smartInput }).unwrap();
-                    if (response.task) {
-                        dispatch(addTask(response.task));
-                        await onSubmit();
-                        onClose();
-                    }
-                } catch (err: any) {
-                    setErrors({ smart: err.data?.message || 'Failed to create smart task' });
-                } finally {
-                    setIsLoading(false);
-                }
-                return;
-            }
+            if (!submissionSucceeded) return;
 
-            // Find or create category
-            const catColor = CATEGORY_OPTIONS.find(c => c.label.toLowerCase() === categoryName.toLowerCase())?.color || '#6B7280';
-            const existingCategory = categories?.find(c => c.name.toLowerCase() === categoryName.trim().toLowerCase());
-
-            let categoryId = existingCategory?.id;
-
-            if (!existingCategory && categoryName.trim()) {
-                const validatedCategory = categorySchema.safeParse({ name: categoryName.trim(), colorCode: catColor });
-                if (validatedCategory.success) {
-                    try {
-                        const catResp = await createCategoryApi({ name: validatedCategory.data.name, colorCode: validatedCategory.data.colorCode }).unwrap();
-                        if (catResp.id) {
-                            dispatch(addCategory(catResp));
-                            categoryId = catResp.id;
-                        }
-                    } catch (err) {
-                        setErrors(prev => ({ ...prev, category: 'Failed to create category' }));
-                        setIsLoading(false);
-                        return;
-                    }
-                }
-            }
-
-            const validationResult = taskSchema.safeParse({
-                title: taskName.trim(),
-                description: description.trim() || undefined,
-                dueDate: new Date(dueDate),
-                categoryId: categoryId || undefined,
-                priority: priority,
-            });
-
-            if (!validationResult.success) {
-                const fieldErrors: Record<string, string | undefined> = {};
-                validationResult.error.issues.forEach((err) => {
-                    if (err.path[0]) {
-                        fieldErrors[err.path[0].toString()] = err.message;
-                    }
-                });
-                setErrors(fieldErrors);
-                setIsLoading(false);
-                return;
-            }
-
-            if (isEdit && task) {
-                const response = await updateTaskApi({
-                    id: task.id,
-                    ...validationResult.data,
-                    status: validationResult.data.status as Status,
-                    priority: validationResult.data.priority as Priority,
-                    dueDate: validationResult.data.dueDate?.toISOString(),
-                }).unwrap();
-                dispatch(updateTaskAction(response));
-            } else {
-                const response = await createTaskApi({
-                    ...validationResult.data,
-                    priority: validationResult.data.priority as Priority,
-                    status: validationResult.data.status as Status,
-                    dueDate: validationResult.data.dueDate?.toISOString(),
-                }).unwrap();
-                dispatch(addTask(response));
-            }
-
-            await onSubmit(); // Notify parent
+            await onSubmit();
             onClose();
-        } catch (error: any) {
-            setErrors(prev => ({ ...prev, form: error.data?.message || `Failed to ${isEdit ? 'update' : 'create'} task` }));
+        } catch (error: unknown) {
+            setErrors((prev) => ({
+                ...prev,
+                form: getApiErrorMessage(error, `Failed to ${isEdit ? "update" : "create"} task`),
+            }));
         } finally {
             setIsLoading(false);
         }
@@ -187,11 +224,11 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                         <div className="py-6 space-y-4">
                             <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
                                 <p className="text-xs text-purple-200">
-                                    <strong>Tip:</strong> Try "Physics exam next Friday at 2pm" or "Buy groceries tomorrow high priority"
+                                    <strong>Tip:</strong> Try &quot;Physics exam next Friday at 2pm&quot; or &quot;Buy groceries tomorrow high priority&quot;
                                 </p>
                             </div>
                             <Field>
-                                <Label htmlFor="smartInput">What's on your mind?</Label>
+                                <Label htmlFor="smartInput">What&apos;s on your mind?</Label>
                                 <textarea
                                     id="smartInput"
                                     value={smartInput}
@@ -239,6 +276,7 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                                     onChange={(e) => setDueDate(e.target.value)}
                                     className="bg-white/5 border-white/10 focus:ring-purple-500/50"
                                 />
+                                {errors.dueDate && <p className="text-red-400 text-xs mt-1">{errors.dueDate}</p>}
                             </Field>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -258,6 +296,7 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                                         ))}
                                         <option value="Other">Other</option>
                                     </select>
+                                    {errors.category && <p className="text-red-400 text-xs mt-1">{errors.category}</p>}
                                 </Field>
                                 <Field>
                                     <Label htmlFor="priority">Priority</Label>
@@ -271,6 +310,7 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                                         <option value={PriorityEnum.MEDIUM}>Medium</option>
                                         <option value={PriorityEnum.HIGH}>High</option>
                                     </select>
+                                    {errors.priority && <p className="text-red-400 text-xs mt-1">{errors.priority}</p>}
                                 </Field>
                             </div>
                         </FieldGroup>

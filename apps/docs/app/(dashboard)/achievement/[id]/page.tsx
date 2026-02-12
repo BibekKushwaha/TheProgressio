@@ -1,32 +1,31 @@
 "use client";
 
-import React, { use, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useGetAchievementsQuery } from '@repo/store';
-import AchievementDetailModal from '../../../../components/modals/achievement-detail-modal';
-import { Loader2 } from 'lucide-react';
+import { useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { useGetAchievementsQuery } from "@repo/store";
+import AchievementDetailModal from "@/components/modals/achievement-detail-modal";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface PageProps {
-    params: Promise<{ id: string }>;
-}
-
-import { Skeleton } from '@/components/ui/skeleton';
-
-const AchievementDetailPage = ({ params }: PageProps) => {
+const AchievementDetailPage = () => {
     const router = useRouter();
-    const resolvedParams = use(params);
-    const { id } = resolvedParams;
-
+    const params = useParams<{ id: string }>();
+    const achievementId = params?.id;
     const { data: achievementsData, isLoading, isError } = useGetAchievementsQuery();
     const [isModalOpen, setIsModalOpen] = useState(true);
 
-    const achievements = achievementsData?.achievements || [];
-    const achievement = achievements.find(a => a.id === id);
+    const achievements = useMemo(
+        () => achievementsData?.achievements ?? [],
+        [achievementsData?.achievements]
+    );
+    const achievement = useMemo(
+        () => achievements.find((item) => item.id === achievementId),
+        [achievementId, achievements]
+    );
 
     const handleClose = () => {
         setIsModalOpen(false);
-        // Navigate back to achievements list after closing
-        router.push('/achievement');
+        router.push("/achievement");
     };
 
     if (isLoading) {
@@ -44,18 +43,19 @@ const AchievementDetailPage = ({ params }: PageProps) => {
         );
     }
 
-    if (isError || !achievement) {
+    if (!achievementId || isError || !achievement) {
         return (
             <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
                 <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl max-w-md">
                     <h1 className="text-2xl font-bold text-red-400 mb-2">Achievement Not Found</h1>
                     <p className="text-slate-400 mb-6">
-                        We couldn't find the achievement you're looking for. It might have been removed or the ID is incorrect.
+                        We could not find this achievement. It may have been removed or the link is invalid.
                     </p>
                     <button
-                        onClick={() => router.push('/achievement')}
-                        className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-full transition-colors"
+                        onClick={() => router.push("/achievement")}
+                        className="inline-flex items-center gap-2 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-full transition-colors"
                     >
+                        <ArrowLeft className="w-4 h-4" />
                         Back to Achievements
                     </button>
                 </div>
@@ -66,7 +66,10 @@ const AchievementDetailPage = ({ params }: PageProps) => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 flex items-center justify-center p-4">
             <div className="text-center">
-                <p className="text-slate-500 mb-4">Opening details for <b>{achievement.name}</b>...</p>
+                <div className="inline-flex items-center gap-2 text-slate-400 mb-4">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Opening details for <b className="text-white">{achievement.name}</b>
+                </div>
                 <button
                     onClick={() => setIsModalOpen(true)}
                     className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-full transition-colors"
@@ -82,6 +85,6 @@ const AchievementDetailPage = ({ params }: PageProps) => {
             />
         </div>
     );
-}
+};
 
 export default AchievementDetailPage;

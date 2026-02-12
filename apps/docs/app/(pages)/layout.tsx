@@ -1,20 +1,11 @@
 "use client";
-import { selectIsAuthenticated, useAppSelector } from '@repo/store';
-import { useRouter } from 'next/navigation';
-import React from 'react'
 
-const layout = ({ children }: { children: React.ReactNode }) => {
-    const isAuthenticated = useAppSelector(selectIsAuthenticated);
-    const router = useRouter();
-    if (!isAuthenticated) {
-        router.push('/login');
-        return null; // Prevent rendering until redirect happens
-    }
-  return (
-    <>
-      {children}
-    </>
-  )
+import { AuthGuard } from "@/components/layout/AuthGuard";
+
+export default function PagesLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    return <AuthGuard>{children}</AuthGuard>;
 }
-
-export default layout

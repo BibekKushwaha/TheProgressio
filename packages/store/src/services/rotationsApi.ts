@@ -74,6 +74,7 @@ export const rotationsApi = createApi({
                 method: 'GET',
                 params: params || {},
             }),
+            providesTags: [{ type: 'Rotations', id: 'RESOLVED' }],
         }),
         createRotationPattern: builder.mutation<RotationPattern, CreateRotationRequest>({
             query: (body) => ({
@@ -81,7 +82,7 @@ export const rotationsApi = createApi({
                 method: 'POST',
                 body,
             }),
-            invalidatesTags: [{ type: 'Rotations', id: 'LIST' }],
+            invalidatesTags: [{ type: 'Rotations', id: 'LIST' }, { type: 'Rotations', id: 'RESOLVED' }],
         }),
         updateRotationPattern: builder.mutation<RotationPattern, UpdateRotationRequest>({
             query: ({ id, ...body }) => ({
@@ -92,6 +93,7 @@ export const rotationsApi = createApi({
             invalidatesTags: (_result, _error, { id }) => [
                 { type: 'Rotations', id },
                 { type: 'Rotations', id: 'LIST' },
+                { type: 'Rotations', id: 'RESOLVED' },
             ],
         }),
         deleteRotationPattern: builder.mutation<{ message: string }, string>({
@@ -102,6 +104,7 @@ export const rotationsApi = createApi({
             invalidatesTags: (_result, _error, id) => [
                 { type: 'Rotations', id },
                 { type: 'Rotations', id: 'LIST' },
+                { type: 'Rotations', id: 'RESOLVED' },
             ],
         }),
     }),

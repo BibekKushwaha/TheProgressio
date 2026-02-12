@@ -3,6 +3,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function FocusTrends({ pastDays }: { pastDays: string }) {
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
+    const chartWidth = 600;
+    const chartHeight = 256;
+
+    const formatDayLabel = (value: string) => {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toLocaleDateString('en-US', { weekday: 'short' });
+        }
+        const compact = value.trim();
+        if (!compact) return 'N/A';
+        return compact.length <= 3 ? compact : compact.slice(0, 3);
+    };
 
     const rawData = trendsData?.data || [
         { date: 'Mon', hours: 0 },
@@ -14,17 +26,19 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
         { date: 'Sun', hours: 0 },
     ];
 
-    const data = rawData.map(d => ({
-        day: new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }),
+    const maxPoints = pastDays === "7" ? 14 : 7;
+    const visibleRawData = rawData.slice(-maxPoints);
+    const data = visibleRawData.map((d) => ({
+        day: formatDayLabel(d.date),
         hours: d.hours,
-        percentage: Math.min(100, (d.hours / 8) * 100) // Assuming 8h is 100% for visualization
     }));
 
     const maxHours = Math.max(...data.map(d => d.hours), 1);
+    const xStep = data.length > 1 ? chartWidth / (data.length - 1) : 0;
 
     // Calculate SVG path points
-    const points = data.map((d, i) => `${i * 100},${256 - (d.hours / maxHours) * 200}`).join(' L ');
-    const areaPath = `M 0 256 L ${points} L 600 256 Z`;
+    const points = data.map((d, i) => `${i * xStep},${chartHeight - (d.hours / maxHours) * 200}`).join(' L ');
+    const areaPath = `M 0 ${chartHeight} L ${points} L ${chartWidth} ${chartHeight} Z`;
     const linePath = `M ${points}`;
 
     return (
@@ -45,7 +59,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
                     <Skeleton className="w-full h-full bg-white/5" />
                 ) : (
                     <>
-                        <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 600 256">
+                        <svg className="w-full h-full" preserveAspectRatio="none" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
                             <defs>
                                 <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                                     <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity="0.3" />
@@ -63,8 +77,8 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
                             {data.map((point, index) => (
                                 <circle
                                     key={index}
-                                    cx={index * 100}
-                                    cy={256 - (point.hours / maxHours) * 200}
+                                    cx={index * xStep}
+                                    cy={chartHeight - (point.hours / maxHours) * 200}
                                     r="5"
                                     fill="rgb(6, 182, 212)"
                                     className="hover:r-7 transition-all cursor-pointer"

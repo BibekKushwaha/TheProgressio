@@ -2,6 +2,27 @@ import type { Response } from "express";
 import { prisma } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 
+const normalizePatternLabels = (raw: unknown): string[] => {
+    if (Array.isArray(raw)) {
+        return raw.map((item) => String(item).trim()).filter(Boolean);
+    }
+    if (typeof raw !== "string") return [];
+
+    const clean = raw.trim();
+    if (!clean) return [];
+
+    const byComma = clean.split(",").map((item) => item.trim()).filter(Boolean);
+    if (byComma.length >= 2) return byComma;
+
+    const byDash = clean.split("-").map((item) => item.trim()).filter(Boolean);
+    if (byDash.length >= 2) return byDash;
+
+    const bySlash = clean.split("/").map((item) => item.trim()).filter(Boolean);
+    if (bySlash.length >= 2) return bySlash;
+
+    return byComma;
+};
+
 /**
  * Create a custom rotation pattern.
  * Body: { name, pattern: string[], startDate, cycleLengthDays? }
@@ -13,12 +34,13 @@ export const createRotationPattern = async (req: AuthenticatedRequest, res: Resp
         }
 
         const { name, pattern, startDate, cycleLengthDays } = req.body;
+        const normalizedPattern = normalizePatternLabels(pattern);
 
         if (!name || typeof name !== "string") {
             return res.status(400).json({ message: "Name is required" });
         }
 
-        if (!Array.isArray(pattern) || pattern.length < 2) {
+        if (normalizedPattern.length < 2) {
             return res.status(400).json({ message: "Pattern must be an array of at least 2 labels (e.g. [\"A\", \"B\"])" });
         }
 
@@ -29,9 +51,9 @@ export const createRotationPattern = async (req: AuthenticatedRequest, res: Resp
         const rotationPattern = await prisma.rotationPattern.create({
             data: {
                 name,
-                pattern,
+                pattern: normalizedPattern,
                 startDate: new Date(startDate),
-                cycleLengthDays: cycleLengthDays ?? 7,
+                cycleLengthDays: Number(cycleLengthDays) > 0 ? Number(cycleLengthDays) : 7,
                 userId: req.user.id,
             },
         });
@@ -76,7 +98,11 @@ export const getRotationPatternById = async (req: AuthenticatedRequest, res: Res
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { id } = req.params;
+        const rawId = req.params.id;
+        if (typeof rawId !== "string" || !rawId) {
+            return res.status(400).json({ message: "Invalid rotation pattern id" });
+        }
+        const id = rawId;
         const pattern = await prisma.rotationPattern.findUnique({ where: { id } });
 
         if (!pattern) return res.status(404).json({ message: "Rotation pattern not found" });
@@ -98,23 +124,45 @@ export const updateRotationPattern = async (req: AuthenticatedRequest, res: Resp
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { id } = req.params;
+        const rawId = req.params.id;
+        if (typeof rawId !== "string" || !rawId) {
+            return res.status(400).json({ message: "Invalid rotation pattern id" });
+        }
+        const id = rawId;
         const { name, pattern, startDate, cycleLengthDays, isActive } = req.body;
+        const normalizedPattern = normalizePatternLabels(pattern);
 
         const existing = await prisma.rotationPattern.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ message: "Rotation pattern not found" });
         if (existing.userId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
 
-        const updated = await prisma.rotationPattern.update({
-            where: { id },
-            data: {
-                ...(name && { name }),
-                ...(Array.isArray(pattern) && { pattern }),
-                ...(startDate && { startDate: new Date(startDate) }),
-                ...(cycleLengthDays !== undefined && { cycleLengthDays }),
-                ...(isActive !== undefined && { isActive }),
-            },
-        });
+        const updateData = {
+            ...(name && { name }),
+            ...(normalizedPattern.length > 0 && { pattern: normalizedPattern }),
+            ...(startDate && { startDate: new Date(startDate) }),
+            ...(cycleLengthDays !== undefined && Number(cycleLengthDays) > 0 && { cycleLengthDays: Number(cycleLengthDays) }),
+            ...(isActive !== undefined && { isActive }),
+        };
+
+        let updated;
+        if (isActive === true) {
+            const [, activatedPattern] = await prisma.$transaction([
+                prisma.rotationPattern.updateMany({
+                    where: { userId: req.user.id, isActive: true, id: { not: id } },
+                    data: { isActive: false },
+                }),
+                prisma.rotationPattern.update({
+                    where: { id },
+                    data: { ...updateData, isActive: true },
+                }),
+            ]);
+            updated = activatedPattern;
+        } else {
+            updated = await prisma.rotationPattern.update({
+                where: { id },
+                data: updateData,
+            });
+        }
 
         return res.status(200).json(updated);
     } catch (error: any) {
@@ -135,7 +183,11 @@ export const deleteRotationPattern = async (req: AuthenticatedRequest, res: Resp
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { id } = req.params;
+        const rawId = req.params.id;
+        if (typeof rawId !== "string" || !rawId) {
+            return res.status(400).json({ message: "Invalid rotation pattern id" });
+        }
+        const id = rawId;
 
         const existing = await prisma.rotationPattern.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ message: "Rotation pattern not found" });
@@ -160,8 +212,9 @@ export const resolveRotation = async (req: AuthenticatedRequest, res: Response) 
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { date } = req.query;
-        const targetDate = date ? new Date(date as string) : new Date();
+        const rawDate = req.query.date;
+        const date = typeof rawDate === "string" ? rawDate : undefined;
+        const targetDate = date ? new Date(date) : new Date();
 
         if (isNaN(targetDate.getTime())) {
             return res.status(400).json({ message: "Invalid date format" });

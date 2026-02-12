@@ -6,6 +6,8 @@ import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { useCreateHabitMutation, useUpdateHabitMutation, Frequency, Habit } from '@repo/store'
 import { cn } from '@/lib/utils'
+import { getApiErrorMessage } from '@/lib/api-error'
+import type { FormErrors } from '@/lib/form'
 
 interface HabitDialogProps {
     open: boolean
@@ -23,37 +25,43 @@ const COLORS = [
     { name: "Indigo", value: "from-indigo-600 to-violet-600", bg: "bg-indigo-600" },
 ]
 
+type HabitDialogField = "form";
+
 const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
     const [habitName, setHabitName] = useState("")
     const [targetValue, setTargetValue] = useState("1")
     const [habitFrequency, setHabitFrequency] = useState<Frequency>(Frequency.DAILY)
     const [selectedEmoji, setSelectedEmoji] = useState(EMOJIS[0]!)
     const [selectedColor, setSelectedColor] = useState(COLORS[0]!)
-    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [errors, setErrors] = useState<FormErrors<HabitDialogField>>({});
 
     const [createHabit, { isLoading: isCreating }] = useCreateHabitMutation()
     const [updateHabit, { isLoading: isUpdating }] = useUpdateHabitMutation()
 
     const isLoading = isCreating || isUpdating
 
-    useEffect(() => {
-        if (open) {
-            if (habit) {
-                setHabitName(habit.name)
-                setTargetValue(habit.targetValue.toString())
-                setHabitFrequency(habit.frequency)
-                setSelectedEmoji(habit.icon || EMOJIS[0]!)
-                const color = COLORS.find(c => c.value === habit.color) || COLORS[0]!
-                setSelectedColor(color)
-            } else {
-                setHabitName("")
-                setTargetValue("1")
-                setHabitFrequency(Frequency.DAILY)
-                setSelectedEmoji(EMOJIS[0]!)
-                setSelectedColor(COLORS[0]!)
-            }
-            setErrors({})
+    const resetFormState = (existingHabit?: Habit) => {
+        if (existingHabit) {
+            setHabitName(existingHabit.name)
+            setTargetValue(existingHabit.targetValue.toString())
+            setHabitFrequency(existingHabit.frequency)
+            setSelectedEmoji(existingHabit.icon || EMOJIS[0]!)
+            const color = COLORS.find((entry) => entry.value === existingHabit.color) || COLORS[0]!
+            setSelectedColor(color)
+            return
         }
+
+        setHabitName("")
+        setTargetValue("1")
+        setHabitFrequency(Frequency.DAILY)
+        setSelectedEmoji(EMOJIS[0]!)
+        setSelectedColor(COLORS[0]!)
+    }
+
+    useEffect(() => {
+        if (!open) return
+        resetFormState(habit)
+        setErrors({})
     }, [open, habit])
 
     const onClose = () => {
@@ -65,28 +73,35 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
         e.preventDefault()
         setErrors({})
 
+        const normalizedName = habitName.trim()
+        const parsedTarget = Number.parseInt(targetValue, 10)
+        const normalizedTarget = Number.isFinite(parsedTarget) && parsedTarget > 0 ? parsedTarget : 1
+
+        if (!normalizedName) {
+            setErrors({ form: "Habit name is required" })
+            return
+        }
+
+        const payload = {
+            name: normalizedName,
+            frequency: habitFrequency,
+            targetValue: normalizedTarget,
+            icon: selectedEmoji,
+            color: selectedColor.value
+        }
+
         try {
             if (habit) {
                 await updateHabit({
                     id: habit.id,
-                    name: habitName,
-                    frequency: habitFrequency,
-                    targetValue: parseInt(targetValue) || 1,
-                    icon: selectedEmoji,
-                    color: selectedColor.value
+                    ...payload
                 }).unwrap()
             } else {
-                await createHabit({
-                    name: habitName,
-                    frequency: habitFrequency,
-                    targetValue: parseInt(targetValue) || 1,
-                    icon: selectedEmoji,
-                    color: selectedColor.value
-                }).unwrap()
+                await createHabit(payload).unwrap()
             }
             onClose()
-        } catch (err: any) {
-            setErrors({ form: err.data?.message || `Failed to ${habit ? 'update' : 'create'} habit` })
+        } catch (err: unknown) {
+            setErrors({ form: getApiErrorMessage(err, `Failed to ${habit ? 'update' : 'create'} habit`) })
         }
     }
 

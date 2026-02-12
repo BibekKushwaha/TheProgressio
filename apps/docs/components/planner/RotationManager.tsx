@@ -16,68 +16,121 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast-provider';
 import { Calendar, Plus, Edit, Trash2, RotateCw, CheckCircle, XCircle } from 'lucide-react';
+import { getApiErrorMessage } from '@/lib/api-error';
+import { getTodayDateKey, normalizeDateInput } from '@/lib/date';
+
+const parsePatternLabels = (raw: string) => {
+    const clean = raw.trim();
+    if (!clean) return [] as string[];
+
+    const byComma = clean.split(',').map((p) => p.trim()).filter(Boolean);
+    if (byComma.length >= 2) return byComma;
+
+    const byDash = clean.split('-').map((p) => p.trim()).filter(Boolean);
+    if (byDash.length >= 2) return byDash;
+
+    const bySlash = clean.split('/').map((p) => p.trim()).filter(Boolean);
+    if (bySlash.length >= 2) return bySlash;
+
+    return byComma;
+};
+
+const getInitialFormData = () => ({
+    name: '',
+    pattern: '',
+    startDate: getTodayDateKey(),
+    cycleLengthDays: '',
+});
 
 export function RotationManager() {
     const { data: patternsData, isLoading } = useGetRotationPatternsQuery();
     const { data: todayRotation } = useResolveRotationQuery();
-    const [createPattern] = useCreateRotationPatternMutation();
-    const [updatePattern] = useUpdateRotationPatternMutation();
-    const [deletePattern] = useDeleteRotationPatternMutation();
+    const [createPattern, { isLoading: isCreating }] = useCreateRotationPatternMutation();
+    const [updatePattern, { isLoading: isUpdating }] = useUpdateRotationPatternMutation();
+    const [deletePattern, { isLoading: isDeleting }] = useDeleteRotationPatternMutation();
     const { toast } = useToast();
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editingPattern, setEditingPattern] = useState<RotationPattern | null>(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        pattern: '',
-        startDate: '',
-        cycleLengthDays: '',
-    });
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const [pendingToggleId, setPendingToggleId] = useState<string | null>(null);
+    const [formData, setFormData] = useState(getInitialFormData);
 
     const patterns = patternsData || [];
 
     const resetForm = () => {
-        setFormData({ name: '', pattern: '', startDate: '', cycleLengthDays: '' });
+        setFormData(getInitialFormData());
         setEditingPattern(null);
     };
 
+    const parseForm = () => {
+        const name = formData.name.trim();
+        const patternArray = parsePatternLabels(formData.pattern);
+        const normalizedStartDate = normalizeDateInput(formData.startDate);
+        const cycleLengthDays = formData.cycleLengthDays
+            ? parseInt(formData.cycleLengthDays, 10)
+            : undefined;
+
+        if (!name) {
+            toast('Please enter a pattern name', 'error');
+            return null;
+        }
+        if (!normalizedStartDate) {
+            toast('Please select a valid start date (YYYY-MM-DD)', 'error');
+            return null;
+        }
+        if (patternArray.length < 2) {
+            toast('Pattern must contain at least 2 labels (e.g., A, B or A-B)', 'error');
+            return null;
+        }
+        if (cycleLengthDays !== undefined && (Number.isNaN(cycleLengthDays) || cycleLengthDays <= 0)) {
+            toast('Cycle length must be a positive number', 'error');
+            return null;
+        }
+
+        return { name, patternArray, cycleLengthDays, startDate: normalizedStartDate };
+    };
+
     const handleCreate = async () => {
+        const parsed = parseForm();
+        if (!parsed) return;
+
         try {
-            const patternArray = formData.pattern.split(',').map(p => p.trim()).filter(Boolean);
             await createPattern({
-                name: formData.name,
-                pattern: patternArray,
-                startDate: formData.startDate,
-                cycleLengthDays: formData.cycleLengthDays ? parseInt(formData.cycleLengthDays) : undefined,
+                name: parsed.name,
+                pattern: parsed.patternArray,
+                startDate: parsed.startDate,
+                cycleLengthDays: parsed.cycleLengthDays,
             }).unwrap();
 
             toast('Rotation pattern created successfully!', 'success');
             setIsCreateOpen(false);
             resetForm();
-        } catch (error) {
-            toast('Failed to create rotation pattern', 'error');
+        } catch (error: unknown) {
+            toast(getApiErrorMessage(error, 'Failed to create rotation pattern'), 'error');
         }
     };
 
     const handleUpdate = async () => {
         if (!editingPattern) return;
+        const parsed = parseForm();
+        if (!parsed) return;
 
         try {
-            const patternArray = formData.pattern.split(',').map(p => p.trim()).filter(Boolean);
             await updatePattern({
                 id: editingPattern.id,
-                name: formData.name || undefined,
-                pattern: patternArray.length > 0 ? patternArray : undefined,
-                startDate: formData.startDate || undefined,
-                cycleLengthDays: formData.cycleLengthDays ? parseInt(formData.cycleLengthDays) : undefined,
+                name: parsed.name,
+                pattern: parsed.patternArray,
+                startDate: parsed.startDate,
+                cycleLengthDays: parsed.cycleLengthDays,
             }).unwrap();
 
             toast('Rotation pattern updated successfully!', 'success');
             setIsEditOpen(false);
             resetForm();
-        } catch (error) {
-            toast('Failed to update rotation pattern', 'error');
+        } catch (error: unknown) {
+            toast(getApiErrorMessage(error, 'Failed to update rotation pattern'), 'error');
         }
     };
 
@@ -85,23 +138,29 @@ export function RotationManager() {
         if (!confirm('Are you sure you want to delete this rotation pattern?')) return;
 
         try {
+            setPendingDeleteId(id);
             await deletePattern(id).unwrap();
             toast('Rotation pattern deleted successfully!', 'success');
-        } catch (error) {
-            toast('Failed to delete rotation pattern', 'error');
+        } catch (error: unknown) {
+            toast(getApiErrorMessage(error, 'Failed to delete rotation pattern'), 'error');
+        } finally {
+            setPendingDeleteId(null);
         }
     };
 
     const handleToggleActive = async (pattern: RotationPattern) => {
         try {
+            setPendingToggleId(pattern.id);
             await updatePattern({
                 id: pattern.id,
                 isActive: !pattern.isActive,
             }).unwrap();
 
             toast(`Rotation pattern ${!pattern.isActive ? 'activated' : 'deactivated'}!`, 'success');
-        } catch (error) {
-            toast('Failed to update rotation pattern', 'error');
+        } catch (error: unknown) {
+            toast(getApiErrorMessage(error, 'Failed to update rotation pattern'), 'error');
+        } finally {
+            setPendingToggleId(null);
         }
     };
 
@@ -111,7 +170,7 @@ export function RotationManager() {
             name: pattern.name,
             pattern: pattern.pattern.join(', '),
             startDate: pattern.startDate.split('T')[0] ?? '',
-            cycleLengthDays: pattern.cycleLengthDays.toString(),
+            cycleLengthDays: String(pattern.cycleLengthDays ?? ''),
         });
         setIsEditOpen(true);
     };
@@ -127,7 +186,6 @@ export function RotationManager() {
 
     return (
         <div className="space-y-6">
-            {/* Header with Today's Rotation */}
             <Card className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 backdrop-blur-md border-cyan-500/20 p-6">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -158,7 +216,7 @@ export function RotationManager() {
                                     className="bg-white/5 border-white/10"
                                 />
                                 <Input
-                                    placeholder="Pattern (comma-separated, e.g., A, B, A, B)"
+                                    placeholder="Pattern (e.g., A, B or A-B)"
                                     value={formData.pattern}
                                     onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
                                     className="bg-white/5 border-white/10"
@@ -177,20 +235,23 @@ export function RotationManager() {
                                     onChange={(e) => setFormData({ ...formData, cycleLengthDays: e.target.value })}
                                     className="bg-white/5 border-white/10"
                                 />
-                                <Button onClick={handleCreate} className="w-full bg-cyan-500 hover:bg-cyan-600">
-                                    Create Pattern
+                                <Button
+                                    onClick={handleCreate}
+                                    disabled={isCreating}
+                                    className="w-full bg-cyan-500 hover:bg-cyan-600 disabled:opacity-60"
+                                >
+                                    {isCreating ? 'Creating...' : 'Create Pattern'}
                                 </Button>
                             </div>
                         </DialogContent>
                     </Dialog>
                 </div>
 
-                {/* Today's Rotation */}
                 {todayRotation && (
                     <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <div className="text-sm text-slate-400 mb-1">Today's Rotation</div>
+                                <div className="text-sm text-slate-400 mb-1">Today&apos;s Rotation</div>
                                 <div className="text-3xl font-bold text-cyan-400">{todayRotation.rotation}</div>
                                 {todayRotation.pattern && (
                                     <div className="text-xs text-slate-500 mt-1">{todayRotation.pattern.name}</div>
@@ -207,7 +268,6 @@ export function RotationManager() {
                 )}
             </Card>
 
-            {/* Rotation Patterns List */}
             {patterns.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {patterns.map((pattern) => (
@@ -245,12 +305,15 @@ export function RotationManager() {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleToggleActive(pattern)}
+                                    disabled={isUpdating && pendingToggleId === pattern.id}
                                     className={`flex-1 ${pattern.isActive
                                         ? 'bg-green-500/20 border-green-500/30 text-green-400 hover:bg-green-500/30'
                                         : 'bg-white/5 border-white/10 hover:bg-white/10'
                                         }`}
                                 >
-                                    {pattern.isActive ? 'Active' : 'Inactive'}
+                                    {isUpdating && pendingToggleId === pattern.id
+                                        ? 'Updating...'
+                                        : (pattern.isActive ? 'Active' : 'Inactive')}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -264,9 +327,10 @@ export function RotationManager() {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleDelete(pattern.id)}
+                                    disabled={(isDeleting && pendingDeleteId === pattern.id) || isUpdating}
                                     className="bg-red-500/20 border-red-500/30 text-red-400 hover:bg-red-500/30"
                                 >
-                                    <Trash2 className="w-4 h-4" />
+                                    {isDeleting && pendingDeleteId === pattern.id ? '...' : <Trash2 className="w-4 h-4" />}
                                 </Button>
                             </div>
                         </Card>
@@ -279,7 +343,6 @@ export function RotationManager() {
                 </Card>
             )}
 
-            {/* Edit Dialog */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                 <DialogContent className="bg-slate-900 border-white/10 text-white">
                     <DialogHeader>
@@ -311,8 +374,12 @@ export function RotationManager() {
                             onChange={(e) => setFormData({ ...formData, cycleLengthDays: e.target.value })}
                             className="bg-white/5 border-white/10"
                         />
-                        <Button onClick={handleUpdate} className="w-full bg-cyan-500 hover:bg-cyan-600">
-                            Update Pattern
+                        <Button
+                            onClick={handleUpdate}
+                            disabled={isUpdating}
+                            className="w-full bg-cyan-500 hover:bg-cyan-600 disabled:opacity-60"
+                        >
+                            {isUpdating ? 'Updating...' : 'Update Pattern'}
                         </Button>
                     </div>
                 </DialogContent>

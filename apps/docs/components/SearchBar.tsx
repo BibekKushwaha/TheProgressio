@@ -1,8 +1,15 @@
 "use client"
-import { Search, Filter, Tag, LayoutGrid, Calendar } from 'lucide-react';
+import { Search, Filter, Tag, LayoutGrid, Calendar, ListTodo } from 'lucide-react';
 import { TaskStatus, PriorityEnum } from '@repo/store';
 import { FilterDropdown } from './planner/FilterDropdown';
 
+
+const STATUS_OPTIONS = [
+    { label: "Status", value: "all" },
+    { label: "Pending", value: TaskStatus.PENDING },
+    { label: "In Progress", value: TaskStatus.IN_PROGRESS },
+    { label: "Completed", value: TaskStatus.COMPLETED },
+] as const;
 
 const PRIORITY_OPTIONS = [
     { label: "Priority", value: "all" },
@@ -24,11 +31,11 @@ interface SearchBarProps {
     searchQuery: string;
     setSearchQuery: (query: string) => void;
     status?: string;
-    setStatus?: (status: any) => void;
+    setStatus?: (status: string) => void;
     priority?: string;
-    setPriority?: (priority: any) => void;
+    setPriority?: (priority: string) => void;
     selectedCategory?: string;
-    setSelectedCategory?: (category: any) => void;
+    setSelectedCategory?: (category: string) => void;
     view?: 'kanban' | 'list' | 'timetable';
     setView?: (view: 'kanban' | 'list' | 'timetable') => void;
     STATUS_OPTIONS?: readonly { label: string; value: string }[];
@@ -39,6 +46,8 @@ interface SearchBarProps {
 export function SearchBar({
     searchQuery,
     setSearchQuery,
+    status,
+    setStatus,
     priority,
     setPriority,
     selectedCategory,
@@ -50,6 +59,7 @@ export function SearchBar({
     CATEGORY_OPTIONS: propCategoryOptions
 }: SearchBarProps) {
 
+    const currentStatusOptions = propStatusOptions || STATUS_OPTIONS;
     const currentPriorityOptions = propPriorityOptions || PRIORITY_OPTIONS;
     const currentCategoryOptions = propCategoryOptions || CATEGORY_OPTIONS;
 
@@ -69,6 +79,15 @@ export function SearchBar({
                     </div>
 
                     <div className="flex gap-2">
+                        {status && setStatus && (
+                            <FilterDropdown
+                                value={status}
+                                options={currentStatusOptions}
+                                onChange={setStatus}
+                                placeholder="Status"
+                                icon={<Filter className="w-4 h-4" />}
+                            />
+                        )}
                         {priority && setPriority && (
                             <FilterDropdown
                                 value={priority}
@@ -101,6 +120,12 @@ export function SearchBar({
                                 className={`px-4 py-2 rounded-lg transition-all duration-300 ${view === 'timetable' ? 'bg-gradient-to-r from-purple-600/40 to-pink-600/40 border border-purple-500/50' : 'hover:bg-white/10'}`}
                             >
                                 <Calendar className={`w-4 h-4 ${view === 'timetable' ? 'text-purple-300' : 'text-slate-400'}`} />
+                            </button>
+                            <button
+                                onClick={() => setView('list')}
+                                className={`px-4 py-2 rounded-lg transition-all duration-300 ${view === 'list' ? 'bg-gradient-to-r from-purple-600/40 to-pink-600/40 border border-purple-500/50' : 'hover:bg-white/10'}`}
+                            >
+                                <ListTodo className={`w-4 h-4 ${view === 'list' ? 'text-purple-300' : 'text-slate-400'}`} />
                             </button>
                         </div>
                     )}
