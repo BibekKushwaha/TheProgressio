@@ -15,7 +15,7 @@ const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 export class AIService {
     private model = genAI ? genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         safetySettings: [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -26,7 +26,7 @@ export class AIService {
 
     // Using flash-8b as fallback or same flash model as it has better limits/availability than pro-1.0
     private fallbackModel = genAI ? genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash-lite",
         safetySettings: [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -134,15 +134,11 @@ export class AIService {
         const effortMatch = text.match(effortRegex);
         let effort: string | undefined;
         if (effortMatch) {
-<<<<<<< HEAD
-            effort = `${effortMatch[1]}${effortMatch[2]?.startsWith('h') ? 'h' : 'm'}`;
-=======
             const amount = effortMatch[1];
             const unit = effortMatch[2]?.toLowerCase();
             if (amount) {
                 effort = `${amount}${unit?.startsWith("h") ? "h" : "m"}`;
             }
->>>>>>> origin/main
         }
 
         // Date & Time Detection
@@ -169,14 +165,9 @@ export class AIService {
             if (dayMatch) {
                 const modifier = dayMatch[1]; // "this" or "next"
                 const dayName = dayMatch[2];
-<<<<<<< HEAD
-                const dayIndex = days.indexOf(dayName!);
-                const currentDayIndex = now.getDay();
-=======
                 if (dayName) {
                     const dayIndex = days.indexOf(dayName);
                     const currentDayIndex = now.getDay();
->>>>>>> origin/main
 
                     let daysToAdd = (dayIndex - currentDayIndex + 7) % 7;
                     if (daysToAdd === 0 && !modifier) daysToAdd = 7; // If today is Monday and user says "Monday", assume next Monday unless specified
@@ -193,11 +184,6 @@ export class AIService {
         const timeMatch = lowerText.match(timeRegex);
 
         if (dueDate && timeMatch) {
-<<<<<<< HEAD
-            let hours = parseInt(timeMatch[1]!);
-            const minutes = parseInt(timeMatch[2] || "0");
-            const meridiem = timeMatch[3];
-=======
             const hourMatch = timeMatch[1];
             if (!hourMatch) {
                 dueDate.setHours(23, 59, 0, 0);
@@ -205,7 +191,6 @@ export class AIService {
                 let hours = parseInt(hourMatch, 10);
                 const minutes = parseInt(timeMatch[2] || "0");
                 const meridiem = timeMatch[3];
->>>>>>> origin/main
 
                 if (meridiem === 'pm' && hours < 12) hours += 12;
                 if (meridiem === 'am' && hours === 12) hours = 0;
