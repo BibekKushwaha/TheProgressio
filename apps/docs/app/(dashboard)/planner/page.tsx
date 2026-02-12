@@ -113,6 +113,12 @@ export default function TasksPage() {
                         CATEGORY_OPTIONS={categoryOptions}
                     />
                     <div className="flex flex-1">
+                        <aside className="hidden xl:block w-72 p-4 md:p-8 pr-0">
+                            <SubjectCardsSidebar
+                                selectedCategoryId={selectedCategory === 'all' ? undefined : selectedCategory}
+                                onSelectCategory={(id) => setSelectedCategory(id || 'all')}
+                            />
+                        </aside>
                         <main className="flex-1 p-4 md:p-8 overflow-auto">
                             {view === 'kanban' ? (
                                 <KanbanBoard

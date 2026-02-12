@@ -122,6 +122,24 @@ export function HabitStreaks() {
                 </motion.button>
             </Link>
 
+<<<<<<< HEAD
+=======
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: rgba(168, 85, 247, 0.1);
+                    border-radius: 10px;
+                }
+                .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+                    background: rgba(168, 85, 247, 0.3);
+                }
+            `}</style>
+>>>>>>> origin/main
         </div>
     );
 }

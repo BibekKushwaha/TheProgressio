@@ -4,6 +4,10 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
+<<<<<<< HEAD
+=======
+import GlassCard from "../../../components/ui/glass-card";
+>>>>>>> origin/main
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
 import { AuthSwitchLink } from "../../../components/auth/auth-footer";
@@ -53,7 +57,17 @@ const LoginPage = () => {
                 router.push("/dashboard");
             }
         } catch (err: unknown) {
+<<<<<<< HEAD
             setErrors({ form: getApiErrorMessage(err, "Login failed. Please try again.") });
+=======
+            const message =
+                typeof err === "object" && err !== null && "data" in err
+                    ? (err as { data?: { message?: string } }).data?.message
+                    : undefined;
+            setError(message || (err instanceof Error ? err.message : "Something went wrong"));
+        } finally {
+            setIsLoading(false);
+>>>>>>> origin/main
         }
     };
 
@@ -133,11 +147,20 @@ const LoginPage = () => {
                             Log In
                         </GradientButton>
 
+<<<<<<< HEAD
                         <AuthSwitchLink
                             prompt="Don't have an account?"
                             href="/signup"
                             label="Sign up"
                         />
+=======
+                        <div className="text-center text-sm text-gray-500 mt-6">
+                            Don&apos;t have an account?{" "}
+                            <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium hover:underline">
+                                Sign up
+                            </Link>
+                        </div>
+>>>>>>> origin/main
                     </form>
                 </AuthFormPane>
             )}

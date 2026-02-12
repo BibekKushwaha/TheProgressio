@@ -110,6 +110,7 @@ export function TodaysTasks() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-white">Today&apos;s Tasks</h2>
+<<<<<<< HEAD
                     <div className="text-sm text-slate-400 mt-1">
                         {isLoading ? (
                             <Skeleton className="h-4 w-32 bg-white/5" />
@@ -119,6 +120,11 @@ export function TodaysTasks() {
                                 : 'Get started with your goals'
                         )}
                     </div>
+=======
+                    <p className="text-sm text-slate-400 mt-1">
+                        {isLoading ? <Skeleton className="h-4 w-32 bg-white/5" /> : (tasks?.length ? `${tasks.filter(t => t.status === TaskStatus.COMPLETED).length}/${tasks.length} completed` : 'Get started with your goals')}
+                    </p>
+>>>>>>> origin/main
                 </div>
                 <Link href="/planner" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-all duration-300 font-semibold group">
                     Planner

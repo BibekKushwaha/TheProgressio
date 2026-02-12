@@ -1,11 +1,8 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
 import { StoreProvider } from "@repo/store";
 
 import { ToastProvider } from "@/components/ui/toast-provider";
-
-const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
@@ -21,8 +18,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
+<<<<<<< HEAD
     <html lang="en" className="dark">
       <body className={`${geist.className} antialiased bg-slate-950 text-slate-100`}>
+=======
+    <html lang="en">
+      <body className="antialiased">
+>>>>>>> origin/main
         <StoreProvider>
           <ToastProvider>{children}</ToastProvider>
         </StoreProvider>

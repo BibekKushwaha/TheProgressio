@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { Sparkles, Loader2, ArrowRight, X } from 'lucide-react';
 import { useParseTaskMutation, useCreateTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
+<<<<<<< HEAD
 
 interface ParsedTaskResult {
     title: string;
@@ -23,11 +24,24 @@ function toPriority(value?: ParsedTaskResult["priority"]): PriorityEnum {
             return PriorityEnum.MEDIUM;
     }
 }
+=======
+>>>>>>> origin/main
 
 export function NLPCommandBar() {
     const [input, setInput] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+<<<<<<< HEAD
     const [parsedResult, setParsedResult] = useState<ParsedTaskResult | null>(null);
+=======
+    type ParsedTask = {
+        title: string;
+        description?: string;
+        dueDate?: string;
+        priority?: PriorityEnum;
+        subject?: string;
+    };
+    const [parsedResult, setParsedResult] = useState<ParsedTask | null>(null);
+>>>>>>> origin/main
     const inputRef = useRef<HTMLInputElement>(null);
     const [parseTask, { isLoading: isParsing }] = useParseTaskMutation();
     const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
@@ -54,7 +68,11 @@ export function NLPCommandBar() {
                 title: parsedResult.title,
                 description: parsedResult.description || '',
                 dueDate: parsedResult.dueDate,
+<<<<<<< HEAD
                 priority: toPriority(parsedResult.priority),
+=======
+                priority: parsedResult.priority ?? PriorityEnum.MEDIUM,
+>>>>>>> origin/main
                 status: TaskStatus.PENDING,
             }).unwrap();
             setParsedResult(null);
@@ -136,9 +154,8 @@ export function NLPCommandBar() {
                         {parsedResult.priority && (
                             <div>
                                 <span className="text-slate-500 text-xs">Priority:</span>
-                                <p className={`font-semibold ${parsedResult.priority === 'URGENT' ? 'text-red-400' :
-                                    parsedResult.priority === 'HIGH' ? 'text-orange-400' :
-                                        parsedResult.priority === 'MEDIUM' ? 'text-yellow-400' : 'text-green-400'
+                                <p className={`font-semibold ${parsedResult.priority === PriorityEnum.HIGH ? 'text-orange-400' :
+                                    parsedResult.priority === PriorityEnum.MEDIUM ? 'text-yellow-400' : 'text-green-400'
                                     }`}>{parsedResult.priority}</p>
                             </div>
                         )}

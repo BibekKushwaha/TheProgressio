@@ -3,6 +3,10 @@
 import React, { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, User } from "lucide-react";
+<<<<<<< HEAD
+=======
+import GlassCard from "../../../components/ui/glass-card";
+>>>>>>> origin/main
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
 import { AuthSwitchLink, AuthTermsConsent } from "../../../components/auth/auth-footer";
@@ -47,7 +51,24 @@ const SignupPage = () => {
       }
       router.push('/');
     } catch (err: unknown) {
+<<<<<<< HEAD
       setErrors({ form: getApiErrorMessage(err, 'Signup failed. Please try again.') });
+=======
+      console.error('Signup failed:', err);
+      // Extract likely server error message if available
+      const serverMessage =
+        typeof err === 'object' && err !== null
+          ? (err as { data?: { message?: string } | string; error?: string; status?: number }).data && typeof (err as { data?: unknown }).data !== 'string'
+            ? (err as { data?: { message?: string } }).data?.message
+            : (err as { data?: string }).data || (err as { error?: string }).error
+          : null;
+      const statusMessage =
+        typeof err === 'object' && err !== null && 'status' in err
+          ? `Request failed: ${(err as { status?: number }).status}`
+          : null;
+      const fallbackMessage = statusMessage || 'Signup failed. Please try again.';
+      setErrors({ email: typeof serverMessage === 'string' ? serverMessage : fallbackMessage });
+>>>>>>> origin/main
     }
   };
 

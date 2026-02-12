@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { CheckCircle2, Flame, Target, Trophy } from 'lucide-react';
+=======
+import { Flame, Trophy } from 'lucide-react';
+>>>>>>> origin/main
 import { cn } from '@/lib/utils';
 import { Habit, useLogHabitMutation } from '@repo/store';
 import { HabitActionMenu } from './HabitActionMenu';
@@ -11,6 +15,12 @@ import {
 } from '@/lib/api-error';
 
 export function HabitCard({ habit }: { habit: Habit }) {
+<<<<<<< HEAD
+=======
+        const hasNewTrophy = Boolean((habit as { newTrophy?: boolean }).newTrophy);
+    // Determine the color theme. If the habit has an RTK-saved color (gradient), use it.
+    // Otherwise fallback to a default purple gradient.
+>>>>>>> origin/main
     const colorTheme = habit.color || "from-purple-600 to-pink-600";
     const progressPercent = Math.min((habit.currentStreak / Math.max(habit.targetValue, 1)) * 100, 100);
     const [markedCompleteLocally, setMarkedCompleteLocally] = useState(false);
@@ -92,7 +102,11 @@ export function HabitCard({ habit }: { habit: Habit }) {
             <div className="absolute -left-16 -bottom-16 w-40 h-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
 
             <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
+<<<<<<< HEAD
                 {habitWithBadge.newTrophy && (
+=======
+                {hasNewTrophy && (
+>>>>>>> origin/main
                     <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                         <Trophy className="w-3 h-3" />
                         <span>New Trophy</span>

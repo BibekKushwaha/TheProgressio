@@ -1,7 +1,11 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
+<<<<<<< HEAD
 export type SelectProps = React.ComponentProps<"select">
+=======
+export type SelectProps = React.ComponentProps<"select">;
+>>>>>>> origin/main
 
 function Select({ className, children, ...props }: SelectProps) {
     return (

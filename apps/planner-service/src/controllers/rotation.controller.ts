@@ -99,10 +99,15 @@ export const getRotationPatternById = async (req: AuthenticatedRequest, res: Res
         }
 
         const rawId = req.params.id;
+<<<<<<< HEAD
         if (typeof rawId !== "string" || !rawId) {
             return res.status(400).json({ message: "Invalid rotation pattern id" });
         }
         const id = rawId;
+=======
+        const id = Array.isArray(rawId) ? rawId[0] : rawId;
+        if (!id) return res.status(400).json({ message: "Invalid rotation pattern id" });
+>>>>>>> origin/main
         const pattern = await prisma.rotationPattern.findUnique({ where: { id } });
 
         if (!pattern) return res.status(404).json({ message: "Rotation pattern not found" });
@@ -125,10 +130,15 @@ export const updateRotationPattern = async (req: AuthenticatedRequest, res: Resp
         }
 
         const rawId = req.params.id;
+<<<<<<< HEAD
         if (typeof rawId !== "string" || !rawId) {
             return res.status(400).json({ message: "Invalid rotation pattern id" });
         }
         const id = rawId;
+=======
+        const id = Array.isArray(rawId) ? rawId[0] : rawId;
+        if (!id) return res.status(400).json({ message: "Invalid rotation pattern id" });
+>>>>>>> origin/main
         const { name, pattern, startDate, cycleLengthDays, isActive } = req.body;
         const normalizedPattern = normalizePatternLabels(pattern);
 
@@ -184,10 +194,15 @@ export const deleteRotationPattern = async (req: AuthenticatedRequest, res: Resp
         }
 
         const rawId = req.params.id;
+<<<<<<< HEAD
         if (typeof rawId !== "string" || !rawId) {
             return res.status(400).json({ message: "Invalid rotation pattern id" });
         }
         const id = rawId;
+=======
+        const id = Array.isArray(rawId) ? rawId[0] : rawId;
+        if (!id) return res.status(400).json({ message: "Invalid rotation pattern id" });
+>>>>>>> origin/main
 
         const existing = await prisma.rotationPattern.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ message: "Rotation pattern not found" });

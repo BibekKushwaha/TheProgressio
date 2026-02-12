@@ -107,8 +107,13 @@ export function RotationManager() {
             toast('Rotation pattern created successfully!', 'success');
             setIsCreateOpen(false);
             resetForm();
+<<<<<<< HEAD
         } catch (error: unknown) {
             toast(getApiErrorMessage(error, 'Failed to create rotation pattern'), 'error');
+=======
+        } catch {
+            toast('Failed to create rotation pattern', 'error');
+>>>>>>> origin/main
         }
     };
 
@@ -129,8 +134,13 @@ export function RotationManager() {
             toast('Rotation pattern updated successfully!', 'success');
             setIsEditOpen(false);
             resetForm();
+<<<<<<< HEAD
         } catch (error: unknown) {
             toast(getApiErrorMessage(error, 'Failed to update rotation pattern'), 'error');
+=======
+        } catch {
+            toast('Failed to update rotation pattern', 'error');
+>>>>>>> origin/main
         }
     };
 
@@ -141,10 +151,15 @@ export function RotationManager() {
             setPendingDeleteId(id);
             await deletePattern(id).unwrap();
             toast('Rotation pattern deleted successfully!', 'success');
+<<<<<<< HEAD
         } catch (error: unknown) {
             toast(getApiErrorMessage(error, 'Failed to delete rotation pattern'), 'error');
         } finally {
             setPendingDeleteId(null);
+=======
+        } catch {
+            toast('Failed to delete rotation pattern', 'error');
+>>>>>>> origin/main
         }
     };
 
@@ -157,10 +172,15 @@ export function RotationManager() {
             }).unwrap();
 
             toast(`Rotation pattern ${!pattern.isActive ? 'activated' : 'deactivated'}!`, 'success');
+<<<<<<< HEAD
         } catch (error: unknown) {
             toast(getApiErrorMessage(error, 'Failed to update rotation pattern'), 'error');
         } finally {
             setPendingToggleId(null);
+=======
+        } catch {
+            toast('Failed to update rotation pattern', 'error');
+>>>>>>> origin/main
         }
     };
 

@@ -30,6 +30,7 @@ function CreateTaskPageContent() {
     const searchParams = useSearchParams();
     const taskId = searchParams.get('id');
     const { toast } = useToast();
+    const dispatch = useAppDispatch();
 
     const [taskDescription, setTaskDescription] = useState('');
     const [description, setDescription] = useState('');
@@ -122,6 +123,24 @@ function CreateTaskPageContent() {
 
     const handleSaveTask = async () => {
         try {
+<<<<<<< HEAD
+=======
+            const shouldUseSmartCreate =
+                !taskId && taskDescription.trim().length > 80 && description.trim().length === 0;
+
+            if (shouldUseSmartCreate) {
+                const response = await smartCreateTask({ text: taskDescription }).unwrap();
+                if (response?.task) {
+                    dispatch(addTask(response.task));
+                    toast('✅ Task created!', 'success');
+                    if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
+                    router.push('/planner');
+                    return;
+                }
+            }
+
+
+>>>>>>> origin/main
             // Map string priority to Enum
             let priorityEnum = PriorityEnum.LOW;
             if (selectedPriority === 'Medium') priorityEnum = PriorityEnum.MEDIUM;
@@ -165,13 +184,17 @@ function CreateTaskPageContent() {
             } else {
                 // If the description is long, we might want to use smart create,
                 // but for now, we'll use manual create for predictability
-                await createTask({
+                const createdTask = await createTask({
                     title: taskDescription,
                     description: description,
                     priority: priorityEnum,
+                    status: TaskStatus.PENDING,
                     categoryId: categoryIdToUse,
                     dueDate: parsedDueDate || undefined,
                 }).unwrap();
+                if (createdTask) {
+                    dispatch(addTask(createdTask));
+                }
             }
 
             toast(taskId ? '✏️ Task updated!' : '✅ Task created!', 'success');

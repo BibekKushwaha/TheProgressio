@@ -7,10 +7,17 @@ import { useRouter, useParams } from 'next/navigation';
 
 export function SingleTaskHeader() {
     const router = useRouter();
+<<<<<<< HEAD
     const params = useParams();
     const id = typeof params?.id === 'string' ? params.id : '';
     const { data: task } = useGetTaskByIdQuery(id, { skip: !id });
     if (!id) return null;
+=======
+    const { id } = useParams()
+    const taskId = typeof id === 'string' ? id : undefined
+    const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId })
+    if (!taskId) return null
+>>>>>>> origin/main
 
     return (
         <div>
@@ -44,7 +51,7 @@ export function SingleTaskHeader() {
                     </div>
                 </div>
                 <button
-                    onClick={() => router.push(`/createtask?id=${id}`)}
+                    onClick={() => router.push(`/createtask?id=${taskId}`)}
                     className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-all duration-300">
                     <Edit className="w-4 h-4" />
                     Edit Task

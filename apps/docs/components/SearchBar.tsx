@@ -26,6 +26,12 @@ const CATEGORY_OPTIONS = [
     { label: "Coding", value: "coding", color: "#F97316" },
 ] as const;
 
+const STATUS_OPTIONS = [
+    { label: "Status", value: "all" },
+    { label: "Pending", value: TaskStatus.PENDING },
+    { label: "Completed", value: TaskStatus.COMPLETED },
+] as const;
+
 
 interface SearchBarProps {
     searchQuery: string;
@@ -62,6 +68,7 @@ export function SearchBar({
     const currentStatusOptions = propStatusOptions || STATUS_OPTIONS;
     const currentPriorityOptions = propPriorityOptions || PRIORITY_OPTIONS;
     const currentCategoryOptions = propCategoryOptions || CATEGORY_OPTIONS;
+    const currentStatusOptions = propStatusOptions || STATUS_OPTIONS;
 
     return (
         <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-3 md:p-4 ml-0.5">

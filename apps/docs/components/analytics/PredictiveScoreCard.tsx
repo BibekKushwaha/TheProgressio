@@ -13,6 +13,7 @@ type PredictiveSubject = {
     entryCount?: number;
 };
 
+<<<<<<< HEAD
 interface PredictiveScoreCardProps {
     examType?: string;
     title?: string;
@@ -22,6 +23,18 @@ export function PredictiveScoreCard({ examType = 'midterm', title = 'Predictive 
     const { data, isLoading } = useGetPredictivePerformanceQuery(examType);
 
     const subjects: PredictiveSubject[] = data?.data || [];
+=======
+    type SubjectPrediction = {
+        subjectName?: string;
+        subject?: string;
+        predictedScore?: number;
+        avgScore?: number;
+        trend?: string;
+        entryCount?: number;
+    };
+
+    const subjects = (data?.data || []) as SubjectPrediction[];
+>>>>>>> origin/main
 
     if (isLoading) {
         return (

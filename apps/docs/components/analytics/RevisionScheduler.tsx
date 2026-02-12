@@ -1,6 +1,10 @@
 'use client';
 
+<<<<<<< HEAD
 import { useEffect, useState } from 'react';
+=======
+import { useState } from 'react';
+>>>>>>> origin/main
 import { CalendarDays, Clock, Target, CheckCircle, Sparkles } from 'lucide-react';
 
 type ExamType = 'JEE' | 'NEET' | 'UPSC' | 'CUSTOM';

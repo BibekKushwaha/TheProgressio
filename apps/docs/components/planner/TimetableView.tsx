@@ -74,7 +74,22 @@ export function TimetableView({ tasks = [], date }: TimetableViewProps) {
 
     return (
         <div className="space-y-6">
+<<<<<<< HEAD
             {scheduleContent}
+=======
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <Calendar className="w-6 h-6 text-purple-400" />
+                        Today&apos;s Schedule
+                    </h2>
+                    <p className="text-slate-400 mt-1">
+                        {new Date(schedule.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                        {schedule.rotation && <span className="ml-2 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs border border-purple-500/30">Rotation {schedule.rotation}</span>}
+                    </p>
+                </div>
+            </div>
+>>>>>>> origin/main
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">

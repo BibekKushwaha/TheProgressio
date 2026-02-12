@@ -32,9 +32,27 @@ export function ProductivityInsights({ examType = 'JEE', days = 7 }: Productivit
         );
     }
 
+    type EfficiencyHour = { hour: number; avgMinutes: number };
+    type PeakWindow = { startHour: number; endHour: number; label?: string };
+    type PeakData = {
+        peakWindow: PeakWindow;
+        efficiencyBoostPercent: number;
+        recommendation?: string;
+        efficiencyByHour?: EfficiencyHour[];
+    };
+    type PerformanceItem = {
+        subjectName: string;
+        recentScoreAvg: number;
+        historicalScoreAvg: number;
+        improvementRate: number;
+        pace: string;
+        estimatedExamScore: number;
+        estimatedPercentile: number;
+    };
+
     const leakage = leakageData?.report;
-    const peak = peakData?.data;
-    const performance = performanceData?.data;
+    const peak = peakData?.data as PeakData | undefined;
+    const performance = (performanceData?.data || []) as PerformanceItem[];
 
     return (
         <div className="space-y-6">
@@ -128,7 +146,11 @@ export function ProductivityInsights({ examType = 'JEE', days = 7 }: Productivit
                         <div className="mt-6">
                             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Hourly Efficiency</h3>
                             <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
+<<<<<<< HEAD
                                 {peak.efficiencyByHour.map((hour: PeakProductivityResult['efficiencyByHour'][number]) => {
+=======
+                                {peak.efficiencyByHour.map((hour) => {
+>>>>>>> origin/main
                                     const isPeak = hour.hour >= peak.peakWindow.startHour && hour.hour < peak.peakWindow.endHour;
                                     return (
                                         <div
@@ -163,7 +185,11 @@ export function ProductivityInsights({ examType = 'JEE', days = 7 }: Productivit
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+<<<<<<< HEAD
                         {performance.map((subject: LearningPace) => (
+=======
+                        {performance.map((subject) => (
+>>>>>>> origin/main
                             <div key={subject.subjectName} className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <h3 className="font-semibold text-white mb-3">{subject.subjectName}</h3>
 

@@ -1,7 +1,11 @@
 // components/landing/Navbar.tsx
 'use client';
 
+<<<<<<< HEAD
 import { logout, selectCurrentUser, selectIsAuthenticated, useAppDispatch, useAppSelector, useLogoutMutation } from '@repo/store';
+=======
+import { selectCurrentUser, useAppSelector, useLogoutMutation } from '@repo/store';
+>>>>>>> origin/main
 import { motion } from 'framer-motion';
 import { Sparkles, LogOut, Settings, User } from 'lucide-react';
 import Link from 'next/link';
@@ -17,8 +21,12 @@ import { useRouter } from 'next/navigation';
 
 export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
+<<<<<<< HEAD
   const userlog = useAppSelector(selectIsAuthenticated);
   const dispatch = useAppDispatch();
+=======
+  
+>>>>>>> origin/main
   
   const [logoutApi] = useLogoutMutation();
   const navLinks = ['Features', 'How it Works', 'Pricing'];

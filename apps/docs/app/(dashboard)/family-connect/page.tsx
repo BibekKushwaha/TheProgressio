@@ -58,8 +58,33 @@ function getWorkloadLevel(overdueCount: number, dueSoonCount: number): 'High' | 
 }
 
 export default function FamilyConnectPage() {
+<<<<<<< HEAD
     const [selectedDays, setSelectedDays] = useState<(typeof DAY_OPTIONS)[number]>('7');
     const [shareState, setShareState] = useState<ShareState>('idle');
+=======
+    type Task = {
+        id: string;
+        title: string;
+        status: string;
+        dueDate?: string | null;
+        priority?: string | null;
+        category?: { name: string } | null;
+    };
+
+    type Habit = {
+        id: string;
+        name: string;
+        icon?: string | null;
+        currentStreak?: number | null;
+    };
+
+    type Summary = {
+        totalFocusMinutes?: number;
+        tasksCompleted?: number;
+        avgFocusMinutes?: number;
+        consistencyScore?: number;
+    };
+>>>>>>> origin/main
 
     const { data: profileData } = useGetProfileQuery();
     const { data: allTasks, isLoading: tasksLoading, error: tasksError } = useGetTasksQuery({ page: 1, limit: 400 });
@@ -69,6 +94,7 @@ export default function FamilyConnectPage() {
     const { data: weeklyTrendsData } = useGetWeeklyTrendsQuery();
 
     const user = profileData?.user;
+<<<<<<< HEAD
     const tasks = allTasks || [];
     const habits = habitsData?.habits || [];
     const summaryStats = summaryData?.stats;
@@ -76,6 +102,17 @@ export default function FamilyConnectPage() {
         () => (weeklyTrendsData?.data || []) as TrendPoint[],
         [weeklyTrendsData]
     );
+=======
+    const tasks = ((allTasks || []) as Task[]).filter(Boolean);
+    const habits =
+        typeof habitsData === 'object' && habitsData !== null && 'habits' in habitsData
+            ? ((habitsData as { habits?: Habit[] }).habits || [])
+            : [];
+    const summary =
+        typeof summaryData === 'object' && summaryData !== null && 'summary' in summaryData
+            ? (summaryData as { summary?: Summary }).summary
+            : undefined;
+>>>>>>> origin/main
 
     const now = new Date();
     const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
@@ -89,6 +126,7 @@ export default function FamilyConnectPage() {
         if (!task.dueDate || task.status === TaskStatus.COMPLETED) return false;
         return new Date(task.dueDate).getTime() < now.getTime();
     });
+<<<<<<< HEAD
 
     const dueSoonTasks = tasks
         .filter((task) => {
@@ -139,6 +177,9 @@ export default function FamilyConnectPage() {
         () => Math.max(1, ...trendSeries.map((point) => point.minutes)),
         [trendSeries]
     );
+=======
+    const workloadIntensity = upcomingTasks.length >= 5 ? 'High' : upcomingTasks.length >= 3 ? 'Medium' : 'Low';
+>>>>>>> origin/main
 
     const isLoading = tasksLoading || habitsLoading || summaryLoading;
     const hasPartialError = !!tasksError || !!habitsError || !!summaryError;
@@ -278,6 +319,7 @@ export default function FamilyConnectPage() {
                     </div>
                 </section>
 
+<<<<<<< HEAD
                 <section className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-5">
                     <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
                         <div className="flex items-center justify-between mb-4">
@@ -297,6 +339,31 @@ export default function FamilyConnectPage() {
                                 >
                                     <AlertTriangle className="w-4 h-4 text-amber-300 mt-0.5 shrink-0" />
                                     <p className="text-sm text-slate-200">{item}</p>
+=======
+                {/* Habits Overview (read-only) */}
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Flame className="w-5 h-5 text-orange-400" />
+                        Habit Streaks
+                    </h2>
+                    {habits.length === 0 ? (
+                        <p className="text-slate-500 text-center py-8">No habits tracked yet.</p>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {habits.map((habit) => (
+                                <div key={habit.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
+                                    <div className="text-2xl">{habit.icon || '📌'}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-medium text-white truncate">{habit.name}</div>
+                                        <div className="text-xs text-slate-400">
+                                            {habit.currentStreak ?? 0} day streak
+                                        </div>
+                                    </div>
+                                    <div className={`text-xs font-bold px-2 py-0.5 rounded ${(habit.currentStreak ?? 0) > 0 ? 'bg-orange-500/20 text-orange-400' : 'bg-white/10 text-slate-400'
+                                        }`}>
+                                        🔥 {habit.currentStreak ?? 0}
+                                    </div>
+>>>>>>> origin/main
                                 </div>
                             ))}
                         </div>

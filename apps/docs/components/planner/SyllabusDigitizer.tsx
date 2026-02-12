@@ -23,6 +23,7 @@ export function SyllabusDigitizer() {
     const [parseTask] = useParseTaskMutation();
     const [createTask] = useCreateTaskMutation();
     type CreateTaskInput = Parameters<typeof createTask>[0];
+<<<<<<< HEAD
 
     const extractTitleAndDescription = (text: string): { title: string; description?: string } => {
         const cleaned = text.trim().replace(/\s+/g, ' ');
@@ -68,6 +69,8 @@ export function SyllabusDigitizer() {
             .filter(chunk => chunk.length >= 5)
             .slice(0, 20); // Cap at 20 items
     };
+=======
+>>>>>>> origin/main
 
     const handleParse = async () => {
         if (!textInput.trim()) return;
@@ -160,7 +163,10 @@ export function SyllabusDigitizer() {
             for (const item of selected) {
                 const payload: CreateTaskInput = {
                     title: item.title,
+<<<<<<< HEAD
                     description: item.description,
+=======
+>>>>>>> origin/main
                     dueDate: item.dueDate,
                     priority: item.priority ?? PriorityEnum.MEDIUM,
                     status: TaskStatus.PENDING,

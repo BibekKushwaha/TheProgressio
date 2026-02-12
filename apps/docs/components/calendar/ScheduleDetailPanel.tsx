@@ -1,5 +1,9 @@
 "use client";
+<<<<<<< HEAD
 import { useCallback, useMemo } from 'react';
+=======
+import React from 'react';
+>>>>>>> origin/main
 import { ScheduleItemCard } from './ScheduleItemCard';
 import { AiSuggestedDialog } from './AiSuggestedDialog';
 import { useGetCalendarDailyScheduleQuery, ResolvedRotation } from '@repo/store';

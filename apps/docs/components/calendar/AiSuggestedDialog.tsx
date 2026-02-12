@@ -10,12 +10,20 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
+<<<<<<< HEAD
 import { Input } from "@/components/ui/input"
+=======
+// import { Field, FieldGroup } from "@/components/ui/field" // removing unused/complex for now
+>>>>>>> origin/main
 import { Select } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { SessionLengthSelector } from "./SessionLengthSelector"
 import { Slider } from "../ui/slider"
+<<<<<<< HEAD
 import { SmartConstraints, type SmartConstraintsValue } from "./SmartConstraints"
+=======
+
+
+>>>>>>> origin/main
 import { useRouter } from 'next/navigation';
 import { useGetTasksQuery, TaskStatus, Task, ScheduleItem } from '@repo/store';
 import { Brain, Clock3, Sparkles, Target } from "lucide-react";

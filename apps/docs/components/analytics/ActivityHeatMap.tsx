@@ -4,7 +4,12 @@ import { useMemo } from 'react';
 import { toLocalDateKey } from '@/lib/date';
 
 export function ActivityHeatmap({ pastDays }: { pastDays: string }) {
+<<<<<<< HEAD
     const weeks = pastDays === "7" ? 24 : 12;
+=======
+    const parsedDays = Number.parseInt(pastDays, 10);
+    const weeks = Number.isFinite(parsedDays) && parsedDays > 0 ? Math.ceil(parsedDays / 7) : 12;
+>>>>>>> origin/main
     const daysPerWeek = 7;
 
     const { data: trendsResponse } = useGetWeeklyTrendsQuery();
@@ -37,8 +42,13 @@ export function ActivityHeatmap({ pastDays }: { pastDays: string }) {
                 map.set(`${week}-${day}`, { date: dateKey, minutes, intensity });
             }
         }
+<<<<<<< HEAD
         return map;
     }, [trendsByDate, weeks]);
+=======
+        return data;
+    }, [daysPerWeek, trendsByDate, weeks]);
+>>>>>>> origin/main
 
     const getColor = (intensity: number) => {
         const colors = [

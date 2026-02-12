@@ -1,7 +1,12 @@
 'use client';
 
+<<<<<<< HEAD
 import { useMemo, useState } from 'react';
 import { useGetGPAQuery, useAddCourseGradeMutation, CGPAResult } from '@repo/store';
+=======
+import { useState } from 'react';
+import { useGetGPAQuery, useAddCourseGradeMutation } from '@repo/store';
+>>>>>>> origin/main
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +29,9 @@ export function GPACalculator() {
         semester: '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    type SemesterBreakdown = { semester: number; gpa?: number; credits?: number };
+    type CourseItem = { courseName: string; semester?: number; grade?: string; gradePoint?: number; credits?: number };
 
     const handleAddCourse = async () => {
         // Client-side validation to avoid sending NaN to the API
@@ -58,10 +66,15 @@ export function GPACalculator() {
             toast('Course added successfully!', 'success');
             setIsAddOpen(false);
             setNewCourse({ courseName: '', credits: '', gradePoint: '', grade: '', semester: '' });
+<<<<<<< HEAD
         } catch (error: unknown) {
             toast(getApiErrorMessage(error, 'Failed to add course'), 'error');
         } finally {
             setIsSubmitting(false);
+=======
+        } catch {
+            toast('Failed to add course', 'error');
+>>>>>>> origin/main
         }
     };
 
@@ -111,6 +124,13 @@ export function GPACalculator() {
         );
     }
 
+<<<<<<< HEAD
+=======
+    const gpaData = data?.result;
+    const semesterBreakdown = (gpaData?.semesterBreakdown ?? []) as SemesterBreakdown[];
+    const courses = (gpaData?.courses ?? []) as CourseItem[];
+
+>>>>>>> origin/main
     return (
         <div className="space-y-6">
             {/* CGPA Overview */}
@@ -222,11 +242,15 @@ export function GPACalculator() {
             </Card>
 
             {/* Semester Breakdown */}
-            {gpaData && gpaData.semesterBreakdown && gpaData.semesterBreakdown.length > 0 && (
+            {gpaData && semesterBreakdown.length > 0 && (
                 <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">Semester Breakdown</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+<<<<<<< HEAD
                         {gpaData.semesterBreakdown.map((sem) => (
+=======
+                        {semesterBreakdown.map((sem) => (
+>>>>>>> origin/main
                             <div key={sem.semester} className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <div className="text-sm text-slate-400 mb-1">Semester {sem.semester}</div>
                                 <div className="text-2xl font-bold text-white">{(sem.gpa ?? 0).toFixed(2)}</div>
@@ -238,12 +262,17 @@ export function GPACalculator() {
             )}
 
             {/* Course List */}
-            {gpaData && gpaData.courses && gpaData.courses.length > 0 && (
+            {gpaData && courses.length > 0 && (
                 <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">All Courses</h3>
                     <div className="space-y-2">
+<<<<<<< HEAD
                         {gpaData.courses.map((course, idx) => (
                             <div key={`${course.courseName}-${course.semester ?? idx}-${idx}`} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
+=======
+                        {courses.map((course, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
+>>>>>>> origin/main
                                 <div className="flex-1">
                                     <div className="font-semibold text-white">{course.courseName}</div>
                                     {course.semester && <div className="text-xs text-slate-500">Semester {course.semester}</div>}

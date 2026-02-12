@@ -174,6 +174,7 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                 ? await submitSmartTask()
                 : await submitManualTask();
 
+<<<<<<< HEAD
             if (!submissionSucceeded) return;
 
             await onSubmit();
@@ -183,6 +184,97 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                 ...prev,
                 form: getApiErrorMessage(error, `Failed to ${isEdit ? "update" : "create"} task`),
             }));
+=======
+                try {
+                    const response = await smartCreateTaskApi({ text: smartInput }).unwrap();
+                    if (response.task) {
+                        dispatch(addTask(response.task));
+                        await onSubmit();
+                        onClose();
+                    }
+                } catch (err: unknown) {
+                    const message =
+                        typeof err === 'object' && err !== null && 'data' in err
+                            ? (err as { data?: { message?: string } }).data?.message
+                            : undefined;
+                    setErrors({ smart: message || 'Failed to create smart task' });
+                } finally {
+                    setIsLoading(false);
+                }
+                return;
+            }
+
+            // Find or create category
+            const catColor = CATEGORY_OPTIONS.find(c => c.label.toLowerCase() === categoryName.toLowerCase())?.color || '#6B7280';
+            const existingCategory = categories?.find(c => c.name.toLowerCase() === categoryName.trim().toLowerCase());
+
+            let categoryId = existingCategory?.id;
+
+            if (!existingCategory && categoryName.trim()) {
+                const validatedCategory = categorySchema.safeParse({ name: categoryName.trim(), colorCode: catColor });
+                if (validatedCategory.success) {
+                    try {
+                        const catResp = await createCategoryApi({ name: validatedCategory.data.name, colorCode: validatedCategory.data.colorCode }).unwrap();
+                        if (catResp.id) {
+                            dispatch(addCategory(catResp));
+                            categoryId = catResp.id;
+                        }
+                    } catch {
+                        setErrors(prev => ({ ...prev, category: 'Failed to create category' }));
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+            }
+
+            const validationResult = taskSchema.safeParse({
+                title: taskName.trim(),
+                description: description.trim() || undefined,
+                dueDate: new Date(dueDate),
+                categoryId: categoryId || undefined,
+                priority: priority,
+            });
+
+            if (!validationResult.success) {
+                const fieldErrors: Record<string, string | undefined> = {};
+                validationResult.error.issues.forEach((err) => {
+                    if (err.path[0]) {
+                        fieldErrors[err.path[0].toString()] = err.message;
+                    }
+                });
+                setErrors(fieldErrors);
+                setIsLoading(false);
+                return;
+            }
+
+            if (isEdit && task) {
+                const response = await updateTaskApi({
+                    id: task.id,
+                    ...validationResult.data,
+                    status: validationResult.data.status as Status,
+                    priority: validationResult.data.priority as Priority,
+                    dueDate: validationResult.data.dueDate?.toISOString(),
+                }).unwrap();
+                dispatch(updateTaskAction(response));
+            } else {
+                const response = await createTaskApi({
+                    ...validationResult.data,
+                    priority: validationResult.data.priority as Priority,
+                    status: validationResult.data.status as Status,
+                    dueDate: validationResult.data.dueDate?.toISOString(),
+                }).unwrap();
+                dispatch(addTask(response));
+            }
+
+            await onSubmit(); // Notify parent
+            onClose();
+        } catch (error: unknown) {
+            const message =
+                typeof error === 'object' && error !== null && 'data' in error
+                    ? (error as { data?: { message?: string } }).data?.message
+                    : undefined;
+            setErrors(prev => ({ ...prev, form: message || `Failed to ${isEdit ? 'update' : 'create'} task` }));
+>>>>>>> origin/main
         } finally {
             setIsLoading(false);
         }

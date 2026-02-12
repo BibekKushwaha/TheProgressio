@@ -13,7 +13,10 @@ import {
 import { Habit, useDeleteHabitMutation, useResetHabitMutation } from "@repo/store"
 import HabitDialog from "./HabitDialog"
 import { HabitStatsModal } from "./HabitStatsModal";
+<<<<<<< HEAD
 import { useToast } from "@/components/ui/toast-provider";
+=======
+>>>>>>> origin/main
 
 interface HabitActionMenuProps {
     habit: Habit
@@ -22,7 +25,10 @@ interface HabitActionMenuProps {
 export function HabitActionMenu({ habit }: HabitActionMenuProps) {
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isStatsOpen, setIsStatsOpen] = useState(false)
+<<<<<<< HEAD
     const { toast } = useToast();
+=======
+>>>>>>> origin/main
 
     const [deleteHabit] = useDeleteHabitMutation()
     const [resetHabit] = useResetHabitMutation()

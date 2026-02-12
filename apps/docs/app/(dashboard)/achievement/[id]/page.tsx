@@ -1,11 +1,18 @@
 "use client";
 
+<<<<<<< HEAD
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useGetAchievementsQuery } from "@repo/store";
 import AchievementDetailModal from "@/components/modals/achievement-detail-modal";
 import { Skeleton } from "@/components/ui/skeleton";
+=======
+import React, { use, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useGetAchievementsQuery } from '@repo/store';
+import AchievementDetailModal from '../../../../components/modals/achievement-detail-modal';
+>>>>>>> origin/main
 
 const AchievementDetailPage = () => {
     const router = useRouter();
@@ -49,7 +56,11 @@ const AchievementDetailPage = () => {
                 <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl max-w-md">
                     <h1 className="text-2xl font-bold text-red-400 mb-2">Achievement Not Found</h1>
                     <p className="text-slate-400 mb-6">
+<<<<<<< HEAD
                         We could not find this achievement. It may have been removed or the link is invalid.
+=======
+                        We couldn&apos;t find the achievement you&apos;re looking for. It might have been removed or the ID is incorrect.
+>>>>>>> origin/main
                     </p>
                     <button
                         onClick={() => router.push("/achievement")}

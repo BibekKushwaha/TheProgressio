@@ -101,7 +101,15 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
             }
             onClose()
         } catch (err: unknown) {
+<<<<<<< HEAD
             setErrors({ form: getApiErrorMessage(err, `Failed to ${habit ? 'update' : 'create'} habit`) })
+=======
+            const message =
+                typeof err === 'object' && err !== null && 'data' in err
+                    ? (err as { data?: { message?: string } }).data?.message
+                    : undefined
+            setErrors({ form: message || `Failed to ${habit ? 'update' : 'create'} habit` })
+>>>>>>> origin/main
         }
     }
 

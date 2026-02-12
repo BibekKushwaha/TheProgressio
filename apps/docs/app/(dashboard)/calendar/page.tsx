@@ -7,7 +7,11 @@ import { UpcomingTasksPanel } from '../../../components/calendar/UpcomingTasksPa
 import { DayGrid } from '@/components/calendar/DayGrid';
 import { useState } from 'react';
 import { useResolveRotationQuery } from '@repo/store';
+<<<<<<< HEAD
 import { CalendarDays, Filter, LayoutGrid, RotateCcw, Sparkles } from 'lucide-react';
+=======
+import { RotateCcw } from 'lucide-react';
+>>>>>>> origin/main
 import Link from 'next/link';
 import { toLocalDateKey } from '@/lib/date';
 import { GlassHero } from '@/components/layout/GlassHero';

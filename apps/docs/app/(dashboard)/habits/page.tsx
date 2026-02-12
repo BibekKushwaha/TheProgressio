@@ -82,6 +82,7 @@ export default function HabitsPage() {
                     />
                     <main className="flex-1 p-4 md:p-8 overflow-auto">
                         <div className="max-w-7xl mx-auto">
+<<<<<<< HEAD
                             <GlassHero
                                 className="mb-8 bg-gradient-to-br from-white/[0.06] via-purple-500/[0.08] to-white/[0.02]"
                                 topGlowClassName="h-60 w-60 bg-purple-500/20"
@@ -107,6 +108,14 @@ export default function HabitsPage() {
                                         <Plus className="w-4 h-4" />
                                         Add Habit
                                     </button>
+=======
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+                                <div>
+                                    <h1 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                                        Habit Gallery
+                                    </h1>
+                                    <p className="text-slate-400">Keep up the streak! You&apos;re doing great.</p>
+>>>>>>> origin/main
                                 </div>
 
                                 <HeroStatsGrid

@@ -300,6 +300,7 @@ export default function ReportsPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
             <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1.4fr] gap-6">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
                     <h2 className="text-lg font-bold text-white mb-4">Performance Radar</h2>
@@ -325,6 +326,37 @@ export default function ReportsPage() {
                                 </RadarChart>
                             </ResponsiveContainer>
                         )}
+=======
+            {/* Performance Radar */}
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
+                <h2 className="text-xl font-bold text-white mb-4">Performance Overview</h2>
+                <div className="h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart data={categoryData}>
+                            <PolarGrid stroke="#ffffff20" />
+                            <PolarAngleAxis dataKey="category" stroke="#94a3b8" fontSize={12} />
+                            <PolarRadiusAxis stroke="#94a3b8" fontSize={12} />
+                            <Radar name="Performance" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#ffffff20', borderRadius: '12px' }}
+                                itemStyle={{ color: '#fff' }}
+                            />
+                        </RadarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Insights */}
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
+                <h2 className="text-xl font-bold text-white mb-4">Key Insights</h2>
+                <div className="space-y-3">
+                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                        <div className="flex items-center gap-2 text-green-400 font-bold mb-1">
+                            <TrendingUp className="w-4 h-4" />
+                            Good Work!
+                        </div>
+                        <p className="text-sm text-slate-300">You&apos;ve logged {stats.totalHours} hours of focused work this week. Keep maintaining your momentum!</p>
+>>>>>>> origin/main
                     </div>
                 </div>
 
@@ -342,8 +374,23 @@ export default function ReportsPage() {
                                 <p className="text-sm font-semibold text-white">{insight.title}</p>
                                 <p className="mt-1 text-sm text-slate-200">{insight.text}</p>
                             </div>
+<<<<<<< HEAD
                         ))}
                     </div>
+=======
+                            <p className="text-sm text-slate-300">You&apos;ve completed {stats.tasksCompleted} tasks successfully. Great job on finishing your goals!</p>
+                        </div>
+                    )}
+                    {stats.streak > 0 && (
+                        <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                            <div className="flex items-center gap-2 text-orange-400 font-bold mb-1">
+                                <Award className="w-4 h-4" />
+                                Consistency is Key
+                            </div>
+                            <p className="text-sm text-slate-300">You&apos;ve maintained a {stats.streak}-day streak. Consistency is the secret to success!</p>
+                        </div>
+                    )}
+>>>>>>> origin/main
                 </div>
             </div>
         </div>
