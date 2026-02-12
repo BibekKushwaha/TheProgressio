@@ -1,82 +1,38 @@
 
 "use client"
 
-import { useGetDailyScheduleQuery, TimetableEntry, Task } from "@repo/store";
+import { useGetDailyScheduleQuery, TimetableEntry } from "@repo/store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Clock, MapPin, User } from "lucide-react";
-import { getTodayDateKey, toLocalDateKey } from "@/lib/date";
 
-type TimetableViewProps = {
-    tasks?: Task[];
-    date?: string;
-};
+export function TimetableView() {
+    const { data: schedule, isLoading, error } = useGetDailyScheduleQuery();
 
-export function TimetableView({ tasks = [], date }: TimetableViewProps) {
-    const { data: schedule, isLoading, error } = useGetDailyScheduleQuery(date ? { date } : undefined);
-    const selectedDateString = date || getTodayDateKey();
-    const todaysTasks = tasks.filter((task) => {
-        if (!task.dueDate) return false;
-        return toLocalDateKey(new Date(task.dueDate)) === selectedDateString;
-    });
-
-    const scheduleContent = (() => {
-        if (isLoading) {
-            return (
-                <div className="space-y-4">
-                    <Skeleton className="h-12 w-48 bg-white/5" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <Skeleton key={i} className="h-32 rounded-xl bg-white/5" />
-                        ))}
-                    </div>
-                </div>
-            );
-        }
-
-        if (error || !schedule) {
-            return (
-                <div className="flex flex-col items-center justify-center p-12 text-slate-400 bg-white/5 rounded-2xl border border-white/10">
-                    <Calendar className="w-12 h-12 mb-4 opacity-50" />
-                    <p>No schedule available for today.</p>
-                </div>
-            );
-        }
-
+    if (isLoading) {
         return (
-            <>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                            <Calendar className="w-6 h-6 text-purple-400" />
-                            Today&apos;s Schedule
-                        </h2>
-                        <p className="text-slate-400 mt-1">
-                            {new Date(schedule.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-                            {schedule.rotation && <span className="ml-2 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs border border-purple-500/30">Rotation {schedule.rotation}</span>}
-                        </p>
-                    </div>
-                </div>
-
+            <div className="space-y-4">
+                <Skeleton className="h-12 w-48 bg-white/5" />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {schedule.entries.length > 0 ? (
-                        schedule.entries.map((entry) => (
-                            <ClassCard key={entry.id} entry={entry} />
-                        ))
-                    ) : (
-                        <div className="col-span-full py-12 text-center text-slate-500">
-                            No classes scheduled for today.
-                        </div>
-                    )}
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <Skeleton key={i} className="h-32 rounded-xl bg-white/5" />
+                    ))}
                 </div>
-            </>
+            </div>
         );
-    })();
+    }
+
+    if (error || !schedule) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 text-slate-400 bg-white/5 rounded-2xl border border-white/10">
+                <Calendar className="w-12 h-12 mb-4 opacity-50" />
+                <p>No schedule available for today.</p>
+                {/* <p className="text-xs mt-2 opacity-50">{(error as any)?.data?.message || 'Server error'}</p> */}
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
-<<<<<<< HEAD
-            {scheduleContent}
-=======
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -89,31 +45,16 @@ export function TimetableView({ tasks = [], date }: TimetableViewProps) {
                     </p>
                 </div>
             </div>
->>>>>>> origin/main
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-white">Today&apos;s Tasks</h3>
-                    <span className="text-xs text-slate-400">{todaysTasks.length} tasks</span>
-                </div>
-                {todaysTasks.length > 0 ? (
-                    <div className="space-y-2">
-                        {todaysTasks.map((task) => (
-                            <div key={task.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                                <div className="min-w-0">
-                                    <div className="text-sm font-semibold text-white truncate">{task.title}</div>
-                                    {task.description && (
-                                        <div className="text-xs text-slate-400 line-clamp-1 mt-0.5">{task.description}</div>
-                                    )}
-                                </div>
-                                <div className="text-xs text-slate-400 whitespace-nowrap">
-                                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {schedule.entries.length > 0 ? (
+                    schedule.entries.map((entry) => (
+                        <ClassCard key={entry.id} entry={entry} />
+                    ))
                 ) : (
-                    <div className="text-sm text-slate-500">No tasks due today.</div>
+                    <div className="col-span-full py-12 text-center text-slate-500">
+                        No classes scheduled for today.
+                    </div>
                 )}
             </div>
         </div>

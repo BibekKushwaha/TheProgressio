@@ -1,9 +1,5 @@
 // components/analytics/StatCards.tsx
 import { Clock, CheckCircle, Target, TrendingUp } from 'lucide-react';
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/main
 import { useGetDailySummaryQuery, useGetFocusScoreQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 

@@ -14,9 +14,6 @@ import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { useAppDispatch, useCreateTaskMutation, useUpdateTaskMutation, useSmartCreateTaskMutation, useCreateCategoryMutation, useGetCategoriesQuery, PriorityEnum, addCategory, addTask, updateTask as updateTaskAction, type Priority, type Task, type Status } from "@repo/store"
 import { categorySchema, taskSchema } from "@repo/schemas"
-import { getApiErrorMessage } from "@/lib/api-error"
-import { getTodayDateKey, toLocalDateKey } from "@/lib/date"
-import { type FormErrors, zodErrorToFormErrors } from "@/lib/form"
 
 interface TaskDialogProps {
     onClose: () => void;
@@ -31,8 +28,6 @@ const CATEGORY_OPTIONS = [
     { label: "Coding", value: "coding", color: "#F97316" },
 ] as const;
 
-type TaskDialogField = "title" | "description" | "dueDate" | "category" | "priority" | "smart" | "form";
-
 export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
     const isEdit = !!task;
     const [taskName, setTaskName] = useState(task?.title || '');
@@ -40,12 +35,12 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
     const [categoryName, setCategoryName] = useState(task?.category?.name || '');
     const [dueDate, setDueDate] = useState<string>(
         (task?.dueDate
-            ? toLocalDateKey(new Date(task.dueDate))
-            : getTodayDateKey()) || ""
+            ? new Date(task.dueDate).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0]) || ""
     );
     const [priority, setPriority] = useState<Priority>(task?.priority || PriorityEnum.MEDIUM);
     const [isLoading, setIsLoading] = useState(false);
-    const [errors, setErrors] = useState<FormErrors<TaskDialogField>>({});
+    const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
     const dispatch = useAppDispatch();
     const [createTaskApi] = useCreateTaskMutation();
@@ -57,134 +52,19 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
     const [smartInput, setSmartInput] = useState('');
     const { data: categories } = useGetCategoriesQuery();
 
-    const submitSmartTask = async (): Promise<boolean> => {
-        if (!smartInput.trim()) {
-            setErrors({ smart: "Please enter a task description" });
-            return false;
-        }
-
-        try {
-            const response = await smartCreateTaskApi({ text: smartInput.trim() }).unwrap();
-            if (!response.task) {
-                setErrors({ smart: "Unable to create task from your input" });
-                return false;
-            }
-
-            dispatch(addTask(response.task));
-            return true;
-        } catch (error: unknown) {
-            setErrors({ smart: getApiErrorMessage(error, "Failed to create smart task") });
-            return false;
-        }
-    };
-
-    const resolveCategoryId = async (): Promise<string | null | undefined> => {
-        const trimmedCategory = categoryName.trim();
-        if (!trimmedCategory) return undefined;
-
-        const normalizedCategory = trimmedCategory.toLowerCase();
-        const existingCategory = categories?.find(
-            (category) => category.name.toLowerCase() === normalizedCategory
-        );
-        if (existingCategory?.id) return existingCategory.id;
-
-        const selectedCategory = CATEGORY_OPTIONS.find(
-            (option) => option.label.toLowerCase() === normalizedCategory
-        );
-        const colorCode = selectedCategory?.color || '#6B7280';
-        const categoryValidation = categorySchema.safeParse({ name: trimmedCategory, colorCode });
-
-        if (!categoryValidation.success) {
-            setErrors({
-                category: categoryValidation.error.issues[0]?.message || "Category is invalid",
-            });
-            return null;
-        }
-
-        try {
-            const categoryResponse = await createCategoryApi({
-                name: categoryValidation.data.name,
-                colorCode: categoryValidation.data.colorCode,
-            }).unwrap();
-            if (categoryResponse.id) {
-                dispatch(addCategory(categoryResponse));
-                return categoryResponse.id;
-            }
-
-            return undefined;
-        } catch (error: unknown) {
-            setErrors({ category: getApiErrorMessage(error, "Failed to create category") });
-            return null;
-        }
-    };
-
-    const submitManualTask = async (): Promise<boolean> => {
-        const categoryId = await resolveCategoryId();
-        if (categoryId === null) return false;
-
-        const validationResult = taskSchema.safeParse({
-            title: taskName.trim(),
-            description: description.trim() || undefined,
-            dueDate: new Date(dueDate),
-            categoryId: categoryId || undefined,
-            priority,
-        });
-
-        if (!validationResult.success) {
-            const validationErrors = zodErrorToFormErrors(validationResult.error);
-            setErrors({
-                title: validationErrors.title,
-                description: validationErrors.description,
-                dueDate: validationErrors.dueDate,
-                priority: validationErrors.priority,
-                category: validationErrors.categoryId,
-            });
-            return false;
-        }
-
-        if (isEdit && task) {
-            const updatedTask = await updateTaskApi({
-                id: task.id,
-                ...validationResult.data,
-                status: validationResult.data.status as Status,
-                priority: validationResult.data.priority as Priority,
-                dueDate: validationResult.data.dueDate?.toISOString(),
-            }).unwrap();
-            dispatch(updateTaskAction(updatedTask));
-            return true;
-        }
-
-        const createdTask = await createTaskApi({
-            ...validationResult.data,
-            priority: validationResult.data.priority as Priority,
-            status: validationResult.data.status as Status,
-            dueDate: validationResult.data.dueDate?.toISOString(),
-        }).unwrap();
-        dispatch(addTask(createdTask));
-        return true;
-    };
-
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setErrors({});
 
         try {
-            const submissionSucceeded = mode === 'smart'
-                ? await submitSmartTask()
-                : await submitManualTask();
+            if (mode === 'smart') {
+                if (!smartInput.trim()) {
+                    setErrors({ smart: 'Please enter a task description' });
+                    setIsLoading(false);
+                    return;
+                }
 
-<<<<<<< HEAD
-            if (!submissionSucceeded) return;
-
-            await onSubmit();
-            onClose();
-        } catch (error: unknown) {
-            setErrors((prev) => ({
-                ...prev,
-                form: getApiErrorMessage(error, `Failed to ${isEdit ? "update" : "create"} task`),
-            }));
-=======
                 try {
                     const response = await smartCreateTaskApi({ text: smartInput }).unwrap();
                     if (response.task) {
@@ -274,7 +154,6 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                     ? (error as { data?: { message?: string } }).data?.message
                     : undefined;
             setErrors(prev => ({ ...prev, form: message || `Failed to ${isEdit ? 'update' : 'create'} task` }));
->>>>>>> origin/main
         } finally {
             setIsLoading(false);
         }
@@ -368,7 +247,6 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                                     onChange={(e) => setDueDate(e.target.value)}
                                     className="bg-white/5 border-white/10 focus:ring-purple-500/50"
                                 />
-                                {errors.dueDate && <p className="text-red-400 text-xs mt-1">{errors.dueDate}</p>}
                             </Field>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -388,7 +266,6 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                                         ))}
                                         <option value="Other">Other</option>
                                     </select>
-                                    {errors.category && <p className="text-red-400 text-xs mt-1">{errors.category}</p>}
                                 </Field>
                                 <Field>
                                     <Label htmlFor="priority">Priority</Label>
@@ -402,7 +279,6 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                                         <option value={PriorityEnum.MEDIUM}>Medium</option>
                                         <option value={PriorityEnum.HIGH}>High</option>
                                     </select>
-                                    {errors.priority && <p className="text-red-400 text-xs mt-1">{errors.priority}</p>}
                                 </Field>
                             </div>
                         </FieldGroup>

@@ -169,7 +169,4 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
         </div>
     );
 }
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main

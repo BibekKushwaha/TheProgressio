@@ -30,7 +30,7 @@ export function HabitStreaks() {
                 </span>
             </div>
 
-            <div className="space-y-6 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(168,85,247,0.3)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-purple-500/20 hover:[&::-webkit-scrollbar-thumb]:bg-purple-500/40">
+            <div className="space-y-6 flex-1 overflow-y-auto pr-1 custom-scrollbar">
                 <AnimatePresence mode="popLayout">
                     {habitsList.length === 0 ? (
                         <motion.div
@@ -111,7 +111,7 @@ export function HabitStreaks() {
                 </AnimatePresence>
             </div>
 
-            <Link href="/habits" className="mt-6">
+            <Link href="/dashboard/habits" className="mt-6">
                 <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -122,8 +122,6 @@ export function HabitStreaks() {
                 </motion.button>
             </Link>
 
-<<<<<<< HEAD
-=======
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 4px;
@@ -139,7 +137,6 @@ export function HabitStreaks() {
                     background: rgba(168, 85, 247, 0.3);
                 }
             `}</style>
->>>>>>> origin/main
         </div>
     );
 }

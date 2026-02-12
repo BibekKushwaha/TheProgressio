@@ -11,7 +11,7 @@ import { useSearchParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Navbar } from '@/components/Navbar';
 import { SearchBar } from '@/components/SearchBar';
-import { getTodayDateKey } from '@/lib/date';
+import { SubjectCardsSidebar } from '@/components/planner/SubjectCardsSidebar';
 
 export default function TasksPage() {
     const searchParams = useSearchParams();
@@ -20,7 +20,6 @@ export default function TasksPage() {
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [view, setView] = useState<'kanban' | 'list' | 'timetable'>('kanban');
-    const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
 
     const { data: categories } = useGetCategoriesQuery();
     const { data: allTasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
@@ -65,11 +64,6 @@ export default function TasksPage() {
 
     const handleViewChange = (nextView: 'kanban' | 'list' | 'timetable') => {
         setView(nextView);
-        if (nextView === 'timetable') {
-            setDateFilter(getTodayDateKey());
-        } else {
-            setDateFilter(undefined);
-        }
     };
 
 
@@ -137,7 +131,7 @@ export default function TasksPage() {
                                     tasks={tasks}
                                 />
                             ) : (
-                                <TimetableView tasks={tasks} date={dateFilter} />
+                                <TimetableView />
                             )}
                         </main>
                     </div>

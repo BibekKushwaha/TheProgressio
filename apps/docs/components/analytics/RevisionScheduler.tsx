@@ -1,10 +1,6 @@
 'use client';
 
-<<<<<<< HEAD
-import { useEffect, useState } from 'react';
-=======
 import { useState } from 'react';
->>>>>>> origin/main
 import { CalendarDays, Clock, Target, CheckCircle, Sparkles } from 'lucide-react';
 
 type ExamType = 'JEE' | 'NEET' | 'UPSC' | 'CUSTOM';
@@ -61,18 +57,10 @@ const MOCK_SCHEDULE: ScheduledBlock[] = [
     { id: '6', subject: 'Mathematics', chapter: 'Probability — Bayes Theorem', type: 'PYQ', time: '16:00', duration: 60, completed: false },
 ];
 
-interface RevisionSchedulerProps {
-    initialExam?: ExamType;
-}
-
-export function RevisionScheduler({ initialExam = 'JEE' }: RevisionSchedulerProps) {
-    const [selectedExam, setSelectedExam] = useState<ExamType>(initialExam);
+export function RevisionScheduler() {
+    const [selectedExam, setSelectedExam] = useState<ExamType>('JEE');
     const [schedule, setSchedule] = useState<ScheduledBlock[]>(MOCK_SCHEDULE);
     const [showRoutine, setShowRoutine] = useState(false);
-
-    useEffect(() => {
-        setSelectedExam(initialExam);
-    }, [initialExam]);
 
     const routine = EXAM_ROUTINES[selectedExam];
     const completed = schedule.filter(s => s.completed).length;

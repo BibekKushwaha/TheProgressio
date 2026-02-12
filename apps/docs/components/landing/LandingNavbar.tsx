@@ -1,11 +1,7 @@
 // components/landing/Navbar.tsx
 'use client';
 
-<<<<<<< HEAD
-import { logout, selectCurrentUser, selectIsAuthenticated, useAppDispatch, useAppSelector, useLogoutMutation } from '@repo/store';
-=======
 import { selectCurrentUser, useAppSelector, useLogoutMutation } from '@repo/store';
->>>>>>> origin/main
 import { motion } from 'framer-motion';
 import { Sparkles, LogOut, Settings, User } from 'lucide-react';
 import Link from 'next/link';
@@ -21,28 +17,15 @@ import { useRouter } from 'next/navigation';
 
 export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
-<<<<<<< HEAD
-  const userlog = useAppSelector(selectIsAuthenticated);
-  const dispatch = useAppDispatch();
-=======
   
->>>>>>> origin/main
   
-  const [logoutApi] = useLogoutMutation();
+  const [logout] = useLogoutMutation();
   const navLinks = ['Features', 'How it Works', 'Pricing'];
   const router = useRouter();
 
 
   const handleLogout = async () => {
-    try {
-      await logoutApi().unwrap();
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth:hasSession');
-    }
-    dispatch(logout());
+    await logout();
     router.push('/'); // Redirect to homepage after logout
   };
 
@@ -83,11 +66,11 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-4">
-            {userlog ? (
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button className="text-slate-300 hover:bg-slate-700 transition-colors">
-                    {user?.username?.charAt(0).toUpperCase()}
+                    {user.username?.charAt(0).toUpperCase()}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -127,3 +110,4 @@ export function Navbar() {
     </motion.nav>
   );
 }
+

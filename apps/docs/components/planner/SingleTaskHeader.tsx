@@ -7,17 +7,10 @@ import { useRouter, useParams } from 'next/navigation';
 
 export function SingleTaskHeader() {
     const router = useRouter();
-<<<<<<< HEAD
-    const params = useParams();
-    const id = typeof params?.id === 'string' ? params.id : '';
-    const { data: task } = useGetTaskByIdQuery(id, { skip: !id });
-    if (!id) return null;
-=======
     const { id } = useParams()
     const taskId = typeof id === 'string' ? id : undefined
     const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId })
     if (!taskId) return null
->>>>>>> origin/main
 
     return (
         <div>

@@ -1,25 +1,14 @@
 'use client';
 
-import {
-    useGetTimeLeakageQuery,
-    useGetPeakWindowQuery,
-    useGetPredictivePerformanceQuery,
-    PeakProductivityResult,
-    LearningPace,
-} from '@repo/store';
+import { useGetTimeLeakageQuery, useGetPeakWindowQuery, useGetPredictivePerformanceQuery } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Clock, TrendingUp, AlertCircle, Sun } from 'lucide-react';
 
-interface ProductivityInsightsProps {
-    examType?: string;
-    days?: number;
-}
-
-export function ProductivityInsights({ examType = 'JEE', days = 7 }: ProductivityInsightsProps) {
-    const { data: leakageData, isLoading: leakageLoading } = useGetTimeLeakageQuery(days);
+export function ProductivityInsights() {
+    const { data: leakageData, isLoading: leakageLoading } = useGetTimeLeakageQuery(7);
     const { data: peakData, isLoading: peakLoading } = useGetPeakWindowQuery();
-    const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery(examType);
+    const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery('');
 
     const isLoading = leakageLoading || peakLoading || performanceLoading;
 
@@ -146,11 +135,7 @@ export function ProductivityInsights({ examType = 'JEE', days = 7 }: Productivit
                         <div className="mt-6">
                             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Hourly Efficiency</h3>
                             <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
-<<<<<<< HEAD
-                                {peak.efficiencyByHour.map((hour: PeakProductivityResult['efficiencyByHour'][number]) => {
-=======
                                 {peak.efficiencyByHour.map((hour) => {
->>>>>>> origin/main
                                     const isPeak = hour.hour >= peak.peakWindow.startHour && hour.hour < peak.peakWindow.endHour;
                                     return (
                                         <div
@@ -185,11 +170,7 @@ export function ProductivityInsights({ examType = 'JEE', days = 7 }: Productivit
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<<<<<<< HEAD
-                        {performance.map((subject: LearningPace) => (
-=======
                         {performance.map((subject) => (
->>>>>>> origin/main
                             <div key={subject.subjectName} className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <h3 className="font-semibold text-white mb-3">{subject.subjectName}</h3>
 

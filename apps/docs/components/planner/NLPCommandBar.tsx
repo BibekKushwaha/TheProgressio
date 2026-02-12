@@ -3,36 +3,10 @@
 import { useState, useRef } from 'react';
 import { Sparkles, Loader2, ArrowRight, X } from 'lucide-react';
 import { useParseTaskMutation, useCreateTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
-<<<<<<< HEAD
-
-interface ParsedTaskResult {
-    title: string;
-    description?: string;
-    dueDate?: string;
-    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-    subject?: string;
-}
-
-function toPriority(value?: ParsedTaskResult["priority"]): PriorityEnum {
-    switch (value) {
-        case 'LOW':
-            return PriorityEnum.LOW;
-        case 'HIGH':
-        case 'URGENT':
-            return PriorityEnum.HIGH;
-        default:
-            return PriorityEnum.MEDIUM;
-    }
-}
-=======
->>>>>>> origin/main
 
 export function NLPCommandBar() {
     const [input, setInput] = useState('');
     const [isOpen, setIsOpen] = useState(false);
-<<<<<<< HEAD
-    const [parsedResult, setParsedResult] = useState<ParsedTaskResult | null>(null);
-=======
     type ParsedTask = {
         title: string;
         description?: string;
@@ -41,7 +15,6 @@ export function NLPCommandBar() {
         subject?: string;
     };
     const [parsedResult, setParsedResult] = useState<ParsedTask | null>(null);
->>>>>>> origin/main
     const inputRef = useRef<HTMLInputElement>(null);
     const [parseTask, { isLoading: isParsing }] = useParseTaskMutation();
     const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
@@ -68,11 +41,7 @@ export function NLPCommandBar() {
                 title: parsedResult.title,
                 description: parsedResult.description || '',
                 dueDate: parsedResult.dueDate,
-<<<<<<< HEAD
-                priority: toPriority(parsedResult.priority),
-=======
                 priority: parsedResult.priority ?? PriorityEnum.MEDIUM,
->>>>>>> origin/main
                 status: TaskStatus.PENDING,
             }).unwrap();
             setParsedResult(null);
@@ -117,7 +86,6 @@ export function NLPCommandBar() {
                     className="flex-1 bg-transparent text-white placeholder-slate-500 text-sm focus:outline-none"
                     autoFocus
                 />
-               
                 {isParsing ? (
                     <Loader2 className="w-5 h-5 text-indigo-400 animate-spin shrink-0" />
                 ) : (
@@ -135,7 +103,7 @@ export function NLPCommandBar() {
                     </div>
                 )}
             </div>
-            
+
             {/* Parsed Result Preview */}
             {parsedResult && (
                 <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3 space-y-2">

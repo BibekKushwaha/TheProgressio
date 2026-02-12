@@ -1,8 +1,4 @@
 // components/calendar/DeadlineChip.tsx
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/main
 interface DeadlineChipProps {
     label: string;
     title: string;
