@@ -23,7 +23,7 @@ export default function HomePage() {
             <Navbar />
 
             <main className="relative z-10">
-                <section className="max-w-7xl mx-auto px-4 pt-24 pb-6">
+                <section className="max-w-7xl mx-auto px-4 pt-24">
                     <div className="flex flex-wrap gap-2">
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-cyan-100">
                             <Sparkles className="w-3.5 h-3.5" />

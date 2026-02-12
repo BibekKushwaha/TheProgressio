@@ -6,7 +6,7 @@ import { ArrowRight, Sparkles, Focus } from 'lucide-react';
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center px-6 pt-32 pb-20">
+    <section className="relative min-h-screen flex items-center justify-center px-6  pb-20">
       <div className="max-w-5xl mx-auto text-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
