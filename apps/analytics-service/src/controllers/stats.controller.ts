@@ -681,17 +681,27 @@ export const getGPA = async (req: AuthenticatedRequest, res: Response): Promise<
 
         const scale = (req.query.scale as string) || "INDIA_10";
         const raw = await calculateCGPA(userId, scale as "INDIA_10" | "US_4" | "PERCENTAGE");
+        const normalizedRaw = raw as typeof raw & {
+            cgpa?: number;
+            semesterBreakdown?: Array<{ semester: number; gpa: number; credits?: number; totalCredits?: number }>;
+            courses?: Array<{ courseName: string; credits: number; gradePoint: number; grade?: string | null; semester?: number }>;
+        };
 
-        // Normalize service response to UI/store contract shape.
-        const result = {
-            cgpa: raw.currentCGPA,
-            totalCredits: raw.totalCredits,
-            semesterBreakdown: raw.semesters.map((sem) => ({
+        const semesterBreakdown = normalizedRaw.semesters
+            ? normalizedRaw.semesters.map((sem) => ({
                 semester: sem.semester,
                 gpa: sem.gpa,
                 credits: sem.totalCredits,
-            })),
-            courses: raw.semesters.flatMap((sem) =>
+            }))
+            : (normalizedRaw.semesterBreakdown ?? []).map((sem) => ({
+                semester: sem.semester,
+                gpa: sem.gpa,
+                credits: sem.credits ?? sem.totalCredits ?? 0,
+            }));
+
+        const courses = normalizedRaw.courses
+            ? normalizedRaw.courses
+            : (normalizedRaw.semesters ?? []).flatMap((sem) =>
                 sem.courses.map((course) => ({
                     courseName: course.courseName,
                     credits: course.credits,
@@ -699,7 +709,14 @@ export const getGPA = async (req: AuthenticatedRequest, res: Response): Promise<
                     grade: course.grade ?? undefined,
                     semester: sem.semester,
                 }))
-            ),
+            );
+
+        // Normalize service response to UI/store contract shape.
+        const result = {
+            cgpa: normalizedRaw.currentCGPA ?? normalizedRaw.cgpa ?? 0,
+            totalCredits: normalizedRaw.totalCredits ?? 0,
+            semesterBreakdown,
+            courses,
         };
 
         res.status(200).json({ message: "CGPA calculated", result });
