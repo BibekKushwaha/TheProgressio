@@ -7,13 +7,13 @@ import {
     // Phase 3 — SWOT
     getSWOTAnalysis, getSubjectStats,
     // Phase 3 — GPA
-    getGPA, getWhatIfGPA, addCourse, updateCourse, deleteCourse,
+    getGPA, getWhatIfGPA, addCourse, updateCourse, deleteCourse, previewGPAComponents,
     // Phase 3 — Grade Entries
     addGradeEntry, getGradeEntries, deleteGradeEntry,
     // Phase 3 — Focus / Leakage
     getTimeLeakage, getPeakWindow, getPredictivePerformanceEndpoint,
 } from "../controllers/stats.controller.js";
-import { isAuth } from "../middleware/auth.middleware.js";
+import { enforceReadOnlyWrites, isAuth } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
@@ -35,15 +35,16 @@ router.get("/subject/:name", isAuth, getSubjectStats);
 
 // ── GPA Calculator ─────────────────────────────────────────────────────
 router.get("/gpa", isAuth, getGPA);
-router.post("/gpa/what-if", isAuth, getWhatIfGPA);
-router.post("/gpa/course", isAuth, addCourse);
-router.put("/gpa/course/:id", isAuth, updateCourse);
-router.delete("/gpa/course/:id", isAuth, deleteCourse);
+router.post("/gpa/what-if", isAuth, enforceReadOnlyWrites, getWhatIfGPA);
+router.post("/gpa/components/preview", isAuth, enforceReadOnlyWrites, previewGPAComponents);
+router.post("/gpa/course", isAuth, enforceReadOnlyWrites, addCourse);
+router.put("/gpa/course/:id", isAuth, enforceReadOnlyWrites, updateCourse);
+router.delete("/gpa/course/:id", isAuth, enforceReadOnlyWrites, deleteCourse);
 
 // ── Grade Entries ──────────────────────────────────────────────────────
-router.post("/grade-entry", isAuth, addGradeEntry);
+router.post("/grade-entry", isAuth, enforceReadOnlyWrites, addGradeEntry);
 router.get("/grade-entries", isAuth, getGradeEntries);
-router.delete("/grade-entry/:id", isAuth, deleteGradeEntry);
+router.delete("/grade-entry/:id", isAuth, enforceReadOnlyWrites, deleteGradeEntry);
 
 // ── Focus & Time Leakage ──────────────────────────────────────────────
 router.get("/focus/leakage", isAuth, getTimeLeakage);

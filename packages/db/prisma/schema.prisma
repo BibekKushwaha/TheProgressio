@@ -19,6 +19,9 @@ model User {
   email            String     @unique
   password         String
   dailyGoalHours   Float      @default(4.0)
+  whatsappOptIn    Boolean    @default(true)
+  quietHoursStart  String?
+  quietHoursEnd    String?
   createdAt        DateTime   @default(now())
   
   // XP / Gamification
@@ -41,6 +44,13 @@ model User {
   studyGoals       StudyGoal[]
   timetable        Timetable[]
   rotationPatterns RotationPattern[]
+  schoolHolidays   SchoolHoliday[]
+  familyShareLinks FamilyShareLink[]
+  mobileRefreshTokens MobileRefreshToken[]
+
+  // Billing
+  subscriptions    Subscription[]
+  payments         Payment[]
 }
 
 model Achievement {
@@ -301,6 +311,20 @@ model Timetable {
   updatedAt   DateTime @updatedAt
 }
 
+model SchoolHoliday {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  startDate          DateTime
+  endDate            DateTime
+  pauseNotifications Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId, startDate, endDate])
+}
+
 // Custom rotation pattern — allows users to define their own rotation calendar
 model RotationPattern {
   id            String   @id @default(uuid())
@@ -341,6 +365,35 @@ model Nudge {
   @@index([userId, scheduledAt])
 }
 
+model FamilyShareLink {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  label       String?
+  permissions String   @default("READ_ONLY")
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, revokedAt])
+}
+
+model MobileRefreshToken {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId    String
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, deviceId])
+  @@index([userId, revokedAt])
+}
+
 // ── Phase 3: GPA / Grade Tracking ──────────────────────────────────────
 
 model CourseGrade {
@@ -371,9 +424,64 @@ model GradeEntry {
   obtainedMarks Float
   examType      String   // "JEE", "NEET", "UPSC", "INTERNAL", "BOARD"
   timeTakenMins Int?     // time taken per question/section
+  assessmentWeights    Json?
+  assessmentComponents Json?
+  gradingMode          String @default("RAW")
   
   createdAt     DateTime @default(now())
   
   @@index([userId, subjectName])
   @@index([userId, examType])
+}
+
+// ─── Billing & Payments ─────────────────────────────────────────────────────────
+
+model Subscription {
+  id                    String   @id @default(uuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan                  String   // "FREE", "PRO", "INSTITUTION"
+  status                String   @default("ACTIVE") // "ACTIVE", "CANCELLED", "EXPIRED", "PAST_DUE"
+  razorpaySubscriptionId String?  @unique
+  razorpayCustomerId    String?
+
+  amountPaise           Int      @default(0) // amount in paise (14900 = ₹149)
+  currency              String   @default("INR")
+  interval              String   @default("monthly") // "monthly", "yearly"
+
+  currentPeriodStart    DateTime @default(now())
+  currentPeriodEnd      DateTime?
+  cancelledAt           DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  payments              Payment[]
+
+  @@index([userId])
+  @@index([razorpaySubscriptionId])
+}
+
+model Payment {
+  id                    String   @id @default(uuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId        String?
+  subscription          Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  razorpayOrderId       String?  @unique
+  razorpayPaymentId     String?  @unique
+  razorpaySignature     String?
+
+  amountPaise           Int      // amount in paise
+  currency              String   @default("INR")
+  status                String   @default("CREATED") // "CREATED", "AUTHORIZED", "CAPTURED", "FAILED", "REFUNDED"
+  method                String?  // "upi", "card", "netbanking"
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
+  @@index([razorpayOrderId])
 }

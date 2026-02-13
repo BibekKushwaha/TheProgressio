@@ -1,5 +1,20 @@
 import express from "express";
-import { createTask, getAllTasks, getTaskById, updateTask, deleteTask, toggleTask, taskCategories, smartCreateTask, generateSubtasks, previewSubtasks, parseTaskIntent } from "../controllers/task.controller.js";
+import {
+    applyRecoveryPlan,
+    createTask,
+    generateSubtasks,
+    getAllTasks,
+    getTaskById,
+    parseTaskIntent,
+    previewRecoveryPlan,
+    previewSubtasks,
+    scanSyllabusImage,
+    smartCreateTask,
+    taskCategories,
+    toggleTask,
+    updateTask,
+    deleteTask,
+} from "../controllers/task.controller.js";
 
 const router = express.Router();
 
@@ -15,8 +30,17 @@ router.post("/smart-create", smartCreateTask);
 // POST /tasks/parse - Parse a task intent without creating it
 router.post("/parse", parseTaskIntent);
 
+// POST /tasks/scan-syllabus - Parse syllabus image into structured tasks
+router.post("/scan-syllabus", scanSyllabusImage);
+
 // POST /tasks/preview-subtasks - Generate AI subtasks without creating a task
 router.post("/preview-subtasks", previewSubtasks);
+
+// POST /tasks/recovery/preview - Preview recovery rebalance
+router.post("/recovery/preview", previewRecoveryPlan);
+
+// POST /tasks/recovery/apply - Apply recovery rebalance
+router.post("/recovery/apply", applyRecoveryPlan);
 
 // POST /tasks/:id/subtasks - Generate AI subtasks
 router.post("/:id/subtasks", generateSubtasks);

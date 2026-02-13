@@ -61,7 +61,7 @@ const Sidebar = () => {
     return (
         <>
             {/* Desktop Sidebar */}
-            <div className="hidden lg:flex w-80 flex-col h-screen fixed left-0 top-0 p-4 z-50">
+            <div className="hidden lg:flex w-75 flex-col h-screen fixed left-0 top-0 p-4 z-50">
                 <GlassCard className="h-full flex flex-col p-4" gradient>
                     <div className="flex items-center gap-2 px-2 mb-8 mt-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-xl">

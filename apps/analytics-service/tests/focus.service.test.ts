@@ -185,12 +185,14 @@ describe('Focus Service — detectPeakProductivity', () => {
 describe('Focus Service — getPredictivePerformance', () => {
     beforeEach(() => vi.clearAllMocks());
 
-    it('returns empty array when no entries exist', async () => {
+    it('returns safe defaults when no entries exist', async () => {
         mockPrisma.gradeEntry.findMany.mockResolvedValue([]);
 
         const result = await getPredictivePerformance('u1', 'JEE');
 
-        expect(result).toEqual([]);
+        expect(result.data).toEqual([]);
+        expect(result.confidence).toBe(0);
+        expect(result.dataQuality.label).toBe('low');
     });
 
     it('returns learning pace per subject', async () => {
@@ -204,12 +206,15 @@ describe('Focus Service — getPredictivePerformance', () => {
 
         const result = await getPredictivePerformance('u1', 'JEE');
 
-        expect(result.length).toBe(1);
-        expect(result[0]).toHaveProperty('subjectName', 'Physics');
-        expect(result[0]).toHaveProperty('pace');
-        expect(result[0]).toHaveProperty('estimatedExamScore');
-        expect(result[0]).toHaveProperty('estimatedPercentile');
-        expect(result[0]!.pace).toBe('accelerating');
+        expect(result.data.length).toBe(1);
+        expect(result.data[0]).toHaveProperty('subjectName', 'Physics');
+        expect(result.data[0]).toHaveProperty('pace');
+        expect(result.data[0]).toHaveProperty('estimatedExamScore');
+        expect(result.data[0]).toHaveProperty('estimatedPercentile');
+        expect(result.data[0]!.pace).toBe('accelerating');
+        expect(result).toHaveProperty('modelVersion');
+        expect(result.modelVersion).toBe('montecarlo-v3.0');
+        expect(result).toHaveProperty('dataQuality');
     });
 
     it('handles multiple subjects', async () => {
@@ -223,9 +228,9 @@ describe('Focus Service — getPredictivePerformance', () => {
 
         const result = await getPredictivePerformance('u1', 'JEE');
 
-        expect(result.length).toBe(2);
-        const physics = result.find(r => r.subjectName === 'Physics');
-        const chemistry = result.find(r => r.subjectName === 'Chemistry');
+        expect(result.data.length).toBe(2);
+        const physics = result.data.find(r => r.subjectName === 'Physics');
+        const chemistry = result.data.find(r => r.subjectName === 'Chemistry');
         expect(physics).toBeDefined();
         expect(chemistry).toBeDefined();
         expect(chemistry!.pace).toBe('declining');

@@ -5,9 +5,10 @@
  * Runs automatically when online, pauses when offline.
  * Uses Last-Write-Wins (LWW) conflict resolution.
  */
-import { localDb, syncQueue, localTasks, localCategories, type SyncQueueItem } from './local-db';
+import { localDb, syncQueue, localTasks, localCategories, localHabits, localHabitLogs, localTimetable, type SyncQueueItem } from './local-db';
 
 const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
+const HABIT_SERVICE_URL = process.env.NEXT_PUBLIC_HABIT_SERVICE_URL || 'http://localhost:4002';
 const MAX_RETRIES = 5;
 const SYNC_INTERVAL_MS = 5000; // 5 seconds
 
@@ -96,7 +97,25 @@ class BackgroundSyncEngine {
                 await localCategories.hydrate(categories);
             }
 
-            console.log('[Sync] Pulled fresh data from server');
+            // Fetch habits
+            const habitsRes = await fetch(`${HABIT_SERVICE_URL}/api/habits`, {
+                credentials: 'include',
+            });
+            if (habitsRes.ok) {
+                const habits = await habitsRes.json();
+                await localHabits.hydrate(Array.isArray(habits) ? habits : habits.habits ?? []);
+            }
+
+            // Fetch timetable entries
+            const timetableRes = await fetch(`${PLANNER_SERVICE_URL}/api/timetable`, {
+                credentials: 'include',
+            });
+            if (timetableRes.ok) {
+                const entries = await timetableRes.json();
+                await localTimetable.hydrate(Array.isArray(entries) ? entries : entries.entries ?? []);
+            }
+
+            console.log('[Sync] Pulled fresh data from server (tasks, categories, habits, timetable)');
         } catch (error) {
             console.warn('[Sync] Pull from server failed:', error);
         }
@@ -147,6 +166,24 @@ class BackgroundSyncEngine {
                             _dirty: false,
                         });
                     }
+                } else if (item.entityType === 'habit') {
+                    const habit = await localDb.habits.get(item.entityId);
+                    if (habit) {
+                        await localDb.habits.update(item.entityId, {
+                            _localOnly: false,
+                            _dirty: false,
+                            _lastSyncedAt: new Date().toISOString(),
+                        });
+                    }
+                } else if (item.entityType === 'habitLog') {
+                    const log = await localDb.habitLogs.get(item.entityId);
+                    if (log) {
+                        await localDb.habitLogs.update(item.entityId, {
+                            _localOnly: false,
+                            _dirty: false,
+                            _lastSyncedAt: new Date().toISOString(),
+                        });
+                    }
                 }
             } catch (error) {
                 const errMsg = error instanceof Error ? error.message : String(error);
@@ -168,6 +205,10 @@ class BackgroundSyncEngine {
             await this.syncCategory(entityId, action, payload);
         } else if (entityType === 'subtask') {
             await this.syncSubTask(entityId, action, payload);
+        } else if (entityType === 'habit') {
+            await this.syncHabit(entityId, action, payload);
+        } else if (entityType === 'habitLog') {
+            await this.syncHabitLog(entityId, action, payload);
         }
     }
 
@@ -291,6 +332,69 @@ class BackgroundSyncEngine {
                     credentials: 'include',
                 });
                 if (!res.ok && res.status !== 404) throw new Error(`Delete subtask failed: ${res.status}`);
+                break;
+            }
+        }
+    }
+
+    private async syncHabit(id: string, action: string, payload: Record<string, unknown>): Promise<void> {
+        const base = `${HABIT_SERVICE_URL}/api/habits`;
+
+        switch (action) {
+            case 'CREATE': {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { _localOnly, _dirty, _deletedLocally, _lastSyncedAt, ...data } = payload as any;
+                const res = await fetch(base, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(data),
+                });
+                if (!res.ok) throw new Error(`Create habit failed: ${res.status}`);
+                const serverHabit = await res.json();
+                if (serverHabit.id !== id) {
+                    await localDb.habits.delete(id);
+                    await localDb.habits.put({ ...serverHabit, _localOnly: false, _dirty: false });
+                }
+                break;
+            }
+            case 'UPDATE': {
+                const res = await fetch(`${base}/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) throw new Error(`Update habit failed: ${res.status}`);
+                break;
+            }
+            case 'DELETE': {
+                const res = await fetch(`${base}/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                });
+                if (!res.ok && res.status !== 404) throw new Error(`Delete habit failed: ${res.status}`);
+                await localDb.habits.delete(id);
+                break;
+            }
+        }
+    }
+
+    private async syncHabitLog(id: string, action: string, payload: Record<string, unknown>): Promise<void> {
+        const habitId = typeof payload.habitId === 'string' ? payload.habitId : '';
+
+        switch (action) {
+            case 'LOG':
+            case 'CREATE': {
+                const res = await fetch(`${HABIT_SERVICE_URL}/api/habits/${habitId}/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        completedValue: payload.completedValue ?? 1,
+                    }),
+                });
+                if (!res.ok) throw new Error(`Log habit failed: ${res.status}`);
                 break;
             }
         }

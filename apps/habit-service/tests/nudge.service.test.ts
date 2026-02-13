@@ -17,6 +17,7 @@ const { mockPrisma } = vi.hoisted(() => ({
         habitLog: { findMany: vi.fn(), groupBy: vi.fn() },
         user: { findUnique: vi.fn() },
         timetable: { findMany: vi.fn() },
+        schoolHoliday: { findFirst: vi.fn() },
     },
 }));
 
@@ -154,7 +155,10 @@ describe('Nudge Service — detectExamWarnings', () => {
 });
 
 describe('Nudge Service — generateMorningBriefing', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockPrisma.schoolHoliday.findFirst.mockResolvedValue(null);
+    });
 
     it('returns a morning briefing with all fields', async () => {
         mockPrisma.task.count.mockResolvedValue(3);

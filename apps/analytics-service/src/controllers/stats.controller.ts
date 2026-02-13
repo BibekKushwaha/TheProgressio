@@ -3,7 +3,14 @@ import { prisma } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { predictTaskDuration, getCycleTimePercentiles } from "../services/prediction.service.js";
 import { generateSWOT, getSubjectPerformance } from "../services/swot.service.js";
-import { calculateCGPA, whatIfGPA, addCourseGrade, updateCourseGrade, deleteCourseGrade } from "../services/gpa.service.js";
+import {
+    addCourseGrade,
+    calculateCGPA,
+    deleteCourseGrade,
+    previewWeightedComponents,
+    updateCourseGrade,
+    whatIfGPA,
+} from "../services/gpa.service.js";
 import { getPlannedVsActual, detectPeakProductivity, getPredictivePerformance } from "../services/focus.service.js";
 
 const startOfDay = (date: Date): Date => {
@@ -812,16 +819,33 @@ export const addGradeEntry = async (req: AuthenticatedRequest, res: Response): P
         const userId = req.user?.id;
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
-        const { subjectName, chapter, totalMarks, obtainedMarks, examType, timeTakenMins } = req.body ?? {};
+        const {
+            subjectName,
+            chapter,
+            totalMarks,
+            obtainedMarks,
+            examType,
+            timeTakenMins,
+            assessmentWeights,
+            assessmentComponents,
+            gradingMode,
+            components,
+        } = req.body ?? {};
         if (!subjectName || totalMarks == null || obtainedMarks == null) {
             res.status(400).json({ message: "subjectName, totalMarks, and obtainedMarks are required" });
             return;
         }
 
+        const normalizedComponents = Array.isArray(components) ? components : assessmentComponents;
+        const normalizedWeights = assessmentWeights ?? null;
+
         const entry = await prisma.gradeEntry.create({
             data: {
                 userId, subjectName, chapter, totalMarks: parseFloat(totalMarks), obtainedMarks: parseFloat(obtainedMarks),
                 examType: examType || "JEE", timeTakenMins: timeTakenMins ? parseInt(timeTakenMins) : null,
+                assessmentComponents: normalizedComponents ?? null,
+                assessmentWeights: normalizedWeights,
+                gradingMode: typeof gradingMode === "string" ? gradingMode : "RAW",
             },
         });
         res.status(201).json({ message: "Grade entry added", entry });
@@ -911,10 +935,48 @@ export const getPredictivePerformanceEndpoint = async (req: AuthenticatedRequest
         const { examType } = req.params;
         if (!examType) { res.status(400).json({ message: "examType is required" }); return; }
 
-        const data = await getPredictivePerformance(userId, examType as string);
-        res.status(200).json({ message: "Predictive performance", data });
+        const result = await getPredictivePerformance(userId, examType as string);
+        res.status(200).json({
+            message: "Predictive performance",
+            data: result.data,
+            confidence: result.confidence,
+            modelVersion: result.modelVersion,
+            dataQuality: result.dataQuality,
+        });
     } catch (error) {
         console.error("Error fetching predictive performance:", error);
         res.status(500).json({ message: "Failed to fetch predictive performance", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// POST /stats/gpa/components/preview
+export const previewGPAComponents = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { components, scale } = req.body ?? {};
+        if (!Array.isArray(components) || components.length === 0) {
+            res.status(400).json({ message: "components array is required" });
+            return;
+        }
+
+        const result = previewWeightedComponents(
+            components.map((component) => ({
+                name: String(component?.name ?? "Component"),
+                weight: Number(component?.weight ?? 0),
+                obtainedMarks: Number(component?.obtainedMarks ?? 0),
+                totalMarks: Number(component?.totalMarks ?? 0),
+            })),
+            (scale as "INDIA_10" | "US_4" | "PERCENTAGE") || "INDIA_10",
+        );
+
+        res.status(200).json({
+            message: "GPA component preview generated",
+            result,
+        });
+    } catch (error) {
+        console.error("Error previewing GPA components:", error);
+        res.status(500).json({ message: "Failed to preview GPA components", error: error instanceof Error ? error.message : "Unknown error" });
     }
 };

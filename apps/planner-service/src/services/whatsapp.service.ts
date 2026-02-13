@@ -4,6 +4,7 @@ export interface WhatsAppInbound {
     text: string | null;
     sender: string | null;
     explicitUserId: string | null;
+    messageId: string | null;
 }
 
 const asObject = (value: unknown): PlainObject | null => {
@@ -39,7 +40,7 @@ const readUserMapping = (): Record<string, string> => {
 
 export const extractWhatsAppInbound = (payload: unknown): WhatsAppInbound => {
     const root = asObject(payload);
-    if (!root) return { text: null, sender: null, explicitUserId: null };
+    if (!root) return { text: null, sender: null, explicitUserId: null, messageId: null };
 
     // Direct payload mode for internal callers:
     // { userId, text, from }
@@ -51,6 +52,7 @@ export const extractWhatsAppInbound = (payload: unknown): WhatsAppInbound => {
             text: directText,
             sender: directSender,
             explicitUserId: directUserId,
+            messageId: null,
         };
     }
 
@@ -67,25 +69,61 @@ export const extractWhatsAppInbound = (payload: unknown): WhatsAppInbound => {
 
     const text = textContainer ? toStringValue(textContainer.body) : null;
     const sender = firstMessage ? toStringValue(firstMessage.from) : null;
+    const messageId = firstMessage ? toStringValue(firstMessage.id) : null;
 
     return {
         text,
         sender,
         explicitUserId: directUserId,
+        messageId,
     };
 };
 
-export const resolveWhatsAppUserId = (params: {
+/**
+ * Resolve a WhatsApp sender to a userId.
+ * Priority: explicit userId → DB lookup (WhatsAppUser) → env-var mapping fallback.
+ */
+export const resolveWhatsAppUserId = async (params: {
     explicitUserId: string | null;
     sender: string | null;
-}): string | null => {
+    prisma?: any;
+}): Promise<string | null> => {
     if (params.explicitUserId) return params.explicitUserId;
 
     const sender = normalizePhone(params.sender);
     if (!sender) return null;
 
+    // DB-based lookup (if prisma is available)
+    if (params.prisma) {
+        try {
+            const whatsappUser = await params.prisma.whatsAppUser.findFirst({
+                where: { phoneNumber: sender, verified: true, optedIn: true },
+                select: { userId: true },
+            });
+            if (whatsappUser) return whatsappUser.userId;
+        } catch {
+            // Fall through to env-var mapping
+        }
+    }
+
+    // Fallback: env-var mapping
     const mapping = readUserMapping();
     return mapping[sender] ?? null;
+};
+
+/**
+ * Detect slash commands from WhatsApp messages.
+ * Supported: /status, /today, /help
+ */
+export type WhatsAppCommand = "status" | "today" | "help" | null;
+
+export const detectCommand = (text: string | null): WhatsAppCommand => {
+    if (!text) return null;
+    const trimmed = text.trim().toLowerCase();
+    if (trimmed === "/status" || trimmed === "status") return "status";
+    if (trimmed === "/today" || trimmed === "today") return "today";
+    if (trimmed === "/help" || trimmed === "help") return "help";
+    return null;
 };
 
 export const isWhatsAppCaptureAuthorized = (secretHeader: unknown): boolean => {

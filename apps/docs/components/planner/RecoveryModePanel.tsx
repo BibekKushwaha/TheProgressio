@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { AlertTriangle, CalendarClock, RefreshCw, Sparkles, Wand2 } from 'lucide-react';
-import { Task, useUpdateTaskMutation } from '@repo/store';
+import { Task, useApplyRecoveryPlanMutation, usePreviewRecoveryPlanMutation } from '@repo/store';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-provider';
 import { buildRecoveryPlan, type RecoveryPlan } from '@/lib/recoveryPlan';
@@ -16,9 +16,9 @@ const formatDate = (value: string) =>
 
 export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
     const { toast } = useToast();
-    const [updateTask] = useUpdateTaskMutation();
+    const [previewRecoveryPlan, { isLoading: isPreviewing }] = usePreviewRecoveryPlanMutation();
+    const [applyRecoveryPlan, { isLoading: isApplying }] = useApplyRecoveryPlanMutation();
     const [plan, setPlan] = useState<RecoveryPlan | null>(null);
-    const [isApplying, setIsApplying] = useState(false);
 
     const preview = useMemo(() => buildRecoveryPlan(tasks), [tasks]);
     const activePlan = plan ?? preview;
@@ -26,45 +26,42 @@ export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
     const overdueCount = preview.backlogCount;
     const hasPlan = activePlan.items.length > 0;
 
-    const handleGenerate = () => {
-        const generatedPlan = buildRecoveryPlan(tasks);
-        setPlan(generatedPlan);
-        if (generatedPlan.items.length === 0) {
+    const handleGenerate = async () => {
+        try {
+            const response = await previewRecoveryPlan().unwrap();
+            const generatedPlan = response.plan;
+            setPlan(generatedPlan);
+
+            if (generatedPlan.items.length === 0) {
+                toast('No overdue tasks. Recovery mode is on standby.', 'success');
+                return;
+            }
+
+            toast(`Recovery plan generated for ${generatedPlan.items.length} tasks.`, 'success');
+            return;
+        } catch (error) {
+            console.error('Recovery preview failed, falling back to local heuristic:', error);
+        }
+
+        const localPlan = buildRecoveryPlan(tasks);
+        setPlan(localPlan);
+        if (localPlan.items.length === 0) {
             toast('No overdue tasks. Recovery mode is on standby.', 'success');
             return;
         }
-        toast(`Recovery plan generated for ${generatedPlan.items.length} tasks.`, 'success');
+
+        toast(`Local recovery plan generated for ${localPlan.items.length} tasks.`, 'success');
     };
 
     const handleApply = async () => {
         if (!hasPlan) return;
-
-        setIsApplying(true);
         try {
-            const outcomes = await Promise.allSettled(
-                activePlan.items.map((item) =>
-                    updateTask({
-                        id: item.taskId,
-                        dueDate: item.newDueDate,
-                    }).unwrap()
-                )
-            );
-
-            const success = outcomes.filter((result) => result.status === 'fulfilled').length;
-            const failed = outcomes.length - success;
-
-            if (success > 0) {
-                toast(`Recovery plan applied to ${success} tasks.`, 'success');
-            }
-            if (failed > 0) {
-                toast(`${failed} tasks could not be rescheduled.`, 'error');
-            }
-
-            if (failed === 0) {
-                setPlan(null);
-            }
-        } finally {
-            setIsApplying(false);
+            const response = await applyRecoveryPlan().unwrap();
+            toast(`Recovery plan applied to ${response.updatedCount} tasks.`, 'success');
+            setPlan(null);
+        } catch (error) {
+            console.error('Recovery apply failed:', error);
+            toast('Recovery apply failed. Please retry.', 'error');
         }
     };
 
@@ -85,10 +82,20 @@ export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
                 <div className="flex items-center gap-2">
                     <Button
                         onClick={handleGenerate}
+                        disabled={isPreviewing}
                         className="border-amber-400/30 bg-amber-500/20 text-amber-100 hover:bg-amber-500/30"
                     >
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        {plan ? 'Regenerate Plan' : 'Generate Plan'}
+                        {isPreviewing ? (
+                            <>
+                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="mr-2 h-4 w-4" />
+                                {plan ? 'Regenerate Plan' : 'Generate Plan'}
+                            </>
+                        )}
                     </Button>
                     <Button
                         onClick={handleApply}

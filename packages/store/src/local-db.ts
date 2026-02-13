@@ -1,7 +1,8 @@
 /**
  * Local-First Persistence Layer using Dexie.js (IndexedDB)
  * 
- * Provides instant offline access to tasks, categories, and sync queue.
+ * Provides instant offline access to tasks, categories, habits, habit logs,
+ * timetable entries, and sync queue.
  * Background sync reconciles local changes with the server when online.
  */
 import Dexie, { type Table } from 'dexie';
@@ -57,11 +58,59 @@ export interface LocalAttachment {
     createdAt: string;
 }
 
-export type SyncAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TOGGLE';
+export interface LocalHabit {
+    id: string;
+    name: string;
+    frequency: 'DAILY' | 'WEEKLY';
+    targetValue: number;
+    currentStreak: number;
+    longestStreak: number;
+    mercyDaysAllowed: number;
+    mercyDaysUsed: number;
+    icon?: string | null;
+    color?: string | null;
+    lastLogDate?: string | null;
+    linkedCategoryId?: string | null;
+    userId: string;
+    createdAt: string;
+    updatedAt: string;
+    // Sync metadata
+    _localOnly?: boolean;
+    _dirty?: boolean;
+    _deletedLocally?: boolean;
+    _lastSyncedAt?: string;
+}
+
+export interface LocalHabitLog {
+    id: string;
+    habitId: string;
+    completedValue: number;
+    loggedAt: string;
+    // Sync metadata
+    _localOnly?: boolean;
+    _dirty?: boolean;
+    _lastSyncedAt?: string;
+}
+
+export interface LocalTimetableEntry {
+    id: string;
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+    subjectId: string;
+    subjectName?: string;
+    subjectColor?: string;
+    userId: string;
+    rotation?: string | null;
+    // Timetable is read-only locally (rare changes made on server)
+    _lastSyncedAt?: string;
+}
+
+export type SyncAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TOGGLE' | 'LOG';
 
 export interface SyncQueueItem {
     id?: number; // auto-incremented
-    entityType: 'task' | 'category' | 'subtask';
+    entityType: 'task' | 'category' | 'subtask' | 'habit' | 'habitLog';
     entityId: string;
     action: SyncAction;
     payload: Record<string, unknown>;
@@ -75,6 +124,9 @@ export interface SyncQueueItem {
 class TransitionDB extends Dexie {
     tasks!: Table<LocalTask, string>;
     categories!: Table<LocalCategory, string>;
+    habits!: Table<LocalHabit, string>;
+    habitLogs!: Table<LocalHabitLog, string>;
+    timetableEntries!: Table<LocalTimetableEntry, string>;
     syncQueue!: Table<SyncQueueItem, number>;
 
     constructor() {
@@ -83,6 +135,15 @@ class TransitionDB extends Dexie {
         this.version(1).stores({
             tasks: 'id, userId, status, priority, categoryId, dueDate, _dirty, _localOnly',
             categories: 'id, userId, name, _dirty, _localOnly',
+            syncQueue: '++id, entityType, entityId, action, createdAt',
+        });
+
+        this.version(2).stores({
+            tasks: 'id, userId, status, priority, categoryId, dueDate, _dirty, _localOnly',
+            categories: 'id, userId, name, _dirty, _localOnly',
+            habits: 'id, userId, frequency, _dirty, _localOnly, _deletedLocally',
+            habitLogs: 'id, habitId, loggedAt, _dirty, _localOnly',
+            timetableEntries: 'id, userId, dayOfWeek, subjectId',
             syncQueue: '++id, entityType, entityId, action, createdAt',
         });
     }
@@ -294,5 +355,119 @@ export const syncQueue = {
 export async function clearLocalData(): Promise<void> {
     await localDb.tasks.clear();
     await localDb.categories.clear();
+    await localDb.habits.clear();
+    await localDb.habitLogs.clear();
+    await localDb.timetableEntries.clear();
     await localDb.syncQueue.clear();
 }
+
+// ─── Habit Operations (Local-First) ─────────────────────────────────────────────
+
+export const localHabits = {
+    async getAll(filters?: { userId?: string }): Promise<LocalHabit[]> {
+        let results: LocalHabit[];
+        if (filters?.userId) {
+            results = await localDb.habits.where('userId').equals(filters.userId).toArray();
+        } else {
+            results = await localDb.habits.toArray();
+        }
+        return results.filter((h) => !h._deletedLocally);
+    },
+
+    async getById(id: string): Promise<LocalHabit | undefined> {
+        return localDb.habits.get(id);
+    },
+
+    async create(habit: LocalHabit): Promise<LocalHabit> {
+        const local: LocalHabit = { ...habit, _localOnly: true, _dirty: true };
+        await localDb.habits.put(local);
+        await enqueueSync('habit', habit.id, 'CREATE', { ...habit } as unknown as Record<string, unknown>);
+        return local;
+    },
+
+    async update(id: string, changes: Partial<LocalHabit>): Promise<void> {
+        await localDb.habits.update(id, { ...changes, _dirty: true });
+        await enqueueSync('habit', id, 'UPDATE', changes);
+    },
+
+    async delete(id: string): Promise<void> {
+        const habit = await localDb.habits.get(id);
+        if (habit?._localOnly) {
+            await localDb.habits.delete(id);
+        } else {
+            await localDb.habits.update(id, { _deletedLocally: true, _dirty: true });
+            await enqueueSync('habit', id, 'DELETE', {});
+        }
+    },
+
+    async hydrate(habits: LocalHabit[]): Promise<void> {
+        for (const habit of habits) {
+            const existing = await localDb.habits.get(habit.id);
+            if (existing?._dirty) continue;
+            await localDb.habits.put({
+                ...habit,
+                _localOnly: false,
+                _dirty: false,
+                _lastSyncedAt: new Date().toISOString(),
+            });
+        }
+    },
+};
+
+// ─── Habit Log Operations (Local-First) ─────────────────────────────────────────
+
+export const localHabitLogs = {
+    async getByHabitId(habitId: string): Promise<LocalHabitLog[]> {
+        return localDb.habitLogs.where('habitId').equals(habitId).toArray();
+    },
+
+    async create(log: LocalHabitLog): Promise<LocalHabitLog> {
+        const local: LocalHabitLog = { ...log, _localOnly: true, _dirty: true };
+        await localDb.habitLogs.put(local);
+        await enqueueSync('habitLog', log.id, 'LOG', { ...log } as unknown as Record<string, unknown>);
+        return local;
+    },
+
+    async hydrate(logs: LocalHabitLog[]): Promise<void> {
+        for (const log of logs) {
+            const existing = await localDb.habitLogs.get(log.id);
+            if (existing?._dirty) continue;
+            await localDb.habitLogs.put({
+                ...log,
+                _localOnly: false,
+                _dirty: false,
+                _lastSyncedAt: new Date().toISOString(),
+            });
+        }
+    },
+};
+
+// ─── Timetable Operations (Read-Only Local Cache) ───────────────────────────────
+
+export const localTimetable = {
+    async getAll(filters?: { userId?: string; dayOfWeek?: number }): Promise<LocalTimetableEntry[]> {
+        let results: LocalTimetableEntry[];
+        if (filters?.userId) {
+            results = await localDb.timetableEntries.where('userId').equals(filters.userId).toArray();
+        } else {
+            results = await localDb.timetableEntries.toArray();
+        }
+
+        if (filters?.dayOfWeek !== undefined) {
+            results = results.filter((e) => e.dayOfWeek === filters.dayOfWeek);
+        }
+
+        return results.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    },
+
+    async hydrate(entries: LocalTimetableEntry[]): Promise<void> {
+        // Timetable is server-authoritative; always overwrite local
+        await localDb.timetableEntries.clear();
+        for (const entry of entries) {
+            await localDb.timetableEntries.put({
+                ...entry,
+                _lastSyncedAt: new Date().toISOString(),
+            });
+        }
+    },
+};

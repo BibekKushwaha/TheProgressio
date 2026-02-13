@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { isAuth } from "./middleware/auth.middleware.js";
+import { enforceReadOnlyWrites, isAuth } from "./middleware/auth.middleware.js";
 import taskRouter from "./routes/task.route.js";
 import categoryRouter from "./routes/category.route.js";
 import subtaskRouter from "./routes/subtask.route.js";
@@ -11,6 +11,7 @@ import timetableRouter from "./routes/timetable.route.js";
 import calendarRouter from "./routes/calendar.routes.js";
 import rotationRouter from "./routes/rotation.route.js";
 import whatsappRouter from "./routes/whatsapp.route.js";
+import paymentRouter from "./routes/payment.route.js";
 import { producer } from "./services/producer.service.js";
 
 export const app = express();
@@ -31,13 +32,14 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/api/integrations/whatsapp", whatsappRouter);
-app.use("/api/tasks", isAuth, taskRouter);
-app.use("/api/categories", isAuth, categoryRouter);
-app.use("/api/subtasks", isAuth, subtaskRouter);
-app.use("/api/attachments", isAuth, attachmentRouter);
-app.use("/api/timetable", isAuth, timetableRouter);
-app.use("/api/calendar", isAuth, calendarRouter);
-app.use("/api/rotations", isAuth, rotationRouter);
+app.use("/api/tasks", isAuth, enforceReadOnlyWrites, taskRouter);
+app.use("/api/categories", isAuth, enforceReadOnlyWrites, categoryRouter);
+app.use("/api/subtasks", isAuth, enforceReadOnlyWrites, subtaskRouter);
+app.use("/api/attachments", isAuth, enforceReadOnlyWrites, attachmentRouter);
+app.use("/api/timetable", isAuth, enforceReadOnlyWrites, timetableRouter);
+app.use("/api/calendar", isAuth, enforceReadOnlyWrites, calendarRouter);
+app.use("/api/rotations", isAuth, enforceReadOnlyWrites, rotationRouter);
+app.use("/api/payments", paymentRouter);
 
 const PORT = process.env.PORT || 4001;
 

@@ -25,6 +25,53 @@ export interface LogSessionRequest {
     sessionType?: SessionType;
 }
 
+export type FocusLiveStatus = 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+
+export interface FocusLiveSession {
+    sessionId: string;
+    userId: string;
+    taskId: string;
+    taskTitle: string;
+    sessionType: SessionType;
+    status: FocusLiveStatus;
+    plannedDurationMinutes: number;
+    elapsedSeconds: number;
+    remainingSeconds: number;
+    startedAt: string;
+    pausedAt?: string;
+    resumedAt?: string;
+    endedAt?: string;
+    lastHeartbeatAt: string;
+    deviceId?: string;
+    source?: string;
+    recommendedStart?: string;
+    recommendedEnd?: string;
+}
+
+export interface StartLiveSessionRequest {
+    taskId: string;
+    taskTitle?: string;
+    plannedDurationMinutes?: number;
+    sessionType?: SessionType;
+    deviceId?: string;
+    source?: string;
+    recommendedStart?: string;
+    recommendedEnd?: string;
+}
+
+export interface LiveSessionSignalRequest {
+    sessionId: string;
+    deviceId?: string;
+}
+
+export interface HeartbeatLiveSessionRequest extends LiveSessionSignalRequest {
+    remainingSeconds?: number;
+}
+
+export interface StopLiveSessionRequest extends LiveSessionSignalRequest {
+    outcome?: 'COMPLETED' | 'CANCELLED';
+}
+
 export interface DailyStats {
     totalMinutes: number;
     totalHours: number;
@@ -161,6 +208,38 @@ export interface LearningPace {
     pace: "accelerating" | "steady" | "declining";
     estimatedExamScore: number;
     estimatedPercentile: number;
+    entryCount: number;
+    confidence: number;
+    trend: "improving" | "stable" | "declining";
+}
+
+export interface PredictiveDataQuality {
+    sampleSize: number;
+    subjectCoverage: number;
+    sparseData: boolean;
+    label: "low" | "medium" | "high";
+    trainingWindowDays: number;
+}
+
+export interface GPAComponentInput {
+    name: string;
+    weight: number;
+    obtainedMarks: number;
+    totalMarks: number;
+}
+
+export interface GPAComponentPreview {
+    scale: string;
+    weightedPercentage: number;
+    weightedGradePoint: number;
+    normalizedWeight: number;
+    components: Array<{
+        name: string;
+        weight: number;
+        normalizedWeight: number;
+        scorePercent: number;
+        weightedContribution: number;
+    }>;
 }
 
 export const analyticsApi = createApi({
@@ -179,6 +258,53 @@ export const analyticsApi = createApi({
             query: (body) => ({
                 url: '/activity/log',
                 method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Activity', 'Stats'],
+        }),
+        getActiveLiveSession: builder.query<{ message: string; session: FocusLiveSession | null }, void>({
+            query: () => ({
+                url: '/activity/live/active',
+                method: 'GET',
+            }),
+            providesTags: ['Activity'],
+        }),
+        startLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, StartLiveSessionRequest>({
+            query: (body) => ({
+                url: '/activity/live/start',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Activity'],
+        }),
+        pauseLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, LiveSessionSignalRequest>({
+            query: (body) => ({
+                url: '/activity/live/pause',
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: ['Activity'],
+        }),
+        resumeLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, LiveSessionSignalRequest>({
+            query: (body) => ({
+                url: '/activity/live/resume',
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: ['Activity'],
+        }),
+        heartbeatLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, HeartbeatLiveSessionRequest>({
+            query: (body) => ({
+                url: '/activity/live/heartbeat',
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: ['Activity'],
+        }),
+        stopLiveSession: builder.mutation<{ message: string; session: FocusLiveSession; log?: ActivityLog }, StopLiveSessionRequest>({
+            query: (body) => ({
+                url: '/activity/live/stop',
+                method: 'PATCH',
                 body,
             }),
             invalidatesTags: ['Activity', 'Stats'],
@@ -258,6 +384,13 @@ export const analyticsApi = createApi({
                 body,
             }),
         }),
+        previewGPAComponents: builder.mutation<{ message: string; result: GPAComponentPreview }, { components: GPAComponentInput[]; scale?: string }>({
+            query: (body) => ({
+                url: '/stats/gpa/components/preview',
+                method: 'POST',
+                body,
+            }),
+        }),
         addCourseGrade: builder.mutation<{ message: string; course: CourseGrade }, Partial<CourseGrade>>({
             query: (body) => ({
                 url: '/stats/gpa/course',
@@ -321,7 +454,13 @@ export const analyticsApi = createApi({
             }),
             providesTags: ['Stats'],
         }),
-        getPredictivePerformance: builder.query<{ message: string; data: LearningPace[] }, string>({
+        getPredictivePerformance: builder.query<{
+            message: string;
+            data: LearningPace[];
+            confidence: number;
+            modelVersion: string;
+            dataQuality: PredictiveDataQuality;
+        }, string>({
             query: (examType) => {
                 const safeExamType = examType?.trim() || 'midterm';
                 return `/stats/performance/${encodeURIComponent(safeExamType)}`;
@@ -333,6 +472,12 @@ export const analyticsApi = createApi({
 
 export const {
     useLogSessionMutation,
+    useGetActiveLiveSessionQuery,
+    useStartLiveSessionMutation,
+    usePauseLiveSessionMutation,
+    useResumeLiveSessionMutation,
+    useHeartbeatLiveSessionMutation,
+    useStopLiveSessionMutation,
     useGetDailySummaryQuery,
     useGetWeeklyTrendsQuery,
     useGetTaskEfficiencyQuery,
@@ -346,6 +491,7 @@ export const {
     useGetSubjectPerformanceQuery,
     useGetGPAQuery,
     useWhatIfGPAMutation,
+    usePreviewGPAComponentsMutation,
     useAddCourseGradeMutation,
     useUpdateCourseGradeMutation,
     useDeleteCourseGradeMutation,

@@ -7,7 +7,15 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { CircularProgress } from './CircularProgress';
 import { AmbiencePanel } from './AmbiencePanel';
 import { StrictModeToggle } from './StrictModeToggle';
-import { useLogSessionMutation, SessionType } from '@repo/store';
+import {
+    useHeartbeatLiveSessionMutation,
+    useLogSessionMutation,
+    usePauseLiveSessionMutation,
+    useResumeLiveSessionMutation,
+    SessionType,
+    useStartLiveSessionMutation,
+    useStopLiveSessionMutation,
+} from '@repo/store';
 
 interface ActiveFocusTimerProps {
     onComplete: () => void;
@@ -31,12 +39,79 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
 
     const [timeLeft, setTimeLeft] = useState(initialMinutes * 60);
     const [isPaused, setIsPaused] = useState(false);
+    const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
     const totalTime = initialMinutes * 60;
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    const progress = totalTime > 0 ? ((totalTime - timeLeft) / totalTime) * 100 : 0;
     const startTimeRef = useRef(new Date().toISOString());
+    const liveBootstrapRef = useRef(false);
     const [logSession] = useLogSessionMutation();
+    const [startLiveSession] = useStartLiveSessionMutation();
+    const [pauseLiveSession] = usePauseLiveSessionMutation();
+    const [resumeLiveSession] = useResumeLiveSessionMutation();
+    const [heartbeatLiveSession] = useHeartbeatLiveSessionMutation();
+    const [stopLiveSession] = useStopLiveSessionMutation();
+
+    useEffect(() => {
+        if (!taskId || liveBootstrapRef.current) return;
+        liveBootstrapRef.current = true;
+
+        const boot = async () => {
+            try {
+                const response = await startLiveSession({
+                    taskId,
+                    taskTitle,
+                    plannedDurationMinutes: initialMinutes,
+                    sessionType: SessionType.DEEP_WORK,
+                    source: 'web-dashboard',
+                    recommendedStart: recommendedStart || undefined,
+                    recommendedEnd: recommendedEnd || undefined,
+                }).unwrap();
+
+                setLiveSessionId(response.session.sessionId);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('activeFocusSessionId', response.session.sessionId);
+                }
+            } catch (error) {
+                console.error('Failed to start live focus session:', error);
+            }
+        };
+
+        void boot();
+    }, [taskId, taskTitle, initialMinutes, recommendedStart, recommendedEnd, startLiveSession]);
 
     const handleSessionEnd = useCallback(async () => {
-        if (taskId) {
+        let handledByLiveContract = false;
+        if (liveSessionId) {
+            try {
+                await stopLiveSession({
+                    sessionId: liveSessionId,
+                    outcome: 'COMPLETED',
+                }).unwrap();
+                handledByLiveContract = true;
+            } catch (error) {
+                console.error('Failed to stop live focus session:', error);
+            }
+        }
+
+        setLiveSessionId(null);
+
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('activeFocusSession');
+            localStorage.removeItem('activeFocusSessionId');
+            if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification('Focus session complete', {
+                        body: `${taskTitle} finished`,
+                    });
+                } catch {
+                    // no-op if browser blocks direct notifications
+                }
+            }
+        }
+
+        if (!handledByLiveContract && taskId) {
             const elapsedMinutes = Math.round((totalTime - timeLeft) / 60);
             try {
                 await logSession({
@@ -52,7 +127,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             }
         }
         onComplete();
-    }, [taskId, totalTime, timeLeft, logSession, onComplete]);
+    }, [liveSessionId, stopLiveSession, taskId, taskTitle, totalTime, timeLeft, logSession, onComplete]);
 
     useEffect(() => {
         if (isPaused) return;
@@ -71,9 +146,78 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
         return () => clearInterval(interval);
     }, [isPaused, handleSessionEnd]);
 
-    const minutes = Math.floor(timeLeft / 60);
-    const seconds = timeLeft % 60;
-    const progress = totalTime > 0 ? ((totalTime - timeLeft) / totalTime) * 100 : 0;
+    useEffect(() => {
+        if (!liveSessionId || isPaused) return;
+
+        const interval = setInterval(() => {
+            heartbeatLiveSession({
+                sessionId: liveSessionId,
+                remainingSeconds: timeLeft,
+            }).catch((error) => {
+                console.error('Focus heartbeat failed:', error);
+            });
+        }, 15000);
+
+        return () => clearInterval(interval);
+    }, [liveSessionId, isPaused, timeLeft, heartbeatLiveSession]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        localStorage.setItem('activeFocusSession', JSON.stringify({
+            taskTitle,
+            startTime: startTimeRef.current,
+            duration: initialMinutes,
+            isPaused,
+            ...(liveSessionId && { sessionId: liveSessionId }),
+        }));
+    }, [taskTitle, initialMinutes, isPaused, timeLeft, liveSessionId]);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        document.title = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} • Focus`;
+        return () => {
+            document.title = 'Student Activity Tracker';
+        };
+    }, [minutes, seconds]);
+
+    const handleStop = async () => {
+        if (liveSessionId) {
+            try {
+                await stopLiveSession({
+                    sessionId: liveSessionId,
+                    outcome: 'CANCELLED',
+                }).unwrap();
+            } catch (error) {
+                console.error('Failed to cancel live focus session:', error);
+            }
+        }
+
+        setLiveSessionId(null);
+
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('activeFocusSession');
+            localStorage.removeItem('activeFocusSessionId');
+        }
+        router.back();
+    };
+
+    const togglePause = async () => {
+        const nextPaused = !isPaused;
+        setIsPaused(nextPaused);
+
+        if (!liveSessionId) return;
+
+        try {
+            if (nextPaused) {
+                await pauseLiveSession({ sessionId: liveSessionId }).unwrap();
+            } else {
+                await resumeLiveSession({ sessionId: liveSessionId }).unwrap();
+            }
+        } catch (error) {
+            console.error('Failed to toggle live focus pause state:', error);
+            setIsPaused(!nextPaused);
+        }
+    };
 
     return (
         <div className="relative min-h-screen flex flex-col items-center justify-center p-6">
@@ -112,7 +256,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                 </button>
 
                 <button
-                    onClick={() => setIsPaused(!isPaused)}
+                    onClick={togglePause}
                     className="w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center hover:scale-110 transition-all duration-300 shadow-xl shadow-purple-500/30"
                     aria-label={isPaused ? 'Play' : 'Pause'}
                 >
@@ -124,7 +268,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                 </button>
 
                 <button
-                    onClick={() => router.back()}
+                    onClick={handleStop}
                     className="w-16 h-16 bg-white/5 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-300 shadow-lg"
                     aria-label="Stop"
                 >

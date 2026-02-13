@@ -45,6 +45,22 @@ export interface LearningPace {
     pace: "accelerating" | "steady" | "declining";
     estimatedExamScore: number;
     estimatedPercentile: number;
+    entryCount: number;
+    confidence: number;
+    trend: "improving" | "stable" | "declining";
+}
+
+export interface PredictivePerformanceResponse {
+    data: LearningPace[];
+    confidence: number;
+    modelVersion: string;
+    dataQuality: {
+        sampleSize: number;
+        subjectCoverage: number;
+        sparseData: boolean;
+        label: "low" | "medium" | "high";
+        trainingWindowDays: number;
+    };
 }
 
 // ── Planned vs Actual ──────────────────────────────────────────────────
@@ -193,18 +209,145 @@ export async function detectPeakProductivity(userId: string, days: number = 30):
     };
 }
 
-// ── Learning Pace & Predictive Performance ─────────────────────────────
+// ── Learning Pace & Predictive Performance (Monte Carlo) ───────────────
+
+/**
+ * Seed-able pseudo-random number generator (Mulberry32).
+ * Ensures reproducible simulation results for the same input data.
+ */
+function mulberry32(seed: number): () => number {
+    return () => {
+        seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+/**
+ * Run N Monte Carlo simulations to project a future score.
+ *
+ * For each simulation:
+ *   1. Sample a trend from Normal(μ_trend, σ_trend)
+ *   2. Sample noise from Normal(0, σ_noise)
+ *   3. projected = recentAvg + sampledTrend × stepsAhead + noise
+ *   4. Clamp to [0, 100]
+ *
+ * Returns percentiles (p10, p25, p50, p75, p90) and stats.
+ */
+function monteCarloScoreProjection(params: {
+    recentAvg: number;
+    trendPerEntry: number;
+    scores: number[];
+    stepsAhead?: number;
+    simulations?: number;
+    seed?: number;
+}): {
+    p10: number; p25: number; p50: number; p75: number; p90: number;
+    mean: number; stdDev: number;
+    simulations: number;
+} {
+    const {
+        recentAvg,
+        trendPerEntry,
+        scores,
+        stepsAhead = 3,
+        simulations: N = 1000,
+        seed = 42,
+    } = params;
+
+    const rng = mulberry32(seed);
+
+    // Box-Muller transform for normal distribution
+    const normalRandom = (mean: number, std: number): number => {
+        const u1 = rng();
+        const u2 = rng();
+        const z = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
+        return mean + z * std;
+    };
+
+    // Compute score volatility (standard deviation of differences)
+    let trendStdDev = Math.abs(trendPerEntry) * 0.5; // default fallback
+    if (scores.length >= 3) {
+        const diffs = [];
+        for (let i = 1; i < scores.length; i++) {
+            diffs.push(scores[i]! - scores[i - 1]!);
+        }
+        const diffMean = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+        const variance = diffs.reduce((a, d) => a + (d - diffMean) ** 2, 0) / diffs.length;
+        trendStdDev = Math.sqrt(variance);
+    }
+
+    // Noise from residual variance around linear trend
+    let noiseStdDev = 3; // default fallback
+    if (scores.length >= 3) {
+        const residuals = scores.map((s, i) => s - (scores[0]! + trendPerEntry * i));
+        const resVariance = residuals.reduce((a, r) => a + r * r, 0) / residuals.length;
+        noiseStdDev = Math.sqrt(resVariance);
+    }
+
+    // Run simulations
+    const projected: number[] = [];
+    for (let i = 0; i < N; i++) {
+        const sampledTrend = normalRandom(trendPerEntry, trendStdDev);
+        const noise = normalRandom(0, noiseStdDev);
+        const score = Math.min(100, Math.max(0, recentAvg + sampledTrend * stepsAhead + noise));
+        projected.push(score);
+    }
+
+    projected.sort((a, b) => a - b);
+
+    const percentile = (arr: number[], p: number): number => {
+        const idx = Math.ceil((p / 100) * arr.length) - 1;
+        return Math.round(arr[Math.max(0, idx)]!);
+    };
+
+    const mean = Math.round(projected.reduce((a, b) => a + b, 0) / N);
+    const variance = projected.reduce((a, v) => a + (v - mean) ** 2, 0) / N;
+
+    return {
+        p10: percentile(projected, 10),
+        p25: percentile(projected, 25),
+        p50: percentile(projected, 50),
+        p75: percentile(projected, 75),
+        p90: percentile(projected, 90),
+        mean,
+        stdDev: Math.round(Math.sqrt(variance)),
+        simulations: N,
+    };
+}
 
 export async function getPredictivePerformance(
     userId: string,
     examType: string
-): Promise<LearningPace[]> {
+): Promise<PredictivePerformanceResponse> {
+    const trainingWindowDays = 180;
+    const since = new Date();
+    since.setDate(since.getDate() - trainingWindowDays);
+
     const entries = await prisma.gradeEntry.findMany({
-        where: { userId, examType },
+        where: {
+            userId,
+            examType,
+            createdAt: { gte: since },
+        },
         orderBy: { createdAt: "asc" },
     });
 
-    if (entries.length === 0) return [];
+    if (entries.length === 0) {
+        return {
+            data: [],
+            confidence: 0,
+            modelVersion: "montecarlo-v3.0",
+            dataQuality: {
+                sampleSize: 0,
+                subjectCoverage: 0,
+                sparseData: true,
+                label: "low",
+                trainingWindowDays,
+            },
+        };
+    }
 
     // Group by subject
     const subjectMap = new Map<string, typeof entries>();
@@ -234,21 +377,67 @@ export async function getPredictivePerformance(
         else if (improvementRate >= -2) pace = "steady";
         else pace = "declining";
 
-        // Simple linear extrapolation for exam score prediction
         const trendPerEntry = scores.length > 1
             ? (scores[scores.length - 1]! - scores[0]!) / (scores.length - 1)
             : 0;
-        const estimatedExamScore = Math.min(100, Math.max(0, Math.round(recentAvg + trendPerEntry * 3)));
+        const sparseData = subjectEntries.length < 4;
 
-        // Rough percentile mapping based on estimated score
-        let estimatedPercentile;
-        if (estimatedExamScore >= 95) estimatedPercentile = 99;
-        else if (estimatedExamScore >= 90) estimatedPercentile = 95;
-        else if (estimatedExamScore >= 80) estimatedPercentile = 85;
-        else if (estimatedExamScore >= 70) estimatedPercentile = 70;
-        else if (estimatedExamScore >= 60) estimatedPercentile = 55;
-        else if (estimatedExamScore >= 50) estimatedPercentile = 40;
-        else estimatedPercentile = 20;
+        // ── Monte Carlo Simulation ─────────────────────────────────────
+        let estimatedExamScore: number;
+        let estimatedPercentile: number;
+        let mcResults: ReturnType<typeof monteCarloScoreProjection> | null = null;
+
+        if (sparseData) {
+            // Too few data points — fall back to simple average
+            estimatedExamScore = Math.min(100, Math.max(0, recentAvg));
+        } else {
+            // Run 1000 Monte Carlo simulations
+            mcResults = monteCarloScoreProjection({
+                recentAvg,
+                trendPerEntry,
+                scores,
+                stepsAhead: 3,
+                simulations: 1000,
+                seed: subjectName.length * 31 + subjectEntries.length,
+            });
+            // Use median (p50) as the estimated score
+            estimatedExamScore = mcResults.p50;
+        }
+
+        // Percentile mapping from Monte Carlo range or heuristic
+        if (mcResults) {
+            // Use the spread of the distribution to estimate percentile
+            const p90 = mcResults.p90;
+            if (p90 >= 95) estimatedPercentile = 99;
+            else if (p90 >= 90) estimatedPercentile = 95;
+            else if (estimatedExamScore >= 80) estimatedPercentile = 85;
+            else if (estimatedExamScore >= 70) estimatedPercentile = 70;
+            else if (estimatedExamScore >= 60) estimatedPercentile = 55;
+            else if (estimatedExamScore >= 50) estimatedPercentile = 40;
+            else estimatedPercentile = 20;
+        } else {
+            if (estimatedExamScore >= 95) estimatedPercentile = 99;
+            else if (estimatedExamScore >= 90) estimatedPercentile = 95;
+            else if (estimatedExamScore >= 80) estimatedPercentile = 85;
+            else if (estimatedExamScore >= 70) estimatedPercentile = 70;
+            else if (estimatedExamScore >= 60) estimatedPercentile = 55;
+            else if (estimatedExamScore >= 50) estimatedPercentile = 40;
+            else estimatedPercentile = 20;
+        }
+
+        // Confidence: higher with more data, penalized by high volatility
+        let subjectConfidence = Math.max(
+            0.2,
+            Math.min(0.95, Math.round((Math.min(subjectEntries.length, 12) / 12) * 100) / 100),
+        );
+        if (mcResults && mcResults.stdDev > 15) {
+            subjectConfidence = Math.max(0.2, subjectConfidence - 0.15);
+        }
+
+        let trend: "improving" | "stable" | "declining";
+        if (improvementRate > 3) trend = "improving";
+        else if (improvementRate < -3) trend = "declining";
+        else trend = "stable";
 
         results.push({
             subjectName,
@@ -258,8 +447,34 @@ export async function getPredictivePerformance(
             pace,
             estimatedExamScore,
             estimatedPercentile,
+            entryCount: subjectEntries.length,
+            confidence: subjectConfidence,
+            trend,
         });
     }
 
-    return results;
+    const sampleSize = entries.length;
+    const subjectCoverage = results.length;
+    const sparseData = sampleSize < 8 || results.some((item) => item.entryCount < 3);
+    const confidence = results.length > 0
+        ? Math.round((results.reduce((sum, item) => sum + item.confidence, 0) / results.length) * 100) / 100
+        : 0;
+
+    let label: "low" | "medium" | "high";
+    if (confidence >= 0.75 && !sparseData) label = "high";
+    else if (confidence >= 0.45) label = "medium";
+    else label = "low";
+
+    return {
+        data: results,
+        confidence,
+        modelVersion: "montecarlo-v3.0",
+        dataQuality: {
+            sampleSize,
+            subjectCoverage,
+            sparseData,
+            label,
+            trainingWindowDays,
+        },
+    };
 }

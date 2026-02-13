@@ -11,23 +11,28 @@ datasource db {
 }
 
 model Habit {
-  id            String    @id @default(uuid())
-  name          String
-  frequency     Frequency @default(DAILY)
-  targetValue   Int       @default(1) 
-  currentStreak Int       @default(0)
-  longestStreak Int       @default(0)
-  icon          String?
-  color         String?
-  lastLogDate   DateTime? 
+  id                String    @id @default(uuid())
+  name              String
+  frequency         Frequency @default(DAILY)
+  targetValue       Int       @default(1) 
+  currentStreak     Int       @default(0)
+  longestStreak     Int       @default(0)
+  mercyDaysAllowed  Int       @default(2)
+  mercyDaysUsed     Int       @default(0)
+  icon              String?
+  color             String?
+  lastLogDate       DateTime? 
+  linkedCategoryId  String?   // auto-log when tasks in this category are completed
   
-  userId        String    // references auth-service User.id
+  userId            String    // references auth-service User.id
   
-  logs          HabitLog[]
-  reminders     HabitReminder[]
+  logs              HabitLog[]
+  reminders         HabitReminder[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId, linkedCategoryId])
 }
 
 model HabitLog {

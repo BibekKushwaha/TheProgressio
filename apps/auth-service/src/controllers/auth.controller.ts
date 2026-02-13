@@ -6,10 +6,50 @@ import { TryCatch } from "../utils/tryCatch.js";
 import bcrypt from 'bcrypt';
 import { registerSchema, loginSchema } from "@repo/schemas/auth";
 
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
+import crypto from "crypto";
 // import { forgotPasswordTemplate } from "../templete.js";
 // import { publishToTopic } from "../producer.js";
 // import { redisClient } from "../index.js";
+
+const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "15m";
+const MOBILE_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.MOBILE_REFRESH_TOKEN_DAYS ?? "30", 10);
+
+const ensureJwtSecret = (): string => {
+  const secret = process.env.JWT_SEC;
+  if (!secret) {
+    throw new ErrorHandler(500, "JWT secret not configured");
+  }
+  return secret;
+};
+
+const issueAccessToken = (userId: string, options?: { expiresIn?: string }) => {
+  const expiresIn = (options?.expiresIn ?? "15d") as NonNullable<SignOptions["expiresIn"]>;
+  const signOptions: SignOptions = { expiresIn };
+  return jwt.sign({ id: userId }, ensureJwtSecret(), signOptions);
+};
+
+const hashOpaqueToken = (raw: string): string =>
+  crypto.createHash("sha256").update(raw).digest("hex");
+
+const generateOpaqueToken = (): string =>
+  crypto.randomBytes(48).toString("hex");
+
+const getBearerToken = (req: any): string | null => {
+  const authHeader = req.headers?.authorization;
+  if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+    return authHeader.slice("Bearer ".length);
+  }
+  return null;
+};
+
+const decodeAccessToken = (token: string): { id: string } => {
+  const decoded = jwt.verify(token, ensureJwtSecret()) as jwt.JwtPayload;
+  if (!decoded?.id || typeof decoded.id !== "string") {
+    throw new ErrorHandler(401, "Invalid token payload");
+  }
+  return { id: decoded.id };
+};
 
 
 export const registerUser = TryCatch(async (req, res) => {
@@ -52,6 +92,9 @@ export const registerUser = TryCatch(async (req, res) => {
       username: true,
       email: true,
       dailyGoalHours: true,
+      whatsappOptIn: true,
+      quietHoursStart: true,
+      quietHoursEnd: true,
       createdAt: true,
     },
   })
@@ -101,9 +144,18 @@ export const loginUser = TryCatch(async (req, res) => {
       where: {
         email: email,
       },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        password: true,
+      },
     });
   } catch (err) {
     console.error('Prisma findUnique error (login)', { email }, err);
+    if ((err as any)?.code === "P2022") {
+      throw new ErrorHandler(500, "Database schema out of date. Run Prisma migrations and restart services.");
+    }
     throw new ErrorHandler(500, 'Database error during user lookup');
   }
 
@@ -118,13 +170,7 @@ export const loginUser = TryCatch(async (req, res) => {
     throw new ErrorHandler(400, "Invalid credentials");
   }
 
-  const token = jwt.sign(
-    { id: user?.id },
-    process.env.JWT_SEC as string,
-    {
-      expiresIn: "15d",
-    }
-  );
+  const token = issueAccessToken(user?.id);
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -185,6 +231,9 @@ export const getCurrentUser = TryCatch(async (req, res) => {
       username: true,
       email: true,
       dailyGoalHours: true,
+      whatsappOptIn: true,
+      quietHoursStart: true,
+      quietHoursEnd: true,
       createdAt: true
     },
   });
@@ -214,7 +263,7 @@ export const updateProfile = TryCatch(async (req, res) => {
     return res.status(401).json({ message: 'Invalid token payload' });
   }
 
-  const { dailyGoalHours, username, email } = req.body;
+  const { dailyGoalHours, username, email, whatsappOptIn, quietHoursStart, quietHoursEnd } = req.body;
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -222,12 +271,18 @@ export const updateProfile = TryCatch(async (req, res) => {
       ...(dailyGoalHours !== undefined && { dailyGoalHours: parseFloat(dailyGoalHours) }),
       ...(username && { username }),
       ...(email && { email }),
+      ...(whatsappOptIn !== undefined && { whatsappOptIn: Boolean(whatsappOptIn) }),
+      ...(quietHoursStart !== undefined && { quietHoursStart: quietHoursStart || null }),
+      ...(quietHoursEnd !== undefined && { quietHoursEnd: quietHoursEnd || null }),
     },
     select: {
       id: true,
       username: true,
       email: true,
       dailyGoalHours: true,
+      whatsappOptIn: true,
+      quietHoursStart: true,
+      quietHoursEnd: true,
       createdAt: true
     },
   });
@@ -307,4 +362,314 @@ export const resetPassword = TryCatch(async (req, res) => {
   });
 
   return res.json({ message: "Password changed successfully" });
+});
+
+// ── Mobile Auth (refresh-token flow) ──────────────────────────────────
+
+export const mobileLogin = TryCatch(async (req, res) => {
+  const result = loginSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({
+      message: "Invalid email or password format",
+      errors: result.error.flatten(),
+    });
+  }
+
+  const { email, password } = result.data;
+  const deviceId = typeof req.body?.deviceId === "string" && req.body.deviceId.trim()
+    ? req.body.deviceId.trim()
+    : "unknown-device";
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new ErrorHandler(400, "Invalid credentials");
+  }
+
+  const isValid = await bcrypt.compare(password, user.password);
+  if (!isValid) {
+    throw new ErrorHandler(400, "Invalid credentials");
+  }
+
+  const accessToken = issueAccessToken(user.id, { expiresIn: ACCESS_TOKEN_TTL });
+  const rawRefreshToken = generateOpaqueToken();
+  const expiresAt = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+
+  await prisma.mobileRefreshToken.create({
+    data: {
+      userId: user.id,
+      deviceId,
+      tokenHash: hashOpaqueToken(rawRefreshToken),
+      expiresAt,
+    },
+  });
+
+  const { password: _password, ...safeUser } = user;
+
+  return res.status(200).json({
+    message: "Mobile login successful",
+    user: safeUser,
+    accessToken,
+    refreshToken: rawRefreshToken,
+    expiresAt: expiresAt.toISOString(),
+  });
+});
+
+export const mobileRefresh = TryCatch(async (req, res) => {
+  const refreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
+  const requestedDeviceId =
+    typeof req.body?.deviceId === "string" && req.body.deviceId.trim()
+      ? req.body.deviceId.trim()
+      : null;
+
+  if (!refreshToken) {
+    return res.status(400).json({ message: "refreshToken is required" });
+  }
+
+  const tokenHash = hashOpaqueToken(refreshToken);
+  const existing = await prisma.mobileRefreshToken.findFirst({
+    where: {
+      tokenHash,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+      ...(requestedDeviceId ? { deviceId: requestedDeviceId } : {}),
+    },
+    include: {
+      user: {
+        select: { id: true, username: true, email: true, dailyGoalHours: true, createdAt: true },
+      },
+    },
+  });
+
+  if (!existing) {
+    return res.status(401).json({ message: "Invalid or expired refresh token" });
+  }
+
+  const rotatedRefresh = generateOpaqueToken();
+  const nextExpiry = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+
+  await prisma.$transaction([
+    prisma.mobileRefreshToken.update({
+      where: { id: existing.id },
+      data: { revokedAt: new Date() },
+    }),
+    prisma.mobileRefreshToken.create({
+      data: {
+        userId: existing.userId,
+        deviceId: existing.deviceId,
+        tokenHash: hashOpaqueToken(rotatedRefresh),
+        expiresAt: nextExpiry,
+      },
+    }),
+  ]);
+
+  const accessToken = issueAccessToken(existing.userId, { expiresIn: ACCESS_TOKEN_TTL });
+
+  return res.status(200).json({
+    message: "Token refreshed",
+    user: existing.user,
+    accessToken,
+    refreshToken: rotatedRefresh,
+    expiresAt: nextExpiry.toISOString(),
+  });
+});
+
+export const mobileLogout = TryCatch(async (req, res) => {
+  const refreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
+  const authToken = getBearerToken(req);
+
+  const operations = [];
+  if (refreshToken) {
+    operations.push(
+      prisma.mobileRefreshToken.updateMany({
+        where: { tokenHash: hashOpaqueToken(refreshToken), revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+    );
+  }
+
+  if (authToken) {
+    try {
+      const { id } = decodeAccessToken(authToken);
+      operations.push(
+        prisma.mobileRefreshToken.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      );
+    } catch {
+      // If bearer token is invalid, continue with refresh-token based revocation only.
+    }
+  }
+
+  if (operations.length > 0) {
+    await prisma.$transaction(operations);
+  }
+
+  return res.status(200).json({ message: "Mobile logout successful" });
+});
+
+export const mobileMe = TryCatch(async (req, res) => {
+  const token = getBearerToken(req);
+  if (!token) {
+    return res.status(401).json({ message: "Missing bearer token" });
+  }
+
+  const { id } = decodeAccessToken(token);
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      dailyGoalHours: true,
+      createdAt: true,
+    },
+  });
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  return res.status(200).json({ message: "Mobile user profile", user });
+});
+
+// ── Family / Mentor Share Links ───────────────────────────────────────
+
+const getCookieAuthenticatedUserId = (req: any): string | null => {
+  const token = req.cookies?.token;
+  if (!token || typeof token !== "string") return null;
+
+  try {
+    const decoded = decodeAccessToken(token);
+    return decoded.id;
+  } catch {
+    return null;
+  }
+};
+
+export const createFamilyShareLink = TryCatch(async (req, res) => {
+  const userId = getCookieAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
+  const label = typeof req.body?.label === "string" && req.body.label.trim()
+    ? req.body.label.trim()
+    : null;
+  const permissions = typeof req.body?.permissions === "string" && req.body.permissions.trim()
+    ? req.body.permissions.trim().toUpperCase()
+    : "READ_ONLY";
+  const expiresInDays = Number.parseInt(String(req.body?.expiresInDays ?? "14"), 10);
+  const expiresAt = new Date(Date.now() + Math.max(1, expiresInDays) * 24 * 60 * 60 * 1000);
+
+  const shareToken = `fml_${generateOpaqueToken()}`;
+
+  const link = await prisma.familyShareLink.create({
+    data: {
+      userId,
+      tokenHash: hashOpaqueToken(shareToken),
+      label,
+      permissions,
+      expiresAt,
+    },
+  });
+
+  return res.status(201).json({
+    message: "Family share link created",
+    link: {
+      id: link.id,
+      label: link.label,
+      permissions: link.permissions,
+      expiresAt: link.expiresAt,
+      createdAt: link.createdAt,
+      revokedAt: link.revokedAt,
+    },
+    shareToken,
+  });
+});
+
+export const listFamilyShareLinks = TryCatch(async (req, res) => {
+  const userId = getCookieAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
+  const links = await prisma.familyShareLink.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      label: true,
+      permissions: true,
+      expiresAt: true,
+      createdAt: true,
+      revokedAt: true,
+      lastUsedAt: true,
+    },
+  });
+
+  return res.status(200).json({
+    message: "Family share links fetched",
+    links,
+  });
+});
+
+export const revokeFamilyShareLink = TryCatch(async (req, res) => {
+  const userId = getCookieAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
+  const id = req.params?.id;
+  if (!id || typeof id !== "string") {
+    return res.status(400).json({ message: "Invalid share link id" });
+  }
+
+  const result = await prisma.familyShareLink.updateMany({
+    where: { id, userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  if (result.count === 0) {
+    return res.status(404).json({ message: "Share link not found" });
+  }
+
+  return res.status(200).json({ message: "Share link revoked" });
+});
+
+export const resolveFamilyShareLink = TryCatch(async (req, res) => {
+  const rawToken = req.params?.token;
+  if (!rawToken || typeof rawToken !== "string") {
+    return res.status(400).json({ message: "Invalid share token" });
+  }
+
+  const tokenHash = hashOpaqueToken(rawToken);
+  const link = await prisma.familyShareLink.findFirst({
+    where: {
+      tokenHash,
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    select: {
+      id: true,
+      userId: true,
+      label: true,
+      permissions: true,
+      expiresAt: true,
+    },
+  });
+
+  if (!link) {
+    return res.status(404).json({ message: "Share link is invalid or expired" });
+  }
+
+  await prisma.familyShareLink.update({
+    where: { id: link.id },
+    data: { lastUsedAt: new Date() },
+  });
+
+  return res.status(200).json({
+    message: "Share token resolved",
+    link,
+  });
 });

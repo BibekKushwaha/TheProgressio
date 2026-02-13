@@ -193,6 +193,10 @@ export const getDailySchedule = async (req: AuthenticatedRequest, res: Response)
         return res.status(200).json({
             date: targetDate.toISOString().split('T')[0],
             dayOfWeek: targetDate.getDay(),
+            isHoliday: timetableData.isHoliday,
+            holidayName: timetableData.holidayName,
+            pauseNotifications: timetableData.pauseNotifications,
+            conflicts: timetableData.conflicts,
             items: scheduleItems
         });
 

@@ -13,6 +13,7 @@ vi.mock('../src/middleware/auth.middleware.js', () => ({
         req.user = { id: 'user-1', username: 'Tester', email: 'test@example.com', dailyGoalHours: 4 };
         next();
     },
+    enforceReadOnlyWrites: (_req: any, _res: any, next: any) => next(),
 }));
 
 // ─── Mock services ──────────────────────────────────────────────────────────────
@@ -82,9 +83,12 @@ vi.mock('../src/services/focus.service.js', () => ({
         })),
         recommendation: 'Peak at 9-11 AM', efficiencyBoostPercent: 45,
     }),
-    getPredictivePerformance: vi.fn().mockResolvedValue([
-        { subjectName: 'Physics', pace: 'accelerating', estimatedExamScore: 85, estimatedPercentile: 85 },
-    ]),
+    getPredictivePerformance: vi.fn().mockResolvedValue({
+        data: [{ subjectName: 'Physics', pace: 'accelerating', estimatedExamScore: 85, estimatedPercentile: 85 }],
+        confidence: 0.72,
+        modelVersion: 'heuristic-v2.1',
+        dataQuality: { sampleSize: 12, subjectCoverage: 1, sparseData: false, label: 'high', trainingWindowDays: 180 },
+    }),
 }));
 
 // ─── Mock Prisma ────────────────────────────────────────────────────────────────

@@ -7,6 +7,8 @@ import { useGetProfileQuery } from './services/authApi';
 import { useAppDispatch } from './hooks';
 import { hydrateAuth, logout } from './slices/authSlice';
 
+const STORE_BUILD_VERSION = '2026-02-13-payment-api';
+
 function AuthHydrator() {
   const dispatch = useAppDispatch();
   const [shouldFetch, setShouldFetch] = useState(false);
@@ -46,8 +48,10 @@ function AuthHydrator() {
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const storeRef = useRef<AppStore | null>(null);
-  if (!storeRef.current) {
-    storeRef.current = makeStore();
+  if (!storeRef.current || (storeRef.current as AppStore & { __storeBuildVersion?: string }).__storeBuildVersion !== STORE_BUILD_VERSION) {
+    const store = makeStore() as AppStore & { __storeBuildVersion?: string };
+    store.__storeBuildVersion = STORE_BUILD_VERSION;
+    storeRef.current = store;
   }
 
   return (

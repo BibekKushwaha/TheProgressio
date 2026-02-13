@@ -73,6 +73,32 @@ export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
     id: string;
 }
 
+export interface SyllabusScanItem {
+    title: string;
+    dueDate?: string;
+    priority?: Priority;
+    subject?: string;
+}
+
+export interface RecoveryPlanItem {
+    taskId: string;
+    title: string;
+    priority: Priority;
+    oldDueDate: string;
+    newDueDate: string;
+    daysShifted: number;
+    loadPoints: number;
+}
+
+export interface RecoveryPlan {
+    createdAt: string;
+    backlogCount: number;
+    totalPriorityLoad: number;
+    recoveryDays: number;
+    maxDailyLoad: number;
+    items: RecoveryPlanItem[];
+}
+
 export const tasksApi = createApi({
     reducerPath: 'tasksApi',
     baseQuery: fetchBaseQuery({
@@ -309,6 +335,30 @@ export const tasksApi = createApi({
             }),
             invalidatesTags: [],
         }),
+        scanSyllabus: builder.mutation<{ items: SyllabusScanItem[] }, { imageBase64: string; mimeType?: string }>({
+            query: (body) => ({
+                url: '/scan-syllabus',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [],
+        }),
+        previewRecoveryPlan: builder.mutation<{ message: string; plan: RecoveryPlan }, { anchorDate?: string } | void>({
+            query: (body) => ({
+                url: '/recovery/preview',
+                method: 'POST',
+                body: body || {},
+            }),
+            invalidatesTags: [],
+        }),
+        applyRecoveryPlan: builder.mutation<{ message: string; plan: RecoveryPlan; updatedCount: number }, { anchorDate?: string } | void>({
+            query: (body) => ({
+                url: '/recovery/apply',
+                method: 'POST',
+                body: body || {},
+            }),
+            invalidatesTags: [{ type: 'Tasks', id: 'LIST' }],
+        }),
     }),
 });
 
@@ -328,4 +378,7 @@ export const {
     useGenerateSubtasksMutation,
     usePreviewSubtasksMutation,
     useParseTaskMutation,
+    useScanSyllabusMutation,
+    usePreviewRecoveryPlanMutation,
+    useApplyRecoveryPlanMutation,
 } = tasksApi;

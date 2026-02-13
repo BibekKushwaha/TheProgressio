@@ -7,6 +7,7 @@ import { analyticsApi } from './services/analyticsApi';
 import { timetableApi } from './services/timetableApi';
 import { calendarApi } from './services/calendarApi';
 import { rotationsApi } from './services/rotationsApi';
+import { paymentApi } from './services/paymentApi';
 import authReducer from './slices/authSlice';
 import tasksReducer from './slices/tasksSlice';
 import categoriesReducer from './slices/categoriesSlice';
@@ -29,6 +30,7 @@ export const makeStore = () => {
       [timetableApi.reducerPath]: timetableApi.reducer,
       [calendarApi.reducerPath]: calendarApi.reducer,
       [rotationsApi.reducerPath]: rotationsApi.reducer,
+      [paymentApi.reducerPath]: paymentApi.reducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(
@@ -39,7 +41,8 @@ export const makeStore = () => {
         analyticsApi.middleware,
         timetableApi.middleware,
         calendarApi.middleware,
-        rotationsApi.middleware
+        rotationsApi.middleware,
+        paymentApi.middleware
       ),
   });
 };

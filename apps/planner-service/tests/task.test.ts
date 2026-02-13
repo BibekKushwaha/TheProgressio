@@ -8,7 +8,8 @@ vi.mock('../src/middleware/auth.middleware.js', () => ({
   isAuth: (req: any, _res: any, next: any) => {
     req.user = { id: 'user-1', username: 'Tester', email: 'test@example.com', dailyGoalHours: 4 }
     next()
-  }
+  },
+  enforceReadOnlyWrites: (_req: any, _res: any, next: any) => next(),
 }))
 
 // Mock Kafka producer (non-blocking)
@@ -33,6 +34,14 @@ vi.mock('../src/services/ai.service.js', () => ({
       dueDate: new Date('2026-02-14'),
       subject: 'Chemistry',
     }),
+    scanSyllabusImage: vi.fn().mockResolvedValue([
+      {
+        title: 'Physics Chapter 1 Revision',
+        dueDate: new Date('2026-02-20'),
+        priority: 'MEDIUM',
+        subject: 'Physics',
+      },
+    ]),
     generateSubtasks: vi.fn().mockResolvedValue([
       'Gather materials',
       'Write introduction',
@@ -318,6 +327,25 @@ describe('Task endpoints', () => {
 
     expect(res.status).toBe(200)
     expect(res.body).toHaveProperty('title')
+  })
+
+  it('scans syllabus image and returns extracted items', async () => {
+    const sampleImageBase64 = Buffer.from('fake-image-content').toString('base64')
+    const res = await request(app)
+      .post('/api/tasks/scan-syllabus')
+      .send({ imageBase64: sampleImageBase64, mimeType: 'image/png' })
+
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.items)).toBe(true)
+    expect(res.body.items[0]).toHaveProperty('title', 'Physics Chapter 1 Revision')
+  })
+
+  it('returns 400 for scan-syllabus without image payload', async () => {
+    const res = await request(app)
+      .post('/api/tasks/scan-syllabus')
+      .send({})
+
+    expect(res.status).toBe(400)
   })
 
   // GENERATE SUBTASKS

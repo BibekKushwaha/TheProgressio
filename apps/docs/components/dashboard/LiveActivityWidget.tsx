@@ -38,7 +38,13 @@ export function LiveActivityWidget() {
         const tick = () => {
             const start = new Date(session.startTime).getTime();
             const now = Date.now();
-            setElapsed(Math.floor((now - start) / 1000));
+            const secondsElapsed = Math.floor((now - start) / 1000);
+            if (session.duration > 0 && secondsElapsed >= session.duration * 60) {
+                localStorage.removeItem('activeFocusSession');
+                setSession(null);
+                return;
+            }
+            setElapsed(secondsElapsed);
         };
 
         tick();

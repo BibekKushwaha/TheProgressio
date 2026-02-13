@@ -164,20 +164,54 @@ export async function generateMorningBriefing(userId: string): Promise<MorningBr
     // Focus goal
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { dailyGoalHours: true } });
 
-    // Conflict detection: overlapping timetable slots today
+    const holiday = await prisma.schoolHoliday.findFirst({
+        where: {
+            userId,
+            startDate: { lte: todayEnd },
+            endDate: { gte: todayStart },
+        },
+        select: { name: true, pauseNotifications: true },
+    });
+
+    // Conflict detection: overlapping timetable slots today + class/exam collisions
     const dayOfWeek = now.getDay();
     const timetable = await prisma.timetable.findMany({
         where: { userId, dayOfWeek },
         include: { subject: true },
         orderBy: { startTime: "asc" },
     });
+    const todaysExams = await prisma.exam.findMany({
+        where: { userId, date: { gte: todayStart, lte: todayEnd } },
+        select: { id: true, title: true, date: true, durationMinutes: true },
+    });
 
     const conflicts: string[] = [];
+    if (holiday?.pauseNotifications) {
+        conflicts.push(`Holiday "${holiday.name}" — notifications paused`);
+    }
     for (let i = 0; i < timetable.length - 1; i++) {
         const current = timetable[i]!;
         const next = timetable[i + 1]!;
         if (current.endTime > next.startTime) {
             conflicts.push(`${current.subject.name} (${current.startTime}-${current.endTime}) overlaps with ${next.subject.name} (${next.startTime}-${next.endTime})`);
+        }
+    }
+
+    for (const entry of timetable) {
+        const [classStartH = "0", classStartM = "0"] = entry.startTime.split(":");
+        const [classEndH = "0", classEndM = "0"] = entry.endTime.split(":");
+        const classStart = Number.parseInt(classStartH, 10) * 60 + Number.parseInt(classStartM, 10);
+        const classEnd = Number.parseInt(classEndH, 10) * 60 + Number.parseInt(classEndM, 10);
+
+        for (const exam of todaysExams) {
+            const examStart = exam.date.getHours() * 60 + exam.date.getMinutes();
+            const examEnd = examStart + Math.max(15, exam.durationMinutes);
+            const overlap = classStart < examEnd && classEnd > examStart;
+            if (!overlap) continue;
+
+            conflicts.push(
+                `${entry.subject.name} (${entry.startTime}-${entry.endTime}) overlaps with exam "${exam.title}"`,
+            );
         }
     }
 

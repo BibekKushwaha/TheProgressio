@@ -5,18 +5,8 @@ import { TrendingUp, TrendingDown, Minus, Trophy, Target } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function PredictiveScoreCard() {
-    const { data, isLoading } = useGetPredictivePerformanceQuery('');
-
-    type SubjectPrediction = {
-        subjectName?: string;
-        subject?: string;
-        predictedScore?: number;
-        avgScore?: number;
-        trend?: string;
-        entryCount?: number;
-    };
-
-    const subjects = (data?.data || []) as SubjectPrediction[];
+    const { data, isLoading } = useGetPredictivePerformanceQuery('JEE');
+    const subjects = data?.data || [];
 
     if (isLoading) {
         return (
@@ -42,8 +32,8 @@ export function PredictiveScoreCard() {
     }
 
     return (
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6">
-            <div className="flex items-center gap-3 mb-5">
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-5">
                 <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg">
                     <Trophy className="w-5 h-5 text-white" />
                 </div>
@@ -51,22 +41,25 @@ export function PredictiveScoreCard() {
                     <h3 className="text-lg font-bold text-white">Predictive Score Indicator</h3>
                     <p className="text-xs text-slate-400">Based on your learning pace and historical performance</p>
                 </div>
-            </div>
+                </div>
+                <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                    Confidence {((data?.confidence ?? 0) * 100).toFixed(0)}% • {data?.dataQuality?.label ?? 'low'} data quality • {data?.modelVersion ?? 'unknown model'}
+                </div>
 
-            <div className="space-y-3">
-                {subjects.map((subject) => {
-                    const predicted = subject.predictedScore ?? subject.avgScore ?? 0;
-                    const trend = subject.trend || 'stable';
-                    const TrendIcon = trend === 'improving' ? TrendingUp : trend === 'declining' ? TrendingDown : Minus;
-                    const trendColor = trend === 'improving' ? 'text-green-400' : trend === 'declining' ? 'text-red-400' : 'text-yellow-400';
+                <div className="space-y-3">
+                    {subjects.map((subject) => {
+                        const predicted = subject.estimatedExamScore ?? 0;
+                        const trend = subject.trend || 'stable';
+                        const TrendIcon = trend === 'improving' ? TrendingUp : trend === 'declining' ? TrendingDown : Minus;
+                        const trendColor = trend === 'improving' ? 'text-green-400' : trend === 'declining' ? 'text-red-400' : 'text-yellow-400';
                     const barColor = predicted >= 80 ? 'from-green-500 to-emerald-400' :
                         predicted >= 60 ? 'from-yellow-500 to-orange-400' :
                             'from-red-500 to-rose-400';
 
                     return (
-                        <div key={subject.subjectName || subject.subject} className="p-3 bg-white/5 rounded-lg">
+                        <div key={subject.subjectName} className="p-3 bg-white/5 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-semibold text-white">{subject.subjectName || subject.subject}</span>
+                                <span className="text-sm font-semibold text-white">{subject.subjectName}</span>
                                 <div className="flex items-center gap-2">
                                     <span className="text-lg font-bold text-white">{predicted.toFixed(0)}%</span>
                                     <TrendIcon className={`w-4 h-4 ${trendColor}`} />
@@ -80,7 +73,9 @@ export function PredictiveScoreCard() {
                             </div>
                             <div className="flex justify-between mt-1.5 text-xs text-slate-500">
                                 <span>{subject.entryCount || 0} entries</span>
-                                <span className={trendColor}>{trend}</span>
+                                <span className={trendColor}>
+                                    {trend} • {(subject.confidence * 100).toFixed(0)}% conf
+                                </span>
                             </div>
                         </div>
                     );
