@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { KanbanBoard } from '@/components/planner/KanbanBoard';
 import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
+import { TimelineView } from '@/components/planner/TimelineView';
 import { LocalTask, Task, TaskStatus, useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
 import { useSearchParams } from 'next/navigation';
 
@@ -45,7 +46,7 @@ export default function TasksPage() {
     const [status, setStatus] = useState('all');
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [view, setView] = useState<'kanban' | 'list' | 'timetable'>('kanban');
+    const [view, setView] = useState<'kanban' | 'list' | 'timetable' | 'timeline'>('kanban');
 
     const localHydrated = useLocalDbHydration();
     const { data: categories } = useGetCategoriesQuery();
@@ -94,7 +95,7 @@ export default function TasksPage() {
         [categories]
     );
 
-    const handleViewChange = (nextView: 'kanban' | 'list' | 'timetable') => {
+    const handleViewChange = (nextView: 'kanban' | 'list' | 'timetable' | 'timeline') => {
         setView(nextView);
     };
 
@@ -144,6 +145,14 @@ export default function TasksPage() {
                                 />
                             ) : view === 'list' ? (
                                 <TaskList
+                                    searchQuery={searchQuery}
+                                    status={status}
+                                    priority={priority}
+                                    category={selectedCategory}
+                                    tasks={tasks}
+                                />
+                            ) : view === 'timeline' ? (
+                                <TimelineView
                                     searchQuery={searchQuery}
                                     status={status}
                                     priority={priority}

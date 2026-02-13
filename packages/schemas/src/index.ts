@@ -15,3 +15,6 @@ export * from "./gradeEntry";
 export * from "./subtask";
 export * from "./attachment";
 export * from "./reminder";
+export * from "./billing";
+export * from "./payment";
+export * from "./sync";

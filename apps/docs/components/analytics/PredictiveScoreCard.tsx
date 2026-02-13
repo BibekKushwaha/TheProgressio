@@ -43,15 +43,15 @@ export function PredictiveScoreCard() {
                 </div>
                 </div>
                 <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                    Confidence {((data?.confidence ?? 0) * 100).toFixed(0)}% • {data?.dataQuality?.label ?? 'low'} data quality • {data?.modelVersion ?? 'unknown model'}
+                    Model {data?.modelVersion ?? 'unknown'} • subject confidence labels are shown per row
                 </div>
 
                 <div className="space-y-3">
                     {subjects.map((subject) => {
                         const predicted = subject.estimatedExamScore ?? 0;
-                        const trend = subject.trend || 'stable';
-                        const TrendIcon = trend === 'improving' ? TrendingUp : trend === 'declining' ? TrendingDown : Minus;
-                        const trendColor = trend === 'improving' ? 'text-green-400' : trend === 'declining' ? 'text-red-400' : 'text-yellow-400';
+                        const trend = subject.pace ?? 'steady';
+                        const TrendIcon = trend === 'accelerating' ? TrendingUp : trend === 'declining' ? TrendingDown : Minus;
+                        const trendColor = trend === 'accelerating' ? 'text-green-400' : trend === 'declining' ? 'text-red-400' : 'text-yellow-400';
                     const barColor = predicted >= 80 ? 'from-green-500 to-emerald-400' :
                         predicted >= 60 ? 'from-yellow-500 to-orange-400' :
                             'from-red-500 to-rose-400';
@@ -72,9 +72,9 @@ export function PredictiveScoreCard() {
                                 />
                             </div>
                             <div className="flex justify-between mt-1.5 text-xs text-slate-500">
-                                <span>{subject.entryCount || 0} entries</span>
+                                <span>{subject.simulationRuns || 0} sims</span>
                                 <span className={trendColor}>
-                                    {trend} • {(subject.confidence * 100).toFixed(0)}% conf
+                                    {trend} • {subject.confidence} confidence
                                 </span>
                             </div>
                         </div>

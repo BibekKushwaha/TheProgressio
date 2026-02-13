@@ -5,6 +5,8 @@ const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http
 export type BillingPlan = 'FREE' | 'PRO' | 'INSTITUTION';
 export type BillingStatus = 'INACTIVE' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED';
 export type PaymentProvider = 'UPI' | 'PAYTM' | 'NET_BANKING' | 'CARD';
+export type PlanId = BillingPlan;
+export type PaymentMethod = PaymentProvider;
 
 export interface BillingProfile {
   id: string;
@@ -22,6 +24,41 @@ export interface PaymentIntent {
   provider: PaymentProvider;
   amountPaise: number;
   status: string;
+}
+
+export interface CreateOrderRequest {
+  plan: PlanId;
+  paymentMethod: PaymentMethod;
+  amountPaise?: number;
+}
+
+export interface CreateOrderResponse {
+  message: string;
+  intent: PaymentIntent;
+}
+
+export interface VerifyPaymentRequest {
+  intentId: string;
+  paymentRef: string;
+  status?: 'PENDING' | 'SUCCESS' | 'FAILED';
+  payload?: string;
+}
+
+export interface VerifyPaymentResponse {
+  message: string;
+  intent: PaymentIntent;
+}
+
+export type SubscriptionStatus = BillingProfile;
+
+export interface PaymentRecord {
+  intentId: string;
+  paymentRef: string;
+  plan: BillingPlan;
+  provider: PaymentProvider;
+  amountPaise: number;
+  status: string;
+  createdAt?: string;
 }
 
 export interface UpiCollectResponse {
@@ -70,6 +107,45 @@ export const paymentApi = createApi({
       }),
       invalidatesTags: ['Payments'],
     }),
+    createOrder: builder.mutation<CreateOrderResponse, CreateOrderRequest>({
+      query: (body) => ({
+        url: '/payments/intents',
+        method: 'POST',
+        body: {
+          plan: body.plan,
+          provider: body.paymentMethod,
+          amountPaise: body.amountPaise,
+        },
+      }),
+      invalidatesTags: ['Payments'],
+    }),
+    verifyPayment: builder.mutation<VerifyPaymentResponse, VerifyPaymentRequest>({
+      query: (body) => ({
+        url: '/payments/intents/verify',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Payments'],
+    }),
+    getSubscriptionStatus: builder.query<SubscriptionStatus, void>({
+      query: () => '/payments/me',
+      transformResponse: (response: { profile: SubscriptionStatus } | SubscriptionStatus) =>
+        'profile' in (response as any) ? (response as { profile: SubscriptionStatus }).profile : (response as SubscriptionStatus),
+      providesTags: ['Payments'],
+    }),
+    cancelSubscription: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: '/payments/cancel',
+        method: 'POST',
+      }),
+      invalidatesTags: ['Payments'],
+    }),
+    getPaymentHistory: builder.query<PaymentRecord[], void>({
+      query: () => '/payments/history',
+      transformResponse: (response: { items?: PaymentRecord[] } | PaymentRecord[]) =>
+        Array.isArray(response) ? response : response.items ?? [],
+      providesTags: ['Payments'],
+    }),
   }),
 });
 
@@ -77,4 +153,9 @@ export const {
   useGetBillingProfileQuery,
   useCreatePaymentIntentMutation,
   useCreateUpiCollectMutation,
+  useCreateOrderMutation,
+  useVerifyPaymentMutation,
+  useGetSubscriptionStatusQuery,
+  useCancelSubscriptionMutation,
+  useGetPaymentHistoryQuery,
 } = paymentApi;

@@ -63,6 +63,33 @@ export interface LocalAttachment {
     createdAt: string;
 }
 
+export interface LocalHabit {
+    id: string;
+    userId: string;
+    title: string;
+    frequency?: string | null;
+    targetCount?: number | null;
+    isActive?: boolean;
+}
+
+export interface LocalHabitLog {
+    id: string;
+    habitId: string;
+    userId: string;
+    completedValue: number;
+    occurredAt: string;
+}
+
+export interface LocalTimetableEntry {
+    id: string;
+    userId: string;
+    dayOfWeek: number;
+    subject: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    location?: string | null;
+}
+
 export type SyncAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TOGGLE';
 export type SyncEntityType = 'task' | 'category' | 'subtask';
 export type VectorClock = Record<string, number>;
@@ -596,6 +623,26 @@ export const localCategories = {
                 _syncVectorClock: category._syncVectorClock ?? null,
             });
         }
+    },
+};
+
+// ─── Compatibility Adapters (non-persistent placeholders) ────────────────────
+
+export const localHabits = {
+    async getAll(_filters?: { userId?: string }): Promise<LocalHabit[]> {
+        return [];
+    },
+};
+
+export const localHabitLogs = {
+    async getByHabitId(_habitId: string): Promise<LocalHabitLog[]> {
+        return [];
+    },
+};
+
+export const localTimetable = {
+    async getAll(_filters?: { userId?: string; dayOfWeek?: number }): Promise<LocalTimetableEntry[]> {
+        return [];
     },
 };
 

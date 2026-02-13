@@ -25,6 +25,53 @@ export interface LogSessionRequest {
     sessionType?: SessionType;
 }
 
+export type FocusLiveStatus = 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+
+export interface FocusLiveSession {
+    sessionId: string;
+    userId: string;
+    taskId: string;
+    taskTitle: string;
+    sessionType: SessionType;
+    status: FocusLiveStatus;
+    plannedDurationMinutes: number;
+    elapsedSeconds: number;
+    remainingSeconds: number;
+    startedAt: string;
+    pausedAt?: string;
+    resumedAt?: string;
+    endedAt?: string;
+    lastHeartbeatAt: string;
+    deviceId?: string;
+    source?: string;
+    recommendedStart?: string;
+    recommendedEnd?: string;
+}
+
+export interface StartLiveSessionRequest {
+    taskId: string;
+    taskTitle?: string;
+    plannedDurationMinutes: number;
+    sessionType?: SessionType;
+    deviceId?: string;
+    source?: string;
+    recommendedStart?: string;
+    recommendedEnd?: string;
+}
+
+export interface LiveSessionSignalRequest {
+    sessionId: string;
+    deviceId?: string;
+}
+
+export interface HeartbeatLiveSessionRequest extends LiveSessionSignalRequest {
+    remainingSeconds?: number;
+}
+
+export interface StopLiveSessionRequest extends LiveSessionSignalRequest {
+    outcome?: 'COMPLETED' | 'CANCELLED';
+}
+
 export interface DailyStats {
     totalMinutes: number;
     totalHours: number;
@@ -171,6 +218,23 @@ export interface LearningPace {
     dataQuality: "low" | "medium" | "high";
 }
 
+export interface PredictiveDataQuality {
+    label: 'low' | 'medium' | 'high';
+}
+
+export interface GPAComponentInput {
+    name: string;
+    weight: number;
+    obtainedMarks: number;
+    totalMarks: number;
+}
+
+export interface GPAComponentPreview {
+    weightedPercentage: number;
+    weightedGradePoint: number;
+    scale: 'INDIA_10' | 'US_4' | 'PERCENTAGE';
+}
+
 export const analyticsApi = createApi({
     reducerPath: 'analyticsApi',
     baseQuery: fetchBaseQuery({
@@ -187,6 +251,50 @@ export const analyticsApi = createApi({
             query: (body) => ({
                 url: '/activity/log',
                 method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Activity', 'Stats'],
+        }),
+        getActiveLiveSession: builder.query<{ message: string; session: FocusLiveSession | null }, void>({
+            query: () => '/activity/live/active',
+            providesTags: ['Activity'],
+        }),
+        startLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, StartLiveSessionRequest>({
+            query: (body) => ({
+                url: '/activity/live/start',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Activity', 'Stats'],
+        }),
+        pauseLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, LiveSessionSignalRequest>({
+            query: (body) => ({
+                url: '/activity/live/pause',
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: ['Activity', 'Stats'],
+        }),
+        resumeLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, LiveSessionSignalRequest>({
+            query: (body) => ({
+                url: '/activity/live/resume',
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: ['Activity', 'Stats'],
+        }),
+        heartbeatLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, HeartbeatLiveSessionRequest>({
+            query: (body) => ({
+                url: '/activity/live/heartbeat',
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: ['Activity'],
+        }),
+        stopLiveSession: builder.mutation<{ message: string; session: FocusLiveSession; log?: ActivityLog }, StopLiveSessionRequest>({
+            query: (body) => ({
+                url: '/activity/live/stop',
+                method: 'PATCH',
                 body,
             }),
             invalidatesTags: ['Activity', 'Stats'],
@@ -265,6 +373,58 @@ export const analyticsApi = createApi({
                 method: 'POST',
                 body,
             }),
+        }),
+        previewGPAComponents: builder.mutation<
+            { message: string; result: GPAComponentPreview },
+            { scale: 'INDIA_10' | 'US_4' | 'PERCENTAGE'; components: GPAComponentInput[] }
+        >({
+            queryFn: async ({ scale, components }) => {
+                const normalized = components
+                    .map((component) => ({
+                        name: component.name,
+                        weight: Number.isFinite(component.weight) ? component.weight : 0,
+                        obtainedMarks: Number.isFinite(component.obtainedMarks) ? component.obtainedMarks : 0,
+                        totalMarks: Number.isFinite(component.totalMarks) ? component.totalMarks : 0,
+                    }))
+                    .filter((component) => component.totalMarks > 0 && component.weight > 0);
+
+                if (normalized.length === 0) {
+                    return {
+                        data: {
+                            message: 'No valid components provided',
+                            result: {
+                                weightedPercentage: 0,
+                                weightedGradePoint: 0,
+                                scale,
+                            },
+                        },
+                    };
+                }
+
+                const totalWeight = normalized.reduce((sum, component) => sum + component.weight, 0);
+                const weightedPercentage = normalized.reduce((sum, component) => {
+                    const percentage = Math.max(0, Math.min(100, (component.obtainedMarks / component.totalMarks) * 100));
+                    return sum + percentage * (component.weight / totalWeight);
+                }, 0);
+
+                const weightedGradePoint =
+                    scale === 'US_4'
+                        ? (weightedPercentage / 100) * 4
+                        : scale === 'PERCENTAGE'
+                            ? weightedPercentage
+                            : (weightedPercentage / 100) * 10;
+
+                return {
+                    data: {
+                        message: 'Weighted GPA preview generated',
+                        result: {
+                            weightedPercentage,
+                            weightedGradePoint,
+                            scale,
+                        },
+                    },
+                };
+            },
         }),
         addCourseGrade: builder.mutation<{ message: string; course: CourseGrade }, Partial<CourseGrade>>({
             query: (body) => ({
@@ -355,6 +515,12 @@ export const analyticsApi = createApi({
 
 export const {
     useLogSessionMutation,
+    useGetActiveLiveSessionQuery,
+    useStartLiveSessionMutation,
+    usePauseLiveSessionMutation,
+    useResumeLiveSessionMutation,
+    useHeartbeatLiveSessionMutation,
+    useStopLiveSessionMutation,
     useGetDailySummaryQuery,
     useGetWeeklyTrendsQuery,
     useGetTaskEfficiencyQuery,
@@ -371,6 +537,7 @@ export const {
     useAddCourseGradeMutation,
     useUpdateCourseGradeMutation,
     useDeleteCourseGradeMutation,
+    usePreviewGPAComponentsMutation,
     useAddGradeEntryMutation,
     useGetGradeEntriesQuery,
     useDeleteGradeEntryMutation,

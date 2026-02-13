@@ -3,6 +3,7 @@ import { prisma, Status, Priority } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService } from "../services/ai.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/producer.service.js";
+import { recoveryService } from "../services/recovery.service.js";
 
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || "http://localhost:4003";
@@ -412,6 +413,59 @@ export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
 export const taskCategories = async (_req: Request, res: Response) => {
     // Placeholder for category logic if needed, user had it in routes
     return res.status(501).json({ message: "Not implemented" });
+};
+
+export const scanSyllabusImage = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user?.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const { imageBase64, mimeType } = req.body ?? {};
+        if (!imageBase64 || typeof imageBase64 !== "string") {
+            return res.status(400).json({ message: "imageBase64 is required" });
+        }
+
+        const items = await aiService.scanSyllabusImage(imageBase64, typeof mimeType === "string" ? mimeType : "image/jpeg");
+        return res.status(200).json({ items });
+    } catch (error) {
+        console.error("Scan syllabus error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const previewRecoveryPlan = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user?.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const anchorInput = req.body?.anchorDate;
+        const anchorDate = typeof anchorInput === "string" ? new Date(anchorInput) : new Date();
+        const plan = await recoveryService.preview(req.user.id, anchorDate);
+
+        return res.status(200).json(plan);
+    } catch (error) {
+        console.error("Recovery preview error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const applyRecoveryPlan = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user?.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const anchorInput = req.body?.anchorDate;
+        const anchorDate = typeof anchorInput === "string" ? new Date(anchorInput) : new Date();
+        const result = await recoveryService.apply(req.user.id, anchorDate);
+
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error("Recovery apply error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
 };
 
 interface CreateTaskFromTextParams {

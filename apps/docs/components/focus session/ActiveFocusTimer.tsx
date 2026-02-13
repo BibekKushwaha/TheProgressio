@@ -153,7 +153,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             heartbeatLiveSession({
                 sessionId: liveSessionId,
                 remainingSeconds: timeLeft,
-            }).catch((error) => {
+            }).catch((error: unknown) => {
                 console.error('Focus heartbeat failed:', error);
             });
         }, 15000);
