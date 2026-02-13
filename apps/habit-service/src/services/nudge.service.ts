@@ -164,15 +164,6 @@ export async function generateMorningBriefing(userId: string): Promise<MorningBr
     // Focus goal
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { dailyGoalHours: true } });
 
-    const holiday = await prisma.schoolHoliday.findFirst({
-        where: {
-            userId,
-            startDate: { lte: todayEnd },
-            endDate: { gte: todayStart },
-        },
-        select: { name: true, pauseNotifications: true },
-    });
-
     // Conflict detection: overlapping timetable slots today + class/exam collisions
     const dayOfWeek = now.getDay();
     const timetable = await prisma.timetable.findMany({
@@ -186,9 +177,6 @@ export async function generateMorningBriefing(userId: string): Promise<MorningBr
     });
 
     const conflicts: string[] = [];
-    if (holiday?.pauseNotifications) {
-        conflicts.push(`Holiday "${holiday.name}" — notifications paused`);
-    }
     for (let i = 0; i < timetable.length - 1; i++) {
         const current = timetable[i]!;
         const next = timetable[i + 1]!;

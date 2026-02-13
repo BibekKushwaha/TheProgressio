@@ -52,31 +52,6 @@ const normalizePhone = (value: string | undefined): string | null => {
     return digits.length > 0 ? digits : null;
 };
 
-const parseMinuteOfDay = (value: string | null | undefined): number | null => {
-    if (!value) return null;
-    const [h, m] = value.split(":");
-    const hours = Number.parseInt(h ?? "", 10);
-    const minutes = Number.parseInt(m ?? "", 10);
-    if (Number.isNaN(hours) || Number.isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-        return null;
-    }
-    return hours * 60 + minutes;
-};
-
-const isWithinQuietHours = (now: Date, start: string | null | undefined, end: string | null | undefined): boolean => {
-    const startMinute = parseMinuteOfDay(start);
-    const endMinute = parseMinuteOfDay(end);
-    if (startMinute === null || endMinute === null) return false;
-
-    const currentMinute = now.getHours() * 60 + now.getMinutes();
-    // Same-day quiet window: 13:00 -> 15:00
-    if (startMinute < endMinute) {
-        return currentMinute >= startMinute && currentMinute < endMinute;
-    }
-    // Overnight quiet window: 22:00 -> 07:00
-    return currentMinute >= startMinute || currentMinute < endMinute;
-};
-
 const buildDispatchHash = (payload: { nudgeId: string; recipient: string; message: string }): string =>
     crypto
         .createHash("sha256")
@@ -183,29 +158,14 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
     results: DispatchResult[];
 }> => {
     const now = new Date();
-    const dayStart = new Date(now);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(now);
-    dayEnd.setHours(23, 59, 59, 999);
     const userPhoneMap = getUserPhoneMapping();
     const limit = Math.max(1, params?.limit ?? 50);
     const dedupeCache = new Set<string>();
-    const holidayPauseCache = new Map<string, boolean>();
 
     const nudges = await prisma.nudge.findMany({
         where: {
             scheduledAt: { lte: now },
             OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
-        },
-        include: {
-            user: {
-                select: {
-                    id: true,
-                    whatsappOptIn: true,
-                    quietHoursStart: true,
-                    quietHoursEnd: true,
-                },
-            },
         },
         orderBy: [{ scheduledAt: "asc" }],
         take: limit,
@@ -217,41 +177,10 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
     let failed = 0;
 
     for (const nudge of nudges) {
-        if (!holidayPauseCache.has(nudge.userId)) {
-            const holiday = await prisma.schoolHoliday.findFirst({
-                where: {
-                    userId: nudge.userId,
-                    startDate: { lte: dayEnd },
-                    endDate: { gte: dayStart },
-                    pauseNotifications: true,
-                },
-                select: { id: true },
-            });
-            holidayPauseCache.set(nudge.userId, Boolean(holiday));
-        }
-
-        if (holidayPauseCache.get(nudge.userId)) {
-            skipped += 1;
-            results.push({ nudgeId: nudge.id, status: "skipped", reason: "holiday_pause" });
-            continue;
-        }
-
         const recipient = normalizePhone(userPhoneMap[nudge.userId]);
         if (!recipient) {
             skipped += 1;
             results.push({ nudgeId: nudge.id, status: "skipped", reason: "recipient_not_mapped" });
-            continue;
-        }
-
-        if (!nudge.user.whatsappOptIn) {
-            skipped += 1;
-            results.push({ nudgeId: nudge.id, status: "skipped", reason: "user_opted_out" });
-            continue;
-        }
-
-        if (isWithinQuietHours(now, nudge.user.quietHoursStart, nudge.user.quietHoursEnd)) {
-            skipped += 1;
-            results.push({ nudgeId: nudge.id, status: "skipped", reason: "quiet_hours" });
             continue;
         }
 
