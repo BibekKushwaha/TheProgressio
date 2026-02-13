@@ -34,6 +34,7 @@
     "./reminder": "./src/reminder.ts",
     "./billing": "./src/billing.ts",
     "./payment": "./src/payment.ts",
-    "./sync": "./src/sync.ts"
+    "./sync": "./src/sync.ts",
+    "./whatsapp": "./src/whatsapp.ts"
   }
 }

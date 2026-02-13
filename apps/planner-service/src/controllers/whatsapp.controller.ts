@@ -1,5 +1,11 @@
 import type { Request, Response } from "express";
 import { prisma, Status } from "@repo/db";
+import {
+    whatsappCaptureSchema,
+    whatsappOutcomeNudgeSchema,
+    whatsappTaskReminderSchema,
+    whatsappTemplateMessageSchema,
+} from "@repo/schemas/whatsapp";
 import { aiService } from "../services/ai.service.js";
 import { createTaskFromText, runTaskCompletionSideEffects } from "./task.controller.js";
 import {
@@ -150,7 +156,15 @@ export const captureWhatsAppTask = async (req: Request, res: Response) => {
     try {
         if (!ensureAuthorized(req, res)) return;
 
-        const inbound = extractWhatsAppInbound(req.body);
+        const parsedPayload = whatsappCaptureSchema.safeParse(req.body ?? {});
+        if (!parsedPayload.success) {
+            return res.status(400).json({
+                message: "Invalid WhatsApp payload",
+                errors: parsedPayload.error.flatten(),
+            });
+        }
+
+        const inbound = extractWhatsAppInbound(parsedPayload.data);
         const userId = resolveWhatsAppUserId({
             explicitUserId: inbound.explicitUserId,
             sender: inbound.sender,
@@ -214,10 +228,15 @@ export const sendWhatsAppTaskReminder = async (req: Request, res: Response) => {
     try {
         if (!ensureAuthorized(req, res)) return;
 
-        const { to, taskId } = req.body ?? {};
-        if (typeof to !== "string" || !to.trim() || typeof taskId !== "string" || !taskId.trim()) {
-            return res.status(400).json({ message: "to and taskId are required" });
+        const parsed = whatsappTaskReminderSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "to and taskId are required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { to, taskId } = parsed.data;
 
         const task = await prisma.task.findUnique({ where: { id: taskId } });
         if (!task) {
@@ -246,10 +265,15 @@ export const sendWhatsAppTemplateMessage = async (req: Request, res: Response) =
     try {
         if (!ensureAuthorized(req, res)) return;
 
-        const { to, templateName, languageCode, bodyVariables } = req.body ?? {};
-        if (typeof to !== "string" || !to.trim() || typeof templateName !== "string" || !templateName.trim()) {
-            return res.status(400).json({ message: "to and templateName are required" });
+        const parsed = whatsappTemplateMessageSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "to and templateName are required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { to, templateName, languageCode, bodyVariables } = parsed.data;
 
         await sendWhatsAppTemplate({
             to,
@@ -269,10 +293,15 @@ export const sendOutcomeNudge = async (req: Request, res: Response) => {
     try {
         if (!ensureAuthorized(req, res)) return;
 
-        const { to, userId, targetPercentile = 95, chapter } = req.body ?? {};
-        if (typeof to !== "string" || !to.trim() || typeof userId !== "string" || !userId.trim()) {
-            return res.status(400).json({ message: "to and userId are required" });
+        const parsed = whatsappOutcomeNudgeSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "to and userId are required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { to, userId, targetPercentile = 95, chapter } = parsed.data;
 
         const [totalTasks, completedTasks, nextPending] = await Promise.all([
             prisma.task.count({ where: { userId } }),

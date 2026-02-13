@@ -4,7 +4,17 @@ import { prisma } from "@repo/db/client";
 import ErrorHandler from "../utils/errorHandler.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import bcrypt from 'bcrypt';
-import { registerSchema, loginSchema } from "@repo/schemas/auth";
+import {
+  registerSchema,
+  loginSchema,
+  updateProfileSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  mobileLoginSchema,
+  mobileRefreshSchema,
+  mobileLogoutSchema,
+  createFamilyShareLinkSchema,
+} from "@repo/schemas/auth";
 
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import crypto from "crypto";
@@ -14,6 +24,7 @@ import crypto from "crypto";
 
 const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "15m";
 const MOBILE_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.MOBILE_REFRESH_TOKEN_DAYS ?? "30", 10);
+const prismaAny = prisma as any;
 
 const ensureJwtSecret = (): string => {
   const secret = process.env.JWT_SEC;
@@ -92,9 +103,6 @@ export const registerUser = TryCatch(async (req, res) => {
       username: true,
       email: true,
       dailyGoalHours: true,
-      whatsappOptIn: true,
-      quietHoursStart: true,
-      quietHoursEnd: true,
       createdAt: true,
     },
   })
@@ -231,9 +239,6 @@ export const getCurrentUser = TryCatch(async (req, res) => {
       username: true,
       email: true,
       dailyGoalHours: true,
-      whatsappOptIn: true,
-      quietHoursStart: true,
-      quietHoursEnd: true,
       createdAt: true
     },
   });
@@ -263,26 +268,28 @@ export const updateProfile = TryCatch(async (req, res) => {
     return res.status(401).json({ message: 'Invalid token payload' });
   }
 
-  const { dailyGoalHours, username, email, whatsappOptIn, quietHoursStart, quietHoursEnd } = req.body;
+  const parsed = updateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Invalid profile payload",
+      errors: parsed.error.flatten(),
+    });
+  }
+
+  const { dailyGoalHours, username, email } = parsed.data;
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
-      ...(dailyGoalHours !== undefined && { dailyGoalHours: parseFloat(dailyGoalHours) }),
+      ...(dailyGoalHours !== undefined && { dailyGoalHours }),
       ...(username && { username }),
       ...(email && { email }),
-      ...(whatsappOptIn !== undefined && { whatsappOptIn: Boolean(whatsappOptIn) }),
-      ...(quietHoursStart !== undefined && { quietHoursStart: quietHoursStart || null }),
-      ...(quietHoursEnd !== undefined && { quietHoursEnd: quietHoursEnd || null }),
     },
     select: {
       id: true,
       username: true,
       email: true,
       dailyGoalHours: true,
-      whatsappOptIn: true,
-      quietHoursStart: true,
-      quietHoursEnd: true,
       createdAt: true
     },
   });
@@ -297,11 +304,15 @@ export const updateProfile = TryCatch(async (req, res) => {
 // ── Forgot Password (JWT-based, no Redis/Kafka required) ──────────────
 
 export const forgotPassword = TryCatch(async (req, res) => {
-  const { email } = req.body;
-
-  if (!email || typeof email !== 'string') {
-    return res.status(400).json({ message: "Email is required" });
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Email is required",
+      errors: parsed.error.flatten(),
+    });
   }
+
+  const { email } = parsed.data;
 
   const user = await prisma.user.findUnique({ where: { email } });
 
@@ -327,15 +338,20 @@ export const forgotPassword = TryCatch(async (req, res) => {
 
 export const resetPassword = TryCatch(async (req, res) => {
   const { token } = req.params;
-  const { password } = req.body;
+  const parsed = resetPasswordSchema.safeParse(req.body);
 
   if (!token) {
     return res.status(400).json({ message: "Reset token is required" });
   }
 
-  if (!password || typeof password !== 'string' || password.length < 6) {
-    return res.status(400).json({ message: "Password must be at least 6 characters" });
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Password must be at least 6 characters",
+      errors: parsed.error.flatten(),
+    });
   }
+
+  const { password } = parsed.data;
 
   let decoded: any;
   try {
@@ -367,7 +383,7 @@ export const resetPassword = TryCatch(async (req, res) => {
 // ── Mobile Auth (refresh-token flow) ──────────────────────────────────
 
 export const mobileLogin = TryCatch(async (req, res) => {
-  const result = loginSchema.safeParse(req.body);
+  const result = mobileLoginSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({
       message: "Invalid email or password format",
@@ -375,10 +391,8 @@ export const mobileLogin = TryCatch(async (req, res) => {
     });
   }
 
-  const { email, password } = result.data;
-  const deviceId = typeof req.body?.deviceId === "string" && req.body.deviceId.trim()
-    ? req.body.deviceId.trim()
-    : "unknown-device";
+  const { email, password, deviceId } = result.data;
+  const resolvedDeviceId = deviceId?.trim() ? deviceId.trim() : "unknown-device";
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
@@ -394,10 +408,10 @@ export const mobileLogin = TryCatch(async (req, res) => {
   const rawRefreshToken = generateOpaqueToken();
   const expiresAt = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
 
-  await prisma.mobileRefreshToken.create({
+  await prismaAny.mobileRefreshToken.create({
     data: {
       userId: user.id,
-      deviceId,
+      deviceId: resolvedDeviceId,
       tokenHash: hashOpaqueToken(rawRefreshToken),
       expiresAt,
     },
@@ -415,18 +429,19 @@ export const mobileLogin = TryCatch(async (req, res) => {
 });
 
 export const mobileRefresh = TryCatch(async (req, res) => {
-  const refreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
-  const requestedDeviceId =
-    typeof req.body?.deviceId === "string" && req.body.deviceId.trim()
-      ? req.body.deviceId.trim()
-      : null;
-
-  if (!refreshToken) {
-    return res.status(400).json({ message: "refreshToken is required" });
+  const parsed = mobileRefreshSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "refreshToken is required",
+      errors: parsed.error.flatten(),
+    });
   }
 
+  const refreshToken = parsed.data.refreshToken;
+  const requestedDeviceId = parsed.data.deviceId?.trim() ? parsed.data.deviceId.trim() : null;
+
   const tokenHash = hashOpaqueToken(refreshToken);
-  const existing = await prisma.mobileRefreshToken.findFirst({
+  const existing = await prismaAny.mobileRefreshToken.findFirst({
     where: {
       tokenHash,
       revokedAt: null,
@@ -448,11 +463,11 @@ export const mobileRefresh = TryCatch(async (req, res) => {
   const nextExpiry = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
 
   await prisma.$transaction([
-    prisma.mobileRefreshToken.update({
+    prismaAny.mobileRefreshToken.update({
       where: { id: existing.id },
       data: { revokedAt: new Date() },
     }),
-    prisma.mobileRefreshToken.create({
+    prismaAny.mobileRefreshToken.create({
       data: {
         userId: existing.userId,
         deviceId: existing.deviceId,
@@ -474,13 +489,21 @@ export const mobileRefresh = TryCatch(async (req, res) => {
 });
 
 export const mobileLogout = TryCatch(async (req, res) => {
-  const refreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
+  const parsed = mobileLogoutSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Invalid logout payload",
+      errors: parsed.error.flatten(),
+    });
+  }
+
+  const refreshToken = parsed.data.refreshToken ?? "";
   const authToken = getBearerToken(req);
 
   const operations = [];
   if (refreshToken) {
     operations.push(
-      prisma.mobileRefreshToken.updateMany({
+      prismaAny.mobileRefreshToken.updateMany({
         where: { tokenHash: hashOpaqueToken(refreshToken), revokedAt: null },
         data: { revokedAt: new Date() },
       })
@@ -491,7 +514,7 @@ export const mobileLogout = TryCatch(async (req, res) => {
     try {
       const { id } = decodeAccessToken(authToken);
       operations.push(
-        prisma.mobileRefreshToken.updateMany({
+        prismaAny.mobileRefreshToken.updateMany({
           where: { userId: id, revokedAt: null },
           data: { revokedAt: new Date() },
         }),
@@ -553,18 +576,24 @@ export const createFamilyShareLink = TryCatch(async (req, res) => {
     return res.status(401).json({ message: "Not authenticated" });
   }
 
-  const label = typeof req.body?.label === "string" && req.body.label.trim()
-    ? req.body.label.trim()
-    : null;
-  const permissions = typeof req.body?.permissions === "string" && req.body.permissions.trim()
-    ? req.body.permissions.trim().toUpperCase()
+  const parsed = createFamilyShareLinkSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Invalid family share link payload",
+      errors: parsed.error.flatten(),
+    });
+  }
+
+  const label = parsed.data.label?.trim() ? parsed.data.label.trim() : null;
+  const permissions = parsed.data.permissions?.trim()
+    ? parsed.data.permissions.trim().toUpperCase()
     : "READ_ONLY";
-  const expiresInDays = Number.parseInt(String(req.body?.expiresInDays ?? "14"), 10);
+  const expiresInDays = parsed.data.expiresInDays ?? 14;
   const expiresAt = new Date(Date.now() + Math.max(1, expiresInDays) * 24 * 60 * 60 * 1000);
 
   const shareToken = `fml_${generateOpaqueToken()}`;
 
-  const link = await prisma.familyShareLink.create({
+  const link = await prismaAny.familyShareLink.create({
     data: {
       userId,
       tokenHash: hashOpaqueToken(shareToken),
@@ -594,7 +623,7 @@ export const listFamilyShareLinks = TryCatch(async (req, res) => {
     return res.status(401).json({ message: "Not authenticated" });
   }
 
-  const links = await prisma.familyShareLink.findMany({
+  const links = await prismaAny.familyShareLink.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
     select: {
@@ -625,7 +654,7 @@ export const revokeFamilyShareLink = TryCatch(async (req, res) => {
     return res.status(400).json({ message: "Invalid share link id" });
   }
 
-  const result = await prisma.familyShareLink.updateMany({
+  const result = await prismaAny.familyShareLink.updateMany({
     where: { id, userId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
@@ -644,7 +673,7 @@ export const resolveFamilyShareLink = TryCatch(async (req, res) => {
   }
 
   const tokenHash = hashOpaqueToken(rawToken);
-  const link = await prisma.familyShareLink.findFirst({
+  const link = await prismaAny.familyShareLink.findFirst({
     where: {
       tokenHash,
       revokedAt: null,
@@ -663,7 +692,7 @@ export const resolveFamilyShareLink = TryCatch(async (req, res) => {
     return res.status(404).json({ message: "Share link is invalid or expired" });
   }
 
-  await prisma.familyShareLink.update({
+  await prismaAny.familyShareLink.update({
     where: { id: link.id },
     data: { lastUsedAt: new Date() },
   });

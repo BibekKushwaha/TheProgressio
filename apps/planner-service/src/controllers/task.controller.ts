@@ -1,5 +1,13 @@
 import type { Request, Response } from "express";
 import { prisma, Status, Priority } from "@repo/db";
+import {
+    parseTaskIntentSchema,
+    previewSubtasksSchema,
+    recoveryPlanSchema,
+    scanSyllabusImageSchema,
+    smartCreateTaskSchema,
+    taskSchema,
+} from "@repo/schemas/task";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService } from "../services/ai.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/producer.service.js";
@@ -96,28 +104,28 @@ export const createTask = async (req: AuthenticatedRequest, res: Response) => {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        if (!req.body) {
+        const parsed = taskSchema.safeParse(req.body);
+        if (!parsed.success) {
+            const titleIssue = parsed.error.issues.find((issue) => issue.path[0] === "title");
             return res.status(400).json({
-                message: "Request body is missing. Ensure Content-Type is application/json"
+                message: titleIssue ? "Title is required" : "Invalid task payload",
+                errors: parsed.error.flatten(),
             });
         }
 
-        const { title, description, status, priority, categoryId, dueDate, isRecurring } = req.body;
-
-        if (!title || typeof title !== "string") {
-            return res.status(400).json({ message: "Title is required" });
-        }
+        const { title, description, status, priority, categoryId, dueDate, isRecurring, subjectId } = parsed.data;
 
         const task = await prisma.task.create({
             data: {
                 title,
-                description,
-                status: (status as Status) ?? Status.PENDING,
-                priority: (priority as Priority) ?? Priority.MEDIUM,
-                dueDate: dueDate ? new Date(dueDate) : null,
+                description: description ?? null,
+                status,
+                priority,
+                dueDate: dueDate ?? null,
                 isRecurring: isRecurring ?? false,
                 userId: req.user.id,
                 categoryId: categoryId || null,
+                subjectId: subjectId || null,
             },
         });
 
@@ -421,11 +429,15 @@ export const scanSyllabusImage = async (req: AuthenticatedRequest, res: Response
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { imageBase64, mimeType } = req.body ?? {};
-        if (!imageBase64 || typeof imageBase64 !== "string") {
-            return res.status(400).json({ message: "imageBase64 is required" });
+        const parsed = scanSyllabusImageSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "imageBase64 is required",
+                errors: parsed.error.flatten(),
+            });
         }
 
+        const { imageBase64, mimeType } = parsed.data;
         const items = await aiService.scanSyllabusImage(imageBase64, typeof mimeType === "string" ? mimeType : "image/jpeg");
         return res.status(200).json({ items });
     } catch (error) {
@@ -440,8 +452,15 @@ export const previewRecoveryPlan = async (req: AuthenticatedRequest, res: Respon
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const anchorInput = req.body?.anchorDate;
-        const anchorDate = typeof anchorInput === "string" ? new Date(anchorInput) : new Date();
+        const parsed = recoveryPlanSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Invalid recovery payload",
+                errors: parsed.error.flatten(),
+            });
+        }
+
+        const anchorDate = parsed.data.anchorDate ?? new Date();
         const plan = await recoveryService.preview(req.user.id, anchorDate);
 
         return res.status(200).json(plan);
@@ -457,8 +476,15 @@ export const applyRecoveryPlan = async (req: AuthenticatedRequest, res: Response
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const anchorInput = req.body?.anchorDate;
-        const anchorDate = typeof anchorInput === "string" ? new Date(anchorInput) : new Date();
+        const parsed = recoveryPlanSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Invalid recovery payload",
+                errors: parsed.error.flatten(),
+            });
+        }
+
+        const anchorDate = parsed.data.anchorDate ?? new Date();
         const result = await recoveryService.apply(req.user.id, anchorDate);
 
         return res.status(200).json(result);
@@ -512,10 +538,15 @@ export const smartCreateTask = async (req: AuthenticatedRequest, res: Response) 
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { text } = req.body;
-        if (!text || typeof text !== "string") {
-            return res.status(400).json({ message: "Text input is required" });
+        const parsed = smartCreateTaskSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Text input is required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { text } = parsed.data;
 
         const { task, parsedData } = await createTaskFromText({
             userId: req.user.id,
@@ -580,10 +611,15 @@ export const previewSubtasks = async (req: AuthenticatedRequest, res: Response) 
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { title, description } = req.body;
-        if (!title || typeof title !== "string") {
-            return res.status(400).json({ message: "Title is required" });
+        const parsed = previewSubtasksSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Title is required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { title, description } = parsed.data;
 
         const subtaskTitles = await aiService.generateSubtasks(title, description || "");
 
@@ -600,10 +636,15 @@ export const parseTaskIntent = async (req: AuthenticatedRequest, res: Response) 
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { text } = req.body;
-        if (!text || typeof text !== "string") {
-            return res.status(400).json({ message: "Text input is required" });
+        const parsed = parseTaskIntentSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Text input is required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { text } = parsed.data;
 
         const parsedData = await aiService.parseTaskIntent(text);
 
