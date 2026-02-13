@@ -10,7 +10,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" 
+  provider = "postgresql"
 }
 
 model User {
@@ -19,6 +19,11 @@ model User {
   email            String     @unique
   password         String
   dailyGoalHours   Float      @default(4.0)
+  plan             BillingPlan   @default(FREE)
+  planStatus       BillingStatus @default(INACTIVE)
+  renewalAt        DateTime?
+  paymentProvider  String?
+  paymentRef       String?
   createdAt        DateTime   @default(now())
   
   // XP / Gamification
@@ -34,6 +39,8 @@ model User {
   nudges           Nudge[]
   gradeEntries     GradeEntry[]
   courseGrades      CourseGrade[]
+  paymentEvents    PaymentEvent[]
+  syncOperations   SyncOperation[]
   
   // Academic Relations
   subjects         Subject[]
@@ -72,6 +79,8 @@ model Category {
   name         String
   colorCode    String   @default("#3B82F6")
   icon         String?  // Lucide icon name e.g. "Calculator", "Beaker", "BookOpen"
+  syncLamportTs Int     @default(0)
+  syncVectorClock String?
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks        Task[]
@@ -97,6 +106,8 @@ model Task {
   subject      Subject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   
   description  String?
+  syncLamportTs Int       @default(0)
+  syncVectorClock String?
   subtasks     SubTask[]
   attachments  Attachment[]
 
@@ -376,4 +387,58 @@ model GradeEntry {
   
   @@index([userId, subjectName])
   @@index([userId, examType])
+}
+
+// ── Phase 4: Payments ──────────────────────────────────────────────────
+
+model PaymentEvent {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intentId        String   @unique
+  paymentRef      String   @unique
+  provider        String   // "UPI" | "PAYTM" | "NET_BANKING"
+  plan            BillingPlan
+  amountPaise     Int
+  status          String   // "CREATED" | "PENDING" | "SUCCESS" | "FAILED"
+  upiId           String?
+  payload         String?  // JSON metadata / webhook payload
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model SyncOperation {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId    String
+  opId        String
+  entityType  String   // "task" | "category"
+  entityId    String
+  action      String   // "UPSERT" | "DELETE"
+  payload     String?  // JSON payload
+  lamportTs   Int
+  vectorClock String?  // JSON object string
+  tombstone   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, opId])
+  @@index([userId, id])
+  @@index([userId, entityType, entityId, lamportTs])
+}
+
+enum BillingPlan {
+  FREE
+  PRO
+  INSTITUTION
+}
+
+enum BillingStatus {
+  INACTIVE
+  ACTIVE
+  PAST_DUE
+  CANCELED
 }

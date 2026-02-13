@@ -202,13 +202,18 @@ describe('Focus Service — getPredictivePerformance', () => {
         ];
         mockPrisma.gradeEntry.findMany.mockResolvedValue(entries);
 
-        const result = await getPredictivePerformance('u1', 'JEE');
+        const result = await getPredictivePerformance('u1', 'JEE', { runs: 1000, seed: 42 });
 
         expect(result.length).toBe(1);
         expect(result[0]).toHaveProperty('subjectName', 'Physics');
         expect(result[0]).toHaveProperty('pace');
         expect(result[0]).toHaveProperty('estimatedExamScore');
         expect(result[0]).toHaveProperty('estimatedPercentile');
+        expect(result[0]).toHaveProperty('simulationRuns', 1000);
+        expect(result[0]).toHaveProperty('scoreDistribution');
+        expect(result[0]).toHaveProperty('rankBands');
+        expect(result[0]).toHaveProperty('confidenceInterval');
+        expect(result[0]).toHaveProperty('modelVersion', 'monte-carlo-v1');
         expect(result[0]!.pace).toBe('accelerating');
     });
 
@@ -229,5 +234,22 @@ describe('Focus Service — getPredictivePerformance', () => {
         expect(physics).toBeDefined();
         expect(chemistry).toBeDefined();
         expect(chemistry!.pace).toBe('declining');
+    });
+
+    it('returns deterministic seeded simulation output', async () => {
+        const entries = [
+            { subjectName: 'Math', totalMarks: 100, obtainedMarks: 70, examType: 'JEE', createdAt: daysAgo(20) },
+            { subjectName: 'Math', totalMarks: 100, obtainedMarks: 76, examType: 'JEE', createdAt: daysAgo(10) },
+            { subjectName: 'Math', totalMarks: 100, obtainedMarks: 82, examType: 'JEE', createdAt: daysAgo(2) },
+        ];
+        mockPrisma.gradeEntry.findMany.mockResolvedValue(entries);
+
+        const first = await getPredictivePerformance('u1', 'JEE', { runs: 500, seed: 7 });
+        const second = await getPredictivePerformance('u1', 'JEE', { runs: 500, seed: 7 });
+
+        expect(first[0]?.estimatedExamScore).toBe(second[0]?.estimatedExamScore);
+        expect(first[0]?.estimatedPercentile).toBe(second[0]?.estimatedPercentile);
+        expect(first[0]?.confidenceInterval).toEqual(second[0]?.confidenceInterval);
+        expect(first[0]?.dataQuality).toBe('low');
     });
 });

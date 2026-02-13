@@ -37,6 +37,9 @@ const LoginPage = () => {
 
             if (response) {
                 dispatch(hydrateAuth(response));
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('auth:hasSession', '1');
+                }
                 // Assuming cookie is set by backend, just redirect
                 router.push("/dashboard");
             }

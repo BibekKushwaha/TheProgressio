@@ -22,14 +22,14 @@ export default function FamilyConnectPage() {
     };
 
     type Summary = {
-        totalFocusMinutes?: number;
-        tasksCompleted?: number;
-        avgFocusMinutes?: number;
+        totalMinutes?: number;
+        totalTasksCompleted?: number;
+        averageSessionLength?: number;
         consistencyScore?: number;
     };
 
     const { data: profileData } = useGetProfileQuery();
-    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery();
+    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery({ page: 1, limit: 500 });
     const { data: habitsData, isLoading: habitsLoading } = useGetHabitsQuery();
     const { data: summaryData, isLoading: summaryLoading } = useGetDailySummaryQuery('7');
 
@@ -40,8 +40,8 @@ export default function FamilyConnectPage() {
             ? ((habitsData as { habits?: Habit[] }).habits || [])
             : [];
     const summary =
-        typeof summaryData === 'object' && summaryData !== null && 'summary' in summaryData
-            ? (summaryData as { summary?: Summary }).summary
+        typeof summaryData === 'object' && summaryData !== null && 'stats' in summaryData
+            ? (summaryData as { stats?: Summary }).stats
             : undefined;
 
     const completedTasks = tasks.filter(t => t.status === 'COMPLETED').length;
@@ -123,7 +123,7 @@ export default function FamilyConnectPage() {
                     </div>
                     <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 text-center">
                         <Clock className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                        <div className="text-3xl font-black text-white">{summary?.totalFocusMinutes ? Math.round(summary.totalFocusMinutes / 60) : 0}h</div>
+                        <div className="text-3xl font-black text-white">{summary?.totalMinutes ? Math.round(summary.totalMinutes / 60) : 0}h</div>
                         <div className="text-xs text-slate-400 mt-1">Focus Time (7d)</div>
                         <div className="text-xs text-slate-500">deep work logged</div>
                     </div>
@@ -211,11 +211,11 @@ export default function FamilyConnectPage() {
                     </h2>
                     <div className="grid grid-cols-3 gap-4">
                         <div className="p-4 bg-white/5 rounded-xl text-center">
-                            <div className="text-2xl font-black text-white">{summary?.tasksCompleted ?? 0}</div>
+                            <div className="text-2xl font-black text-white">{summary?.totalTasksCompleted ?? 0}</div>
                             <div className="text-xs text-slate-400 mt-1">Tasks finished</div>
                         </div>
                         <div className="p-4 bg-white/5 rounded-xl text-center">
-                            <div className="text-2xl font-black text-white">{summary?.avgFocusMinutes ? Math.round(summary.avgFocusMinutes) : 0}m</div>
+                            <div className="text-2xl font-black text-white">{summary?.averageSessionLength ? Math.round(summary.averageSessionLength) : 0}m</div>
                             <div className="text-xs text-slate-400 mt-1">Avg. daily focus</div>
                         </div>
                         <div className="p-4 bg-white/5 rounded-xl text-center">

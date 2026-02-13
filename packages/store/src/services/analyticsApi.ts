@@ -161,6 +161,14 @@ export interface LearningPace {
     pace: "accelerating" | "steady" | "declining";
     estimatedExamScore: number;
     estimatedPercentile: number;
+    simulationRuns: number;
+    scoreDistribution: Array<{ score: number; probability: number; count: number }>;
+    rankBands: Array<{ label: string; probability: number; minPercentile: number; maxPercentile: number }>;
+    confidenceInterval: { lower: number; upper: number; level: number };
+    assumptions: string[];
+    confidence: "low" | "medium" | "high";
+    modelVersion: string;
+    dataQuality: "low" | "medium" | "high";
 }
 
 export const analyticsApi = createApi({
@@ -321,10 +329,24 @@ export const analyticsApi = createApi({
             }),
             providesTags: ['Stats'],
         }),
-        getPredictivePerformance: builder.query<{ message: string; data: LearningPace[] }, string>({
-            query: (examType) => {
+        getPredictivePerformance: builder.query<
+            { message: string; modelVersion?: string; data: LearningPace[] },
+            string | { examType: string; runs?: number; seed?: number }
+        >({
+            query: (arg) => {
+                const examType = typeof arg === 'string' ? arg : arg.examType;
                 const safeExamType = examType?.trim() || 'midterm';
-                return `/stats/performance/${encodeURIComponent(safeExamType)}`;
+                const queryArg = typeof arg === 'string' ? undefined : arg;
+
+                return {
+                    url: `/stats/performance/${encodeURIComponent(safeExamType)}`,
+                    params: queryArg
+                        ? {
+                            ...(queryArg.runs ? { runs: String(queryArg.runs) } : {}),
+                            ...(queryArg.seed !== undefined ? { seed: String(queryArg.seed) } : {}),
+                        }
+                        : {},
+                };
             },
             providesTags: ['Stats'],
         }),

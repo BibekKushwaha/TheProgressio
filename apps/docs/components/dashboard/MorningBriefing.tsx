@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 export function MorningBriefing() {
     const { data, isLoading } = useGetMorningBriefingQuery();
-    const { data: allTasks } = useGetTasksQuery();
+    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 500 });
     const briefing = data?.briefing;
     type UpcomingExam = { title: string; daysUntil: number };
     const upcomingExams = (briefing?.upcomingExams ?? []) as UpcomingExam[];
@@ -24,7 +24,9 @@ export function MorningBriefing() {
             const bPri = priorityOrder[b.priority] ?? 3;
             if (aPri !== bPri) return aPri - bPri;
             if (a.dueDate && b.dueDate) return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-            return a.dueDate ? -1 : 1;
+            if (a.dueDate && !b.dueDate) return -1;
+            if (!a.dueDate && b.dueDate) return 1;
+            return 0;
         })
         .slice(0, 3);
 

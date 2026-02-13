@@ -5,12 +5,14 @@ import { aiService } from "../services/ai.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/producer.service.js";
 
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
+const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || "http://localhost:4003";
 
 const notifyHabitCategoryCompletion = async (params: {
     userId: string;
     categoryId: string | null;
     occurredAt: string;
 }): Promise<void> => {
+    if (process.env.NODE_ENV === "test") return;
     if (!params.categoryId) return;
 
     try {
@@ -35,6 +37,56 @@ const notifyHabitCategoryCompletion = async (params: {
     } catch (error) {
         console.warn("⚠️ Habit automation endpoint unreachable:", error);
     }
+};
+
+const notifyAnalyticsTaskCompletion = async (params: {
+    taskId: string;
+}): Promise<void> => {
+    if (process.env.NODE_ENV === "test") return;
+    try {
+        const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: "TASK_COMPLETED",
+                taskId: params.taskId,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(
+                `⚠️ Analytics completion event failed (${response.status}): ${errorText || "Unknown error"}`
+            );
+        }
+    } catch (error) {
+        console.warn("⚠️ Analytics completion endpoint unreachable:", error);
+    }
+};
+
+export const runTaskCompletionSideEffects = async (params: {
+    taskId: string;
+    userId: string;
+    title: string;
+    categoryId: string | null;
+    completedAt?: string;
+}): Promise<void> => {
+    const completedAt = params.completedAt ?? new Date().toISOString();
+
+    await emitTaskEvent(TaskEventType.TASK_COMPLETED, params.taskId, params.userId, {
+        title: params.title,
+        categoryId: params.categoryId,
+        completedAt,
+    });
+
+    await Promise.all([
+        notifyHabitCategoryCompletion({
+            userId: params.userId,
+            categoryId: params.categoryId,
+            occurredAt: completedAt,
+        }),
+        notifyAnalyticsTaskCompletion({ taskId: params.taskId }),
+    ]);
 };
 
 export const createTask = async (req: AuthenticatedRequest, res: Response) => {
@@ -237,9 +289,11 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response) => {
 
         // If status changed to COMPLETED, also emit a completion event
         if (status && updatedTask.status === Status.COMPLETED && existingTask.status !== Status.COMPLETED) {
-            await emitTaskEvent(TaskEventType.TASK_COMPLETED, id, req.user.id, {
+            await runTaskCompletionSideEffects({
+                taskId: id,
+                userId: req.user.id,
                 title: updatedTask.title,
-                completedAt: new Date().toISOString(),
+                categoryId: updatedTask.categoryId ?? null,
             });
         }
 
@@ -340,17 +394,11 @@ export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
 
         // If toggled to COMPLETED, also emit a completion event
         if (newStatus === Status.COMPLETED) {
-            const completedAt = new Date().toISOString();
-            await emitTaskEvent(TaskEventType.TASK_COMPLETED, id, req.user.id, {
-                title: updatedTask.title,
-                categoryId: updatedTask.categoryId,
-                completedAt,
-            });
-
-            await notifyHabitCategoryCompletion({
+            await runTaskCompletionSideEffects({
+                taskId: id,
                 userId: req.user.id,
+                title: updatedTask.title,
                 categoryId: updatedTask.categoryId ?? null,
-                occurredAt: completedAt,
             });
         }
 

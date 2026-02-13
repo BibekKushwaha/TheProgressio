@@ -12,6 +12,7 @@ import {
     addGradeEntry, getGradeEntries, deleteGradeEntry,
     // Phase 3 — Focus / Leakage
     getTimeLeakage, getPeakWindow, getPredictivePerformanceEndpoint,
+    getInternalConsistency,
 } from "../controllers/stats.controller.js";
 import { isAuth } from "../middleware/auth.middleware.js";
 
@@ -52,5 +53,8 @@ router.get("/performance/:examType", isAuth, getPredictivePerformanceEndpoint);
 
 // ── Events ─────────────────────────────────────────────────────────────
 router.post("/events/task-completed", handleTaskCompletedEvent);
+
+// ── Internal service-to-service helpers ────────────────────────────────
+router.get("/internal/consistency", getInternalConsistency);
 
 export default router;

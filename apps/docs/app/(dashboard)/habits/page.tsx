@@ -34,7 +34,7 @@ export default function HabitsPage() {
                         <div className="max-w-7xl mx-auto">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
                                 <div>
-                                    <h1 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                                    <h1 className="text-2xl md:text-3xl font-bold  bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                                         Habit Gallery
                                     </h1>
                                     <p className="text-slate-400">Keep up the streak! You&apos;re doing great.</p>
@@ -48,14 +48,34 @@ export default function HabitsPage() {
                             </div>
 
                             <HabitDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
-
-                            {/* Contribution Heatmap */}
-                            <div className="mb-8">
-                                <ContributionHeatmap />
-                            </div>
+                            {isLoading ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {[1, 2, 3].map(i => (
+                                        <Skeleton key={i} className="h-64 rounded-2xl bg-white/5 border border-white/10" />
+                                    ))}
+                                </div>
+                            ) : habits.length === 0 ? (
+                                <div className="text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
+                                    <h3 className="text-xl font-bold text-slate-300 mb-2">No habits found</h3>
+                                    <p className="text-slate-500 mb-6">Start your journey by creating your first habit!</p>
+                                    <button
+                                        onClick={() => setIsDialogOpen(true)}
+                                        className="text-purple-400 font-semibold hover:text-purple-300 transition-colors"
+                                    >
+                                        + Create New Habit
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {filteredHabits.map((habit) => (
+                                        <HabitCard key={habit.id} habit={habit} />
+                                    ))}
+                                </div>
+                            )}
+                           
 
                             {/* Gamification & Mercy Day Row */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-10 mb-8">
                                 <UserLevelCard />
                                 <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6">
                                     <div className="flex items-center gap-3 mb-4">
@@ -88,30 +108,11 @@ export default function HabitsPage() {
                                 </div>
                             </div>
 
-                            {isLoading ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {[1, 2, 3].map(i => (
-                                        <Skeleton key={i} className="h-64 rounded-2xl bg-white/5 border border-white/10" />
-                                    ))}
-                                </div>
-                            ) : habits.length === 0 ? (
-                                <div className="text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
-                                    <h3 className="text-xl font-bold text-slate-300 mb-2">No habits found</h3>
-                                    <p className="text-slate-500 mb-6">Start your journey by creating your first habit!</p>
-                                    <button
-                                        onClick={() => setIsDialogOpen(true)}
-                                        className="text-purple-400 font-semibold hover:text-purple-300 transition-colors"
-                                    >
-                                        + Create New Habit
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {filteredHabits.map((habit) => (
-                                        <HabitCard key={habit.id} habit={habit} />
-                                    ))}
-                                </div>
-                            )}
+                            
+                             {/* Contribution Heatmap */}
+                            <div className="mb-8">
+                                <ContributionHeatmap />
+                            </div>
                         </div>
                     </main>
                 </div>

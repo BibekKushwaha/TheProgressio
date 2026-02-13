@@ -83,7 +83,23 @@ vi.mock('../src/services/focus.service.js', () => ({
         recommendation: 'Peak at 9-11 AM', efficiencyBoostPercent: 45,
     }),
     getPredictivePerformance: vi.fn().mockResolvedValue([
-        { subjectName: 'Physics', pace: 'accelerating', estimatedExamScore: 85, estimatedPercentile: 85 },
+        {
+            subjectName: 'Physics',
+            pace: 'accelerating',
+            estimatedExamScore: 85,
+            estimatedPercentile: 85,
+            recentScoreAvg: 80,
+            historicalScoreAvg: 74,
+            improvementRate: 6,
+            simulationRuns: 2000,
+            scoreDistribution: [{ score: 80, probability: 0.41, count: 820 }],
+            rankBands: [{ label: 'Top 15%', probability: 0.52, minPercentile: 85, maxPercentile: 95 }],
+            confidenceInterval: { lower: 74, upper: 92, level: 90 },
+            assumptions: ['Historical entries represent trend'],
+            confidence: 'medium',
+            modelVersion: 'monte-carlo-v1',
+            dataQuality: 'medium',
+        },
     ]),
 }));
 
@@ -316,10 +332,22 @@ describe('Analytics API — Focus & Time Leakage', () => {
         const res = await request(app).get('/api/stats/performance/JEE');
 
         expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('modelVersion', 'monte-carlo-v1');
         expect(res.body).toHaveProperty('data');
         expect(Array.isArray(res.body.data)).toBe(true);
         expect(res.body.data[0]).toHaveProperty('subjectName', 'Physics');
         expect(res.body.data[0]).toHaveProperty('pace', 'accelerating');
+        expect(res.body.data[0]).toHaveProperty('simulationRuns', 2000);
+        expect(res.body.data[0]).toHaveProperty('confidenceInterval');
+    });
+
+    it('GET /api/stats/performance/JEE?runs=500&seed=11 — forwards simulation params', async () => {
+        const focusService = await import('../src/services/focus.service.js');
+
+        const res = await request(app).get('/api/stats/performance/JEE?runs=500&seed=11');
+
+        expect(res.status).toBe(200);
+        expect(focusService.getPredictivePerformance).toHaveBeenCalledWith('user-1', 'JEE', { runs: 500, seed: 11 });
     });
 });
 

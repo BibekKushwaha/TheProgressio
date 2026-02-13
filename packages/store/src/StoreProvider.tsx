@@ -6,6 +6,7 @@ import { makeStore, AppStore } from './store';
 import { useGetProfileQuery } from './services/authApi';
 import { useAppDispatch } from './hooks';
 import { hydrateAuth, logout } from './slices/authSlice';
+import { syncEngine } from './sync-engine';
 
 function AuthHydrator() {
   const dispatch = useAppDispatch();
@@ -44,6 +45,18 @@ function AuthHydrator() {
   return null;
 }
 
+function SyncBootstrap() {
+  useEffect(() => {
+    syncEngine.start();
+
+    return () => {
+      syncEngine.stop();
+    };
+  }, []);
+
+  return null;
+}
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const storeRef = useRef<AppStore | null>(null);
   if (!storeRef.current) {
@@ -54,6 +67,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     <Provider store={storeRef.current!}>
       <>
         {children}
+        <SyncBootstrap />
         <AuthHydrator />
       </>
     </Provider>

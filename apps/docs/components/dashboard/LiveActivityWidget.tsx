@@ -18,12 +18,30 @@ export function LiveActivityWidget() {
             try {
                 const raw = localStorage.getItem('activeFocusSession');
                 if (raw) {
-                    setSession(JSON.parse(raw));
+                    const parsed = JSON.parse(raw) as {
+                        taskTitle?: unknown;
+                        startTime?: unknown;
+                        duration?: unknown;
+                        isPaused?: unknown;
+                    };
+                    if (typeof parsed.startTime === 'string') {
+                        setSession({
+                            taskTitle: typeof parsed.taskTitle === 'string' ? parsed.taskTitle : 'Focus Session',
+                            startTime: parsed.startTime,
+                            duration: typeof parsed.duration === 'number' ? parsed.duration : 0,
+                            isPaused: typeof parsed.isPaused === 'boolean' ? parsed.isPaused : false,
+                        });
+                    } else {
+                        setSession(null);
+                        setElapsed(0);
+                    }
                 } else {
                     setSession(null);
+                    setElapsed(0);
                 }
             } catch {
                 setSession(null);
+                setElapsed(0);
             }
         };
 
@@ -33,10 +51,15 @@ export function LiveActivityWidget() {
     }, []);
 
     useEffect(() => {
-        if (!session || session.isPaused) return;
+        if (!session) return;
+        if (session.isPaused) return;
 
         const tick = () => {
             const start = new Date(session.startTime).getTime();
+            if (Number.isNaN(start)) {
+                setElapsed(0);
+                return;
+            }
             const now = Date.now();
             setElapsed(Math.floor((now - start) / 1000));
         };

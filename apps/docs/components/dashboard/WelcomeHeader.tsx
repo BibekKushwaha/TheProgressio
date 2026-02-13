@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 export function WelcomeHeader() {
     const user = useAppSelector((state) => state.auth.user);
     const router = useRouter();
+    const username = user?.username?.trim() || 'there';
 
     const handleViewSchedule = () => {
         router.push('/calendar');
@@ -16,7 +17,7 @@ export function WelcomeHeader() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
                 <h1 className="text-2xl md:text-2.5xl font-bold ">
-                    Welcome back, {user?.username} 👋
+                    Welcome back, {username} 👋
                 </h1>
                 <p className="text-slate-400">
                     Let&apos;s make today productive. It&apos;s {new Date().toLocaleDateString('en-US', {

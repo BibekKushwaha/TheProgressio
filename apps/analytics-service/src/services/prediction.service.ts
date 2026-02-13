@@ -35,7 +35,7 @@ export interface CycleTimePercentiles {
 
 export async function predictTaskDuration(
     userId: string,
-    options: { categoryId?: string; subjectId?: string; taskTitle?: string }
+    options: { categoryId?: string; subjectId?: string; taskTitle?: string; taskId?: string }
 ): Promise<DurationPrediction> {
     // Find similar completed tasks with activity logs
     const where: any = {
@@ -44,6 +44,7 @@ export async function predictTaskDuration(
     };
     if (options.categoryId) where.categoryId = options.categoryId;
     if (options.subjectId) where.subjectId = options.subjectId;
+    if (options.taskId) where.id = options.taskId;
 
     const tasks = await prisma.task.findMany({
         where,

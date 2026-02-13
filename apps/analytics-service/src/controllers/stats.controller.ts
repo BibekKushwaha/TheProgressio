@@ -16,6 +16,58 @@ const formatDateKey = (date: Date): string => {
     return date.toISOString().split("T")[0]!;
 };
 
+// Internal-only consistency snapshot for cross-service silent-watch checks.
+// GET /stats/internal/consistency?userId=...
+export const getInternalConsistency = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const secret = req.headers["x-internal-secret"];
+        const expected = process.env.ANALYTICS_INTERNAL_SECRET;
+
+        if (!expected || secret !== expected) {
+            res.status(401).json({ message: "Unauthorized internal request" });
+            return;
+        }
+
+        const userId = typeof req.query.userId === "string" ? req.query.userId : "";
+        if (!userId) {
+            res.status(400).json({ message: "userId is required" });
+            return;
+        }
+
+        const today = startOfDay(new Date());
+        const start = new Date(today);
+        start.setDate(today.getDate() - 6);
+
+        const logs = await prisma.activityLog.findMany({
+            where: {
+                task: { userId },
+                startTime: { gte: start },
+            },
+            select: { startTime: true },
+        });
+
+        const activeDays = new Set(logs.map((log) => formatDateKey(startOfDay(log.startTime)))).size;
+        const consistencyScore = Math.round((activeDays / 7) * 100);
+
+        res.status(200).json({
+            message: "Internal consistency snapshot",
+            userId,
+            activeDays,
+            windowDays: 7,
+            consistencyScore,
+        });
+    } catch (error) {
+        console.error("Error fetching internal consistency:", error);
+        res.status(500).json({
+            message: "Failed to fetch internal consistency",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+
 // Daily Summary - GET /stats/daily
 export const getDailySummary = async (
     req: AuthenticatedRequest,
@@ -569,7 +621,7 @@ export const getPrediction = async (req: AuthenticatedRequest, res: Response): P
         const prediction = await predictTaskDuration(userId, {
             ...(categoryId ? { categoryId: categoryId as string } : {}),
             ...(subject ? { subjectId: subject as string } : {}),
-            ...(taskId ? { taskTitle: taskId as string } : {}),
+            ...(taskId ? { taskId: taskId as string } : {}),
         });
 
         res.status(200).json({ message: "Prediction generated", prediction });
@@ -911,8 +963,26 @@ export const getPredictivePerformanceEndpoint = async (req: AuthenticatedRequest
         const { examType } = req.params;
         if (!examType) { res.status(400).json({ message: "examType is required" }); return; }
 
-        const data = await getPredictivePerformance(userId, examType as string);
-        res.status(200).json({ message: "Predictive performance", data });
+        const runsParam = req.query.runs;
+        const seedParam = req.query.seed;
+        const parsedRuns = typeof runsParam === "string" ? Number.parseInt(runsParam, 10) : NaN;
+        const parsedSeed = typeof seedParam === "string" ? Number.parseInt(seedParam, 10) : NaN;
+        const simulationOptions: { runs?: number; seed?: number } = {};
+
+        if (Number.isFinite(parsedRuns) && parsedRuns > 0) {
+            simulationOptions.runs = parsedRuns;
+        }
+        if (Number.isFinite(parsedSeed)) {
+            simulationOptions.seed = parsedSeed;
+        }
+
+        const data = await getPredictivePerformance(userId, examType as string, simulationOptions);
+
+        res.status(200).json({
+            message: "Predictive performance",
+            modelVersion: "monte-carlo-v1",
+            data,
+        });
     } catch (error) {
         console.error("Error fetching predictive performance:", error);
         res.status(500).json({ message: "Failed to fetch predictive performance", error: error instanceof Error ? error.message : "Unknown error" });

@@ -106,6 +106,18 @@ describe('Prediction Service — predictTaskDuration', () => {
             })
         );
     });
+
+    it('filters by taskId when provided', async () => {
+        mockPrisma.task.findMany.mockResolvedValue([]);
+
+        await predictTaskDuration('u1', { taskId: 't1' });
+
+        expect(mockPrisma.task.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ id: 't1' }),
+            })
+        );
+    });
 });
 
 describe('Prediction Service — getCycleTimePercentiles', () => {
