@@ -4,7 +4,7 @@ import { Field, FieldGroup } from '../ui/field'
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
-import { useCreateHabitMutation, useUpdateHabitMutation, Frequency, Habit } from '@repo/store'
+import { useCreateHabitMutation, useUpdateHabitMutation, useGetCategoriesQuery, Frequency, Habit } from '@repo/store'
 import { cn } from '@/lib/utils'
 
 interface HabitDialogProps {
@@ -29,10 +29,12 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
     const [habitFrequency, setHabitFrequency] = useState<Frequency>(Frequency.DAILY)
     const [selectedEmoji, setSelectedEmoji] = useState(EMOJIS[0]!)
     const [selectedColor, setSelectedColor] = useState(COLORS[0]!)
+    const [linkedCategoryId, setLinkedCategoryId] = useState<string>('none')
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const [createHabit, { isLoading: isCreating }] = useCreateHabitMutation()
     const [updateHabit, { isLoading: isUpdating }] = useUpdateHabitMutation()
+    const { data: categories = [] } = useGetCategoriesQuery();
 
     const isLoading = isCreating || isUpdating
 
@@ -45,12 +47,14 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                 setSelectedEmoji(habit.icon || EMOJIS[0]!)
                 const color = COLORS.find(c => c.value === habit.color) || COLORS[0]!
                 setSelectedColor(color)
+                setLinkedCategoryId(habit.linkedCategoryId || 'none')
             } else {
                 setHabitName("")
                 setTargetValue("1")
                 setHabitFrequency(Frequency.DAILY)
                 setSelectedEmoji(EMOJIS[0]!)
                 setSelectedColor(COLORS[0]!)
+                setLinkedCategoryId('none')
             }
             setErrors({})
         }
@@ -73,7 +77,8 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                     frequency: habitFrequency,
                     targetValue: parseInt(targetValue) || 1,
                     icon: selectedEmoji,
-                    color: selectedColor.value
+                    color: selectedColor.value,
+                    linkedCategoryId: linkedCategoryId === 'none' ? null : linkedCategoryId,
                 }).unwrap()
             } else {
                 await createHabit({
@@ -81,7 +86,8 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                     frequency: habitFrequency,
                     targetValue: parseInt(targetValue) || 1,
                     icon: selectedEmoji,
-                    color: selectedColor.value
+                    color: selectedColor.value,
+                    linkedCategoryId: linkedCategoryId === 'none' ? null : linkedCategoryId,
                 }).unwrap()
             }
             onClose()
@@ -193,6 +199,26 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                                 </select>
                             </Field>
                         </div>
+
+                        <Field>
+                            <Label htmlFor="linkedCategory" className="text-slate-300">Auto-Link Category (Optional)</Label>
+                            <select
+                                id="linkedCategory"
+                                value={linkedCategoryId}
+                                onChange={(e) => setLinkedCategoryId(e.target.value)}
+                                className="mt-1 flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                            >
+                                <option value="none" className="bg-slate-900">None</option>
+                                {categories.map((category) => (
+                                    <option key={category.id} value={category.id} className="bg-slate-900">
+                                        {category.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-slate-500">
+                                Completing a task in this category auto-updates this habit streak.
+                            </p>
+                        </Field>
                     </FieldGroup>
 
                     {errors.form && <p className="text-red-400 text-sm mb-4">{errors.form}</p>}
