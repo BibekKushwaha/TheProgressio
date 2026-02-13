@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { prisma } from "@repo/db";
 
+const prismaAny = prisma as any;
+
 // ─── Meta WhatsApp Cloud API Configuration ──────────────────────────────────────
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID ?? "";
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN ?? "";
@@ -158,9 +160,14 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
     results: DispatchResult[];
 }> => {
     const now = new Date();
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(now);
+    dayEnd.setHours(23, 59, 59, 999);
     const userPhoneMap = getUserPhoneMapping();
     const limit = Math.max(1, params?.limit ?? 50);
     const dedupeCache = new Set<string>();
+    const holidayPauseCache = new Map<string, boolean>();
 
     const nudges = await prisma.nudge.findMany({
         where: {
@@ -177,10 +184,40 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
     let failed = 0;
 
     for (const nudge of nudges) {
+        if (!holidayPauseCache.has(nudge.userId)) {
+            if (typeof prismaAny.schoolHoliday?.findFirst === "function") {
+                const holiday = await prismaAny.schoolHoliday.findFirst({
+                    where: {
+                        userId: nudge.userId,
+                        startDate: { lte: dayEnd },
+                        endDate: { gte: dayStart },
+                        pauseNotifications: true,
+                    },
+                    select: { id: true },
+                });
+                holidayPauseCache.set(nudge.userId, Boolean(holiday));
+            } else {
+                holidayPauseCache.set(nudge.userId, false);
+            }
+        }
+
+        if (holidayPauseCache.get(nudge.userId)) {
+            skipped += 1;
+            results.push({ nudgeId: nudge.id, status: "skipped", reason: "holiday_pause" });
+            continue;
+        }
+
         const recipient = normalizePhone(userPhoneMap[nudge.userId]);
         if (!recipient) {
             skipped += 1;
             results.push({ nudgeId: nudge.id, status: "skipped", reason: "recipient_not_mapped" });
+            continue;
+        }
+
+        const userPreferences = (nudge as any).user;
+        if (userPreferences?.whatsappOptIn === false) {
+            skipped += 1;
+            results.push({ nudgeId: nudge.id, status: "skipped", reason: "user_opted_out" });
             continue;
         }
 
