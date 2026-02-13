@@ -1,5 +1,5 @@
 "use client"
-import { Search, Filter, Tag, LayoutGrid, Calendar, ListTodo } from 'lucide-react';
+import { Search, Filter, Tag, LayoutGrid, Calendar, ListTodo, BarChart3 } from 'lucide-react';
 import { TaskStatus, PriorityEnum } from '@repo/store';
 import { FilterDropdown } from './planner/FilterDropdown';
 
@@ -36,8 +36,8 @@ interface SearchBarProps {
     setPriority?: (priority: string) => void;
     selectedCategory?: string;
     setSelectedCategory?: (category: string) => void;
-    view?: 'kanban' | 'list' | 'timetable';
-    setView?: (view: 'kanban' | 'list' | 'timetable') => void;
+    view?: 'kanban' | 'list' | 'timetable' | 'timeline';
+    setView?: (view: 'kanban' | 'list' | 'timetable' | 'timeline') => void;
     STATUS_OPTIONS?: readonly { label: string; value: string }[];
     PRIORITY_OPTIONS?: readonly { label: string; value: string }[];
     CATEGORY_OPTIONS?: readonly { label: string; value: string; color?: string }[];
@@ -126,6 +126,12 @@ export function SearchBar({
                                 className={`px-4 py-2 rounded-lg transition-all duration-300 ${view === 'list' ? 'bg-gradient-to-r from-purple-600/40 to-pink-600/40 border border-purple-500/50' : 'hover:bg-white/10'}`}
                             >
                                 <ListTodo className={`w-4 h-4 ${view === 'list' ? 'text-purple-300' : 'text-slate-400'}`} />
+                            </button>
+                            <button
+                                onClick={() => setView('timeline')}
+                                className={`px-4 py-2 rounded-lg transition-all duration-300 ${view === 'timeline' ? 'bg-gradient-to-r from-purple-600/40 to-pink-600/40 border border-purple-500/50' : 'hover:bg-white/10'}`}
+                            >
+                                <BarChart3 className={`w-4 h-4 ${view === 'timeline' ? 'text-purple-300' : 'text-slate-400'}`} />
                             </button>
                         </div>
                     )}

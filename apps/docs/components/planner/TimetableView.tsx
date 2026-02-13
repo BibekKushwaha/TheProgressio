@@ -3,7 +3,7 @@
 
 import { useGetDailyScheduleQuery, TimetableEntry } from "@repo/store";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Clock, MapPin, User } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, MapPin, User } from "lucide-react";
 
 export function TimetableView() {
     const { data: schedule, isLoading, error } = useGetDailyScheduleQuery();
@@ -42,9 +42,36 @@ export function TimetableView() {
                     <p className="text-slate-400 mt-1">
                         {new Date(schedule.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
                         {schedule.rotation && <span className="ml-2 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs border border-purple-500/30">Rotation {schedule.rotation}</span>}
+                        {schedule.isHoliday && (
+                            <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-xs border border-amber-500/30">
+                                Holiday {schedule.holidayName ? `• ${schedule.holidayName}` : ''}
+                            </span>
+                        )}
                     </p>
                 </div>
             </div>
+
+            {schedule.conflicts?.length > 0 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-300">
+                        <AlertTriangle className="h-4 w-4" />
+                        Scheduling Conflicts ({schedule.conflicts.length})
+                    </div>
+                    <div className="space-y-1">
+                        {schedule.conflicts.map((conflict) => (
+                            <p key={conflict.id} className="text-xs text-amber-200">
+                                • {conflict.message} ({conflict.startsAt} - {conflict.endsAt})
+                            </p>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {schedule.pauseNotifications && schedule.isHoliday && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+                    Notifications are paused for this holiday.
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {schedule.entries.length > 0 ? (

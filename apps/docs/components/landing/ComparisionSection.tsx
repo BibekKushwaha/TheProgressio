@@ -47,7 +47,7 @@ const FEATURE_LAYERS: FeatureLayer[] = [
     tone: 'from-cyan-500/20 to-blue-500/5 border-cyan-500/20',
     features: [
       { name: 'Frictionless NLP Quick Capture', detail: 'NLP command bar + smart parser', status: 'implemented' },
-      { name: 'Multi-Dimensional Views', detail: 'List + Kanban + timetable views', status: 'implemented' },
+      { name: 'Multi-Dimensional Views', detail: 'List + Kanban + timetable + timeline/Gantt views', status: 'implemented' },
       { name: 'Academic Timetable Hub', detail: 'Day/Week rotation manager + resolver', status: 'implemented' },
       { name: 'Manual Habit Logging', detail: 'Habit gallery with check-ins and streaks', status: 'implemented' },
       { name: 'Grade & GPA Tracking', detail: 'Course logging + what-if calculator', status: 'implemented' },
@@ -74,11 +74,11 @@ const FEATURE_LAYERS: FeatureLayer[] = [
     icon: Globe2,
     tone: 'from-emerald-500/20 to-teal-500/5 border-emerald-500/20',
     features: [
-      { name: 'WhatsApp Capture & Nudges', detail: 'Landing workflow demo is present', status: 'partial' },
-      { name: 'Local-First Sync Protocol', detail: 'IndexedDB sync engine scaffold in store', status: 'partial' },
-      { name: 'Lock-Screen Persistence', detail: 'No live-activity integration yet', status: 'planned' },
+      { name: 'WhatsApp Capture & Nudges', detail: 'Webhook capture API + adaptive nudge center', status: 'implemented' },
+      { name: 'Local-First Sync Protocol', detail: 'IndexedDB + background sync engine + sync status UI', status: 'implemented' },
+      { name: 'Lock-Screen Persistence', detail: 'Live session API + mobile focus bridge contract for lock-screen lifecycle', status: 'implemented' },
       { name: 'Family/Mentor Connect', detail: 'Read-only family connect dashboard', status: 'implemented' },
-      { name: 'Syllabus Week Automator', detail: 'Upload + parse digitizer (OCR fallback pending)', status: 'partial' },
+      { name: 'Syllabus Week Automator', detail: 'Text/image syllabus scan and bulk task creation', status: 'implemented' },
     ],
   },
 ];

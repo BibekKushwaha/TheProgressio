@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Transition",
+    "slug": "transition",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "transition",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "bundleIdentifier": "com.transition.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSupportsLiveActivities": true
+      }
+    },
+    "android": {
+      "package": "com.transition.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A"
+      }
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-task-manager"
+    ]
+  }
+}

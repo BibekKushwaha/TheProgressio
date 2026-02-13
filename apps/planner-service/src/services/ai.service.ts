@@ -13,6 +13,23 @@ if (!API_KEY) {
 
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
+export interface ParsedTaskIntent {
+    title: string;
+    description?: string;
+    dueDate?: Date;
+    priority?: "LOW" | "MEDIUM" | "HIGH";
+    subject?: string;
+    effort?: string;
+    type?: "ASSIGNMENT" | "EXAM" | "STUDY_GOAL";
+}
+
+export interface ParsedSyllabusItem {
+    title: string;
+    dueDate?: Date;
+    priority?: "LOW" | "MEDIUM" | "HIGH";
+    subject?: string;
+}
+
 export class AIService {
     private model = genAI ? genAI.getGenerativeModel({
         model: "gemini-2.0-flash",
@@ -38,15 +55,7 @@ export class AIService {
     /**
      * Parses raw text to extract task metadata using Gemini.
      */
-    async parseTaskIntent(text: string): Promise<{
-        title: string;
-        description?: string;
-        dueDate?: Date;
-        priority?: "LOW" | "MEDIUM" | "HIGH";
-        subject?: string;
-        effort?: string;
-        type?: "ASSIGNMENT" | "EXAM" | "STUDY_GOAL";
-    }> {
+    async parseTaskIntent(text: string): Promise<ParsedTaskIntent> {
         if (!this.model) {
             console.warn("⚠️ AI Service not initialized (missing key). Using fallback.");
             return this.fallbackParse(text);
@@ -233,6 +242,93 @@ export class AIService {
         }
 
         return result;
+    }
+
+    /**
+     * Parses assignments/exams from a syllabus image.
+     */
+    async scanSyllabusImage(imageBase64: string, mimeType: string): Promise<ParsedSyllabusItem[]> {
+        if (!this.model) {
+            return [];
+        }
+
+        const prompt = `
+        You are an academic planning assistant.
+        Read this syllabus image and extract assignment/exam/study milestones into a JSON array.
+        Each item must include:
+        - title (string, required)
+        - dueDate (ISO 8601 string, optional)
+        - priority ("LOW" | "MEDIUM" | "HIGH", optional)
+        - subject (string, optional)
+
+        Rules:
+        - Keep only actionable study items.
+        - If date appears without year, assume current year ${new Date().getFullYear()}.
+        - Return ONLY valid JSON array.
+        `;
+
+        try {
+            const result = await this.model.generateContent([
+                { text: prompt },
+                {
+                    inlineData: {
+                        data: imageBase64,
+                        mimeType: mimeType || "image/jpeg",
+                    },
+                },
+            ]);
+            const response = await result.response;
+            const textResponse = response.text();
+
+            const start = textResponse.indexOf("[");
+            const end = textResponse.lastIndexOf("]");
+            if (start === -1 || end === -1) {
+                return [];
+            }
+
+            const parsed = JSON.parse(textResponse.slice(start, end + 1));
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            const normalized: ParsedSyllabusItem[] = [];
+            for (const item of parsed) {
+                if (!item || typeof item !== "object") continue;
+                const record = item as Record<string, unknown>;
+
+                const title = typeof record.title === "string" ? record.title.trim() : "";
+                if (!title) continue;
+
+                const priority = record.priority;
+                const safePriority =
+                    priority === "HIGH" || priority === "MEDIUM" || priority === "LOW"
+                        ? priority
+                        : undefined;
+
+                const dueDate =
+                    typeof record.dueDate === "string" && record.dueDate.trim()
+                        ? new Date(record.dueDate)
+                        : undefined;
+
+                const normalizedItem: ParsedSyllabusItem = { title };
+                if (dueDate && !Number.isNaN(dueDate.getTime())) {
+                    normalizedItem.dueDate = dueDate;
+                }
+                if (safePriority) {
+                    normalizedItem.priority = safePriority;
+                }
+                if (typeof record.subject === "string" && record.subject.trim()) {
+                    normalizedItem.subject = record.subject.trim();
+                }
+
+                normalized.push(normalizedItem);
+            }
+
+            return normalized.slice(0, 40);
+        } catch (error) {
+            console.warn("⚠️ Syllabus image scan failed:", error);
+            return [];
+        }
     }
 
     /**

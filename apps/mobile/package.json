@@ -1,0 +1,25 @@
+{
+  "name": "mobile",
+  "private": true,
+  "version": "1.0.0",
+  "main": "src/App.tsx",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "expo": "~54.0.33",
+    "expo-modules-core": "~2.1.0",
+    "expo-task-manager": "^14.0.9",
+    "expo-notifications": "^55.0.6",
+    "react": "18.3.1",
+    "react-native": "0.76.6"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "typescript": "5.9.2"
+  }
+}

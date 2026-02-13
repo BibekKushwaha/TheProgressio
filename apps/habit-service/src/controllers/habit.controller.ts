@@ -20,6 +20,7 @@ import {
     markNudgeRead,
     markAllNudgesRead,
 } from "../services/nudge.service.js";
+import { dispatchWhatsAppNudges } from "../services/whatsapp-outbound.service.js";
 
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
@@ -821,5 +822,23 @@ export const getMorningBriefing = async (
     } catch (error) {
         console.error("Error generating briefing:", error);
         res.status(500).json({ message: "Failed to generate briefing", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// POST /habits/nudges/dispatch — Internal job endpoint
+export const dispatchNudges = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const limit = Number.parseInt(String(_req.body?.limit ?? "50"), 10);
+        const result = await dispatchWhatsAppNudges({ limit: Number.isNaN(limit) ? 50 : limit });
+        res.status(200).json({
+            message: "Nudge dispatch completed",
+            ...result,
+        });
+    } catch (error) {
+        console.error("Nudge dispatch failed:", error);
+        res.status(500).json({
+            message: "Failed to dispatch nudges",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
 };

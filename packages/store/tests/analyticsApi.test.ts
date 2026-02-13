@@ -15,6 +15,30 @@ describe('analyticsApi — Endpoint Configuration', () => {
         expect(endpoints).toHaveProperty('logSession');
     });
 
+    it('has getActiveLiveSession query', () => {
+        expect(endpoints).toHaveProperty('getActiveLiveSession');
+    });
+
+    it('has startLiveSession mutation', () => {
+        expect(endpoints).toHaveProperty('startLiveSession');
+    });
+
+    it('has pauseLiveSession mutation', () => {
+        expect(endpoints).toHaveProperty('pauseLiveSession');
+    });
+
+    it('has resumeLiveSession mutation', () => {
+        expect(endpoints).toHaveProperty('resumeLiveSession');
+    });
+
+    it('has heartbeatLiveSession mutation', () => {
+        expect(endpoints).toHaveProperty('heartbeatLiveSession');
+    });
+
+    it('has stopLiveSession mutation', () => {
+        expect(endpoints).toHaveProperty('stopLiveSession');
+    });
+
     it('has getDailySummary query', () => {
         expect(endpoints).toHaveProperty('getDailySummary');
     });
@@ -125,8 +149,8 @@ describe('analyticsApi — Reducer & Middleware', () => {
 });
 
 describe('analyticsApi — Total endpoint count', () => {
-    it('has exactly 22 endpoints', () => {
+    it('has exactly 29 endpoints', () => {
         const endpointCount = Object.keys(analyticsApi.endpoints).length;
-        expect(endpointCount).toBe(22);
+        expect(endpointCount).toBe(29);
     });
 });

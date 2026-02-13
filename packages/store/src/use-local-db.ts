@@ -7,7 +7,20 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { localTasks, localCategories, syncQueue, type LocalTask, type LocalCategory, clearLocalData } from './local-db';
+import {
+    localTasks,
+    localCategories,
+    localHabits,
+    localHabitLogs,
+    localTimetable,
+    syncQueue,
+    clearLocalData,
+    type LocalTask,
+    type LocalCategory,
+    type LocalHabit,
+    type LocalHabitLog,
+    type LocalTimetableEntry,
+} from './local-db';
 import { syncEngine } from './sync-engine';
 
 type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
@@ -140,4 +153,91 @@ export function useClearLocalData() {
         syncEngine.stop();
         await clearLocalData();
     }, []);
+}
+
+// ─── Local Habits Hook ──────────────────────────────────────────────────────────
+
+export function useLocalHabits(filters?: { userId?: string }) {
+    const [habits, setHabits] = useState<LocalHabit[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const filtersRef = useRef(filters);
+    filtersRef.current = filters;
+
+    const refresh = useCallback(async () => {
+        try {
+            const result = await localHabits.getAll(filtersRef.current);
+            setHabits(result);
+        } catch (error) {
+            console.warn('[useLocalHabits] Failed to read local DB:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        refresh();
+        const interval = setInterval(refresh, 2000);
+        return () => clearInterval(interval);
+    }, [refresh]);
+
+    return { habits, isLoading, refresh };
+}
+
+// ─── Local Habit Logs Hook ──────────────────────────────────────────────────────
+
+export function useLocalHabitLogs(habitId?: string) {
+    const [logs, setLogs] = useState<LocalHabitLog[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const refresh = useCallback(async () => {
+        if (!habitId) {
+            setLogs([]);
+            setIsLoading(false);
+            return;
+        }
+        try {
+            const result = await localHabitLogs.getByHabitId(habitId);
+            setLogs(result);
+        } catch (error) {
+            console.warn('[useLocalHabitLogs] Failed to read local DB:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [habitId]);
+
+    useEffect(() => {
+        refresh();
+        const interval = setInterval(refresh, 2000);
+        return () => clearInterval(interval);
+    }, [refresh]);
+
+    return { logs, isLoading, refresh };
+}
+
+// ─── Local Timetable Hook ───────────────────────────────────────────────────────
+
+export function useLocalTimetable(filters?: { userId?: string; dayOfWeek?: number }) {
+    const [entries, setEntries] = useState<LocalTimetableEntry[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const filtersRef = useRef(filters);
+    filtersRef.current = filters;
+
+    const refresh = useCallback(async () => {
+        try {
+            const result = await localTimetable.getAll(filtersRef.current);
+            setEntries(result);
+        } catch (error) {
+            console.warn('[useLocalTimetable] Failed to read local DB:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        refresh();
+        const interval = setInterval(refresh, 3000); // Less frequent — timetable changes rarely
+        return () => clearInterval(interval);
+    }, [refresh]);
+
+    return { entries, isLoading, refresh };
 }

@@ -7,6 +7,9 @@ export interface User {
   username: string;
   email: string;
   dailyGoalHours?: number;
+  whatsappOptIn?: boolean;
+  quietHoursStart?: string | null;
+  quietHoursEnd?: string | null;
   createdAt: string;
 }
 
@@ -27,6 +30,24 @@ export interface AuthResponse {
   message?: string;
   user: User;
   token?: string;
+}
+
+export interface MobileAuthResponse {
+  message: string;
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+}
+
+export interface FamilyShareLink {
+  id: string;
+  label?: string | null;
+  permissions: string;
+  expiresAt?: string | null;
+  createdAt: string;
+  revokedAt?: string | null;
+  lastUsedAt?: string | null;
 }
 
 export const authApi = createApi({
@@ -125,6 +146,69 @@ export const authApi = createApi({
         body: { password },
       }),
     }),
+    mobileLogin: builder.mutation<MobileAuthResponse, { email: string; password: string; deviceId?: string }>({
+      query: (body) => ({
+        url: '/mobile/login',
+        method: 'POST',
+        body,
+      }),
+    }),
+    mobileRefresh: builder.mutation<MobileAuthResponse, { refreshToken: string; deviceId?: string }>({
+      query: (body) => ({
+        url: '/mobile/refresh',
+        method: 'POST',
+        body,
+      }),
+    }),
+    mobileLogout: builder.mutation<{ message: string }, { refreshToken?: string }>({
+      query: (body) => ({
+        url: '/mobile/logout',
+        method: 'POST',
+        body,
+      }),
+    }),
+    mobileMe: builder.query<{ message: string; user: User }, string>({
+      query: (accessToken) => ({
+        url: '/mobile/me',
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }),
+    }),
+    createFamilyLink: builder.mutation<
+      { message: string; link: FamilyShareLink; shareToken: string },
+      { label?: string; permissions?: string; expiresInDays?: number }
+    >({
+      query: (body) => ({
+        url: '/family-links',
+        method: 'POST',
+        body,
+      }),
+    }),
+    getFamilyLinks: builder.query<{ message: string; links: FamilyShareLink[] }, void>({
+      query: () => ({
+        url: '/family-links',
+        method: 'GET',
+      }),
+      providesTags: ['User'],
+    }),
+    revokeFamilyLink: builder.mutation<{ message: string }, string>({
+      query: (id) => ({
+        url: `/family-links/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['User'],
+    }),
+    resolveFamilyLink: builder.query<{
+      message: string;
+      link: { id: string; userId: string; label?: string; permissions: string; expiresAt?: string | null };
+    }, string>({
+      query: (token) => ({
+        url: `/family-links/resolve/${token}`,
+        method: 'GET',
+      }),
+    }),
   }),
 });
 
@@ -136,4 +220,12 @@ export const {
   useUpdateProfileMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
+  useMobileLoginMutation,
+  useMobileRefreshMutation,
+  useMobileLogoutMutation,
+  useMobileMeQuery,
+  useCreateFamilyLinkMutation,
+  useGetFamilyLinksQuery,
+  useRevokeFamilyLinkMutation,
+  useResolveFamilyLinkQuery,
 } = authApi;

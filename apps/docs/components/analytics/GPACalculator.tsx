@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useGetGPAQuery, useAddCourseGradeMutation } from '@repo/store';
+import { useGetGPAQuery, useAddCourseGradeMutation, usePreviewGPAComponentsMutation } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/toast-provider';
 export function GPACalculator() {
     const { data, isLoading } = useGetGPAQuery();
     const [addCourse] = useAddCourseGradeMutation();
+    const [previewComponents, { data: componentPreview, isLoading: isPreviewingComponents }] = usePreviewGPAComponentsMutation();
     const { toast } = useToast();
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [newCourse, setNewCourse] = useState({
@@ -22,6 +23,12 @@ export function GPACalculator() {
         grade: '',
         semester: '',
     });
+    const [components, setComponents] = useState([
+        { name: 'Assignment', weight: '30', obtainedMarks: '0', totalMarks: '100' },
+        { name: 'Midterm', weight: '30', obtainedMarks: '0', totalMarks: '100' },
+        { name: 'Final', weight: '40', obtainedMarks: '0', totalMarks: '100' },
+    ]);
+    const [componentScale, setComponentScale] = useState<'INDIA_10' | 'US_4' | 'PERCENTAGE'>('INDIA_10');
 
     type SemesterBreakdown = { semester: number; gpa?: number; credits?: number };
     type CourseItem = { courseName: string; semester?: number; grade?: string; gradePoint?: number; credits?: number };
@@ -56,6 +63,29 @@ export function GPACalculator() {
     const gpaData = data?.result;
     const semesterBreakdown = (gpaData?.semesterBreakdown ?? []) as SemesterBreakdown[];
     const courses = (gpaData?.courses ?? []) as CourseItem[];
+    const updateComponent = (index: number, patch: Partial<{ name: string; weight: string; obtainedMarks: string; totalMarks: string }>) => {
+        setComponents((current) =>
+            current.map((item, currentIndex) =>
+                currentIndex === index ? { ...item, ...patch } : item,
+            ),
+        );
+    };
+
+    const handlePreviewComponents = async () => {
+        try {
+            await previewComponents({
+                scale: componentScale,
+                components: components.map((component) => ({
+                    name: component.name,
+                    weight: parseFloat(component.weight) || 0,
+                    obtainedMarks: parseFloat(component.obtainedMarks) || 0,
+                    totalMarks: parseFloat(component.totalMarks) || 0,
+                })),
+            }).unwrap();
+        } catch {
+            toast('Unable to preview component GPA', 'error');
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -156,6 +186,76 @@ export function GPACalculator() {
                 ) : (
                     <div className="text-center py-8 text-slate-400">
                         No GPA data available. Add your first course to get started!
+                    </div>
+                )}
+            </Card>
+
+            {/* Semester Breakdown */}
+            <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Weighted Component Preview</h3>
+                <p className="text-xs text-slate-400 mb-3">
+                    Configure custom grading components (for example: Finals 40%, Internals 60%).
+                </p>
+
+                <div className="mb-3 flex items-center gap-2">
+                    <label className="text-xs text-slate-400">Scale</label>
+                    <select
+                        value={componentScale}
+                        onChange={(event) => setComponentScale(event.target.value as 'INDIA_10' | 'US_4' | 'PERCENTAGE')}
+                        className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white"
+                    >
+                        <option value="INDIA_10" className="bg-slate-900">INDIA_10</option>
+                        <option value="US_4" className="bg-slate-900">US_4</option>
+                        <option value="PERCENTAGE" className="bg-slate-900">PERCENTAGE</option>
+                    </select>
+                </div>
+
+                <div className="space-y-2">
+                    {components.map((component, index) => (
+                        <div key={`${component.name}-${index}`} className="grid grid-cols-4 gap-2">
+                            <Input
+                                value={component.name}
+                                onChange={(event) => updateComponent(index, { name: event.target.value })}
+                                className="bg-white/5 border-white/10"
+                                placeholder="Component"
+                            />
+                            <Input
+                                value={component.weight}
+                                onChange={(event) => updateComponent(index, { weight: event.target.value })}
+                                className="bg-white/5 border-white/10"
+                                placeholder="Weight %"
+                                type="number"
+                            />
+                            <Input
+                                value={component.obtainedMarks}
+                                onChange={(event) => updateComponent(index, { obtainedMarks: event.target.value })}
+                                className="bg-white/5 border-white/10"
+                                placeholder="Scored"
+                                type="number"
+                            />
+                            <Input
+                                value={component.totalMarks}
+                                onChange={(event) => updateComponent(index, { totalMarks: event.target.value })}
+                                className="bg-white/5 border-white/10"
+                                placeholder="Total"
+                                type="number"
+                            />
+                        </div>
+                    ))}
+                </div>
+
+                <Button onClick={handlePreviewComponents} className="mt-4 bg-indigo-500 hover:bg-indigo-600">
+                    {isPreviewingComponents ? 'Calculating...' : 'Preview Weighted GPA'}
+                </Button>
+
+                {componentPreview?.result && (
+                    <div className="mt-4 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4">
+                        <p className="text-sm text-cyan-200">
+                            Weighted Score: <span className="font-bold text-white">{componentPreview.result.weightedPercentage.toFixed(2)}%</span>
+                        </p>
+                        <p className="text-sm text-cyan-200 mt-1">
+                            Grade Point: <span className="font-bold text-white">{componentPreview.result.weightedGradePoint.toFixed(2)}</span> ({componentPreview.result.scale})
+                        </p>
                     </div>
                 )}
             </Card>

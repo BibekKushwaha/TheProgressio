@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Camera, Upload, FileText, Sparkles, Check, X, Loader2, Plus } from 'lucide-react';
-import { useParseTaskMutation, useCreateTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
+import { useParseTaskMutation, useCreateTaskMutation, useScanSyllabusMutation, TaskStatus, PriorityEnum } from '@repo/store';
 
 interface ParsedItem {
     title: string;
@@ -19,6 +19,7 @@ export function SyllabusDigitizer() {
     const [isCreating, setIsCreating] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [parseTask] = useParseTaskMutation();
+    const [scanSyllabus] = useScanSyllabusMutation();
     const [createTask] = useCreateTaskMutation();
     type CreateTaskInput = Parameters<typeof createTask>[0];
 
@@ -60,10 +61,45 @@ export function SyllabusDigitizer() {
                 setTextInput(ev.target?.result as string || '');
             };
             reader.readAsText(file);
-        } else {
-            // For images, set a placeholder
-            setTextInput(`[Uploaded: ${file.name}]\nPhysics Ch.1 — Kinematics\nPhysics Ch.2 — Laws of Motion\nChemistry Ch.1 — Atomic Structure\nMathematics Ch.1 — Sets & Relations`);
+            return;
         }
+
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                const imageBase64 = typeof ev.target?.result === 'string' ? ev.target.result : '';
+                if (!imageBase64) return;
+
+                setIsParsing(true);
+                try {
+                    const response = await scanSyllabus({
+                        imageBase64,
+                        mimeType: file.type || 'image/jpeg',
+                    }).unwrap();
+
+                    if (response.items.length > 0) {
+                        setParsedItems(response.items.map((item) => ({
+                            title: item.title,
+                            dueDate: item.dueDate,
+                            priority: item.priority,
+                            selected: true,
+                        })));
+                        setTextInput('');
+                    } else {
+                        setTextInput(`[No structured items found in ${file.name}]\nTry a clearer photo or paste text manually.`);
+                    }
+                } catch (error) {
+                    console.error('Syllabus image scan failed:', error);
+                    setTextInput(`[Scan failed for ${file.name}]\nTry uploading a text file or paste the syllabus manually.`);
+                } finally {
+                    setIsParsing(false);
+                }
+            };
+            reader.readAsDataURL(file);
+            return;
+        }
+
+        setTextInput(`[Unsupported file format: ${file.name}]\nUse image, txt, or csv files.`);
     };
 
     const handleBulkCreate = async () => {
@@ -115,7 +151,7 @@ export function SyllabusDigitizer() {
                     </div>
                     <div>
                         <h3 className="font-bold text-white">Syllabus Digitizer</h3>
-                        <p className="text-xs text-slate-400">Paste or upload your coaching schedule to bulk-create tasks</p>
+                        <p className="text-xs text-slate-400">Paste text or upload image/text schedule to bulk-create tasks</p>
                     </div>
                 </div>
                 <button onClick={() => { setIsOpen(false); setParsedItems([]); setTextInput(''); }} className="p-1 hover:bg-white/10 rounded-lg transition-colors">

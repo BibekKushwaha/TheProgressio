@@ -41,11 +41,21 @@ export {
   useUpdateProfileMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
+  useMobileLoginMutation,
+  useMobileRefreshMutation,
+  useMobileLogoutMutation,
+  useMobileMeQuery,
+  useCreateFamilyLinkMutation,
+  useGetFamilyLinksQuery,
+  useRevokeFamilyLinkMutation,
+  useResolveFamilyLinkQuery,
 } from './services/authApi';
 export type {
   RegisterRequest,
   LoginRequest,
   AuthResponse,
+  MobileAuthResponse,
+  FamilyShareLink,
 } from './services/authApi';
 
 // Tasks API
@@ -66,6 +76,9 @@ export {
   useGenerateSubtasksMutation,
   usePreviewSubtasksMutation,
   useParseTaskMutation,
+  useScanSyllabusMutation,
+  usePreviewRecoveryPlanMutation,
+  useApplyRecoveryPlanMutation,
 } from './services/tasksApi';
 export type {
   Task,
@@ -73,6 +86,9 @@ export type {
   Attachment,
   CreateTaskRequest,
   UpdateTaskRequest,
+  SyllabusScanItem,
+  RecoveryPlan,
+  RecoveryPlanItem,
 } from './services/tasksApi';
 export type { Status, Priority } from './services/tasksApi';
 export { TaskStatus, PriorityEnum } from './services/tasksApi';
@@ -142,6 +158,12 @@ export type {
 export {
   analyticsApi,
   useLogSessionMutation,
+  useGetActiveLiveSessionQuery,
+  useStartLiveSessionMutation,
+  usePauseLiveSessionMutation,
+  useResumeLiveSessionMutation,
+  useHeartbeatLiveSessionMutation,
+  useStopLiveSessionMutation,
   useGetDailySummaryQuery,
   useGetWeeklyTrendsQuery,
   useGetTaskEfficiencyQuery,
@@ -158,6 +180,7 @@ export {
   useUpdateCourseGradeMutation,
   useDeleteCourseGradeMutation,
   useWhatIfGPAMutation,
+  usePreviewGPAComponentsMutation,
   useGetGradeEntriesQuery,
   useAddGradeEntryMutation,
   useDeleteGradeEntryMutation,
@@ -168,11 +191,18 @@ export {
 export type {
   ActivityLog,
   LogSessionRequest,
+  FocusLiveStatus,
+  FocusLiveSession,
+  StartLiveSessionRequest,
+  LiveSessionSignalRequest,
+  HeartbeatLiveSessionRequest,
+  StopLiveSessionRequest,
   DailyStats,
   Achievement,
   // Phase 3 Types
   CGPAResult,
   WhatIfResult,
+  PredictiveDataQuality,
   FullSWOT,
   DurationPrediction,
   TimeLeakageReport,
@@ -180,6 +210,8 @@ export type {
   LearningPace,
   CourseGrade,
   GradeEntry,
+  GPAComponentInput,
+  GPAComponentPreview,
 } from './services/analyticsApi';
 export { SessionType } from './services/analyticsApi';
 export * from './services/timetableApi';
@@ -187,14 +219,40 @@ export * from './services/calendarApi';
 export * from './services/rotationsApi';
 export * from './services/paymentApi';
 
+// Payment API
+export {
+  paymentApi,
+  useCreateOrderMutation,
+  useVerifyPaymentMutation,
+  useGetSubscriptionStatusQuery,
+  useCancelSubscriptionMutation,
+  useGetPaymentHistoryQuery,
+} from './services/paymentApi';
+export type {
+  PlanId,
+  PaymentMethod,
+  CreateOrderRequest,
+  CreateOrderResponse,
+  VerifyPaymentRequest,
+  VerifyPaymentResponse,
+  SubscriptionStatus,
+  PaymentRecord,
+} from './services/paymentApi';
+
 // Timetable API
 export {
   timetableApi,
   useGetDailyScheduleQuery,
+  useGetHolidaysQuery,
+  useCreateHolidayMutation,
+  useUpdateHolidayMutation,
+  useDeleteHolidayMutation,
 } from './services/timetableApi';
 export type {
   DailySchedule,
   TimetableEntry,
+  TimetableConflict,
+  SchoolHoliday,
   Subject,
   Rotation,
 } from './services/timetableApi';

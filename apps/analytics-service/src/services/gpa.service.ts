@@ -78,6 +78,27 @@ export interface WhatIfResult {
     strategy: string;
 }
 
+export interface GPAComponentInput {
+    name: string;
+    weight: number; // percentage weight (0-100)
+    obtainedMarks: number;
+    totalMarks: number;
+}
+
+export interface GPAComponentPreviewResult {
+    scale: string;
+    weightedPercentage: number;
+    weightedGradePoint: number;
+    normalizedWeight: number;
+    components: Array<{
+        name: string;
+        weight: number;
+        normalizedWeight: number;
+        scorePercent: number;
+        weightedContribution: number;
+    }>;
+}
+
 // ── CGPA Calculation ───────────────────────────────────────────────────
 
 export async function calculateCGPA(userId: string, scale: GradingScaleKey = "INDIA_10"): Promise<CGPAResult> {
@@ -227,4 +248,78 @@ export async function deleteCourseGrade(id: string, userId: string): Promise<Pri
     return prisma.courseGrade.deleteMany({
         where: { id, userId },
     });
+}
+
+const toGradePointFromPercentage = (percentage: number, scale: GradingScaleKey): number => {
+    if (scale === "PERCENTAGE") {
+        return Math.round(percentage * 100) / 100;
+    }
+
+    const gradeRow = GRADING_SCALES[scale].grades.find((row) => percentage >= row.min);
+    if (!gradeRow) return 0;
+    return gradeRow.point;
+};
+
+export function previewWeightedComponents(
+    components: GPAComponentInput[],
+    scale: GradingScaleKey = "INDIA_10",
+): GPAComponentPreviewResult {
+    if (!Array.isArray(components) || components.length === 0) {
+        return {
+            scale: GRADING_SCALES[scale].name,
+            weightedPercentage: 0,
+            weightedGradePoint: 0,
+            normalizedWeight: 0,
+            components: [],
+        };
+    }
+
+    const sanitized = components
+        .map((component) => ({
+            name: component.name?.trim() || "Component",
+            weight: Number(component.weight) || 0,
+            obtainedMarks: Number(component.obtainedMarks) || 0,
+            totalMarks: Number(component.totalMarks) || 0,
+        }))
+        .filter((component) => component.totalMarks > 0 && component.weight > 0);
+
+    if (sanitized.length === 0) {
+        return {
+            scale: GRADING_SCALES[scale].name,
+            weightedPercentage: 0,
+            weightedGradePoint: 0,
+            normalizedWeight: 0,
+            components: [],
+        };
+    }
+
+    const totalWeight = sanitized.reduce((sum, component) => sum + component.weight, 0);
+
+    const componentDetails = sanitized.map((component) => {
+        const scorePercent = (component.obtainedMarks / component.totalMarks) * 100;
+        const normalizedWeight = totalWeight > 0 ? component.weight / totalWeight : 0;
+        const weightedContribution = scorePercent * normalizedWeight;
+
+        return {
+            name: component.name,
+            weight: Math.round(component.weight * 100) / 100,
+            normalizedWeight: Math.round(normalizedWeight * 10000) / 10000,
+            scorePercent: Math.round(scorePercent * 100) / 100,
+            weightedContribution: Math.round(weightedContribution * 100) / 100,
+        };
+    });
+
+    const weightedPercentage = componentDetails.reduce(
+        (sum, component) => sum + component.weightedContribution,
+        0,
+    );
+    const weightedGradePoint = toGradePointFromPercentage(weightedPercentage, scale);
+
+    return {
+        scale: GRADING_SCALES[scale].name,
+        weightedPercentage: Math.round(weightedPercentage * 100) / 100,
+        weightedGradePoint: Math.round(weightedGradePoint * 100) / 100,
+        normalizedWeight: Math.round(totalWeight * 100) / 100,
+        components: componentDetails,
+    };
 }
