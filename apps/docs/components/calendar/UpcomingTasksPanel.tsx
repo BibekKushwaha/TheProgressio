@@ -6,7 +6,7 @@ import { useGetTasksQuery, Task } from "@repo/store";
 import { getTodayDateKey, toLocalDateKey } from "@/lib/date";
 
 export function UpcomingTasksPanel() {
-    const { data: tasks, isLoading } = useGetTasksQuery();
+    const { data: tasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
 
     const upcomingTasks = useMemo(() => {
         if (!tasks) return [] as Task[];

@@ -1,122 +1,158 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-const PLANNER_SERVICE_URL =
-  process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
+const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
 
-// ─── Types ──────────────────────────────────────────────────────────────────────
+export type BillingPlan = 'FREE' | 'PRO' | 'INSTITUTION';
+export type BillingStatus = 'INACTIVE' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED';
+export type PaymentProvider = 'UPI' | 'PAYTM' | 'NET_BANKING' | 'CARD';
+export type PlanId = BillingPlan;
+export type PaymentMethod = PaymentProvider;
 
-export type PlanId = 'PRO' | 'INSTITUTION';
-export type PaymentMethod = 'upi' | 'netbanking' | 'card';
+export interface BillingProfile {
+  id: string;
+  plan: BillingPlan;
+  planStatus: BillingStatus;
+  renewalAt?: string | null;
+  paymentProvider?: string | null;
+  paymentRef?: string | null;
+}
+
+export interface PaymentIntent {
+  intentId: string;
+  paymentRef: string;
+  plan: BillingPlan;
+  provider: PaymentProvider;
+  amountPaise: number;
+  status: string;
+}
 
 export interface CreateOrderRequest {
   plan: PlanId;
-  method?: PaymentMethod;
+  paymentMethod: PaymentMethod;
+  amountPaise?: number;
 }
 
 export interface CreateOrderResponse {
-  orderId: string;
-  razorpayOrderId: string;
-  amountPaise: number;
-  currency: string;
-  keyId: string;
-  plan: PlanId;
-  description: string;
-  mock: boolean;
+  message: string;
+  intent: PaymentIntent;
 }
 
 export interface VerifyPaymentRequest {
-  razorpayOrderId: string;
-  razorpayPaymentId: string;
-  razorpaySignature: string;
-  plan: PlanId;
+  intentId: string;
+  paymentRef: string;
+  status?: 'PENDING' | 'SUCCESS' | 'FAILED';
+  payload?: string;
 }
 
 export interface VerifyPaymentResponse {
-  success: boolean;
-  subscription: {
-    id: string;
-    plan: string;
-    status: string;
-    currentPeriodEnd: string;
-  };
+  message: string;
+  intent: PaymentIntent;
 }
 
-export interface SubscriptionStatus {
-  active: boolean;
-  plan: string | null;
-  status: string;
-  currentPeriodEnd: string | null;
-  subscription: {
-    id: string;
-    plan: string;
-    status: string;
-    amountPaise: number;
-    currency: string;
-    currentPeriodStart: string;
-    currentPeriodEnd: string;
-    cancelledAt: string | null;
-  } | null;
-}
+export type SubscriptionStatus = BillingProfile;
 
 export interface PaymentRecord {
-  id: string;
-  razorpayOrderId: string;
-  razorpayPaymentId: string | null;
+  intentId: string;
+  paymentRef: string;
+  plan: BillingPlan;
+  provider: PaymentProvider;
   amountPaise: number;
-  currency: string;
   status: string;
-  method: string | null;
-  createdAt: string;
+  createdAt?: string;
 }
 
-// ─── API Slice ──────────────────────────────────────────────────────────────────
+export interface UpiCollectResponse {
+  intentId: string;
+  paymentRef: string;
+  status: string;
+  upiId: string;
+  deepLink: string;
+}
 
 export const paymentApi = createApi({
   reducerPath: 'paymentApi',
   baseQuery: fetchBaseQuery({
-    baseUrl: `${PLANNER_SERVICE_URL}/api/payments`,
+    baseUrl: `${PLANNER_SERVICE_URL}/api`,
     credentials: 'include',
+    prepareHeaders: (headers) => {
+      headers.set('Content-Type', 'application/json');
+      return headers;
+    },
   }),
-  tagTypes: ['Subscription', 'PaymentHistory'],
+  tagTypes: ['Payments'],
   endpoints: (builder) => ({
+    getBillingProfile: builder.query<{ message: string; profile: BillingProfile }, void>({
+      query: () => '/payments/me',
+      providesTags: ['Payments'],
+    }),
+    createPaymentIntent: builder.mutation<
+      { message: string; intent: PaymentIntent },
+      { plan: BillingPlan; provider: PaymentProvider; amountPaise?: number }
+    >({
+      query: (body) => ({
+        url: '/payments/intents',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Payments'],
+    }),
+    createUpiCollect: builder.mutation<
+      { message: string; collect: UpiCollectResponse },
+      { intentId: string; upiId: string }
+    >({
+      query: (body) => ({
+        url: '/payments/upi/collect',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Payments'],
+    }),
     createOrder: builder.mutation<CreateOrderResponse, CreateOrderRequest>({
       query: (body) => ({
-        url: '/create-order',
+        url: '/payments/intents',
         method: 'POST',
-        body,
+        body: {
+          plan: body.plan,
+          provider: body.paymentMethod,
+          amountPaise: body.amountPaise,
+        },
       }),
+      invalidatesTags: ['Payments'],
     }),
-
     verifyPayment: builder.mutation<VerifyPaymentResponse, VerifyPaymentRequest>({
       query: (body) => ({
-        url: '/verify',
+        url: '/payments/intents/verify',
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Subscription', 'PaymentHistory'],
+      invalidatesTags: ['Payments'],
     }),
-
     getSubscriptionStatus: builder.query<SubscriptionStatus, void>({
-      query: () => '/status',
-      providesTags: ['Subscription'],
+      query: () => '/payments/me',
+      transformResponse: (response: { profile: SubscriptionStatus } | SubscriptionStatus) =>
+        'profile' in (response as any) ? (response as { profile: SubscriptionStatus }).profile : (response as SubscriptionStatus),
+      providesTags: ['Payments'],
     }),
-
     cancelSubscription: builder.mutation<{ message: string }, void>({
       query: () => ({
-        url: '/cancel',
+        url: '/payments/cancel',
         method: 'POST',
       }),
-      invalidatesTags: ['Subscription'],
+      invalidatesTags: ['Payments'],
     }),
-
     getPaymentHistory: builder.query<PaymentRecord[], void>({
-      query: () => '/history',
-      providesTags: ['PaymentHistory'],
+      query: () => '/payments/history',
+      transformResponse: (response: { items?: PaymentRecord[] } | PaymentRecord[]) =>
+        Array.isArray(response) ? response : response.items ?? [],
+      providesTags: ['Payments'],
     }),
   }),
 });
 
 export const {
+  useGetBillingProfileQuery,
+  useCreatePaymentIntentMutation,
+  useCreateUpiCollectMutation,
   useCreateOrderMutation,
   useVerifyPaymentMutation,
   useGetSubscriptionStatusQuery,

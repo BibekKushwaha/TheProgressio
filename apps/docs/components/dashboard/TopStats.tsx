@@ -14,7 +14,8 @@ export function TopStats() {
     const stats = summaryData?.stats;
     const totalHours = stats?.totalHours ?? 0;
     const dailyGoalHours = stats?.dailyGoalHours ?? 4; // fallback to 4h if not set
-    const progress = Math.min(100, Math.round((totalHours / dailyGoalHours) * 100));
+    const normalizedGoalHours = dailyGoalHours > 0 ? dailyGoalHours : 4;
+    const progress = Math.min(100, Math.round((totalHours / normalizedGoalHours) * 100));
 
     // Focus Score
     const focusScore = focusScoreData?.stats?.score ?? 0;
@@ -40,7 +41,7 @@ export function TopStats() {
                             {isSummaryLoading ? (
                                 <Skeleton className="h-9 w-24" />
                             ) : (
-                                `${totalHours}h / ${dailyGoalHours}h`
+                                `${totalHours}h / ${normalizedGoalHours}h`
                             )}
                         </div>
                     </div>

@@ -102,7 +102,7 @@ export function HabitStreaks() {
 
                                     <div className="mt-2 flex justify-between items-center text-[10px] text-slate-500 uppercase font-bold tracking-widest">
                                         <span>7 Day Goal Progress</span>
-                                        <span>{Math.round((streak / 7) * 100)}%</span>
+                                        <span>{Math.min(100, Math.round((streak / 7) * 100))}%</span>
                                     </div>
                                 </motion.div>
                             );
@@ -111,7 +111,7 @@ export function HabitStreaks() {
                 </AnimatePresence>
             </div>
 
-            <Link href="/dashboard/habits" className="mt-6">
+            <Link href="/habits" className="mt-6">
                 <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}

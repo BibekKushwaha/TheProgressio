@@ -51,7 +51,7 @@ export interface FocusLiveSession {
 export interface StartLiveSessionRequest {
     taskId: string;
     taskTitle?: string;
-    plannedDurationMinutes?: number;
+    plannedDurationMinutes: number;
     sessionType?: SessionType;
     deviceId?: string;
     source?: string;
@@ -208,17 +208,18 @@ export interface LearningPace {
     pace: "accelerating" | "steady" | "declining";
     estimatedExamScore: number;
     estimatedPercentile: number;
-    entryCount: number;
-    confidence: number;
-    trend: "improving" | "stable" | "declining";
+    simulationRuns: number;
+    scoreDistribution: Array<{ score: number; probability: number; count: number }>;
+    rankBands: Array<{ label: string; probability: number; minPercentile: number; maxPercentile: number }>;
+    confidenceInterval: { lower: number; upper: number; level: number };
+    assumptions: string[];
+    confidence: "low" | "medium" | "high";
+    modelVersion: string;
+    dataQuality: "low" | "medium" | "high";
 }
 
 export interface PredictiveDataQuality {
-    sampleSize: number;
-    subjectCoverage: number;
-    sparseData: boolean;
-    label: "low" | "medium" | "high";
-    trainingWindowDays: number;
+    label: 'low' | 'medium' | 'high';
 }
 
 export interface GPAComponentInput {
@@ -229,17 +230,9 @@ export interface GPAComponentInput {
 }
 
 export interface GPAComponentPreview {
-    scale: string;
     weightedPercentage: number;
     weightedGradePoint: number;
-    normalizedWeight: number;
-    components: Array<{
-        name: string;
-        weight: number;
-        normalizedWeight: number;
-        scorePercent: number;
-        weightedContribution: number;
-    }>;
+    scale: 'INDIA_10' | 'US_4' | 'PERCENTAGE';
 }
 
 export const analyticsApi = createApi({
@@ -263,10 +256,7 @@ export const analyticsApi = createApi({
             invalidatesTags: ['Activity', 'Stats'],
         }),
         getActiveLiveSession: builder.query<{ message: string; session: FocusLiveSession | null }, void>({
-            query: () => ({
-                url: '/activity/live/active',
-                method: 'GET',
-            }),
+            query: () => '/activity/live/active',
             providesTags: ['Activity'],
         }),
         startLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, StartLiveSessionRequest>({
@@ -275,7 +265,7 @@ export const analyticsApi = createApi({
                 method: 'POST',
                 body,
             }),
-            invalidatesTags: ['Activity'],
+            invalidatesTags: ['Activity', 'Stats'],
         }),
         pauseLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, LiveSessionSignalRequest>({
             query: (body) => ({
@@ -283,7 +273,7 @@ export const analyticsApi = createApi({
                 method: 'PATCH',
                 body,
             }),
-            invalidatesTags: ['Activity'],
+            invalidatesTags: ['Activity', 'Stats'],
         }),
         resumeLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, LiveSessionSignalRequest>({
             query: (body) => ({
@@ -291,7 +281,7 @@ export const analyticsApi = createApi({
                 method: 'PATCH',
                 body,
             }),
-            invalidatesTags: ['Activity'],
+            invalidatesTags: ['Activity', 'Stats'],
         }),
         heartbeatLiveSession: builder.mutation<{ message: string; session: FocusLiveSession }, HeartbeatLiveSessionRequest>({
             query: (body) => ({
@@ -384,12 +374,57 @@ export const analyticsApi = createApi({
                 body,
             }),
         }),
-        previewGPAComponents: builder.mutation<{ message: string; result: GPAComponentPreview }, { components: GPAComponentInput[]; scale?: string }>({
-            query: (body) => ({
-                url: '/stats/gpa/components/preview',
-                method: 'POST',
-                body,
-            }),
+        previewGPAComponents: builder.mutation<
+            { message: string; result: GPAComponentPreview },
+            { scale: 'INDIA_10' | 'US_4' | 'PERCENTAGE'; components: GPAComponentInput[] }
+        >({
+            queryFn: async ({ scale, components }) => {
+                const normalized = components
+                    .map((component) => ({
+                        name: component.name,
+                        weight: Number.isFinite(component.weight) ? component.weight : 0,
+                        obtainedMarks: Number.isFinite(component.obtainedMarks) ? component.obtainedMarks : 0,
+                        totalMarks: Number.isFinite(component.totalMarks) ? component.totalMarks : 0,
+                    }))
+                    .filter((component) => component.totalMarks > 0 && component.weight > 0);
+
+                if (normalized.length === 0) {
+                    return {
+                        data: {
+                            message: 'No valid components provided',
+                            result: {
+                                weightedPercentage: 0,
+                                weightedGradePoint: 0,
+                                scale,
+                            },
+                        },
+                    };
+                }
+
+                const totalWeight = normalized.reduce((sum, component) => sum + component.weight, 0);
+                const weightedPercentage = normalized.reduce((sum, component) => {
+                    const percentage = Math.max(0, Math.min(100, (component.obtainedMarks / component.totalMarks) * 100));
+                    return sum + percentage * (component.weight / totalWeight);
+                }, 0);
+
+                const weightedGradePoint =
+                    scale === 'US_4'
+                        ? (weightedPercentage / 100) * 4
+                        : scale === 'PERCENTAGE'
+                            ? weightedPercentage
+                            : (weightedPercentage / 100) * 10;
+
+                return {
+                    data: {
+                        message: 'Weighted GPA preview generated',
+                        result: {
+                            weightedPercentage,
+                            weightedGradePoint,
+                            scale,
+                        },
+                    },
+                };
+            },
         }),
         addCourseGrade: builder.mutation<{ message: string; course: CourseGrade }, Partial<CourseGrade>>({
             query: (body) => ({
@@ -454,16 +489,24 @@ export const analyticsApi = createApi({
             }),
             providesTags: ['Stats'],
         }),
-        getPredictivePerformance: builder.query<{
-            message: string;
-            data: LearningPace[];
-            confidence: number;
-            modelVersion: string;
-            dataQuality: PredictiveDataQuality;
-        }, string>({
-            query: (examType) => {
+        getPredictivePerformance: builder.query<
+            { message: string; modelVersion?: string; data: LearningPace[] },
+            string | { examType: string; runs?: number; seed?: number }
+        >({
+            query: (arg) => {
+                const examType = typeof arg === 'string' ? arg : arg.examType;
                 const safeExamType = examType?.trim() || 'midterm';
-                return `/stats/performance/${encodeURIComponent(safeExamType)}`;
+                const queryArg = typeof arg === 'string' ? undefined : arg;
+
+                return {
+                    url: `/stats/performance/${encodeURIComponent(safeExamType)}`,
+                    params: queryArg
+                        ? {
+                            ...(queryArg.runs ? { runs: String(queryArg.runs) } : {}),
+                            ...(queryArg.seed !== undefined ? { seed: String(queryArg.seed) } : {}),
+                        }
+                        : {},
+                };
             },
             providesTags: ['Stats'],
         }),
@@ -491,10 +534,10 @@ export const {
     useGetSubjectPerformanceQuery,
     useGetGPAQuery,
     useWhatIfGPAMutation,
-    usePreviewGPAComponentsMutation,
     useAddCourseGradeMutation,
     useUpdateCourseGradeMutation,
     useDeleteCourseGradeMutation,
+    usePreviewGPAComponentsMutation,
     useAddGradeEntryMutation,
     useGetGradeEntriesQuery,
     useDeleteGradeEntryMutation,

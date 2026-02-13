@@ -10,10 +10,11 @@ export function WeeklyActivity() {
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
 
     const rawData = trendsData?.data || [];
+    const filteredData = viewType === 'week' ? rawData.slice(-7) : rawData.slice(-30);
 
     // Map dates to short day names
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const data = rawData.map(d => {
+    const data = filteredData.map(d => {
         const date = new Date(d.date);
         return {
             ...d,
@@ -33,10 +34,20 @@ export function WeeklyActivity() {
         );
     }
 
+    if (data.length === 0) {
+        return (
+            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6">
+                <h2 className="text-2xl font-bold text-white mb-2">Weekly Activity</h2>
+                <p className="text-sm text-slate-400">No activity data yet.</p>
+            </div>
+        );
+    }
+
     // Generate SVG path for the line and gradient area
-    // Scale X to fit 600 width (6 intervals of 100)
-    const points = data.map((d, i) => `${i * 100} ${256 - (d.percentage * 2)}`).join(' L ');
-    const areaPath = `M 0 256 L ${points} L 600 256 Z`;
+    const chartWidth = 600;
+    const step = data.length > 1 ? chartWidth / (data.length - 1) : chartWidth;
+    const points = data.map((d, i) => `${i * step} ${256 - (d.percentage * 2)}`).join(' L ');
+    const areaPath = `M 0 256 L ${points} L ${chartWidth} 256 Z`;
     const linePath = `M ${points}`;
 
     return (
@@ -126,21 +137,21 @@ export function WeeklyActivity() {
                     {data.map((point, index) => (
                         <g key={point.date} className="cursor-pointer group/point">
                             <circle
-                                cx={index * 100}
+                                cx={index * step}
                                 cy={256 - (point.percentage * 2)}
                                 r="10"
                                 fill="rgb(168, 85, 247)"
                                 className="opacity-0 group-hover/point:opacity-20 transition-all duration-300"
                             />
                             <circle
-                                cx={index * 100}
+                                cx={index * step}
                                 cy={256 - (point.percentage * 2)}
                                 r="4"
                                 fill="white"
                                 className="transition-transform duration-300 group-hover/point:scale-150"
                             />
                             <circle
-                                cx={index * 100}
+                                cx={index * step}
                                 cy={256 - (point.percentage * 2)}
                                 r="2"
                                 fill="rgb(168, 85, 247)"
@@ -150,7 +161,7 @@ export function WeeklyActivity() {
                             {/* Simple tooltip simulation using SVG text - more reliable in standard SVG */}
                             <g className="opacity-0 group-hover/point:opacity-100 transition-opacity duration-300">
                                 <rect
-                                    x={index * 100 - 30}
+                                    x={index * step - 30}
                                     y={256 - (point.percentage * 2) - 45}
                                     width="60"
                                     height="30"
@@ -160,7 +171,7 @@ export function WeeklyActivity() {
                                     className="backdrop-blur-md"
                                 />
                                 <text
-                                    x={index * 100}
+                                    x={index * step}
                                     y={256 - (point.percentage * 2) - 25}
                                     textAnchor="middle"
                                     fill="white"

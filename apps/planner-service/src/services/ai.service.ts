@@ -71,6 +71,12 @@ export class AIService {
         - effort (string, optional, use values like "15m", "30m", "1h", "2h", "4h+" based on context)
         - type (ASSIGNMENT, EXAM, STUDY_GOAL. Default to ASSIGNMENT if unclear, EXAM if "test" or "exam" mentioned)
 
+        The input may be in Hinglish / Indian vernacular mixed with English. Normalize extracted meaning into clear English fields.
+        Examples:
+        - "kal 2 baje math mock test" => dueDate tomorrow 2 PM, subject Math, type EXAM
+        - "is sunday physics rotational motion revise" => this Sunday task
+        - "jaldi" / "urgent" => HIGH priority
+
         Text: "${text}"
         
         Return ONLY valid JSON.
@@ -125,17 +131,28 @@ export class AIService {
         // Advanced Heuristic Parsing Fallback
         const lowerText = text.toLowerCase();
 
+        const normalizedText = lowerText
+            .replace(/\bkal\b/g, 'tomorrow')
+            .replace(/\baaj\b/g, 'today')
+            .replace(/\bparso\b/g, 'day after tomorrow')
+            .replace(/\biss?\s+raviwaar\b/g, 'this sunday')
+            .replace(/\bagle\s+hafte\b/g, 'next week')
+            .replace(/\bjaldi\b/g, 'urgent')
+            .replace(/\bdopahar\b/g, 'afternoon')
+            .replace(/\bshaam\b/g, 'evening')
+            .replace(/\braat\b/g, 'night');
+
         // Priority Detection
-        const isHighPriority = /urgent|important|high priority|asap|critical/.test(lowerText);
-        const isLowPriority = /low priority|trivial|minor|whenever/.test(lowerText);
+        const isHighPriority = /urgent|important|high priority|asap|critical/.test(normalizedText);
+        const isLowPriority = /low priority|trivial|minor|whenever/.test(normalizedText);
 
         // Type Detection
-        const isExam = /exam|test|midterm|final|quiz/.test(lowerText);
-        const isStudy = /study|read|revise|review|learn/.test(lowerText);
+        const isExam = /exam|test|midterm|final|quiz|mock/.test(normalizedText);
+        const isStudy = /study|read|revise|review|learn/.test(normalizedText);
 
         // Subject Detection (Basic List)
         const subjects = ["math", "mathematics", "physics", "chemistry", "biology", "history", "english", "literature", "geography", "science", "coding", "programming", "cs", "computer science", "spanish", "french"];
-        const foundSubject = subjects.find(s => lowerText.includes(s));
+        const foundSubject = subjects.find(s => normalizedText.includes(s));
         const formattedSubject = foundSubject ? foundSubject.charAt(0).toUpperCase() + foundSubject.slice(1) : undefined;
 
         // Effort Detection
@@ -155,12 +172,12 @@ export class AIService {
         const now = new Date();
 
         // "Tomorrow", "Today"
-        if (lowerText.includes("tomorrow")) {
+        if (normalizedText.includes("tomorrow")) {
             dueDate = new Date(now);
             dueDate.setDate(now.getDate() + 1);
-        } else if (lowerText.includes("today")) {
+        } else if (normalizedText.includes("today")) {
             dueDate = new Date(now);
-        } else if (lowerText.includes("day after tomorrow")) {
+        } else if (normalizedText.includes("day after tomorrow")) {
             dueDate = new Date(now);
             dueDate.setDate(now.getDate() + 2);
         }
@@ -169,7 +186,7 @@ export class AIService {
         if (!dueDate) {
             const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
             const dayRegex = new RegExp(`(this|next)?\\s*(${days.join('|')})`, 'i');
-            const dayMatch = lowerText.match(dayRegex);
+            const dayMatch = normalizedText.match(dayRegex);
 
             if (dayMatch) {
                 const modifier = dayMatch[1]; // "this" or "next"
@@ -190,7 +207,7 @@ export class AIService {
 
         // Time Detection (e.g., "at 5pm", "by 14:00")
         const timeRegex = /(?:at|by)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i;
-        const timeMatch = lowerText.match(timeRegex);
+        const timeMatch = normalizedText.match(timeRegex);
 
         if (dueDate && timeMatch) {
             const hourMatch = timeMatch[1];

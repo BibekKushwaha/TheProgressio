@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { enforceReadOnlyWrites, isAuth } from "./middleware/auth.middleware.js";
+import { isAuth } from "./middleware/auth.middleware.js";
 import taskRouter from "./routes/task.route.js";
 import categoryRouter from "./routes/category.route.js";
 import subtaskRouter from "./routes/subtask.route.js";
@@ -12,7 +12,9 @@ import calendarRouter from "./routes/calendar.routes.js";
 import rotationRouter from "./routes/rotation.route.js";
 import whatsappRouter from "./routes/whatsapp.route.js";
 import paymentRouter from "./routes/payment.route.js";
+import syncRouter from "./routes/sync.route.js";
 import { producer } from "./services/producer.service.js";
+import { runSilentWatchSweep } from "./services/whatsapp-watch.service.js";
 
 export const app = express();
 
@@ -32,18 +34,28 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/api/integrations/whatsapp", whatsappRouter);
-app.use("/api/tasks", isAuth, enforceReadOnlyWrites, taskRouter);
-app.use("/api/categories", isAuth, enforceReadOnlyWrites, categoryRouter);
-app.use("/api/subtasks", isAuth, enforceReadOnlyWrites, subtaskRouter);
-app.use("/api/attachments", isAuth, enforceReadOnlyWrites, attachmentRouter);
-app.use("/api/timetable", isAuth, enforceReadOnlyWrites, timetableRouter);
-app.use("/api/calendar", isAuth, enforceReadOnlyWrites, calendarRouter);
-app.use("/api/rotations", isAuth, enforceReadOnlyWrites, rotationRouter);
 app.use("/api/payments", paymentRouter);
+app.use("/api/sync", isAuth, syncRouter);
+app.use("/api/tasks", isAuth, taskRouter);
+app.use("/api/categories", isAuth, categoryRouter);
+app.use("/api/subtasks", isAuth, subtaskRouter);
+app.use("/api/attachments", isAuth, attachmentRouter);
+app.use("/api/timetable", isAuth, timetableRouter);
+app.use("/api/calendar", isAuth, calendarRouter);
+app.use("/api/rotations", isAuth, rotationRouter);
 
 const PORT = process.env.PORT || 4001;
 
 if (process.env.NODE_ENV !== 'test') {
+    if (process.env.WHATSAPP_SILENT_WATCH_CRON_ENABLED === 'true') {
+        const intervalMinutes = Number(process.env.WHATSAPP_SILENT_WATCH_INTERVAL_MINUTES || 60);
+        setInterval(() => {
+            runSilentWatchSweep().catch((error) => {
+                console.warn('Silent watch sweep failed:', error);
+            });
+        }, Math.max(5, intervalMinutes) * 60 * 1000);
+    }
+
     // Connect Kafka producer before starting the server
     producer.connect().then(() => {
         app.listen(PORT, () => {

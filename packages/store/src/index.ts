@@ -217,6 +217,7 @@ export { SessionType } from './services/analyticsApi';
 export * from './services/timetableApi';
 export * from './services/calendarApi';
 export * from './services/rotationsApi';
+export * from './services/paymentApi';
 
 // Payment API
 export {

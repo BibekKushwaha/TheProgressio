@@ -1,34 +1,40 @@
 import type { Request, Response } from "express";
 import { prisma, Status, Priority } from "@repo/db";
+import {
+    parseTaskIntentSchema,
+    previewSubtasksSchema,
+    recoveryPlanSchema,
+    scanSyllabusImageSchema,
+    smartCreateTaskSchema,
+    taskSchema,
+} from "@repo/schemas/task";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService } from "../services/ai.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/producer.service.js";
 import { recoveryService } from "../services/recovery.service.js";
-import { buildInternalEventHeaders } from "../services/internal-auth.service.js";
 
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
-const MAX_SYLLABUS_IMAGE_BYTES = 5 * 1024 * 1024;
+const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || "http://localhost:4003";
 
 const notifyHabitCategoryCompletion = async (params: {
     userId: string;
     categoryId: string | null;
     occurredAt: string;
 }): Promise<void> => {
+    if (process.env.NODE_ENV === "test") return;
     if (!params.categoryId) return;
 
     try {
-        const eventPayload = {
-            type: "TaskCompleted",
-            userId: params.userId,
-            categoryId: params.categoryId,
-            completedValue: 1,
-            occurredAt: params.occurredAt,
-        };
-
         const response = await fetch(`${HABIT_SERVICE_URL}/api/habits/events`, {
             method: "POST",
-            headers: buildInternalEventHeaders(eventPayload),
-            body: JSON.stringify(eventPayload),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: "TaskCompleted",
+                userId: params.userId,
+                categoryId: params.categoryId,
+                completedValue: 1,
+                occurredAt: params.occurredAt,
+            }),
         });
 
         if (!response.ok) {
@@ -42,34 +48,84 @@ const notifyHabitCategoryCompletion = async (params: {
     }
 };
 
+const notifyAnalyticsTaskCompletion = async (params: {
+    taskId: string;
+}): Promise<void> => {
+    if (process.env.NODE_ENV === "test") return;
+    try {
+        const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: "TASK_COMPLETED",
+                taskId: params.taskId,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(
+                `⚠️ Analytics completion event failed (${response.status}): ${errorText || "Unknown error"}`
+            );
+        }
+    } catch (error) {
+        console.warn("⚠️ Analytics completion endpoint unreachable:", error);
+    }
+};
+
+export const runTaskCompletionSideEffects = async (params: {
+    taskId: string;
+    userId: string;
+    title: string;
+    categoryId: string | null;
+    completedAt?: string;
+}): Promise<void> => {
+    const completedAt = params.completedAt ?? new Date().toISOString();
+
+    await emitTaskEvent(TaskEventType.TASK_COMPLETED, params.taskId, params.userId, {
+        title: params.title,
+        categoryId: params.categoryId,
+        completedAt,
+    });
+
+    await Promise.all([
+        notifyHabitCategoryCompletion({
+            userId: params.userId,
+            categoryId: params.categoryId,
+            occurredAt: completedAt,
+        }),
+        notifyAnalyticsTaskCompletion({ taskId: params.taskId }),
+    ]);
+};
+
 export const createTask = async (req: AuthenticatedRequest, res: Response) => {
     try {
         if (!req.user || !req.user.id) {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        if (!req.body) {
+        const parsed = taskSchema.safeParse(req.body);
+        if (!parsed.success) {
+            const titleIssue = parsed.error.issues.find((issue) => issue.path[0] === "title");
             return res.status(400).json({
-                message: "Request body is missing. Ensure Content-Type is application/json"
+                message: titleIssue ? "Title is required" : "Invalid task payload",
+                errors: parsed.error.flatten(),
             });
         }
 
-        const { title, description, status, priority, categoryId, dueDate, isRecurring } = req.body;
-
-        if (!title || typeof title !== "string") {
-            return res.status(400).json({ message: "Title is required" });
-        }
+        const { title, description, status, priority, categoryId, dueDate, isRecurring, subjectId } = parsed.data;
 
         const task = await prisma.task.create({
             data: {
                 title,
-                description,
-                status: (status as Status) ?? Status.PENDING,
-                priority: (priority as Priority) ?? Priority.MEDIUM,
-                dueDate: dueDate ? new Date(dueDate) : null,
+                description: description ?? null,
+                status,
+                priority,
+                dueDate: dueDate ?? null,
                 isRecurring: isRecurring ?? false,
                 userId: req.user.id,
                 categoryId: categoryId || null,
+                subjectId: subjectId || null,
             },
         });
 
@@ -242,17 +298,11 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response) => {
 
         // If status changed to COMPLETED, also emit a completion event
         if (status && updatedTask.status === Status.COMPLETED && existingTask.status !== Status.COMPLETED) {
-            const completedAt = new Date().toISOString();
-            await emitTaskEvent(TaskEventType.TASK_COMPLETED, id, req.user.id, {
-                title: updatedTask.title,
-                categoryId: updatedTask.categoryId,
-                completedAt,
-            });
-
-            await notifyHabitCategoryCompletion({
+            await runTaskCompletionSideEffects({
+                taskId: id,
                 userId: req.user.id,
+                title: updatedTask.title,
                 categoryId: updatedTask.categoryId ?? null,
-                occurredAt: completedAt,
             });
         }
 
@@ -353,17 +403,11 @@ export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
 
         // If toggled to COMPLETED, also emit a completion event
         if (newStatus === Status.COMPLETED) {
-            const completedAt = new Date().toISOString();
-            await emitTaskEvent(TaskEventType.TASK_COMPLETED, id, req.user.id, {
-                title: updatedTask.title,
-                categoryId: updatedTask.categoryId,
-                completedAt,
-            });
-
-            await notifyHabitCategoryCompletion({
+            await runTaskCompletionSideEffects({
+                taskId: id,
                 userId: req.user.id,
+                title: updatedTask.title,
                 categoryId: updatedTask.categoryId ?? null,
-                occurredAt: completedAt,
             });
         }
 
@@ -377,6 +421,77 @@ export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
 export const taskCategories = async (_req: Request, res: Response) => {
     // Placeholder for category logic if needed, user had it in routes
     return res.status(501).json({ message: "Not implemented" });
+};
+
+export const scanSyllabusImage = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user?.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const parsed = scanSyllabusImageSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "imageBase64 is required",
+                errors: parsed.error.flatten(),
+            });
+        }
+
+        const { imageBase64, mimeType } = parsed.data;
+        const items = await aiService.scanSyllabusImage(imageBase64, typeof mimeType === "string" ? mimeType : "image/jpeg");
+        return res.status(200).json({ items });
+    } catch (error) {
+        console.error("Scan syllabus error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const previewRecoveryPlan = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user?.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const parsed = recoveryPlanSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Invalid recovery payload",
+                errors: parsed.error.flatten(),
+            });
+        }
+
+        const anchorDate = parsed.data.anchorDate ?? new Date();
+        const plan = await recoveryService.preview(req.user.id, anchorDate);
+
+        return res.status(200).json(plan);
+    } catch (error) {
+        console.error("Recovery preview error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const applyRecoveryPlan = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        if (!req.user?.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const parsed = recoveryPlanSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Invalid recovery payload",
+                errors: parsed.error.flatten(),
+            });
+        }
+
+        const anchorDate = parsed.data.anchorDate ?? new Date();
+        const result = await recoveryService.apply(req.user.id, anchorDate);
+
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error("Recovery apply error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
 };
 
 interface CreateTaskFromTextParams {
@@ -423,10 +538,15 @@ export const smartCreateTask = async (req: AuthenticatedRequest, res: Response) 
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { text } = req.body;
-        if (!text || typeof text !== "string") {
-            return res.status(400).json({ message: "Text input is required" });
+        const parsed = smartCreateTaskSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Text input is required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { text } = parsed.data;
 
         const { task, parsedData } = await createTaskFromText({
             userId: req.user.id,
@@ -491,10 +611,15 @@ export const previewSubtasks = async (req: AuthenticatedRequest, res: Response) 
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { title, description } = req.body;
-        if (!title || typeof title !== "string") {
-            return res.status(400).json({ message: "Title is required" });
+        const parsed = previewSubtasksSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Title is required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { title, description } = parsed.data;
 
         const subtaskTitles = await aiService.generateSubtasks(title, description || "");
 
@@ -505,59 +630,21 @@ export const previewSubtasks = async (req: AuthenticatedRequest, res: Response) 
         return res.status(500).json({ message: "Internal server error" });
     }
 };
-
-export const scanSyllabusImage = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const { imageBase64, mimeType } = req.body as {
-            imageBase64?: string;
-            mimeType?: string;
-        };
-
-        if (!imageBase64 || typeof imageBase64 !== "string") {
-            return res.status(400).json({ message: "imageBase64 is required" });
-        }
-
-        const sanitizedBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "").trim();
-        if (!sanitizedBase64) {
-            return res.status(400).json({ message: "Invalid image payload" });
-        }
-
-        const imageBytes = Buffer.byteLength(sanitizedBase64, "base64");
-        if (imageBytes > MAX_SYLLABUS_IMAGE_BYTES) {
-            return res.status(413).json({ message: "Image is too large. Max size is 5MB." });
-        }
-
-        const items = await aiService.scanSyllabusImage(
-            sanitizedBase64,
-            typeof mimeType === "string" && mimeType ? mimeType : "image/jpeg"
-        );
-
-        return res.status(200).json({
-            items: items.map((item) => ({
-                ...item,
-                dueDate: item.dueDate ? item.dueDate.toISOString() : undefined,
-            })),
-        });
-    } catch (error) {
-        console.error("Syllabus scan error:", error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-};
-
 export const parseTaskIntent = async (req: AuthenticatedRequest, res: Response) => {
     try {
         if (!req.user || !req.user.id) {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const { text } = req.body;
-        if (!text || typeof text !== "string") {
-            return res.status(400).json({ message: "Text input is required" });
+        const parsed = parseTaskIntentSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Text input is required",
+                errors: parsed.error.flatten(),
+            });
         }
+
+        const { text } = parsed.data;
 
         const parsedData = await aiService.parseTaskIntent(text);
 
@@ -565,50 +652,6 @@ export const parseTaskIntent = async (req: AuthenticatedRequest, res: Response) 
 
     } catch (error) {
         console.error("Parse task error:", error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-};
-
-// POST /tasks/recovery/preview
-export const previewRecoveryPlan = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user?.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const anchorDate = req.body?.anchorDate ? new Date(req.body.anchorDate) : new Date();
-        if (Number.isNaN(anchorDate.getTime())) {
-            return res.status(400).json({ message: "Invalid anchorDate" });
-        }
-
-        const plan = await recoveryService.preview(req.user.id, anchorDate);
-        return res.status(200).json({ message: "Recovery preview generated", plan });
-    } catch (error) {
-        console.error("Recovery preview error:", error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-};
-
-// POST /tasks/recovery/apply
-export const applyRecoveryPlan = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user?.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const anchorDate = req.body?.anchorDate ? new Date(req.body.anchorDate) : new Date();
-        if (Number.isNaN(anchorDate.getTime())) {
-            return res.status(400).json({ message: "Invalid anchorDate" });
-        }
-
-        const { plan, updatedCount } = await recoveryService.apply(req.user.id, anchorDate);
-        return res.status(200).json({
-            message: "Recovery plan applied",
-            updatedCount,
-            plan,
-        });
-    } catch (error) {
-        console.error("Recovery apply error:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 };

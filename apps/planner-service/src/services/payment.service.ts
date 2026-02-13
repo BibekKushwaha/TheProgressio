@@ -1,372 +1,215 @@
-/**
- * Razorpay Payment Service
- *
- * Handles order creation, payment verification (HMAC-SHA256),
- * and subscription management via Razorpay API.
- *
- * Required env vars:
- *   RAZORPAY_KEY_ID       — Razorpay key id (rzp_test_... or rzp_live_...)
- *   RAZORPAY_KEY_SECRET   — Razorpay key secret
- */
-import crypto from "crypto";
-import { prisma } from "@repo/db";
+import { BillingPlan, BillingStatus, prisma } from '@repo/db';
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID ?? "";
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET ?? "";
-const RAZORPAY_API_BASE = "https://api.razorpay.com/v1";
+export type PaymentProvider = 'UPI' | 'PAYTM' | 'NET_BANKING' | 'CARD';
+export type PaymentStatus = 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED';
 
-// ─── Plan Config ────────────────────────────────────────────────────────────────
+export interface CreatePaymentIntentInput {
+  plan: BillingPlan;
+  provider: PaymentProvider;
+  amountPaise?: number;
+}
 
-export const PLAN_CONFIG = {
-    PRO: {
-        name: "Pro",
-        amountPaise: 14900, // ₹149
-        currency: "INR",
-        description: "Transition Pro — Unlimited tasks, AI tools, WhatsApp nudges",
+export interface PaymentWebhookInput {
+  paymentRef: string;
+  status: PaymentStatus;
+  provider?: PaymentProvider;
+  payload?: unknown;
+}
+
+const DEFAULT_PLAN_PRICE_PAISE: Record<BillingPlan, number> = {
+  FREE: 0,
+  PRO: 14900,
+  INSTITUTION: 99900,
+};
+
+const randomToken = (prefix: string): string => {
+  const stamp = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `${prefix}_${stamp}_${rand}`;
+};
+
+const toJsonString = (value: unknown): string | null => {
+  if (value === undefined || value === null) return null;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+};
+
+export const normalizePlan = (value: unknown): BillingPlan | null => {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  if (normalized === BillingPlan.PRO) return BillingPlan.PRO;
+  if (normalized === BillingPlan.INSTITUTION) return BillingPlan.INSTITUTION;
+  if (normalized === BillingPlan.FREE) return BillingPlan.FREE;
+  return null;
+};
+
+export const normalizeProvider = (value: unknown): PaymentProvider | null => {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  if (normalized === 'UPI') return 'UPI';
+  if (normalized === 'PAYTM') return 'PAYTM';
+  if (normalized === 'NET_BANKING') return 'NET_BANKING';
+  if (normalized === 'CARD') return 'CARD';
+  return null;
+};
+
+export const normalizePaymentStatus = (value: unknown): PaymentStatus | null => {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  if (normalized === 'CREATED') return 'CREATED';
+  if (normalized === 'PENDING') return 'PENDING';
+  if (normalized === 'SUCCESS') return 'SUCCESS';
+  if (normalized === 'FAILED') return 'FAILED';
+  return null;
+};
+
+export async function createPaymentIntent(userId: string, input: CreatePaymentIntentInput) {
+  if (input.plan === BillingPlan.FREE) {
+    throw new Error('FREE plan does not require payment intent');
+  }
+
+  const amountPaise = Math.max(100, Math.round(input.amountPaise ?? DEFAULT_PLAN_PRICE_PAISE[input.plan]));
+  const intentId = randomToken('intent');
+  const paymentRef = randomToken('pay');
+
+  const event = await prisma.paymentEvent.create({
+    data: {
+      userId,
+      intentId,
+      paymentRef,
+      provider: input.provider,
+      plan: input.plan,
+      amountPaise,
+      status: 'CREATED',
+      payload: toJsonString({ source: 'pricing-ui' }),
     },
-    INSTITUTION: {
-        name: "Institution",
-        amountPaise: 99900, // ₹999
-        currency: "INR",
-        description: "Transition Institution — QR attendance, batch management",
+  });
+
+  return {
+    intentId: event.intentId,
+    paymentRef: event.paymentRef,
+    plan: event.plan,
+    provider: event.provider,
+    amountPaise: event.amountPaise,
+    status: event.status,
+  };
+}
+
+export async function createUpiCollectRequest(userId: string, intentId: string, upiId: string) {
+  const record = await prisma.paymentEvent.findFirst({
+    where: { intentId, userId },
+  });
+
+  if (!record) {
+    return null;
+  }
+
+  const updated = await prisma.paymentEvent.update({
+    where: { intentId },
+    data: {
+      status: 'PENDING',
+      upiId,
+      payload: toJsonString({ lastAction: 'upi_collect_requested', upiId }),
     },
-} as const;
+  });
 
-export type PlanId = keyof typeof PLAN_CONFIG;
+  const deepLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=Academic+Tracker&am=${(updated.amountPaise / 100).toFixed(2)}&tn=${encodeURIComponent(updated.paymentRef)}`;
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
-
-function isConfigured(): boolean {
-    return Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
+  return {
+    intentId: updated.intentId,
+    paymentRef: updated.paymentRef,
+    status: updated.status,
+    upiId: updated.upiId,
+    deepLink,
+  };
 }
 
-async function razorpayRequest<T>(
-    path: string,
-    method: "GET" | "POST",
-    body?: Record<string, unknown>,
-): Promise<T> {
-    const auth = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString("base64");
+const addDays = (date: Date, days: number): Date => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
 
-    const response = await fetch(`${RAZORPAY_API_BASE}${path}`, {
-        method,
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Basic ${auth}`,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
-    });
+export async function applyPaymentWebhook(input: PaymentWebhookInput) {
+  const existing = await prisma.paymentEvent.findUnique({
+    where: { paymentRef: input.paymentRef },
+  });
 
-    if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`Razorpay API error (${response.status}): ${err}`);
-    }
+  if (!existing) {
+    return { processed: false as const, reason: 'payment_ref_not_found' as const };
+  }
 
-    return (await response.json()) as T;
-}
-
-// ─── Create Order ───────────────────────────────────────────────────────────────
-
-export interface CreateOrderResult {
-    orderId: string;
-    razorpayOrderId: string;
-    amountPaise: number;
-    currency: string;
-    keyId: string;
-    prefill: { name: string; email: string };
-    notes: Record<string, string>;
-}
-
-export async function createOrder(
-    userId: string,
-    planId: PlanId,
-    paymentMethod?: string,
-): Promise<CreateOrderResult> {
-    const plan = PLAN_CONFIG[planId];
-    if (!plan) throw new Error(`Unknown plan: ${planId}`);
-
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { username: true, email: true },
-    });
-    if (!user) throw new Error("User not found");
-
-    let razorpayOrderId: string;
-    const notes = {
-        userId,
-        plan: planId,
-        ...(paymentMethod ? { preferred_method: paymentMethod } : {}),
+  if (existing.status === 'SUCCESS' && input.status === 'SUCCESS') {
+    return {
+      processed: true as const,
+      idempotent: true,
+      paymentRef: existing.paymentRef,
+      status: existing.status,
     };
+  }
 
-    if (isConfigured()) {
-        // Real Razorpay order
-        const order = await razorpayRequest<{
-            id: string;
-            amount: number;
-            currency: string;
-            status: string;
-        }>("/orders", "POST", {
-            amount: plan.amountPaise,
-            currency: plan.currency,
-            receipt: `txn_${userId}_${Date.now()}`,
-            notes,
-        });
-        razorpayOrderId = order.id;
-    } else {
-        // Mock mode for development
-        razorpayOrderId = `order_mock_${Date.now()}`;
-        console.info(`[Payment Mock] Created order ${razorpayOrderId} for plan ${planId}`);
-    }
+  const result = await prisma.$transaction(async (tx) => {
+    const updatedEvent = await tx.paymentEvent.update({
+      where: { paymentRef: input.paymentRef },
+      data: {
+        status: input.status,
+        provider: input.provider ?? existing.provider,
+        payload: toJsonString(input.payload),
+      },
+    });
 
-    // Store in DB
-    const payment = await prisma.payment.create({
+    if (input.status === 'SUCCESS') {
+      await tx.user.update({
+        where: { id: existing.userId },
         data: {
-            userId,
-            razorpayOrderId,
-            amountPaise: plan.amountPaise,
-            currency: plan.currency,
-            status: "CREATED",
-            method: paymentMethod ?? null,
+          plan: existing.plan,
+          planStatus: BillingStatus.ACTIVE,
+          paymentProvider: input.provider ?? existing.provider,
+          paymentRef: existing.paymentRef,
+          renewalAt: addDays(new Date(), 30),
         },
-    });
-
-    return {
-        orderId: payment.id,
-        razorpayOrderId,
-        amountPaise: plan.amountPaise,
-        currency: plan.currency,
-        keyId: RAZORPAY_KEY_ID || "rzp_test_placeholder",
-        prefill: { name: user.username, email: user.email },
-        notes,
-    };
-}
-
-// ─── Verify Payment ─────────────────────────────────────────────────────────────
-
-export interface VerifyPaymentResult {
-    verified: boolean;
-    paymentId: string;
-    subscriptionId: string;
-    plan: string;
-    status: string;
-}
-
-export async function verifyPayment(params: {
-    razorpayOrderId: string;
-    razorpayPaymentId: string;
-    razorpaySignature: string;
-    userId: string;
-    plan: PlanId;
-}): Promise<VerifyPaymentResult> {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, userId, plan: planId } = params;
-
-    // Find the payment record
-    const payment = await prisma.payment.findUnique({
-        where: { razorpayOrderId },
-    });
-    if (!payment || payment.userId !== userId) {
-        throw new Error("Payment not found or unauthorized");
+      });
     }
 
-    // HMAC-SHA256 signature verification
-    let verified = false;
-    if (isConfigured()) {
-        const generatedSignature = crypto
-            .createHmac("sha256", RAZORPAY_KEY_SECRET)
-            .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-            .digest("hex");
-        verified = generatedSignature === razorpaySignature;
-    } else {
-        // Mock mode — always verify
-        verified = true;
-        console.info(`[Payment Mock] Verified payment ${razorpayPaymentId} for order ${razorpayOrderId}`);
-    }
-
-    if (!verified) {
-        await prisma.payment.update({
-            where: { id: payment.id },
-            data: { status: "FAILED", razorpayPaymentId },
-        });
-        throw new Error("Payment signature verification failed");
-    }
-
-    // Calculate subscription period
-    const periodEnd = new Date();
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-    // Create subscription + update payment in a transaction
-    const [subscription] = await prisma.$transaction([
-        prisma.subscription.create({
-            data: {
-                userId,
-                plan: planId,
-                status: "ACTIVE",
-                amountPaise: PLAN_CONFIG[planId].amountPaise,
-                currency: "INR",
-                interval: "monthly",
-                currentPeriodStart: new Date(),
-                currentPeriodEnd: periodEnd,
-            },
-        }),
-        prisma.payment.update({
-            where: { id: payment.id },
-            data: {
-                razorpayPaymentId,
-                razorpaySignature,
-                status: "CAPTURED",
-            },
-        }),
-    ]);
-
-    // Link payment to subscription
-    await prisma.payment.update({
-        where: { id: payment.id },
-        data: { subscriptionId: subscription.id },
-    });
-
-    return {
-        verified: true,
-        paymentId: payment.id,
-        subscriptionId: subscription.id,
-        plan: planId,
-        status: "ACTIVE",
-    };
-}
-
-// ─── Get Subscription Status ────────────────────────────────────────────────────
-
-export interface SubscriptionStatus {
-    hasActiveSubscription: boolean;
-    plan: string;
-    status: string;
-    currentPeriodEnd: string | null;
-    amountPaise: number;
-}
-
-export async function getSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
-    const subscription = await prisma.subscription.findFirst({
-        where: {
-            userId,
-            status: { in: ["ACTIVE", "PAST_DUE"] },
-        },
-        orderBy: { createdAt: "desc" },
-    });
-
-    if (!subscription) {
-        return {
-            hasActiveSubscription: false,
-            plan: "FREE",
-            status: "NONE",
-            currentPeriodEnd: null,
-            amountPaise: 0,
-        };
-    }
-
-    return {
-        hasActiveSubscription: true,
-        plan: subscription.plan,
-        status: subscription.status,
-        currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
-        amountPaise: subscription.amountPaise,
-    };
-}
-
-// ─── Cancel Subscription ────────────────────────────────────────────────────────
-
-export async function cancelSubscription(userId: string): Promise<{ cancelled: boolean }> {
-    const subscription = await prisma.subscription.findFirst({
-        where: { userId, status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-    });
-
-    if (!subscription) {
-        throw new Error("No active subscription found");
-    }
-
-    await prisma.subscription.update({
-        where: { id: subscription.id },
+    if (input.status === 'FAILED') {
+      await tx.user.update({
+        where: { id: existing.userId },
         data: {
-            status: "CANCELLED",
-            cancelledAt: new Date(),
+          planStatus: BillingStatus.PAST_DUE,
         },
-    });
+      });
+    }
 
-    return { cancelled: true };
+    return updatedEvent;
+  });
+
+  return {
+    processed: true as const,
+    idempotent: false,
+    paymentRef: result.paymentRef,
+    status: result.status,
+  };
 }
 
-// ─── Get Payment History ────────────────────────────────────────────────────────
+export async function getUserBillingProfile(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      plan: true,
+      planStatus: true,
+      renewalAt: true,
+      paymentProvider: true,
+      paymentRef: true,
+    },
+  });
 
-export async function getPaymentHistory(userId: string): Promise<{
-    payments: Array<{
-        id: string;
-        amountPaise: number;
-        currency: string;
-        status: string;
-        method: string | null;
-        createdAt: string;
-    }>;
-}> {
-    const payments = await prisma.payment.findMany({
-        where: { userId },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-    });
+  if (!user) {
+    return null;
+  }
 
-    return {
-        payments: payments.map((p) => ({
-            id: p.id,
-            amountPaise: p.amountPaise,
-            currency: p.currency,
-            status: p.status,
-            method: p.method,
-            createdAt: p.createdAt.toISOString(),
-        })),
-    };
-}
-
-// ─── Razorpay Webhook Handler ───────────────────────────────────────────────────
-
-export async function handleWebhook(
-    body: Record<string, unknown>,
-    signature: string,
-): Promise<{ handled: boolean; event?: string }> {
-    // Verify webhook signature
-    if (isConfigured()) {
-        const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET ?? RAZORPAY_KEY_SECRET;
-        const expectedSignature = crypto
-            .createHmac("sha256", webhookSecret)
-            .update(JSON.stringify(body))
-            .digest("hex");
-
-        if (expectedSignature !== signature) {
-            throw new Error("Invalid webhook signature");
-        }
-    }
-
-    const event = typeof body.event === "string" ? body.event : "";
-    const payload = body.payload as Record<string, unknown> | undefined;
-
-    if (event === "payment.captured" && payload) {
-        const paymentEntity = (payload as any)?.payment?.entity;
-        if (paymentEntity?.order_id) {
-            await prisma.payment.updateMany({
-                where: { razorpayOrderId: paymentEntity.order_id },
-                data: {
-                    status: "CAPTURED",
-                    razorpayPaymentId: paymentEntity.id,
-                },
-            });
-        }
-    }
-
-    if (event === "payment.failed" && payload) {
-        const paymentEntity = (payload as any)?.payment?.entity;
-        if (paymentEntity?.order_id) {
-            await prisma.payment.updateMany({
-                where: { razorpayOrderId: paymentEntity.order_id },
-                data: { status: "FAILED" },
-            });
-        }
-    }
-
-    return { handled: true, event };
+  return user;
 }

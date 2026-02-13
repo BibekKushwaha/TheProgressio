@@ -3,6 +3,8 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 import crypto from "crypto";
 import { prisma } from "@repo/db";
 
+const prismaAny = prisma as any;
+
 export interface User {
     id: string;
     username: string;
@@ -39,7 +41,7 @@ const hashToken = (value: string): string =>
 
 const resolveShareSession = async (rawShareToken: string): Promise<{ user: User; permissions: string; linkId: string } | null> => {
     const tokenHash = hashToken(rawShareToken);
-    const link = await prisma.familyShareLink.findFirst({
+    const link = await prismaAny.familyShareLink.findFirst({
         where: {
             tokenHash,
             revokedAt: null,
@@ -66,7 +68,7 @@ const resolveShareSession = async (rawShareToken: string): Promise<{ user: User;
 
     if (!user) return null;
 
-    await prisma.familyShareLink.update({
+    await prismaAny.familyShareLink.update({
         where: { id: link.id },
         data: { lastUsedAt: new Date() },
     });

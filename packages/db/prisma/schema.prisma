@@ -10,7 +10,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" 
+  provider = "postgresql"
 }
 
 model User {
@@ -19,9 +19,11 @@ model User {
   email            String     @unique
   password         String
   dailyGoalHours   Float      @default(4.0)
-  whatsappOptIn    Boolean    @default(true)
-  quietHoursStart  String?
-  quietHoursEnd    String?
+  plan             BillingPlan   @default(FREE)
+  planStatus       BillingStatus @default(INACTIVE)
+  renewalAt        DateTime?
+  paymentProvider  String?
+  paymentRef       String?
   createdAt        DateTime   @default(now())
   
   // XP / Gamification
@@ -37,6 +39,8 @@ model User {
   nudges           Nudge[]
   gradeEntries     GradeEntry[]
   courseGrades      CourseGrade[]
+  paymentEvents    PaymentEvent[]
+  syncOperations   SyncOperation[]
   
   // Academic Relations
   subjects         Subject[]
@@ -44,13 +48,6 @@ model User {
   studyGoals       StudyGoal[]
   timetable        Timetable[]
   rotationPatterns RotationPattern[]
-  schoolHolidays   SchoolHoliday[]
-  familyShareLinks FamilyShareLink[]
-  mobileRefreshTokens MobileRefreshToken[]
-
-  // Billing
-  subscriptions    Subscription[]
-  payments         Payment[]
 }
 
 model Achievement {
@@ -82,6 +79,8 @@ model Category {
   name         String
   colorCode    String   @default("#3B82F6")
   icon         String?  // Lucide icon name e.g. "Calculator", "Beaker", "BookOpen"
+  syncLamportTs Int     @default(0)
+  syncVectorClock String?
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks        Task[]
@@ -107,6 +106,8 @@ model Task {
   subject      Subject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   
   description  String?
+  syncLamportTs Int       @default(0)
+  syncVectorClock String?
   subtasks     SubTask[]
   attachments  Attachment[]
 
@@ -311,20 +312,6 @@ model Timetable {
   updatedAt   DateTime @updatedAt
 }
 
-model SchoolHoliday {
-  id                 String   @id @default(uuid())
-  userId             String
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name               String
-  startDate          DateTime
-  endDate            DateTime
-  pauseNotifications Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  @@index([userId, startDate, endDate])
-}
-
 // Custom rotation pattern — allows users to define their own rotation calendar
 model RotationPattern {
   id            String   @id @default(uuid())
@@ -365,35 +352,6 @@ model Nudge {
   @@index([userId, scheduledAt])
 }
 
-model FamilyShareLink {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash   String   @unique
-  label       String?
-  permissions String   @default("READ_ONLY")
-  expiresAt   DateTime?
-  revokedAt   DateTime?
-  lastUsedAt  DateTime?
-  createdAt   DateTime @default(now())
-
-  @@index([userId, revokedAt])
-}
-
-model MobileRefreshToken {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceId    String
-  tokenHash   String   @unique
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdAt   DateTime @default(now())
-
-  @@index([userId, deviceId])
-  @@index([userId, revokedAt])
-}
-
 // ── Phase 3: GPA / Grade Tracking ──────────────────────────────────────
 
 model CourseGrade {
@@ -424,9 +382,6 @@ model GradeEntry {
   obtainedMarks Float
   examType      String   // "JEE", "NEET", "UPSC", "INTERNAL", "BOARD"
   timeTakenMins Int?     // time taken per question/section
-  assessmentWeights    Json?
-  assessmentComponents Json?
-  gradingMode          String @default("RAW")
   
   createdAt     DateTime @default(now())
   
@@ -434,54 +389,56 @@ model GradeEntry {
   @@index([userId, examType])
 }
 
-// ─── Billing & Payments ─────────────────────────────────────────────────────────
+// ── Phase 4: Payments ──────────────────────────────────────────────────
 
-model Subscription {
-  id                    String   @id @default(uuid())
-  userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model PaymentEvent {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intentId        String   @unique
+  paymentRef      String   @unique
+  provider        String   // "UPI" | "PAYTM" | "NET_BANKING"
+  plan            BillingPlan
+  amountPaise     Int
+  status          String   // "CREATED" | "PENDING" | "SUCCESS" | "FAILED"
+  upiId           String?
+  payload         String?  // JSON metadata / webhook payload
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  plan                  String   // "FREE", "PRO", "INSTITUTION"
-  status                String   @default("ACTIVE") // "ACTIVE", "CANCELLED", "EXPIRED", "PAST_DUE"
-  razorpaySubscriptionId String?  @unique
-  razorpayCustomerId    String?
-
-  amountPaise           Int      @default(0) // amount in paise (14900 = ₹149)
-  currency              String   @default("INR")
-  interval              String   @default("monthly") // "monthly", "yearly"
-
-  currentPeriodStart    DateTime @default(now())
-  currentPeriodEnd      DateTime?
-  cancelledAt           DateTime?
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  payments              Payment[]
-
-  @@index([userId])
-  @@index([razorpaySubscriptionId])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
-model Payment {
-  id                    String   @id @default(uuid())
-  userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subscriptionId        String?
-  subscription          Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+model SyncOperation {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId    String
+  opId        String
+  entityType  String   // "task" | "category"
+  entityId    String
+  action      String   // "UPSERT" | "DELETE"
+  payload     String?  // JSON payload
+  lamportTs   Int
+  vectorClock String?  // JSON object string
+  tombstone   Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
-  razorpayOrderId       String?  @unique
-  razorpayPaymentId     String?  @unique
-  razorpaySignature     String?
+  @@unique([userId, opId])
+  @@index([userId, id])
+  @@index([userId, entityType, entityId, lamportTs])
+}
 
-  amountPaise           Int      // amount in paise
-  currency              String   @default("INR")
-  status                String   @default("CREATED") // "CREATED", "AUTHORIZED", "CAPTURED", "FAILED", "REFUNDED"
-  method                String?  // "upi", "card", "netbanking"
+enum BillingPlan {
+  FREE
+  PRO
+  INSTITUTION
+}
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  @@index([userId])
-  @@index([razorpayOrderId])
+enum BillingStatus {
+  INACTIVE
+  ACTIVE
+  PAST_DUE
+  CANCELED
 }

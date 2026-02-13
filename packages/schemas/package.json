@@ -31,6 +31,10 @@
     "./gradeEntry": "./src/gradeEntry.ts",
     "./subtask": "./src/subtask.ts",
     "./attachment": "./src/attachment.ts",
-    "./reminder": "./src/reminder.ts"
+    "./reminder": "./src/reminder.ts",
+    "./billing": "./src/billing.ts",
+    "./payment": "./src/payment.ts",
+    "./sync": "./src/sync.ts",
+    "./whatsapp": "./src/whatsapp.ts"
   }
 }

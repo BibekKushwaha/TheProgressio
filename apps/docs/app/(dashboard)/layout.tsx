@@ -18,7 +18,7 @@ export default function DashboardLayout({
 
                 <Sidebar />
 
-                <main className="lg:pl-70 min-h-screen relative z-10 transition-all duration-300">
+                <main className="lg:pl-73 lg:pr-3 pt-4 min-h-screen relative z-10 transition-all duration-300">
                     <div className="container mx-auto  max-w-7xl">
                         {children}
                     </div>

@@ -6,6 +6,7 @@ import { makeStore, AppStore } from './store';
 import { useGetProfileQuery } from './services/authApi';
 import { useAppDispatch } from './hooks';
 import { hydrateAuth, logout } from './slices/authSlice';
+import { syncEngine } from './sync-engine';
 
 const STORE_BUILD_VERSION = '2026-02-13-payment-api';
 
@@ -46,6 +47,18 @@ function AuthHydrator() {
   return null;
 }
 
+function SyncBootstrap() {
+  useEffect(() => {
+    syncEngine.start();
+
+    return () => {
+      syncEngine.stop();
+    };
+  }, []);
+
+  return null;
+}
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const storeRef = useRef<AppStore | null>(null);
   if (!storeRef.current || (storeRef.current as AppStore & { __storeBuildVersion?: string }).__storeBuildVersion !== STORE_BUILD_VERSION) {
@@ -58,6 +71,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     <Provider store={storeRef.current!}>
       <>
         {children}
+        <SyncBootstrap />
         <AuthHydrator />
       </>
     </Provider>
