@@ -5,13 +5,42 @@ import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
 import { NLPCommandBar } from '@/components/planner/NLPCommandBar';
 import { SyllabusDigitizer } from '@/components/planner/SyllabusDigitizer';
-import { TaskStatus, useGetCategoriesQuery, useGetTasksQuery } from '@repo/store';
+import { LocalTask, Task, TaskStatus, useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
 import { useSearchParams } from 'next/navigation';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Navbar } from '@/components/Navbar';
 import { SearchBar } from '@/components/SearchBar';
 import { SubjectCardsSidebar } from '@/components/planner/SubjectCardsSidebar';
+import { RecoveryModePanel } from '@/components/planner/RecoveryModePanel';
+
+const toTimestamp = (value: string | Date | null | undefined): number => {
+    if (!value) return Number.POSITIVE_INFINITY;
+    return new Date(value).getTime();
+};
+
+const mergeTaskSources = (remoteTasks: Task[], localTasks: LocalTask[]): Task[] => {
+    const merged = new Map<string, Task>();
+
+    remoteTasks.forEach((task) => {
+        merged.set(task.id, task);
+    });
+
+    localTasks.forEach((localTask) => {
+        if (localTask._deletedLocally) {
+            merged.delete(localTask.id);
+            return;
+        }
+
+        if (localTask._dirty || localTask._localOnly || !merged.has(localTask.id)) {
+            merged.set(localTask.id, localTask as unknown as Task);
+        }
+    });
+
+    return Array.from(merged.values()).sort(
+        (a, b) => toTimestamp(a.dueDate) - toTimestamp(b.dueDate)
+    );
+};
 
 export default function TasksPage() {
     const searchParams = useSearchParams();
@@ -21,9 +50,14 @@ export default function TasksPage() {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [view, setView] = useState<'kanban' | 'list' | 'timetable'>('kanban');
 
+    const localHydrated = useLocalDbHydration();
     const { data: categories } = useGetCategoriesQuery();
     const { data: allTasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
-    const tasks = allTasks || [];
+    const { tasks: cachedTasks } = useLocalTasks();
+    const tasks = useMemo(
+        () => mergeTaskSources(allTasks || [], cachedTasks),
+        [allTasks, cachedTasks]
+    );
 
     useEffect(() => {
         const queryCategoryId = searchParams.get('categoryId');
@@ -67,7 +101,7 @@ export default function TasksPage() {
     };
 
 
-    if (isLoading) {
+    if (isLoading && tasks.length === 0 && !localHydrated) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-8 space-y-8">
                 <Skeleton className="h-10 w-1/3 bg-white/5" />
@@ -92,6 +126,7 @@ export default function TasksPage() {
                     <div className="px-4 md:px-8 pt-4">
                         <NLPCommandBar />
                         <SyllabusDigitizer />
+                        <RecoveryModePanel tasks={tasks} />
                     </div>
                     <SearchBar
                         searchQuery={searchQuery}

@@ -10,6 +10,7 @@ import attachmentRouter from "./routes/attachment.route.js";
 import timetableRouter from "./routes/timetable.route.js";
 import calendarRouter from "./routes/calendar.routes.js";
 import rotationRouter from "./routes/rotation.route.js";
+import whatsappRouter from "./routes/whatsapp.route.js";
 import { producer } from "./services/producer.service.js";
 
 export const app = express();
@@ -29,6 +30,7 @@ app.get("/", (_req, res) => {
     res.send("Task Management API");
 });
 
+app.use("/api/integrations/whatsapp", whatsappRouter);
 app.use("/api/tasks", isAuth, taskRouter);
 app.use("/api/categories", isAuth, categoryRouter);
 app.use("/api/subtasks", isAuth, subtaskRouter);

@@ -7,6 +7,7 @@ import {
     XP_REWARDS,
     getStreakBonusXP,
     getYearlyHeatmap,
+    autoLogHabitFromCategory,
     calculateLevel,
     xpToNextLevel,
 } from "../services/streak.service.js";
@@ -543,15 +544,26 @@ export const handleHabitEvent = async (
     res: Response
 ): Promise<void> => {
     try {
-        const { type, habitId, completedValue, occurredAt } = req.body ?? {};
+        const { type, habitId, userId, categoryId, completedValue, occurredAt } = req.body ?? {};
 
-        if (!type || !habitId || typeof habitId !== "string") {
+        if (!type) {
             res.status(400).json({ message: "Invalid event payload" });
             return;
         }
 
         if (type !== "TaskCompleted") {
             res.status(200).json({ message: "Event ignored" });
+            return;
+        }
+
+        if (typeof categoryId === "string" && categoryId && typeof userId === "string" && userId) {
+            await autoLogHabitFromCategory(userId, categoryId);
+            res.status(200).json({ message: "Linked habits auto-logged" });
+            return;
+        }
+
+        if (!habitId || typeof habitId !== "string") {
+            res.status(400).json({ message: "Invalid event payload" });
             return;
         }
 

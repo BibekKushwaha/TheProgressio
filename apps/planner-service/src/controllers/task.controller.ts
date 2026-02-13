@@ -4,6 +4,39 @@ import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService } from "../services/ai.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/producer.service.js";
 
+const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
+
+const notifyHabitCategoryCompletion = async (params: {
+    userId: string;
+    categoryId: string | null;
+    occurredAt: string;
+}): Promise<void> => {
+    if (!params.categoryId) return;
+
+    try {
+        const response = await fetch(`${HABIT_SERVICE_URL}/api/habits/events`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: "TaskCompleted",
+                userId: params.userId,
+                categoryId: params.categoryId,
+                completedValue: 1,
+                occurredAt: params.occurredAt,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(
+                `⚠️ Habit automation event failed (${response.status}): ${errorText || "Unknown error"}`
+            );
+        }
+    } catch (error) {
+        console.warn("⚠️ Habit automation endpoint unreachable:", error);
+    }
+};
+
 export const createTask = async (req: AuthenticatedRequest, res: Response) => {
     try {
         if (!req.user || !req.user.id) {
@@ -307,9 +340,17 @@ export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
 
         // If toggled to COMPLETED, also emit a completion event
         if (newStatus === Status.COMPLETED) {
+            const completedAt = new Date().toISOString();
             await emitTaskEvent(TaskEventType.TASK_COMPLETED, id, req.user.id, {
                 title: updatedTask.title,
-                completedAt: new Date().toISOString(),
+                categoryId: updatedTask.categoryId,
+                completedAt,
+            });
+
+            await notifyHabitCategoryCompletion({
+                userId: req.user.id,
+                categoryId: updatedTask.categoryId ?? null,
+                occurredAt: completedAt,
             });
         }
 
@@ -325,6 +366,44 @@ export const taskCategories = async (_req: Request, res: Response) => {
     return res.status(501).json({ message: "Not implemented" });
 };
 
+interface CreateTaskFromTextParams {
+    userId: string;
+    text: string;
+    source: string;
+    metadata?: Record<string, unknown>;
+}
+
+export const createTaskFromText = async ({
+    userId,
+    text,
+    source,
+    metadata = {},
+}: CreateTaskFromTextParams) => {
+    const parsedData = await aiService.parseTaskIntent(text);
+
+    const task = await prisma.task.create({
+        data: {
+            title: parsedData.title || text,
+            description: parsedData.description || `Generated from: "${text}"`,
+            priority: (parsedData.priority as Priority) || Priority.MEDIUM,
+            status: Status.PENDING,
+            dueDate: parsedData.dueDate || null,
+            userId,
+        }
+    });
+
+    await emitTaskEvent(TaskEventType.TASK_CREATED, task.id, userId, {
+        title: task.title,
+        priority: task.priority,
+        dueDate: task.dueDate,
+        source,
+        rawInput: text,
+        ...metadata,
+    });
+
+    return { task, parsedData };
+};
+
 export const smartCreateTask = async (req: AuthenticatedRequest, res: Response) => {
     try {
         if (!req.user || !req.user.id) {
@@ -336,29 +415,10 @@ export const smartCreateTask = async (req: AuthenticatedRequest, res: Response) 
             return res.status(400).json({ message: "Text input is required" });
         }
 
-        // 1. Parse intent using Gemini
-        const parsedData = await aiService.parseTaskIntent(text);
-
-        // 2. Create Task in DB
-        const task = await prisma.task.create({
-            data: {
-                title: parsedData.title || text, // Fallback to raw text if title missing
-                description: parsedData.description || `Generated from: "${text}"`,
-                priority: (parsedData.priority as Priority) || Priority.MEDIUM,
-                status: Status.PENDING,
-                dueDate: parsedData.dueDate || null,
-                userId: req.user.id,
-                // If subject exists, could link it here logic to find Subject ID by name would be needed
-            }
-        });
-
-        // 3. Emit structured task event
-        await emitTaskEvent(TaskEventType.TASK_CREATED, task.id, req.user.id, {
-            title: task.title,
-            priority: task.priority,
-            dueDate: task.dueDate,
+        const { task, parsedData } = await createTaskFromText({
+            userId: req.user.id,
+            text,
             source: "nlp-smart-create",
-            rawInput: text,
         });
 
         return res.status(201).json({

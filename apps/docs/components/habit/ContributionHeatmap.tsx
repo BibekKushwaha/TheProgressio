@@ -44,11 +44,13 @@ export function ContributionHeatmap() {
         return result;
     }, [sortedDays]);
 
+    const displayWeeks = useMemo(() => [...weeks].reverse(), [weeks]);
+
     const monthHeaders = useMemo(() => {
         const headers: Array<{ weekIndex: number; label: string }> = [];
         let previousMonth: number | null = null;
 
-        weeks.forEach((week, weekIndex) => {
+        displayWeeks.forEach((week, weekIndex) => {
             const firstRealDay = week.find((day) => day !== null);
             if (!firstRealDay) return;
 
@@ -64,7 +66,7 @@ export function ContributionHeatmap() {
         });
 
         return headers;
-    }, [weeks]);
+    }, [displayWeeks]);
 
     const getColor = (intensity: 0 | 1 | 2 | 3 | 4) => {
         const colors: Record<number, string> = {
@@ -161,7 +163,7 @@ export function ContributionHeatmap() {
                     </div>
 
                     {/* Heatmap grid */}
-                    {weeks.map((week, weekIdx) => (
+                    {displayWeeks.map((week, weekIdx) => (
                         <div key={weekIdx} className="flex flex-col gap-[4px]">
                             <div className="h-4 mb-1 flex items-center">
                                 {monthHeaders.find((header) => header.weekIndex === weekIdx) ? (

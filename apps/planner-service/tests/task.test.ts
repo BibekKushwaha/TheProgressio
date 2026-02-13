@@ -344,6 +344,57 @@ describe('Task endpoints', () => {
     expect(res.status).toBe(200)
     expect(res.body.subtasks).toHaveLength(3)
   })
+
+  // WHATSAPP CAPTURE
+  it('captures a task from WhatsApp payload', async () => {
+    process.env.WHATSAPP_WEBHOOK_SECRET = 'wa-secret'
+    const created = { id: 't3', title: 'Chemistry lab report', userId: 'user-1', status: 'PENDING', priority: 'HIGH' }
+    ;(prisma.task.create as any).mockResolvedValue(created)
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({
+        userId: 'user-1',
+        text: 'Biology quiz next Friday at 9 AM!! p1',
+        from: '15550001111',
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body).toHaveProperty('task.id', 't3')
+    expect(emitTaskEvent).toHaveBeenCalledWith(
+      'task.created', 't3', 'user-1',
+      expect.objectContaining({ source: 'whatsapp-capture' })
+    )
+
+    delete process.env.WHATSAPP_WEBHOOK_SECRET
+  })
+
+  it('returns 400 when WhatsApp payload does not resolve a user', async () => {
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .send({ text: 'Create task from WhatsApp' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.message).toContain('User could not be resolved')
+  })
+
+  it('verifies WhatsApp webhook challenge', async () => {
+    process.env.WHATSAPP_VERIFY_TOKEN = 'verify-token'
+
+    const res = await request(app)
+      .get('/api/integrations/whatsapp/webhook')
+      .query({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': 'verify-token',
+        'hub.challenge': 'challenge-123',
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.text).toBe('challenge-123')
+
+    delete process.env.WHATSAPP_VERIFY_TOKEN
+  })
 })
 
 // ─── Category Tests ─────────────────────────────────────────────────────────────
