@@ -73,6 +73,62 @@ const notifyAnalyticsTaskCompletion = async (params: {
     }
 };
 
+const notifyAnalyticsTaskUpdate = async (params: {
+    taskId: string;
+    userId: string;
+    changedFields: Record<string, unknown>;
+}): Promise<void> => {
+    if (process.env.NODE_ENV === "test") return;
+    try {
+        const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: "TASK_UPDATED",
+                taskId: params.taskId,
+                userId: params.userId,
+                changedFields: params.changedFields,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(
+                `⚠️ Analytics update event failed (${response.status}): ${errorText || "Unknown error"}`
+            );
+        }
+    } catch (error) {
+        console.warn("⚠️ Analytics update endpoint unreachable:", error);
+    }
+};
+
+const notifyAnalyticsTaskDeletion = async (params: {
+    taskId: string;
+    userId: string;
+}): Promise<void> => {
+    if (process.env.NODE_ENV === "test") return;
+    try {
+        const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: "TASK_DELETED",
+                taskId: params.taskId,
+                userId: params.userId,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(
+                `⚠️ Analytics deletion event failed (${response.status}): ${errorText || "Unknown error"}`
+            );
+        }
+    } catch (error) {
+        console.warn("⚠️ Analytics deletion endpoint unreachable:", error);
+    }
+};
+
 export const runTaskCompletionSideEffects = async (params: {
     taskId: string;
     userId: string;
@@ -296,6 +352,13 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response) => {
             newStatus: updatedTask.status,
         });
 
+        // Notify analytics of the update (fire-and-forget)
+        notifyAnalyticsTaskUpdate({
+            taskId: id,
+            userId: req.user.id,
+            changedFields,
+        });
+
         // If status changed to COMPLETED, also emit a completion event
         if (status && updatedTask.status === Status.COMPLETED && existingTask.status !== Status.COMPLETED) {
             await runTaskCompletionSideEffects({
@@ -346,6 +409,9 @@ export const deleteTask = async (req: AuthenticatedRequest, res: Response) => {
             title: existingTask.title,
             previousStatus: existingTask.status,
         });
+
+        // Notify analytics to clean up stats (fire-and-forget)
+        notifyAnalyticsTaskDeletion({ taskId: id, userId: req.user.id });
 
         return res.status(200).json({ message: "Task deleted successfully" });
     } catch (error) {

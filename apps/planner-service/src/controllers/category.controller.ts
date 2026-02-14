@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { prisma } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { categorySchema } from "@repo/schemas/category";
 
 export const createCategory = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -13,6 +14,18 @@ export const createCategory = async (req: AuthenticatedRequest, res: Response) =
 
         if (!name || typeof name !== "string") {
             return res.status(400).json({ message: "Name is required" });
+        }
+
+        const parsed = categorySchema.safeParse({
+            name,
+            colorCode: (colorCode && /^#[0-9A-F]{6}$/i.test(colorCode)) ? colorCode : "#3B82F6",
+            icon: icon || undefined,
+        });
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Invalid category data",
+                errors: parsed.error.flatten(),
+            });
         }
 
         const category = await prisma.category.create({

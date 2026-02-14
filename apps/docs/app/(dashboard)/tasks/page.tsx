@@ -30,7 +30,7 @@ const mergeTaskSources = (remoteTasks: Task[], localTasks: LocalTask[]): Task[] 
             return;
         }
 
-        if (localTask._dirty || localTask._localOnly || !merged.has(localTask.id)) {
+        if (localTask._dirty || localTask._localOnly) {
             merged.set(localTask.id, localTask as unknown as Task);
         }
     });
@@ -51,12 +51,12 @@ export default function TasksPage() {
     const localHydrated = useLocalDbHydration();
     const { data: categories } = useGetCategoriesQuery();
     const { data: allTasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
-    
-     const { tasks: cachedTasks } = useLocalTasks();
-          const tasks = useMemo(
-              () => mergeTaskSources(allTasks || [], cachedTasks),
-              [allTasks, cachedTasks]
-          );
+
+    const { tasks: cachedTasks } = useLocalTasks();
+    const tasks = useMemo(
+        () => mergeTaskSources(allTasks || [], cachedTasks),
+        [allTasks, cachedTasks]
+    );
 
     useEffect(() => {
         const queryCategoryId = searchParams.get('categoryId');
@@ -121,7 +121,7 @@ export default function TasksPage() {
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white">
             <div className="flex">
                 <div className="flex-1 flex flex-col">
-                
+
                     <SearchBar
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}

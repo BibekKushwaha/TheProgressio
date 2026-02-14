@@ -19,7 +19,7 @@ import {
 
 const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
 const MAX_RETRIES = 5;
-const SYNC_INTERVAL_MS = 5000;
+const SYNC_INTERVAL_MS = 30000; // Poll every 30 seconds instead of 5
 
 type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
 

@@ -225,6 +225,8 @@ export function GPACalculator() {
                                 className="bg-white/5 border-white/10"
                                 placeholder="Weight %"
                                 type="number"
+                                step="any"
+                                min="0"
                             />
                             <Input
                                 value={component.obtainedMarks}
@@ -232,6 +234,8 @@ export function GPACalculator() {
                                 className="bg-white/5 border-white/10"
                                 placeholder="Scored"
                                 type="number"
+                                step="any"
+                                min="0"
                             />
                             <Input
                                 value={component.totalMarks}
@@ -239,6 +243,8 @@ export function GPACalculator() {
                                 className="bg-white/5 border-white/10"
                                 placeholder="Total"
                                 type="number"
+                                step="any"
+                                min="1"
                             />
                         </div>
                     ))}

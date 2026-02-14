@@ -62,10 +62,10 @@ export function TodaysTasks() {
         <div
             key={task.id}
             className={`group flex items-center gap-4 p-4 border rounded-xl hover:bg-white/10 hover:border-white/20 transition-all duration-300 ${task.status === TaskStatus.COMPLETED
-                    ? 'bg-white/[0.02] border-white/5'
-                    : isTop3
-                        ? 'bg-gradient-to-r from-white/10 to-white/5 border-purple-500/30 shadow-sm shadow-purple-500/10'
-                        : 'bg-white/5 border-white/10'
+                ? 'bg-white/[0.02] border-white/5'
+                : isTop3
+                    ? 'bg-gradient-to-r from-white/10 to-white/5 border-purple-500/30 shadow-sm shadow-purple-500/10'
+                    : 'bg-white/5 border-white/10'
                 }`}
         >
             <button
@@ -109,9 +109,9 @@ export function TodaysTasks() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-white">Today&apos;s Tasks</h2>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <div className="text-sm text-slate-400 mt-1">
                         {isLoading ? <Skeleton className="h-4 w-32 bg-white/5" /> : (tasks?.length ? `${tasks.filter(t => t.status === TaskStatus.COMPLETED).length}/${tasks.length} completed` : 'Get started with your goals')}
-                    </p>
+                    </div>
                 </div>
                 <Link href="/planner" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-all duration-300 font-semibold group">
                     Planner

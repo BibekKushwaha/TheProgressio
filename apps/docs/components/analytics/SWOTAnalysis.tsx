@@ -12,10 +12,10 @@ interface SWOTAnalysisProps {
     allowExamTypeChange?: boolean;
 }
 
-const EXAM_TYPE_OPTIONS = ['JEE', 'NEET', 'UPSC', 'midterm', 'final', 'quiz'] as const;
+const EXAM_TYPE_OPTIONS = ['JEE', 'NEET', 'UPSC', 'Midterm', 'Final', 'Quiz'] as const;
 
 export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange = true }: SWOTAnalysisProps) {
-    const [examType, setExamType] = useState(controlledExamType || 'midterm');
+    const [examType, setExamType] = useState(controlledExamType || 'Midterm');
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {

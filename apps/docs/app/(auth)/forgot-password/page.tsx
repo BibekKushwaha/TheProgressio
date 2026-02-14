@@ -3,9 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
-import GlassCard from "../../../components/ui/glass-card";
-import GradientButton from "../../../components/auth/gradient-button";
-import Input from "../../../components/auth/input";
+import { Card } from "@/components/ui/card";
+import GradientButton from "@/components/auth/gradient-button";
+import Input from "@/components/auth/input";
 import { useForgotPasswordMutation } from "@repo/store";
 
 const ForgotPasswordPage = () => {
@@ -38,7 +38,7 @@ const ForgotPasswordPage = () => {
                 <div className="absolute top-[40%] right-[10%] w-[40%] h-[40%] bg-[#a855f7]/10 rounded-full blur-[100px]" />
             </div>
 
-            <GlassCard className="w-full max-w-md p-8 relative z-10" gradient>
+            <Card variant="glass" className="w-full max-w-md p-8 relative z-10">
                 {!isSubmitted ? (
                     <>
                         <div className="mb-8 text-center">
@@ -98,7 +98,7 @@ const ForgotPasswordPage = () => {
                         </Link>
                     </div>
                 )}
-            </GlassCard>
+            </Card>
         </div>
     );
 };

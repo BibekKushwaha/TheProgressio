@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Calendar, Clock } from "lucide-react";
 import { useGetTasksQuery, Task } from "@repo/store";
-import { getTodayDateKey, toLocalDateKey } from "@/lib/date";
+import { getTodayDateKey, toLocalDateKey, formatRelativeDate } from "@/lib/date";
 
 export function UpcomingTasksPanel() {
     const { data: tasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
@@ -47,13 +47,13 @@ export function UpcomingTasksPanel() {
                         <div key={task.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
                             <div className="mt-1 h-2 w-2 rounded-full bg-violet-400" />
                             <div className="min-w-0 flex-1">
-                                <div className="text-sm font-semibold text-white truncate">{task.title}</div>
+                                <div className="text-sm font-semibold text-white truncate">{task.title.charAt(0).toUpperCase() + task.title.slice(1)}</div>
                                 {task.description && (
                                     <div className="text-xs text-slate-400 line-clamp-1 mt-0.5">{task.description}</div>
                                 )}
                                 <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                                     <Clock className="w-3 h-3" />
-                                    <span>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No due date"}</span>
+                                    <span>{task.dueDate ? formatRelativeDate(task.dueDate) : "No due date"}</span>
                                 </div>
                             </div>
                         </div>

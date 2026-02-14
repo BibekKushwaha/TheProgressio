@@ -4,11 +4,11 @@ import React, { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, User } from "lucide-react";
-import GlassCard from "../../../components/ui/glass-card";
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
 import { setCredentials, useAppDispatch, useRegisterMutation } from "@repo/store";
 import { registerSchema } from "@repo/schemas/auth";
+import { Card } from "@/components/ui/card";
 
 const SignupPage = () => {
   const [registerApi, { isLoading }] = useRegisterMutation();
@@ -104,7 +104,7 @@ const SignupPage = () => {
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-5">
       {/* Left Side - Form (Reversed from Login) */}
       <div className="lg:col-span-2 bg-slate-950 flex items-center justify-center p-8 relative order-last lg:order-first">
-        <GlassCard className="w-full max-w-md p-8 relative z-10" gradient>
+        <Card variant="glass" className="w-full max-w-md p-8 relative z-10">
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-bold text-white mb-2">Create Account</h2>
             <p className="text-gray-400">Join successfully tracking students</p>
@@ -185,7 +185,7 @@ const SignupPage = () => {
               </Link>
             </div>
           </form>
-        </GlassCard>
+        </Card>
       </div>
 
       {/* Right Side - Art */}

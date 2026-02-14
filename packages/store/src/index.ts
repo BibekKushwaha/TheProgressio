@@ -217,11 +217,13 @@ export { SessionType } from './services/analyticsApi';
 export * from './services/timetableApi';
 export * from './services/calendarApi';
 export * from './services/rotationsApi';
-export * from './services/paymentApi';
 
 // Payment API
 export {
   paymentApi,
+  useGetBillingProfileQuery,
+  useCreatePaymentIntentMutation,
+  useCreateUpiCollectMutation,
   useCreateOrderMutation,
   useVerifyPaymentMutation,
   useGetSubscriptionStatusQuery,
@@ -229,6 +231,12 @@ export {
   useGetPaymentHistoryQuery,
 } from './services/paymentApi';
 export type {
+  BillingPlan,
+  BillingStatus,
+  PaymentProvider,
+  BillingProfile,
+  PaymentIntent,
+  UpiCollectResponse,
   PlanId,
   PaymentMethod,
   CreateOrderRequest,
@@ -239,23 +247,6 @@ export type {
   PaymentRecord,
 } from './services/paymentApi';
 
-// Timetable API
-export {
-  timetableApi,
-  useGetDailyScheduleQuery,
-  useGetHolidaysQuery,
-  useCreateHolidayMutation,
-  useUpdateHolidayMutation,
-  useDeleteHolidayMutation,
-} from './services/timetableApi';
-export type {
-  DailySchedule,
-  TimetableEntry,
-  TimetableConflict,
-  SchoolHoliday,
-  Subject,
-  Rotation,
-} from './services/timetableApi';
 
 
 // Analytics slice

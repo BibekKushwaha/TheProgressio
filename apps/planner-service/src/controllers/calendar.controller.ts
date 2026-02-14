@@ -142,12 +142,12 @@ export const getDailySchedule = async (req: AuthenticatedRequest, res: Response)
             ...timetableData.entries.map(entry => ({
                 id: `timetable-${entry.id}`,
                 type: 'class',
-                title: entry.subject.name,
-                subtitle: entry.subject.room || 'No Room',
+                title: entry.subject?.name || 'Class',
+                subtitle: entry.subject?.room || 'No Room',
                 startTime: entry.startTime,
                 endTime: entry.endTime,
-                color: entry.subject.color,
-                subject: entry.subject.name,
+                color: entry.subject?.color || '#3B82F6',
+                subject: entry.subject?.name || 'Unknown',
                 // Add useful metadata
                 category: 'Academic',
                 isRecurring: true,
@@ -179,7 +179,7 @@ export const getDailySchedule = async (req: AuthenticatedRequest, res: Response)
                 startTime: '09:00', // Needs a proper time field in DB eventually
                 endTime: '11:00',
                 color: '#EF4444',
-                subject: exam.subject.name,
+                subject: exam.subject?.name || 'General',
                 category: 'Exam',
                 priority: exam.priority
             }))

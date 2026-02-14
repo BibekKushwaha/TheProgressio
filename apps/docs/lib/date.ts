@@ -30,3 +30,31 @@ export function normalizeDateInput(raw: string): string | null {
 
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
+
+export function formatRelativeDate(dateInput: Date | string): string {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return '';
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays === -1) return 'Yesterday';
+
+    if (diffDays > 1 && diffDays < 7) {
+        return targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+    }
+
+    if (diffDays >= 7 && diffDays < 14) {
+        return `Next ${targetDate.toLocaleDateString('en-US', { weekday: 'long' })}`;
+    }
+
+    return targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}

@@ -12,8 +12,11 @@ export function ProgressCard() {
     // Default to 0 if totalBadges is 0 to avoid NaN
     const progress = totalBadges > 0 ? (unlockedCount / totalBadges) * 100 : 0;
     const badgesPerLevel = 5;
-    const remainingToNext = badgesPerLevel - (unlockedCount % badgesPerLevel || badgesPerLevel);
-    const nextLevel = Math.floor(unlockedCount / badgesPerLevel) + 1;
+    const currentLevel = Math.floor(unlockedCount / badgesPerLevel) + 1;
+    const nextLevel = currentLevel + 1;
+
+    const remainingToNext = badgesPerLevel - (unlockedCount % badgesPerLevel);
+    const isAllUnlocked = unlockedCount === totalBadges && totalBadges > 0;
 
     if (isLoading) {
         return (
@@ -41,9 +44,8 @@ export function ProgressCard() {
 
             <p className="text-sm text-slate-400">
                 <span className="font-semibold text-purple-400">
-                    {remainingToNext > 0 ? `${remainingToNext} more badges` : 'All badges unlocked!'}
-                </span> to reach{' '}
-                <span className="font-semibold text-purple-300">Level {nextLevel + 1} Master</span> status
+                    {isAllUnlocked ? 'All badges unlocked!' : `${remainingToNext} more badges`}
+                </span> {isAllUnlocked ? 'achieved' : 'to reach'} <span className="font-semibold text-purple-300">{isAllUnlocked ? 'Max Level' : `Level ${nextLevel} Master`}</span> status
             </p>
         </div>
     );

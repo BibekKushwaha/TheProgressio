@@ -4,9 +4,21 @@ import { useGetAchievementsQuery } from '@repo/store';
 import { BadgeCard } from './BadgeCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function BadgesGrid() {
+interface BadgesGridProps {
+    filter: string;
+}
+
+export function BadgesGrid({ filter }: BadgesGridProps) {
     const { data: achievementsData, isLoading } = useGetAchievementsQuery();
     const achievements = achievementsData?.achievements || [];
+
+    const filteredAchievements = achievements.filter((achievement) => {
+        if (filter === 'all') return true;
+        if (filter === 'unlocked') return achievement.unlocked;
+        if (filter === 'locked') return !achievement.unlocked;
+        if (filter === 'legendary') return achievement.type?.toLowerCase() === 'legendary';
+        return true;
+    });
 
     if (isLoading) {
         return (
@@ -18,17 +30,19 @@ export function BadgesGrid() {
         );
     }
 
-    if (achievements.length === 0) {
+    if (filteredAchievements.length === 0) {
         return (
             <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10">
-                <p className="text-slate-400 text-lg">No achievements found.</p>
+                <p className="text-slate-400 text-lg">
+                    {filter === 'all' ? 'No achievements found.' : 'No achievements match this filter.'}
+                </p>
             </div>
         );
     }
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {achievements.map((achievement) => (
+            {filteredAchievements.map((achievement) => (
                 <BadgeCard
                     key={achievement.id}
                     badge={{

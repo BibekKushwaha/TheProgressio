@@ -1,5 +1,5 @@
 import React from "react";
-import GlassCard from "@/components/ui/glass-card";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface AuthSplitLayoutProps {
@@ -79,12 +79,12 @@ export function AuthFormPane({
                     mobileBackgroundClassName,
                 )}
             />
-            <GlassCard
+            <Card
                 className={cn("w-full max-w-md p-8 relative z-10", cardClassName)}
-                gradient
+                variant="glass"
             >
                 {children}
-            </GlassCard>
+            </Card>
         </div>
     );
 }

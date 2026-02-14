@@ -2,7 +2,7 @@
 
 import { useGetPredictionQuery } from '@repo/store';
 import { Clock, TrendingUp, AlertCircle } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AnalyticsCard } from './AnalyticsCard';
 
 export function DurationPredictionCard({ taskId }: { taskId?: string }) {
     const { data, isLoading, error } = useGetPredictionQuery(taskId ? { taskId } : undefined, {
@@ -11,41 +11,44 @@ export function DurationPredictionCard({ taskId }: { taskId?: string }) {
 
     if (!taskId) {
         return (
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                    <Clock className="w-5 h-5 text-blue-400" />
-                    <h3 className="text-lg font-bold text-white">ML Duration Prediction</h3>
+            <AnalyticsCard
+                title="ML Duration Prediction"
+                description="Select a task to see predicted completion time."
+                icon={Clock}
+                iconColor="text-blue-400"
+                iconBgColor="bg-blue-500/10"
+            >
+                <div className="h-20 flex items-center justify-center text-sm text-slate-500 italic">
+                    Waiting for selection...
                 </div>
-                <p className="text-sm text-slate-400">Select a task to see predicted completion time.</p>
-            </div>
+            </AnalyticsCard>
         );
     }
 
-    if (isLoading) return <Skeleton className="h-40 w-full bg-white/5 rounded-xl" />;
-
     if (error || !data?.prediction) {
         return (
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="w-5 h-5 text-slate-500" />
-                    <h3 className="text-lg font-bold text-white">Duration Prediction</h3>
-                </div>
-                <p className="text-sm text-slate-400">Not enough data to predict duration yet.</p>
-            </div>
+            <AnalyticsCard
+                title="Duration Prediction"
+                description="Not enough data to predict duration yet."
+                icon={AlertCircle}
+                iconColor="text-slate-400"
+                iconBgColor="bg-slate-500/10"
+                error={true}
+                emptyMessage="Not enough data to predict duration yet."
+            />
         );
     }
 
     const pred = data.prediction;
 
     return (
-        <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur-md border border-blue-500/20 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
-                    <TrendingUp className="w-4 h-4 text-white" />
-                </div>
-                <h3 className="text-lg font-bold text-white">ML Duration Prediction</h3>
-            </div>
-
+        <AnalyticsCard
+            title="Smart Duration Prediction"
+            icon={TrendingUp}
+            iconColor="text-white"
+            iconBgColor="bg-gradient-to-br from-blue-500 to-cyan-500"
+            isLoading={isLoading}
+        >
             <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="bg-white/5 border border-white/10 rounded-lg p-3 text-center">
                     <div className="text-xs text-green-400 mb-1">Optimistic</div>
@@ -65,6 +68,6 @@ export function DurationPredictionCard({ taskId }: { taskId?: string }) {
                 <span>Confidence: <span className="text-white font-semibold">{pred.confidence}</span></span>
                 <span>Sample: {pred.sampleSize} tasks</span>
             </div>
-        </div>
+        </AnalyticsCard>
     );
 }

@@ -7,6 +7,8 @@ import {
 } from '@repo/store';
 import type { GradeEntry } from '@repo/store';
 import { Plus, GraduationCap } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface GradeEntryManagerProps {
     examType?: string;
@@ -63,42 +65,46 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
 
             <form onSubmit={handleAdd} className={`grid gap-3 mb-5 ${allowExamTypeEdit && !controlledExamType ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
                 {allowExamTypeEdit && !controlledExamType && (
-                    <input
+                    <Input
                         value={examType}
                         onChange={e => setExamType(e.target.value)}
                         placeholder="Exam type"
-                        className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
+                        className="bg-white/5 border-white/10"
                     />
                 )}
-                <input
+                <Input
                     value={subjectName}
                     onChange={e => setSubjectName(e.target.value)}
-                    placeholder="Subject"
-                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
+                    placeholder="Subject Name"
+                    className="bg-white/5 border-white/10"
                 />
-                <div className="flex gap-2">
-                    <input
+                <div className="flex gap-2 flex-1">
+                    <Input
                         value={obtainedMarks}
                         onChange={e => setObtainedMarks(e.target.value)}
                         placeholder="Score"
                         type="number"
-                        className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 w-full"
+                        step="any"
+                        min="0"
+                        className="bg-white/5 border-white/10"
                     />
-                    <input
+                    <Input
                         value={totalMarks}
                         onChange={e => setTotalMarks(e.target.value)}
                         placeholder="Max"
                         type="number"
-                        className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 w-20"
+                        step="any"
+                        min="1"
+                        className="bg-white/5 border-white/10 w-24"
                     />
                 </div>
-                <button
+                <Button
                     type="submit"
                     disabled={isAdding || !subjectName || !obtainedMarks || !activeExamType || invalidInput}
-                    className="flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+                    className="bg-purple-600 hover:bg-purple-500 text-white"
                 >
-                    <Plus className="w-4 h-4" /> Add
-                </button>
+                    <Plus className="w-4 h-4 mr-1.5" /> Add Score
+                </Button>
             </form>
 
             {isLoading ? (

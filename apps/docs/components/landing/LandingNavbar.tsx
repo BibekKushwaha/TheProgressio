@@ -17,10 +17,14 @@ import { useRouter } from 'next/navigation';
 
 export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
-  
-  
+
+
   const [logout] = useLogoutMutation();
-  const navLinks = ['Features', 'How it Works', 'Pricing'];
+  const navLinks = [
+    { label: 'Features', href: '/dashboard' },
+    { label: 'How it Works', href: '/signup' },
+    { label: 'Pricing', href: '#' },
+  ];
   const router = useRouter();
 
 
@@ -29,15 +33,15 @@ export function Navbar() {
     router.push('/'); // Redirect to homepage after logout
   };
 
-   const handleDashboard = () => {
+  const handleDashboard = () => {
     router.push('/dashboard');
   };
 
   const handleSettings = () => {
     router.push('/settings');
   };
-  
-  
+
+
 
   return (
     <motion.nav
@@ -56,11 +60,11 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <Link
-                key={link}
-                href={`#${link.toLowerCase().replace(' ', '-')}`}
+                key={link.label}
+                href={link.href}
                 className="text-slate-300 hover:text-white transition-colors"
               >
-                {link}
+                {link.label}
               </Link>
             ))}
           </div>
@@ -91,22 +95,22 @@ export function Navbar() {
               </DropdownMenu>
             ) : (
               <>
-              
+
                 <Button
-                onClick={()=> router.push("/login")}
-                 className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-300">
+                  onClick={() => router.push("/login")}
+                  className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-300">
                   Get Started
                 </Button>
               </>
             )}
-            
+
           </div>
         </div>
       </div>
 
-      
-        {/* Mobile Menu */}
-        
+
+      {/* Mobile Menu */}
+
     </motion.nav>
   );
 }

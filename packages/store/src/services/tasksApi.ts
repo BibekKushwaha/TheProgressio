@@ -99,21 +99,23 @@ export interface RecoveryPlan {
     items: RecoveryPlanItem[];
 }
 
+const plannerBaseQuery = fetchBaseQuery({
+    baseUrl: `${PLANNER_SERVICE_URL}/api`,
+    credentials: 'include',
+    prepareHeaders: (headers) => {
+        headers.set('Content-Type', 'application/json');
+        return headers;
+    },
+});
+
 export const tasksApi = createApi({
     reducerPath: 'tasksApi',
-    baseQuery: fetchBaseQuery({
-        baseUrl: `${PLANNER_SERVICE_URL}/api/tasks`,
-        credentials: 'include', // Include cookies for isAuth middleware
-        prepareHeaders: (headers) => {
-            headers.set('Content-Type', 'application/json');
-            return headers;
-        },
-    }),
+    baseQuery: plannerBaseQuery,
     tagTypes: ['Tasks'],
     endpoints: (builder) => ({
         getTasks: builder.query<Task[], { page?: number; limit?: number; status?: Status; priority?: Priority; categoryId?: string; search?: string; date?: string } | void>({
             query: (params) => ({
-                url: '/',
+                url: '/tasks',
                 method: 'GET',
                 params: params || {},
             }),
@@ -126,12 +128,12 @@ export const tasksApi = createApi({
                     : [{ type: 'Tasks', id: 'LIST' }],
         }),
         getTaskById: builder.query<Task, string>({
-            query: (id) => `/${id}`,
+            query: (id) => `/tasks/${id}`,
             providesTags: (_result, _error, id) => [{ type: 'Tasks' as const, id }],
         }),
         createTask: builder.mutation<Task, CreateTaskRequest>({
             query: (body) => ({
-                url: '/',
+                url: '/tasks',
                 method: 'POST',
                 body,
             }),
@@ -153,7 +155,7 @@ export const tasksApi = createApi({
         }),
         updateTask: builder.mutation<Task, UpdateTaskRequest>({
             query: ({ id, ...body }) => ({
-                url: `/${id}`,
+                url: `/tasks/${id}`,
                 method: 'PATCH',
                 body,
             }),
@@ -183,7 +185,7 @@ export const tasksApi = createApi({
         }),
         deleteTask: builder.mutation<{ message: string }, string>({
             query: (id) => ({
-                url: `/${id}`,
+                url: `/tasks/${id}`,
                 method: 'DELETE',
             }),
             invalidatesTags: (_result, _error, id) => [{ type: 'Tasks', id }, { type: 'Tasks', id: 'LIST' }],
@@ -204,7 +206,7 @@ export const tasksApi = createApi({
         }),
         toggleTask: builder.mutation<Task, string>({
             query: (id) => ({
-                url: `/${id}/toggle`,
+                url: `/tasks/${id}/toggle`,
                 method: 'PATCH',
             }),
             invalidatesTags: (_result, _error, id) => [{ type: 'Tasks', id }],
@@ -231,7 +233,7 @@ export const tasksApi = createApi({
         }),
         createSubTask: builder.mutation<SubTask, { taskId: string; title: string }>({
             query: (body) => ({
-                url: '/../subtasks',
+                url: '/subtasks',
                 method: 'POST',
                 body,
             }),
@@ -239,7 +241,7 @@ export const tasksApi = createApi({
         }),
         updateSubTask: builder.mutation<SubTask, { id: string; title?: string; completed?: boolean; taskId: string }>({
             query: ({ id, taskId, ...body }) => ({
-                url: `/../subtasks/${id}`,
+                url: `/subtasks/${id}`,
                 method: 'PATCH',
                 body,
             }),
@@ -262,7 +264,7 @@ export const tasksApi = createApi({
         }),
         deleteSubTask: builder.mutation<{ message: string }, { id: string; taskId: string }>({
             query: ({ id }) => ({
-                url: `/../subtasks/${id}`,
+                url: `/subtasks/${id}`,
                 method: 'DELETE',
             }),
             invalidatesTags: (_result, _error, { taskId }) => [{ type: 'Tasks', id: taskId }],
@@ -283,7 +285,7 @@ export const tasksApi = createApi({
         }),
         createAttachment: builder.mutation<Attachment, { taskId: string; name: string; url: string; size?: string }>({
             query: (body) => ({
-                url: '/../attachments',
+                url: '/attachments',
                 method: 'POST',
                 body,
             }),
@@ -291,14 +293,14 @@ export const tasksApi = createApi({
         }),
         deleteAttachment: builder.mutation<{ message: string }, { id: string; taskId: string }>({
             query: ({ id }) => ({
-                url: `/../attachments/${id}`,
+                url: `/attachments/${id}`,
                 method: 'DELETE',
             }),
             invalidatesTags: (_result, _error, { taskId }) => [{ type: 'Tasks', id: taskId }],
         }),
         smartCreateTask: builder.mutation<{ message: string; task: Task; parsedMeta: any }, { text: string }>({
             query: (body) => ({
-                url: '/smart-create',
+                url: '/tasks/smart-create',
                 method: 'POST',
                 body,
             }),
@@ -306,14 +308,14 @@ export const tasksApi = createApi({
         }),
         generateSubtasks: builder.mutation<Task, string>({
             query: (id) => ({
-                url: `/${id}/subtasks`,
+                url: `/tasks/${id}/subtasks`,
                 method: 'POST',
             }),
             invalidatesTags: (_result, _error, id) => [{ type: 'Tasks', id }],
         }),
         previewSubtasks: builder.mutation<{ subtasks: string[] }, { title: string; description?: string }>({
             query: (body) => ({
-                url: '/preview-subtasks',
+                url: '/tasks/preview-subtasks',
                 method: 'POST',
                 body,
             }),
@@ -329,7 +331,7 @@ export const tasksApi = createApi({
             type?: string;
         }, { text: string }>({
             query: (body) => ({
-                url: '/parse',
+                url: '/tasks/parse',
                 method: 'POST',
                 body,
             }),
@@ -337,7 +339,7 @@ export const tasksApi = createApi({
         }),
         scanSyllabus: builder.mutation<{ items: SyllabusScanItem[] }, { imageBase64: string; mimeType?: string }>({
             query: (body) => ({
-                url: '/scan-syllabus',
+                url: '/tasks/scan-syllabus',
                 method: 'POST',
                 body,
             }),
@@ -345,7 +347,7 @@ export const tasksApi = createApi({
         }),
         previewRecoveryPlan: builder.mutation<{ message: string; plan: RecoveryPlan }, { anchorDate?: string } | void>({
             query: (body) => ({
-                url: '/recovery/preview',
+                url: '/tasks/recovery/preview',
                 method: 'POST',
                 body: body || {},
             }),
@@ -353,7 +355,7 @@ export const tasksApi = createApi({
         }),
         applyRecoveryPlan: builder.mutation<{ message: string; plan: RecoveryPlan; updatedCount: number }, { anchorDate?: string } | void>({
             query: (body) => ({
-                url: '/recovery/apply',
+                url: '/tasks/recovery/apply',
                 method: 'POST',
                 body: body || {},
             }),

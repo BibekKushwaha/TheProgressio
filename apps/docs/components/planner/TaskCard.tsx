@@ -63,7 +63,7 @@ export function TaskCard({ task, completed }: TaskCardProps) {
     };
 
     const handleCardClick = () => {
-        router.push(`/planner/${task.id}`);
+        router.push(`/tasks/${task.id}`);
     };
 
     const handleBreakDown = (e: React.MouseEvent) => {

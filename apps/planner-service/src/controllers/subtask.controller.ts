@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { prisma } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { subtaskSchema } from "@repo/schemas/subtask";
 
 export const createSubTask = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -12,6 +13,14 @@ export const createSubTask = async (req: AuthenticatedRequest, res: Response) =>
 
         if (!taskId || !title) {
             return res.status(400).json({ message: "Task ID and title are required" });
+        }
+
+        const parsed = subtaskSchema.safeParse({ title, taskId });
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Invalid subtask data",
+                errors: parsed.error.flatten(),
+            });
         }
 
         // Verify task ownership
