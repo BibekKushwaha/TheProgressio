@@ -1,9 +1,13 @@
+'use client';
 import { AchievementsHeader } from '@/components/achievements/AchievementsHeader';
 import { BadgesTabs } from '@/components/achievements/BadgesTabs';
 import { BadgesGrid } from '@/components/achievements/BadgesGrid';
 import { Award, Sparkles, Target } from 'lucide-react';
+import { useState } from 'react';
 
 export default function AchievementsPage() {
+    const [filter, setFilter] = useState('all');
+
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.15),_transparent_38%),linear-gradient(135deg,_#020617_0%,_#1e1b4b_45%,_#111827_100%)] text-white p-4 md:p-8">
             <div className="max-w-7xl mx-auto space-y-7">
@@ -49,10 +53,10 @@ export default function AchievementsPage() {
 
                 <AchievementsHeader />
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-                    <BadgesTabs />
+                    <BadgesTabs activeTab={filter} onTabChange={setFilter} />
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-                    <BadgesGrid />
+                    <BadgesGrid filter={filter} />
                 </div>
             </div>
         </div>

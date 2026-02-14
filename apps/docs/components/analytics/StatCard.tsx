@@ -2,6 +2,7 @@
 import { Clock, CheckCircle, Target, TrendingUp } from 'lucide-react';
 import { useGetDailySummaryQuery, useGetFocusScoreQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AnalyticsCard } from './AnalyticsCard';
 
 export function StatCards({ pastDays }: { pastDays: string }) {
     const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery(pastDays);
@@ -45,21 +46,21 @@ export function StatCards({ pastDays }: { pastDays: string }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {stats.map((stat) => (
-                <div
+                <AnalyticsCard
                     key={stat.label}
-                    className="group bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-cyan-500/10 hover:-translate-y-1 transition-all duration-300"
+                    title={String(stat.value)}
+                    description={stat.label}
+                    icon={stat.icon}
+                    iconColor="text-white"
+                    iconBgColor={`bg-gradient-to-br ${stat.gradient}`}
+                    className="p-6" // Override padding if needed, though default is p-6
                 >
-                    <div className="flex items-start justify-between mb-4">
-                        <div className={`p-3 bg-gradient-to-br ${stat.gradient} rounded-xl`}>
-                            <stat.icon className="w-6 h-6" />
-                        </div>
+                    <div className="absolute top-6 right-6">
                         <span className="px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-xs font-semibold text-green-400">
                             {stat.trend}
                         </span>
                     </div>
-                    <div className="text-sm text-slate-400 mb-2">{stat.label}</div>
-                    <div className="text-3xl font-bold">{stat.value}</div>
-                </div>
+                </AnalyticsCard>
             ))}
         </div>
     );

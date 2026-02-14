@@ -1,17 +1,14 @@
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { Mistral } from "@mistralai/mistralai";
 
-const API_KEY = process.env.GEMINI_API_KEY;
+const API_KEY = process.env.MISTRAL_API_KEY;
 
 // Log warning if no key is provided
 if (!API_KEY) {
-    console.warn("⚠️ No GEMINI_API_KEY found in environment variables. AI features will fail or use a possibly invalid fallback.");
+    console.warn("⚠️ No MISTRAL_API_KEY found in environment variables. AI features will fail or use fallback.");
 } else {
-    // Log masked key for verification
-    console.log(`✅ AI Service initialized with key: ${API_KEY.substring(0, 4)}...${API_KEY.substring(API_KEY.length - 4)}`);
+    console.log(`✅ AI Service initialized with Mistral key: ${API_KEY.substring(0, 4)}...${API_KEY.substring(API_KEY.length - 4)}`);
 }
-
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 export interface ParsedTaskIntent {
     title: string;
@@ -31,105 +28,140 @@ export interface ParsedSyllabusItem {
 }
 
 export class AIService {
-    private model = genAI ? genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
-        safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ]
-    }) : null;
+    private client = API_KEY ? new Mistral({ apiKey: API_KEY }) : null;
 
-    // Using flash-8b as fallback or same flash model as it has better limits/availability than pro-1.0
-    private fallbackModel = genAI ? genAI.getGenerativeModel({
-        model: "gemini-2.0-flash-lite",
-        safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ]
-    }) : null;
+    // Primary model for Vision/Screenshots
+    private modelIdentifier = "pixtral-12b-2409";
+
+    // Specialized model for OCR/PDFs
+    private ocrModelIdentifier = "mistral-ocr-latest";
+
+    // Text-only model for parsing and subtask generation
+    private textModelIdentifier = "open-mistral-nemo"; // Reliable, fast, and widely available
 
     /**
-     * Parses raw text to extract task metadata using Gemini.
+     * Parses raw text to extract task metadata using Mistral.
      */
     async parseTaskIntent(text: string): Promise<ParsedTaskIntent> {
-        if (!this.model) {
+        if (!this.client) {
             console.warn("⚠️ AI Service not initialized (missing key). Using fallback.");
             return this.fallbackParse(text);
         }
 
+        const today = new Date();
         const prompt = `
         You are a smart planner assistant. Parse the following text into a JSON object with keys: 
-        - title (string)
+        - title (string, extract the core task name only, remove dates/times)
         - description (string, optional)
-        - dueDate (ISO 8601 string, optional. Assume current year ${new Date().getFullYear()} if not specified)
+        - dueDate (ISO 8601 string, optional. Base it on the reference date below.)
         - priority (LOW, MEDIUM, HIGH)
         - subject (string, optional, inferred from context like "Math", "History")
         - effort (string, optional, use values like "15m", "30m", "1h", "2h", "4h+" based on context)
         - type (ASSIGNMENT, EXAM, STUDY_GOAL. Default to ASSIGNMENT if unclear, EXAM if "test" or "exam" mentioned)
 
+        Reference Date: ${today.toISOString()} (${today.toLocaleDateString('en-US', { weekday: 'long' })})
+        
         The input may be in Hinglish / Indian vernacular mixed with English. Normalize extracted meaning into clear English fields.
         Examples:
-        - "kal 2 baje math mock test" => dueDate tomorrow 2 PM, subject Math, type EXAM
-        - "is sunday physics rotational motion revise" => this Sunday task
+        - "kal 2 baje math mock test" => title: "Math Mock Test", dueDate tomorrow 2 PM, subject Math, type EXAM
+        - "is sunday physics rotational motion revise" => title: "Revise Rotational Motion", this Sunday task
         - "jaldi" / "urgent" => HIGH priority
 
-        Text: "${text}"
+        Text to parse: "${text}"
         
         Return ONLY valid JSON.
         `;
 
         try {
-            return await this.generateWithModel(this.model, prompt, text);
+            return await this.generateWithModel(this.textModelIdentifier, prompt, text);
         } catch (error) {
             console.warn("⚠️ Primary AI model failed:", error);
-            console.warn("Trying fallback model (gemini-pro)...");
             try {
-                if (this.fallbackModel) {
-                    return await this.generateWithModel(this.fallbackModel, prompt, text);
-                }
-                throw error;
+                return await this.generateWithModel(this.textModelIdentifier, prompt, text);
             } catch (fallbackError) {
                 console.warn("⚠️ AI Service failed completely:", fallbackError);
-                console.warn("Using basic fallback parser.");
                 return this.fallbackParse(text);
             }
         }
     }
 
-    private async generateWithModel(model: any, prompt: string, originalText: string) {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const textResponse = response.text();
+    private cleanTitle(text: string): string {
+        let clean = text;
+        const remove = (regex: RegExp) => { clean = clean.replace(regex, '').replace(/\s+/g, ' ').trim(); };
 
-        // Robust JSON extraction: look for the first '{' and the last '}'
-        const jsonStart = textResponse.indexOf('{');
-        const jsonEnd = textResponse.lastIndexOf('}');
+        // Remove date terms (global, case-insensitive)
+        remove(/\b(tomorrow|today|day after tomorrow|next week|this sunday|next monday|next tuesday|next wednesday|next thursday|next friday|next saturday|next sunday)\b/gi);
+        remove(/\b(kal|aaj|parso|agle hafte)\b/gi);
 
-        if (jsonStart === -1 || jsonEnd === -1) {
-            throw new Error("No JSON found in response");
+        // Remove priority terms
+        remove(/\b(urgent|important|high priority|asap|critical|low priority|trivial|minor|whenever)\b/gi);
+        remove(/\b(jaldi|dheere)\b/gi);
+
+        // Remove time terms (at 5pm, by 2:00, 3pm, etc)
+        // Matches: "at 5pm", "by 2:00pm", "3pm", "14:00"
+        remove(/(?:at|by|due)?\s*\b\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi);
+
+        // Remove "due [date]" patterns like "due 12", "due on monday"
+        remove(/\bdue\s+(?:on\s+)?(?:[a-z0-9]+)\b/gi);
+
+        return clean;
+    }
+
+    private async generateWithModel(model: string, prompt: string, originalText: string) {
+        if (!this.client) throw new Error("AI client not initialized");
+
+        try {
+            const result = await this.client.chat.complete({
+                model,
+                messages: [{ role: "user", content: prompt }],
+            });
+
+            const textResponse = result.choices?.[0]?.message?.content;
+            if (!textResponse || typeof textResponse !== "string") {
+                throw new Error("Empty response from AI model");
+            }
+
+            // console.log(`[AI] Response for "${originalText}":`, textResponse); // OPTIONAL DEBUG
+
+            // Robust JSON extraction: look for the first '{' and the last '}'
+            const jsonStart = textResponse.indexOf('{');
+            const jsonEnd = textResponse.lastIndexOf('}');
+
+            if (jsonStart === -1 || jsonEnd === -1) {
+                throw new Error("No JSON found in response");
+            }
+
+            const jsonString = textResponse.substring(jsonStart, jsonEnd + 1);
+            const data = JSON.parse(jsonString);
+
+            // Post-process title: if AI just returned the whole text, try to clean it
+            let title = data.title || originalText;
+            if (title.toLowerCase() === originalText.toLowerCase() || title.length > originalText.length * 0.8) {
+                const cleaned = this.cleanTitle(title);
+                if (cleaned.length < title.length) title = cleaned;
+            }
+
+            return {
+                title,
+                description: data.description,
+                priority: data.priority,
+                type: data.type,
+                subject: data.subject,
+                effort: data.effort,
+                ...(data.dueDate && { dueDate: new Date(data.dueDate) })
+            };
+        } catch (err: any) {
+            console.error(`[AI] generateWithModel error:`, err);
+            throw err;
         }
-
-        const jsonString = textResponse.substring(jsonStart, jsonEnd + 1);
-        const data = JSON.parse(jsonString);
-
-        return {
-            title: data.title || originalText,
-            description: data.description,
-            priority: data.priority,
-            type: data.type,
-            subject: data.subject,
-            effort: data.effort,
-            ...(data.dueDate && { dueDate: new Date(data.dueDate) })
-        };
     }
 
     private fallbackParse(text: string) {
         // Advanced Heuristic Parsing Fallback
         const lowerText = text.toLowerCase();
+
+        // Use the centralized cleaner for the title
+        const cleanTitle = this.cleanTitle(text);
 
         const normalizedText = lowerText
             .replace(/\bkal\b/g, 'tomorrow')
@@ -148,12 +180,15 @@ export class AIService {
 
         // Type Detection
         const isExam = /exam|test|midterm|final|quiz|mock/.test(normalizedText);
+        // Don't necessarily remove 'exam' from title as it might be part of the name "Math Exam"
+
         const isStudy = /study|read|revise|review|learn/.test(normalizedText);
 
         // Subject Detection (Basic List)
         const subjects = ["math", "mathematics", "physics", "chemistry", "biology", "history", "english", "literature", "geography", "science", "coding", "programming", "cs", "computer science", "spanish", "french"];
         const foundSubject = subjects.find(s => normalizedText.includes(s));
         const formattedSubject = foundSubject ? foundSubject.charAt(0).toUpperCase() + foundSubject.slice(1) : undefined;
+        // Keep subject in title usually
 
         // Effort Detection
         const effortRegex = /(\d+)\s*(h|hr|hours?|m|min|minutes?)/i;
@@ -170,6 +205,9 @@ export class AIService {
         // Date & Time Detection
         let dueDate: Date | undefined = undefined;
         const now = new Date();
+
+        // Regex for stripping common date terms
+        const dateTermsRegex = /\b(tomorrow|today|day after tomorrow|next week|this sunday|next monday|next tuesday|next wednesday|next thursday|next friday|next saturday|next sunday)\b/gi;
 
         // "Tomorrow", "Today"
         if (normalizedText.includes("tomorrow")) {
@@ -191,12 +229,13 @@ export class AIService {
             if (dayMatch) {
                 const modifier = dayMatch[1]; // "this" or "next"
                 const dayName = dayMatch[2];
+
                 if (dayName) {
                     const dayIndex = days.indexOf(dayName);
                     const currentDayIndex = now.getDay();
 
                     let daysToAdd = (dayIndex - currentDayIndex + 7) % 7;
-                    if (daysToAdd === 0 && !modifier) daysToAdd = 7; // If today is Monday and user says "Monday", assume next Monday unless specified
+                    if (daysToAdd === 0 && !modifier) daysToAdd = 7;
                     if (modifier === 'next') daysToAdd += 7;
 
                     dueDate = new Date(now);
@@ -205,23 +244,28 @@ export class AIService {
             }
         }
 
-        // Time Detection (e.g., "at 5pm", "by 14:00")
-        const timeRegex = /(?:at|by)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i;
-        const timeMatch = normalizedText.match(timeRegex);
+        // Time Detection (e.g., "at 5pm", "by 14:00", "3pm")
+        const timeRegex = /(?:at|by|due)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
+        // Also simple "3pm" without "at/by"
+        const simpleTimeRegex = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
 
-        if (dueDate && timeMatch) {
-            const hourMatch = timeMatch[1];
-            if (!hourMatch) {
-                dueDate.setHours(23, 59, 0, 0);
-            } else {
-                let hours = parseInt(hourMatch, 10);
-                const minutes = parseInt(timeMatch[2] || "0");
-                const meridiem = timeMatch[3];
+        let timeMatch = normalizedText.match(timeRegex) || normalizedText.match(simpleTimeRegex);
 
-                if (meridiem === 'pm' && hours < 12) hours += 12;
-                if (meridiem === 'am' && hours === 12) hours = 0;
+        if (timeMatch) {
+            if (dueDate) {
+                const hourMatch = timeMatch[1];
+                if (!hourMatch) {
+                    dueDate.setHours(23, 59, 0, 0);
+                } else {
+                    let hours = parseInt(hourMatch, 10);
+                    const minutes = parseInt(timeMatch[2] || "0");
+                    const meridiem = timeMatch[3];
 
-                dueDate.setHours(hours, minutes, 0, 0);
+                    if (meridiem === 'pm' && hours < 12) hours += 12;
+                    if (meridiem === 'am' && hours === 12) hours = 0;
+
+                    dueDate.setHours(hours, minutes, 0, 0);
+                }
             }
         } else if (dueDate) {
             // Default to end of day if no time specified
@@ -229,7 +273,7 @@ export class AIService {
         }
 
         const result: any = {
-            title: text,
+            title: cleanTitle || text, // Use cleaned title
             description: "Automatically created via Smart Create (Fallback Parsing)",
             priority: isHighPriority ? "HIGH" : isLowPriority ? "LOW" : "MEDIUM",
             type: isExam ? "EXAM" : isStudy ? "STUDY_GOAL" : "ASSIGNMENT",
@@ -245,10 +289,10 @@ export class AIService {
     }
 
     /**
-     * Parses assignments/exams from a syllabus image.
+     * Parses assignments/exams from a syllabus image using Pixtral vision model.
      */
     async scanSyllabusImage(imageBase64: string, mimeType: string): Promise<ParsedSyllabusItem[]> {
-        if (!this.model) {
+        if (!this.client) {
             return [];
         }
 
@@ -262,23 +306,63 @@ export class AIService {
         - subject (string, optional)
 
         Rules:
-        - Keep only actionable study items.
+        - Extract ALL topics, chapters, assignments, or exam dates found.
+        - If it looks like a list of topics, treat them as study items.
         - If date appears without year, assume current year ${new Date().getFullYear()}.
         - Return ONLY valid JSON array.
         `;
 
         try {
-            const result = await this.model.generateContent([
-                { text: prompt },
-                {
-                    inlineData: {
-                        data: imageBase64,
-                        mimeType: mimeType || "image/jpeg",
-                    },
-                },
-            ]);
-            const response = await result.response;
-            const textResponse = response.text();
+            // Ensure the base64 string has the data URL prefix for Mistral
+            let imageUrl = imageBase64;
+            if (!imageBase64.startsWith('data:')) {
+                imageUrl = `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`;
+            }
+
+            let attempt = 0;
+            const maxRetries = 3;
+            let result;
+
+            while (attempt < maxRetries) {
+                try {
+                    result = await this.client.chat.complete({
+                        model: this.modelIdentifier,
+                        messages: [
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: prompt },
+                                    {
+                                        type: "image_url",
+                                        imageUrl: imageUrl,
+                                    },
+                                ],
+                            },
+                        ],
+                    });
+                    break; // Success
+                } catch (err: any) {
+                    const status = err.status || err.statusCode || err.response?.status;
+                    if (status === 429 || status === 503) {
+                        attempt++;
+                        console.warn(`⚠️ Mistral Rate Limit (${status}). Retrying attempt ${attempt}/${maxRetries} in ${5 * attempt}s...`);
+                        if (attempt >= maxRetries) throw err;
+                        await new Promise(res => setTimeout(res, 5000 * Math.pow(2, attempt - 1)));
+                    } else {
+                        throw err;
+                    }
+                }
+            }
+
+            if (!result) throw new Error("Failed to get response after retries");
+
+            const textResponse = result.choices?.[0]?.message?.content;
+            if (!textResponse || typeof textResponse !== "string") {
+                console.warn("⚠️ Empty response from Mistral vision model");
+                return [];
+            }
+
+            console.log("🔍 Raw AI Response:", textResponse);
 
             const start = textResponse.indexOf("[");
             const end = textResponse.lastIndexOf("]");
@@ -335,7 +419,7 @@ export class AIService {
      * Generates subtasks for a given task description.
      */
     async generateSubtasks(taskTitle: string, description?: string): Promise<string[]> {
-        if (!this.model) {
+        if (!this.client) {
             return this.fallbackSubtasks(taskTitle);
         }
 
@@ -348,14 +432,11 @@ export class AIService {
         `;
 
         try {
-            return await this.generateSubtasksWithModel(this.model, prompt);
+            return await this.generateSubtasksWithModel(this.textModelIdentifier, prompt);
         } catch (error) {
-            console.warn("⚠️ Primary AI model failed for subtasks. Trying fallback model...");
+            console.warn("⚠️ Primary AI model failed for subtasks:", error);
             try {
-                if (this.fallbackModel) {
-                    return await this.generateSubtasksWithModel(this.fallbackModel, prompt);
-                }
-                throw error;
+                return await this.generateSubtasksWithModel(this.textModelIdentifier, prompt);
             } catch (fallbackError) {
                 console.warn("⚠️ AI Subtasks failed completely. Returning generic steps.");
                 return this.fallbackSubtasks(taskTitle);
@@ -363,10 +444,18 @@ export class AIService {
         }
     }
 
-    private async generateSubtasksWithModel(model: any, prompt: string): Promise<string[]> {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const textResponse = response.text();
+    private async generateSubtasksWithModel(model: string, prompt: string): Promise<string[]> {
+        if (!this.client) throw new Error("AI client not initialized");
+
+        const result = await this.client.chat.complete({
+            model,
+            messages: [{ role: "user", content: prompt }],
+        });
+
+        const textResponse = result.choices?.[0]?.message?.content;
+        if (!textResponse || typeof textResponse !== "string") {
+            throw new Error("Empty response from AI model");
+        }
 
         // Robust JSON extraction for array
         const jsonStart = textResponse.indexOf('[');

@@ -121,7 +121,7 @@ export const paymentApi = createApi({
     }),
     verifyPayment: builder.mutation<VerifyPaymentResponse, VerifyPaymentRequest>({
       query: (body) => ({
-        url: '/payments/intents/verify',
+        url: '/payments/verify',
         method: 'POST',
         body,
       }),

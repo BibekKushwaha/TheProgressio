@@ -48,6 +48,7 @@ model User {
   studyGoals       StudyGoal[]
   timetable        Timetable[]
   rotationPatterns RotationPattern[]
+  holidays         SchoolHoliday[]
 }
 
 model Achievement {
@@ -61,6 +62,23 @@ model Achievement {
   createdAt   DateTime @default(now())
   
   users       UserAchievement[]
+}
+
+model SchoolHoliday {
+  id                 String   @id @default(uuid())
+  name               String
+  startDate          DateTime
+  endDate            DateTime
+  pauseNotifications Boolean  @default(true)
+  
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId, startDate])
+  @@index([userId, endDate])
 }
 
 model UserAchievement {

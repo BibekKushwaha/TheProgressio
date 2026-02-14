@@ -59,7 +59,7 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
     };
 
     const handleCardClick = () => {
-        router.push(`/planner/${task.id}`);
+        router.push(`/tasks/${task.id}`);
     };
 
     return (

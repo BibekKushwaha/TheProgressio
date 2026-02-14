@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
-import GlassCard from "../../../components/ui/glass-card";
+import { Card } from "../../../components/ui/card";
 import GradientButton from "../../../components/auth/gradient-button";
 import Input from "../../../components/auth/input";
 import { hydrateAuth, useAppDispatch, useLoginMutation } from "@repo/store";
@@ -80,7 +80,7 @@ const LoginPage = () => {
                 {/* Mobile Background Elements */}
                 <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-slate-950" />
 
-                <GlassCard className="w-full max-w-md p-8 relative z-10" gradient>
+                <Card variant="glass" className="w-full max-w-md p-8 relative z-10">
                     <div className="mb-8 text-center">
                         <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
                         <p className="text-gray-400">Sign in to continue your streak</p>
@@ -139,7 +139,7 @@ const LoginPage = () => {
                             </Link>
                         </div>
                     </form>
-                </GlassCard>
+                </Card>
             </div>
         </div>
     );

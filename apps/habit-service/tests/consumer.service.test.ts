@@ -54,7 +54,7 @@ describe('processMessage', () => {
     expect(autoLogHabitFromCategory).toHaveBeenCalledWith('user-1', 'cat-1')
   })
 
-  it('skips non-completed event types', async () => {
+  it('skips task.created events', async () => {
     await processMessage(makeMessage({
       eventType: 'task.created',
       taskId: 'task-1',
@@ -129,4 +129,57 @@ describe('processMessage', () => {
       }))
     ).resolves.toBeUndefined() // should not throw
   })
+
+  // ── task.updated tests ────────────────────────────────────────────────
+
+  it('task.updated — auto-logs habits when categoryId changes', async () => {
+    await processMessage(makeMessage({
+      eventType: 'task.updated',
+      taskId: 'task-1',
+      userId: 'user-1',
+      timestamp: new Date().toISOString(),
+      payload: { changedFields: { categoryId: 'cat-new' } },
+    }))
+
+    expect(autoLogHabitFromCategory).toHaveBeenCalledWith('user-1', 'cat-new')
+  })
+
+  it('task.updated — skips when no categoryId change', async () => {
+    await processMessage(makeMessage({
+      eventType: 'task.updated',
+      taskId: 'task-1',
+      userId: 'user-1',
+      timestamp: new Date().toISOString(),
+      payload: { changedFields: { title: 'New Title' } },
+    }))
+
+    expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
+  })
+
+  it('task.updated — skips when categoryId is null', async () => {
+    await processMessage(makeMessage({
+      eventType: 'task.updated',
+      taskId: 'task-1',
+      userId: 'user-1',
+      timestamp: new Date().toISOString(),
+      payload: { changedFields: { categoryId: null } },
+    }))
+
+    expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
+  })
+
+  // ── task.deleted tests ────────────────────────────────────────────────
+
+  it('task.deleted — does not log habits (audit only)', async () => {
+    await processMessage(makeMessage({
+      eventType: 'task.deleted',
+      taskId: 'task-1',
+      userId: 'user-1',
+      timestamp: new Date().toISOString(),
+      payload: {},
+    }))
+
+    expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
+  })
 })
+

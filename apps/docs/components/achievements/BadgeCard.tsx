@@ -1,6 +1,6 @@
 'use client';
 
-import { Lock, Award, Target, Zap, Flame, Star, Trophy, LucideIcon } from 'lucide-react';
+import { Lock, Award, Target, Zap, Flame, Star, Trophy, Crown, Medal, Shield, Sword, LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const iconMap: Record<string, LucideIcon> = {
@@ -9,6 +9,11 @@ const iconMap: Record<string, LucideIcon> = {
     'Flame': Flame,
     'Star': Star,
     'Trophy': Trophy,
+    'Award': Award,
+    'Crown': Crown,
+    'Medal': Medal,
+    'Shield': Shield,
+    'Sword': Sword,
 };
 
 interface Badge {

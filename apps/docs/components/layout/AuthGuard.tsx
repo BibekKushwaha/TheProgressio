@@ -32,7 +32,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
         if (isLoading || isFetching || !isError) return;
 
         const status = typeof error === "object" && error && "status" in error ? error.status : undefined;
-        if (status === 401 || status === 404) {
+        if (status === 401 || status === 404 || status === 'FETCH_ERROR') {
             router.replace("/login");
         }
     }, [error, isError, isFetching, isLoading, router]);

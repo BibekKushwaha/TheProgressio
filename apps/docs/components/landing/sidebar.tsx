@@ -17,10 +17,11 @@ import {
     Users,
     X,
     ChevronDown,
+    Award,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
-import GlassCard from "../ui/glass-card";
+import { Card } from "../ui/card";
 import { logout as logoutAction, useAppDispatch, useLogoutMutation } from "@repo/store";
 import { useToast } from "@/components/ui/toast-provider";
 import { trackFeatureOpened } from "@/lib/navigationTelemetry";
@@ -60,14 +61,15 @@ const Sidebar = () => {
             href: "/planner",
             menuKey: "planner",
             children: [
-                { name: "ReOpen Tasks", href: "/planner" },
-                { name: "Task Board", href: "/tasks" },
                 { name: "Create Task", href: "/createtask" },
+                { name: "Task Board", href: "/tasks" },
+                { name: "ReOpen Tasks", href: "/planner" },
                 { name: "Syllabus Digitizer", href: "/syllabus-digitizer" },
             ],
         },
         { name: "Timetable", icon: Calendar, href: "/calendar" },
         { name: "Habit Gallery", icon: Flame, href: "/habits" },
+        { name: "Achievements", icon: Award, href: "/achievement" },
         {
             name: "Analytics",
             icon: BarChart2,
@@ -120,7 +122,7 @@ const Sidebar = () => {
     };
 
     const renderNavItems = ({ mobile }: { mobile: boolean }) => (
-        <nav className="flex-1 space-y-1">
+        <nav className="flex-1 space-y-1 overflow-y-auto pr-2">
             {navItems.map((item) => (
                 <div key={item.href}>
                     {item.children ? (
@@ -212,7 +214,7 @@ const Sidebar = () => {
         <>
             {/* Desktop Sidebar */}
             <div className="hidden lg:flex w-70 flex-col h-screen scroll fixed left-0 top-0 z-50">
-                <GlassCard className="h-full flex flex-col p-4" gradient>
+                <Card variant="glass" className="h-full flex flex-col p-4">
                     <div className="flex items-center gap-2 px-2 mb-8 mt-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-xl">
                             T
@@ -245,7 +247,7 @@ const Sidebar = () => {
                             <span className="font-medium">{isLoggingOut ? "Logging out..." : "Logout"}</span>
                         </button>
                     </div>
-                </GlassCard>
+                </Card>
             </div>
 
             {/* Mobile Header */}
@@ -276,7 +278,7 @@ const Sidebar = () => {
                     mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
                 )}
             >
-                <GlassCard className="h-full flex flex-col p-4 m-4 rounded-2xl" gradient>
+                <Card variant="glass" className="h-full flex flex-col p-4 m-4 rounded-2xl">
                     {renderNavItems({ mobile: true })}
 
                     <div className="mt-auto border-t border-white/10 pt-4 space-y-1">
@@ -306,7 +308,7 @@ const Sidebar = () => {
                             <span className="font-medium">{isLoggingOut ? "Logging out..." : "Logout"}</span>
                         </button>
                     </div>
-                </GlassCard>
+                </Card>
             </div>
         </>
     );

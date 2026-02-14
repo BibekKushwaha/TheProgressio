@@ -5,6 +5,7 @@ import {
 	focusLiveSessionRegistry,
 	FocusSessionError,
 } from "../services/focus-live.service.js";
+import { activityLogSchema } from "@repo/schemas/activity";
 
 const MIN_LOGGABLE_SECONDS = 30;
 const MAX_PLANNED_MINUTES = 360;
@@ -194,6 +195,23 @@ export const logSession = async (
 			return;
 		}
 
+		// Validate core fields using shared schema
+		const logValidation = activityLogSchema.safeParse({
+			taskId,
+			sessionType: sessionType ?? "DEEP_WORK",
+			durationMinutes: durationMinutes ?? 0,
+			startTime: startTime ?? new Date().toISOString(),
+			endTime: endTime ?? new Date().toISOString(),
+		});
+
+		if (!logValidation.success) {
+			res.status(400).json({
+				message: "Invalid session data",
+				errors: logValidation.error.flatten(),
+			});
+			return;
+		}
+
 		const task = await prisma.task.findFirst({
 			where: { id: taskId, userId },
 		});
@@ -210,11 +228,11 @@ export const logSession = async (
 				? durationMinutes
 				: parsedEnd
 					? Math.max(
-						  1,
-						  Math.round(
-							  (parsedEnd.getTime() - parsedStart.getTime()) / 60000
-						  )
-					  )
+						1,
+						Math.round(
+							(parsedEnd.getTime() - parsedStart.getTime()) / 60000
+						)
+					)
 					: undefined;
 
 		if (!computedDuration) {

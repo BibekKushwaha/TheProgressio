@@ -547,61 +547,116 @@ export const getAchievements = async (
 };
 
 // Event Handler - POST /events/task-completed
+// Handles TASK_COMPLETED, TASK_UPDATED, and TASK_DELETED events
 export const handleTaskCompletedEvent = async (
     req: Request,
     res: Response
 ): Promise<void> => {
     try {
-        const { type, taskId } = req.body ?? {};
+        const { type, taskId, userId, changedFields } = req.body ?? {};
 
-        if (type !== "TASK_COMPLETED" || !taskId || typeof taskId !== "string") {
-            res.status(400).json({ message: "Invalid event payload" });
+        if (!taskId || typeof taskId !== "string") {
+            res.status(400).json({ message: "Invalid event payload: taskId is required" });
             return;
         }
 
-        const task = await prisma.task.findUnique({
-            where: { id: taskId },
-            include: { activityLogs: true },
-        });
+        // ── TASK_COMPLETED ──────────────────────────────────────────────────
+        if (type === "TASK_COMPLETED") {
+            const task = await prisma.task.findUnique({
+                where: { id: taskId },
+                include: { activityLogs: true },
+            });
 
-        if (!task) {
-            res.status(404).json({ message: "Task not found" });
+            if (!task) {
+                res.status(404).json({ message: "Task not found" });
+                return;
+            }
+
+            const totalMinutes = task.activityLogs.reduce(
+                (sum, log) => sum + (log.durationMinutes ?? 0),
+                0
+            );
+
+            const completionStat = await prisma.taskCompletionStat.upsert({
+                where: { taskId: task.id },
+                create: {
+                    taskId: task.id,
+                    userId: task.userId,
+                    totalMinutes,
+                    completedAt: new Date(),
+                },
+                update: {
+                    totalMinutes,
+                    completedAt: new Date(),
+                },
+            });
+
+            res.status(200).json({
+                message: "Task completion processed",
+                stats: {
+                    taskId: task.id,
+                    title: task.title,
+                    totalMinutes,
+                    totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+                },
+                completionStat,
+            });
             return;
         }
 
-        const totalMinutes = task.activityLogs.reduce(
-            (sum, log) => sum + (log.durationMinutes ?? 0),
-            0
-        );
+        // ── TASK_UPDATED ────────────────────────────────────────────────────
+        if (type === "TASK_UPDATED") {
+            // If the task was previously completed, re-compute its stat
+            const existingStat = await prisma.taskCompletionStat.findUnique({
+                where: { taskId },
+            });
 
-        const completionStat = await prisma.taskCompletionStat.upsert({
-            where: { taskId: task.id },
-            create: {
-                taskId: task.id,
-                userId: task.userId,
-                totalMinutes,
-                completedAt: new Date(),
-            },
-            update: {
-                totalMinutes,
-                completedAt: new Date(),
-            },
-        });
+            if (existingStat) {
+                const task = await prisma.task.findUnique({
+                    where: { id: taskId },
+                    include: { activityLogs: true },
+                });
 
-        res.status(200).json({
-            message: "Task completion processed",
-            stats: {
-                taskId: task.id,
-                title: task.title,
-                totalMinutes,
-                totalHours: Math.round((totalMinutes / 60) * 10) / 10,
-            },
-            completionStat,
-        });
+                if (task) {
+                    const totalMinutes = task.activityLogs.reduce(
+                        (sum, log) => sum + (log.durationMinutes ?? 0),
+                        0,
+                    );
+
+                    await prisma.taskCompletionStat.update({
+                        where: { taskId },
+                        data: { totalMinutes },
+                    });
+                }
+            }
+
+            res.status(200).json({
+                message: "Task update processed",
+                taskId,
+                changedFields: changedFields || {},
+            });
+            return;
+        }
+
+        // ── TASK_DELETED ────────────────────────────────────────────────────
+        if (type === "TASK_DELETED") {
+            await prisma.taskCompletionStat.deleteMany({
+                where: { taskId },
+            });
+
+            res.status(200).json({
+                message: "Task deletion processed — stats cleaned up",
+                taskId,
+            });
+            return;
+        }
+
+        // Unknown event type
+        res.status(400).json({ message: `Unknown event type: ${type}` });
     } catch (error) {
-        console.error("Error processing task completion event:", error);
+        console.error("Error processing task event:", error);
         res.status(500).json({
-            message: "Failed to process task completion event",
+            message: "Failed to process task event",
             error: error instanceof Error ? error.message : "Unknown error",
         });
     }

@@ -171,13 +171,23 @@ export async function emitTaskEvent(
     try {
         await producer.send(TOPICS.TASK_EVENTS, [message]);
 
-        // Route completion events to downstream consumers
+        // Route events to downstream consumers
         if (eventType === TaskEventType.TASK_COMPLETED) {
             await producer.send(TOPICS.HABIT_TRIGGERS, [message]);
             await producer.send(TOPICS.TASK_ANALYTICS, [message]);
         }
 
         if (eventType === TaskEventType.TASK_STATUS_CHANGED) {
+            await producer.send(TOPICS.TASK_ANALYTICS, [message]);
+        }
+
+        if (eventType === TaskEventType.TASK_UPDATED) {
+            await producer.send(TOPICS.HABIT_TRIGGERS, [message]);
+            await producer.send(TOPICS.TASK_ANALYTICS, [message]);
+        }
+
+        if (eventType === TaskEventType.TASK_DELETED) {
+            await producer.send(TOPICS.HABIT_TRIGGERS, [message]);
             await producer.send(TOPICS.TASK_ANALYTICS, [message]);
         }
     } catch (error) {

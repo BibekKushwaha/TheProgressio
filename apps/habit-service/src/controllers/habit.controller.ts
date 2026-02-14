@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { prisma, type Frequency } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { habitSchema, habitLogSchema } from "@repo/schemas/habit";
 import {
     calculateGentleStreak,
     awardXP,
@@ -189,6 +190,24 @@ export const createHabit = async (
             return;
         }
 
+        const parsed = habitSchema.safeParse({
+            name,
+            frequency,
+            targetValue,
+            icon,
+            color,
+            mercyDaysAllowed,
+            categoryId: linkedCategoryId || undefined,
+        });
+
+        if (!parsed.success) {
+            res.status(400).json({
+                message: "Invalid habit data",
+                errors: parsed.error.flatten(),
+            });
+            return;
+        }
+
         const habit = await prisma.habit.create({
             data: {
                 name,
@@ -237,6 +256,18 @@ export const logHabitCompletion = async (
         }
         if (!id || typeof id !== "string") {
             res.status(400).json({ message: "Habit ID is required" });
+            return;
+        }
+
+        const logParsed = habitLogSchema.pick({ completedValue: true }).safeParse({
+            completedValue: completedValue ?? 1,
+        });
+
+        if (!logParsed.success) {
+            res.status(400).json({
+                message: "Invalid habit log data",
+                errors: logParsed.error.flatten(),
+            });
             return;
         }
         // Verify habit belongs to user
@@ -385,7 +416,8 @@ export const getHabitStats = async (
                 value: log.completedValue,
             }));
 
-        // Calculate completion rate for last 30 days
+        // Calculate completion rate for last 30 days (accout for new habits)
+        const now = new Date();
         const daysToCheck = 30;
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - daysToCheck);
@@ -394,10 +426,17 @@ export const getHabitStats = async (
             (log: any) => log.loggedAt >= thirtyDaysAgo
         );
 
-        let expectedCompletions = daysToCheck;
+        // Calculate how many days the habit has existed within the last 30 days window
+        const createdDate = new Date(habit.createdAt);
+        const effectiveStartDate = createdDate > thirtyDaysAgo ? createdDate : thirtyDaysAgo;
+
+        // Days difference (inclusive of start day)
+        const diffDays = Math.ceil((now.getTime() - effectiveStartDate.getTime()) / (1000 * 60 * 60 * 24));
+        const activeWindowDays = Math.max(1, diffDays);
+
+        let expectedCompletions = activeWindowDays;
         if (habit.frequency === 'WEEKLY') {
-            // Calculate how many week-starts were in the last 30 days
-            expectedCompletions = Math.ceil(daysToCheck / 7);
+            expectedCompletions = Math.ceil(activeWindowDays / 7);
         }
 
         const completionRate = Math.min(recentLogs.length / expectedCompletions, 1);
@@ -724,9 +763,18 @@ export const getContributionHeatmap = async (
         const userId = req.user?.id;
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { createdAt: true },
+        });
+
         const heatmap = await getYearlyHeatmap(userId);
         const totalContributions = heatmap.reduce((sum, d) => sum + d.count, 0);
         const activeDays = heatmap.filter(d => d.count > 0).length;
+
+        // Calculate account age in days (capped at heatmap length)
+        const accountAgeDays = user ? Math.ceil((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : heatmap.length;
+        const relevantTotalDays = Math.max(1, Math.min(heatmap.length, accountAgeDays));
 
         res.status(200).json({
             message: "Heatmap generated successfully",
@@ -734,8 +782,8 @@ export const getContributionHeatmap = async (
             summary: {
                 totalContributions,
                 activeDays,
-                totalDays: heatmap.length,
-                consistencyRate: Math.round((activeDays / heatmap.length) * 100),
+                totalDays: relevantTotalDays,
+                consistencyRate: Math.round((activeDays / relevantTotalDays) * 100),
             },
         });
     } catch (error) {

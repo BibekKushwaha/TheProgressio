@@ -129,35 +129,71 @@ export async function processMessage({ topic, partition, message }: EachMessageP
         return; // skip malformed messages
     }
 
-    if (event.eventType !== "task.completed") {
-        // Only process completion events for habit automation
-        return;
-    }
-
     const { userId, payload } = event;
-    const categoryId = typeof payload.categoryId === "string" ? payload.categoryId : null;
 
     if (!userId) {
-        console.warn(`[Consumer] task.completed event missing userId — skipping (taskId=${event.taskId})`);
+        console.warn(`[Consumer] Event missing userId — skipping (taskId=${event.taskId})`);
         return;
     }
 
-    if (!categoryId) {
-        // Task has no category — no linked habits to auto-log
+    // ── Handle task.completed ────────────────────────────────────────────────
+    if (event.eventType === "task.completed") {
+        const categoryId = typeof payload.categoryId === "string" ? payload.categoryId : null;
+
+        if (!categoryId) {
+            // Task has no category — no linked habits to auto-log
+            return;
+        }
+
+        try {
+            await autoLogHabitFromCategory(userId, categoryId);
+            console.log(
+                `[Consumer] ✅ Auto-logged habits for userId=${userId}, categoryId=${categoryId} (taskId=${event.taskId})`,
+            );
+        } catch (err) {
+            console.error(
+                `[Consumer] ❌ Failed to auto-log habits for userId=${userId}, categoryId=${categoryId}:`,
+                err,
+            );
+        }
         return;
     }
 
-    try {
-        await autoLogHabitFromCategory(userId, categoryId);
+    // ── Handle task.updated (re-evaluate linked habits on category change) ──
+    if (event.eventType === "task.updated") {
+        const changedFields = payload.changedFields as Record<string, unknown> | undefined;
+
+        if (changedFields && "categoryId" in changedFields) {
+            const newCategoryId = typeof changedFields.categoryId === "string"
+                ? changedFields.categoryId
+                : null;
+
+            if (newCategoryId) {
+                try {
+                    await autoLogHabitFromCategory(userId, newCategoryId);
+                    console.log(
+                        `[Consumer] ✅ Re-evaluated habits after category change for userId=${userId}, newCategoryId=${newCategoryId} (taskId=${event.taskId})`,
+                    );
+                } catch (err) {
+                    console.error(
+                        `[Consumer] ❌ Failed to re-evaluate habits for userId=${userId}, categoryId=${newCategoryId}:`,
+                        err,
+                    );
+                }
+            }
+        }
+        return;
+    }
+
+    // ── Handle task.deleted (audit log only — habits are independent) ────────
+    if (event.eventType === "task.deleted") {
         console.log(
-            `[Consumer] ✅ Auto-logged habits for userId=${userId}, categoryId=${categoryId} (taskId=${event.taskId})`,
+            `[Consumer] Task deleted — no habit action needed (taskId=${event.taskId}, userId=${userId})`,
         );
-    } catch (err) {
-        console.error(
-            `[Consumer] ❌ Failed to auto-log habits for userId=${userId}, categoryId=${categoryId}:`,
-            err,
-        );
+        return;
     }
+
+    // Unknown event type — skip silently
 }
 
 // ─── Consumer Singleton ─────────────────────────────────────────────────────────

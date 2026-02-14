@@ -156,7 +156,7 @@ export function TimelineView({ searchQuery, status, priority, category, tasks }:
                 {timeline.bars.map((bar) => (
                     <div key={bar.task.id} className="grid grid-cols-[42%_58%] md:grid-cols-[34%_66%] lg:grid-cols-[28%_72%] gap-3 items-center">
                         <button
-                            onClick={() => router.push(`/planner/${bar.task.id}`)}
+                            onClick={() => router.push(`/tasks/${bar.task.id}`)}
                             className="text-left rounded-lg border border-white/10 bg-black/20 px-3 py-2 hover:bg-black/30 transition-colors"
                         >
                             <div className="truncate text-sm font-semibold text-white">{bar.task.title}</div>

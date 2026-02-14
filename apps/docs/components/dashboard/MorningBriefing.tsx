@@ -90,12 +90,12 @@ export function MorningBriefing() {
                         {top3Tasks.map((task, i) => (
                             <Link
                                 key={task.id}
-                                href={`/planner/${task.id}`}
+                                href={`/tasks/${task.id}`}
                                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors group"
                             >
                                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === 0 ? 'bg-red-500/20 text-red-400' :
-                                        i === 1 ? 'bg-orange-500/20 text-orange-400' :
-                                            'bg-yellow-500/20 text-yellow-400'
+                                    i === 1 ? 'bg-orange-500/20 text-orange-400' :
+                                        'bg-yellow-500/20 text-yellow-400'
                                     }`}>
                                     {i + 1}
                                 </span>

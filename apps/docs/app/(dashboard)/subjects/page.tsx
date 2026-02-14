@@ -1,4 +1,6 @@
 'use client';
+// trigger rebuild
+
 
 import { useMemo, useState } from 'react';
 import { skipToken } from '@reduxjs/toolkit/query';
@@ -6,15 +8,20 @@ import { TaskStatus, useGetCategoriesQuery, useGetTasksQuery } from '@repo/store
 import { GPACalculator } from '@/components/analytics/GPACalculator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     AlertTriangle,
     ArrowUpDown,
     BarChart3,
-    BookOpen,
     Calendar,
     CheckCircle2,
     ChevronRight,
     Clock3,
-    Filter,
     FolderKanban,
     GraduationCap,
     Layers,
@@ -34,7 +41,7 @@ export default function SubjectLibraryPage() {
     const [showGPA, setShowGPA] = useState(false);
     const [subjectSearch, setSubjectSearch] = useState('');
     const [subjectSort, setSubjectSort] = useState<SubjectSortMode>('completion');
-    const [selectedTaskSearch, setSelectedTaskSearch] = useState('');
+    const [selectedTaskSearch] = useState('');
     const [selectedTaskStatus, setSelectedTaskStatus] = useState<SubjectTaskStatusFilter>('all');
 
     const selectedSubjectTasksQueryArgs = selectedSubject
@@ -162,13 +169,13 @@ export default function SubjectLibraryPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-4">
                         <div className="p-4 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl shadow-lg shadow-cyan-500/20">
-                            <BookOpen className="w-8 h-8 text-white" />
+                            <FolderKanban className="w-8 h-8 text-white" />
                         </div>
                         <div>
                             <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent">
                                 Subject Library
                             </h1>
-                            <p className="text-slate-400 mt-1">Track workload, completion velocity, and subject-level momentum.</p>
+                            <p className="text-slate-400 mt-1">Track workload, Completion Speed, and Subject-level momentum.</p>
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -324,7 +331,10 @@ export default function SubjectLibraryPage() {
                             return (
                                 <button
                                     key={subject.id}
-                                    onClick={() => setSelectedSubject(isSelected ? null : subject.id)}
+                                    onClick={() => {
+                                        console.log('Clicked subject:', subject.id);
+                                        setSelectedSubject(subject.id);
+                                    }}
                                     className={`text-left bg-white/5 backdrop-blur-md border-2 rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg ${isSelected
                                         ? 'shadow-lg scale-[1.02]'
                                         : 'border-white/10 hover:border-white/20'
@@ -379,118 +389,107 @@ export default function SubjectLibraryPage() {
                     </div>
                 )}
 
-                {selectedSubject && selectedCat && (
-                    <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 animate-in slide-in-from-bottom-4 duration-300">
-                        <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
-                            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                                <div
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                    style={{ backgroundColor: `${selectedCat.colorCode || '#6366f1'}30`, color: selectedCat.colorCode || '#6366f1' }}
-                                >
-                                    {selectedCat.icon || selectedCat.name[0]}
+                <Dialog open={!!selectedSubject} onOpenChange={(open) => !open && setSelectedSubject(null)} >
+                    <DialogContent className="sm:max-w-[1000px] w-[95vw] max-h-[95vh] overflow-hidden flex flex-col bg-slate-950/95 border-slate-800 backdrop-blur-xl p-0 gap-0">
+                        {selectedCat && (
+                            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 animate-in slide-in-from-bottom-4 duration-300">
+                                <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+                                    <DialogHeader className="flex-shrink-0">
+                                        <DialogTitle className="text-2xl font-bold text-white flex items-center gap-3 whitespace-nowrap">
+                                            {selectedCat.name} — Tasks
+                                        </DialogTitle>
+                                        <DialogDescription className="sr-only">
+                                            Task management and detailed breakdown for {selectedCat.name}
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+                                        <Link
+                                            href={`/calendar?categoryId=${selectedSubject}`}
+                                            className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center text-gray-400 gap-2 whitespace-nowrap"
+                                        >
+                                            <Calendar className="w-4 h-4" /> Timetable
+                                        </Link>
+                                        <Link
+                                            href={`/exam-warroom?categoryId=${selectedSubject}`}
+                                            className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center tex-gray-400 whitespace-nowrap gap-2"
+                                        >
+                                            <Target className="w-4 h-4" /> SWOT
+                                        </Link>
+                                    </div>
                                 </div>
-                                {selectedCat.name} — Tasks
-                            </h2>
-                            <div className="flex flex-wrap gap-3">
-                                <Link
-                                    href={`/planner?categoryId=${selectedSubject}`}
-                                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2"
-                                >
-                                    <Filter className="w-4 h-4" /> Planner
-                                </Link>
-                                <Link
-                                    href={`/calendar?categoryId=${selectedSubject}`}
-                                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2"
-                                >
-                                    <Calendar className="w-4 h-4" /> Timetable
-                                </Link>
-                                <Link
-                                    href={`/exam-warroom?categoryId=${selectedSubject}`}
-                                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2"
-                                >
-                                    <Target className="w-4 h-4" /> SWOT
-                                </Link>
-                            </div>
-                        </div>
 
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
-                            <div className="relative w-full md:max-w-sm">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                <input
-                                    value={selectedTaskSearch}
-                                    onChange={(event) => setSelectedTaskSearch(event.target.value)}
-                                    placeholder="Search tasks in this subject..."
-                                    className="w-full rounded-lg border border-white/10 bg-white/[0.03] pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                                />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {(['all', TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED] as SubjectTaskStatusFilter[]).map((status) => (
-                                    <button
-                                        key={status}
-                                        onClick={() => setSelectedTaskStatus(status)}
-                                        className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${selectedTaskStatus === status
-                                            ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-200'
-                                            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                                            }`}
-                                    >
-                                        {status === 'all' ? 'All' : status.replace('_', ' ')}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
 
-                        {selectedTasksLoading ? (
-                            <div className="space-y-3">
-                                {[1, 2, 3].map((index) => (
-                                    <Skeleton key={index} className="h-20 w-full rounded-xl bg-white/5" />
-                                ))}
-                            </div>
-                        ) : selectedTasks.length === 0 ? (
-                            <p className="text-slate-400 text-center py-8">
-                                {selectedTaskSearch || selectedTaskStatus !== 'all'
-                                    ? 'No tasks match the current filters.'
-                                    : 'No tasks in this subject yet.'}
-                            </p>
-                        ) : (
-                            <div className="space-y-3 max-h-96 overflow-y-auto">
-                                {selectedTasks.map(task => (
-                                    <Link
-                                        key={task.id}
-                                        href={`/planner/${task.id}`}
-                                        className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors group"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-3 h-3 rounded-full ${task.status === 'COMPLETED' ? 'bg-green-400' :
-                                                task.status === 'IN_PROGRESS' ? 'bg-yellow-400' : 'bg-slate-400'
-                                                }`} />
-                                            <div>
-                                                <span className="text-white font-medium group-hover:text-indigo-300 transition-colors">
-                                                    {task.title}
-                                                </span>
-                                                {task.dueDate && (
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        Due: {new Date(task.dueDate).toLocaleDateString()}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2 py-1 rounded text-xs font-semibold bg-white/10 text-slate-200">
-                                                {task.status.replace('_', ' ')}
-                                            </span>
-                                            <span className={`px-2 py-1 rounded text-xs font-semibold ${task.priority === 'HIGH' ? 'bg-red-500/20 text-red-400' :
-                                                task.priority === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                    'bg-green-500/20 text-green-400'
-                                                }`}>
-                                                {task.priority}
-                                            </span>
-                                        </div>
-                                    </Link>
-                                ))}
+                                    <div className="flex flex-wrap gap-2">
+                                        {(['all', TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED] as SubjectTaskStatusFilter[]).map((status) => (
+                                            <button
+                                                key={status}
+                                                onClick={() => setSelectedTaskStatus(status)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${selectedTaskStatus === status
+                                                    ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-200'
+                                                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                                                    }`}
+                                            >
+                                                {status === 'all' ? 'All' : status.replace('_', ' ')}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {selectedTasksLoading ? (
+                                    <div className="space-y-3">
+                                        {[1, 2, 3].map((index) => (
+                                            <Skeleton key={index} className="h-20 w-full rounded-xl bg-white/5" />
+                                        ))}
+                                    </div>
+                                ) : selectedTasks.length === 0 ? (
+                                    <p className="text-slate-400 text-center py-8">
+                                        {selectedTaskSearch || selectedTaskStatus !== 'all'
+                                            ? 'No tasks match the current filters.'
+                                            : 'No tasks in this subject yet.'}
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                                        {selectedTasks.map(task => (
+                                            <Link
+                                                key={task.id}
+                                                href={`/tasks/${task.id}`}
+                                                className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors group"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-3 h-3 rounded-full ${task.status === 'COMPLETED' ? 'bg-green-400' :
+                                                        task.status === 'IN_PROGRESS' ? 'bg-yellow-400' : 'bg-slate-400'
+                                                        }`} />
+                                                    <div>
+                                                        <span className="text-white font-medium group-hover:text-indigo-300 transition-colors">
+                                                            {task.title}
+                                                        </span>
+                                                        {task.dueDate && (
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                Due: {new Date(task.dueDate).toLocaleDateString()}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-2 py-1 rounded text-xs font-semibold bg-white/10 text-slate-200">
+                                                        {task.status.replace('_', ' ')}
+                                                    </span>
+                                                    <span className={`px-2 py-1 rounded text-xs font-semibold ${task.priority === 'HIGH' ? 'bg-red-500/20 text-red-400' :
+                                                        task.priority === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                            'bg-green-500/20 text-green-400'
+                                                        }`}>
+                                                        {task.priority}
+                                                    </span>
+                                                </div>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
-                    </div>
-                )}
+                    </DialogContent>
+                </Dialog>
 
                 {tasksLoading && !catLoading && (
                     <p className="text-xs text-slate-500 text-center">Refreshing task insights...</p>

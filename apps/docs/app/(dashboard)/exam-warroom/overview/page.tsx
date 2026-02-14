@@ -47,7 +47,7 @@ export default function ExamWarRoomPage() {
                         <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
                             Exam War Room
                         </h1>
-                        <p className="text-slate-400 mt-1">Chapter-wise SWOT, success tracking & predictive scores for JEE/NEET/UPSC</p>
+                        <p className="text-slate-400 mt-1">Chapter-wise SWOT, success tracking & predictive scores </p>
                     </div>
                 </div>
 

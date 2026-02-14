@@ -2,7 +2,6 @@
 import { prisma, type Prisma } from "@repo/db";
 
 const MINUTES_PER_DAY = 24 * 60;
-const prismaAny = prisma as any;
 
 export interface ScheduleConflict {
     id: string;
@@ -102,7 +101,7 @@ export class TimetableService {
         const dayStart = startOfDay(date);
         const dayEnd = endOfDay(date);
 
-        return prismaAny.schoolHoliday.findFirst({
+        return prisma.schoolHoliday.findFirst({
             where: {
                 userId,
                 startDate: { lte: dayEnd },
@@ -224,7 +223,7 @@ export class TimetableService {
     }
 
     async listHolidays(userId: string) {
-        return prismaAny.schoolHoliday.findMany({
+        return prisma.schoolHoliday.findMany({
             where: { userId },
             orderBy: [{ startDate: "asc" }, { createdAt: "asc" }],
         });
@@ -237,7 +236,7 @@ export class TimetableService {
         endDate: Date;
         pauseNotifications?: boolean;
     }) {
-        return prismaAny.schoolHoliday.create({
+        return prisma.schoolHoliday.create({
             data: {
                 userId: params.userId,
                 name: params.name,
@@ -258,14 +257,14 @@ export class TimetableService {
             pauseNotifications?: boolean;
         };
     }): Promise<{ count: number }> {
-        return prismaAny.schoolHoliday.updateMany({
+        return prisma.schoolHoliday.updateMany({
             where: { id: params.id, userId: params.userId },
             data: params.data,
         });
     }
 
     async deleteHoliday(params: { id: string; userId: string }): Promise<{ count: number }> {
-        return prismaAny.schoolHoliday.deleteMany({
+        return prisma.schoolHoliday.deleteMany({
             where: { id: params.id, userId: params.userId },
         });
     }

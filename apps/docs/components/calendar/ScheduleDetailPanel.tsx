@@ -9,7 +9,12 @@ interface ScheduleDetailPanelProps {
 }
 
 export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
-    const dateString = date.toISOString().split('T')[0] || '';
+    // Fix: Use local date string to avoid timezone shifts (toISOString uses UTC)
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+
     const { data: schedule } = useGetCalendarDailyScheduleQuery({ date: dateString });
     // Verify type: schedule is DailyScheduleResponse | undefined
 

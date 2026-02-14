@@ -42,7 +42,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
     const linePath = `M ${points}`;
 
     return (
-        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 ">
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold mb-1">Focus Trends</h2>
@@ -54,7 +54,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
                 </div>
             </div>
 
-            <div className="relative h-64">
+            <div className="relative h-64 mb-4">
                 {isLoading ? (
                     <Skeleton className="w-full h-full bg-white/5" />
                 ) : (
