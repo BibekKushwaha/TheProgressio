@@ -13,6 +13,7 @@ import rotationRouter from "./routes/rotation.route.js";
 import whatsappRouter from "./routes/whatsapp.route.js";
 import paymentRouter from "./routes/payment.route.js";
 import syncRouter from "./routes/sync.route.js";
+import notificationRouter from "./routes/notification.route.js";
 import { producer } from "./services/producer.service.js";
 import { runSilentWatchSweep } from "./services/whatsapp-watch.service.js";
 
@@ -36,6 +37,7 @@ app.get("/", (_req, res) => {
 app.use("/api/integrations/whatsapp", whatsappRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/sync", isAuth, syncRouter);
+app.use("/api/notifications", isAuth, notificationRouter);
 app.use("/api/tasks", isAuth, taskRouter);
 app.use("/api/categories", isAuth, categoryRouter);
 app.use("/api/subtasks", isAuth, subtaskRouter);

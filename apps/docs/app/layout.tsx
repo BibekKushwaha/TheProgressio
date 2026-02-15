@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { StoreProvider } from "@repo/store";
 
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ToastProvider } from "@/components/ui/toast-provider";
 
 export const metadata: Metadata = {
@@ -18,7 +19,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <StoreProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <TooltipProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </TooltipProvider>
         </StoreProvider>
       </body>
     </html>

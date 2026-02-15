@@ -27,6 +27,7 @@
     "./timetable": "./src/timetable.ts",
     "./rotationPattern": "./src/rotationPattern.ts",
     "./nudge": "./src/nudge.ts",
+    "./notification": "./src/notification.ts",
     "./courseGrade": "./src/courseGrade.ts",
     "./gradeEntry": "./src/gradeEntry.ts",
     "./subtask": "./src/subtask.ts",

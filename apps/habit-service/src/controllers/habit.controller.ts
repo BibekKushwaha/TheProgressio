@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { prisma, type Frequency } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { habitSchema, habitLogSchema } from "@repo/schemas/habit";
+import { notificationSettingsPatchSchema } from "@repo/schemas/nudge";
 import {
     calculateGentleStreak,
     awardXP,
@@ -17,9 +18,12 @@ import {
     detectExamWarnings,
     generateMorningBriefing,
     detectSlipPatterns,
+    createTransactionSystemNudge,
+    getNotificationSettings,
     getUserNudges,
     markNudgeRead,
     markAllNudgesRead,
+    upsertNotificationSettings,
 } from "../services/nudge.service.js";
 import { dispatchWhatsAppNudges } from "../services/whatsapp-outbound.service.js";
 
@@ -299,6 +303,19 @@ export const logHabitCompletion = async (
         if (result.status === "not_found" || !result.habit) {
             res.status(404).json({ message: "Habit not found" });
             return;
+        }
+
+        try {
+            await createTransactionSystemNudge({
+                userId,
+                title: `Progress recorded for ${result.habit.name}`,
+                message: `Nice work — your ${result.habit.name} update is saved and reflected in your streak insights.`,
+                metadata: {
+                    habitId: result.habit.id,
+                    event: "habit_log_recorded",
+                },
+            });
+        } catch (_nudgeError) {
         }
 
         res.status(201).json({
@@ -847,6 +864,47 @@ export const markAllNudgesAsRead = async (
         res.status(200).json({ message: "All nudges marked as read" });
     } catch (error) {
         res.status(500).json({ message: "Failed to mark nudges", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// GET /habits/nudges/settings — Fetch notification controls
+export const getNudgeSettings = async (
+    req: AuthenticatedRequest,
+    res: Response,
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const settings = await getNotificationSettings(userId);
+        res.status(200).json({ message: "Notification settings fetched", settings });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch notification settings", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// PUT /habits/nudges/settings — Update notification controls
+export const updateNudgeSettings = async (
+    req: AuthenticatedRequest,
+    res: Response,
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const parsed = notificationSettingsPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            res.status(400).json({
+                message: "Invalid notification settings payload",
+                errors: parsed.error.flatten(),
+            });
+            return;
+        }
+
+        const settings = await upsertNotificationSettings(userId, parsed.data as any);
+        res.status(200).json({ message: "Notification settings updated", settings });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to update notification settings", error: error instanceof Error ? error.message : "Unknown error" });
     }
 };
 

@@ -14,34 +14,6 @@ export default function AnalyticsOverviewPage() {
   useGetFocusScoreQuery();
   useGetWeeklyTrendsQuery();
 
-  // const handleExportReport = () => {
-  //   const generatedAt = new Date();
-  //   const payload = {
-  //     generatedAt: generatedAt.toISOString(),
-  //     filters: {
-  //       pastDays,
-  //       selectedPredictionTaskId: selectedPredictionTaskId || null,
-  //     },
-  //     summary: summaryData?.stats ?? null,
-  //     focusScore: focusScoreData?.stats ?? null,
-  //     weeklyTrends: trendsData?.data ?? [],
-  //   };
-
-  //   const blob = new Blob([JSON.stringify(payload, null, 2)], {
-  //     type: "application/json",
-  //   });
-  //   const url = URL.createObjectURL(blob);
-  //   const anchor = document.createElement("a");
-  //   anchor.href = url;
-  //   anchor.download = `analytics-report-${
-  //     generatedAt.toISOString().split("T")[0] || "report"
-  //   }.json`;
-  //   document.body.appendChild(anchor);
-  //   anchor.click();
-  //   anchor.remove();
-  //   URL.revokeObjectURL(url);
-  // };
-
   const handleExportReport = () => {
     redirect("/reports");
   };

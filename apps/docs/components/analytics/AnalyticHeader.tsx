@@ -1,7 +1,7 @@
-// components/analytics/AnalyticsHeader.tsx
-"use client"
 import { Calendar, Download } from 'lucide-react';
 import { FilterDropdown } from '../planner/FilterDropdown';
+import { PageHeader } from '../layout/PageHeader';
+import { Button } from '../ui/button';
 
 interface AnalyticsHeaderProps {
     pastDays: string;
@@ -14,17 +14,15 @@ export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHe
         { label: "Daily", value: "1" },
         { label: "Weekly", value: "7" },
     ] as const;
-    return (
-        <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-4 md:p-6">
-            <div className="max-w-7xl mx-auto">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <div className="mb-4 md:mb-0">
-                        <h1 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                            Analytics Overview
-                        </h1>
-                        <p className="text-slate-400">Track your productivity trends and study habits.</p>
-                    </div>
 
+    return (
+        <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-4 md:p-6 mb-6">
+            <div className="max-w-7xl mx-auto">
+                <PageHeader
+                    title="Analytics Overview"
+                    subtitle="Track your productivity trends and study habits."
+                    className="mb-0" // Remove default margin as header provides padding
+                >
                     <div className="flex gap-3">
                         <FilterDropdown
                             value={pastDays}
@@ -33,15 +31,15 @@ export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHe
                             icon={<Calendar className="w-4 h-4" />}
                             placeholder={'Select'}
                         />
-                        <button
+                        <Button
                             onClick={onExport}
-                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 hover:-translate-y-0.5"
+                            className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:shadow-cyan-500/25 h-12 px-6 rounded-xl font-bold"
                         >
-                            <Download className="w-4 h-4" />
-                            <span>Export Report</span>
-                        </button>
+                            <Download className="w-4 h-4 mr-2" />
+                            Export Report
+                        </Button>
                     </div>
-                </div>
+                </PageHeader>
             </div>
         </header>
     );

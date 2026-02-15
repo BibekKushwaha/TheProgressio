@@ -12,7 +12,7 @@ function Card({ className, variant = "default", ...props }: CardProps) {
       data-slot="card"
       className={cn(
         variant === "default" && "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
-        variant === "glass" && "relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md shadow-xl transition-all duration-300 hover:shadow-2xl hover:bg-black/30",
+        variant === "glass" && "flex flex-col gap-6 py-6 relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md shadow-xl transition-all duration-300 hover:shadow-2xl hover:bg-black/30",
         className
       )}
       {...props}

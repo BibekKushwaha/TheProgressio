@@ -79,6 +79,11 @@ export {
   useScanSyllabusMutation,
   usePreviewRecoveryPlanMutation,
   useApplyRecoveryPlanMutation,
+  useComposeNotificationMutation,
+  usePostNotificationDirectReplyMutation,
+  useCreateRevisionDripCampaignMutation,
+  useTriggerGeofencePingMutation,
+  useGetNotificationDeepLinkQuery,
 } from './services/tasksApi';
 export type {
   Task,
@@ -89,6 +94,8 @@ export type {
   SyllabusScanItem,
   RecoveryPlan,
   RecoveryPlanItem,
+  ComposeNotificationRequest,
+  PlannerNotification,
 } from './services/tasksApi';
 export type { Status, Priority } from './services/tasksApi';
 export { TaskStatus, PriorityEnum } from './services/tasksApi';
@@ -140,6 +147,8 @@ export {
   useGetNudgesQuery,
   useMarkNudgeAsReadMutation,
   useMarkAllNudgesAsReadMutation,
+  useGetNudgeSettingsQuery,
+  useUpdateNudgeSettingsMutation,
   useGetMorningBriefingQuery,
 } from './services/habitsApi';
 export type {
@@ -149,6 +158,7 @@ export type {
   UserXP,
   HeatmapDay,
   Nudge,
+  NotificationSettings,
   MorningBriefing,
   CreateHabitRequest,
   UpdateHabitRequest,
@@ -187,6 +197,8 @@ export {
   useGetTimeLeakageQuery,
   useGetPeakWindowQuery,
   useGetPredictivePerformanceQuery,
+  useGetNotificationIntelligenceQuery,
+  useGetNotificationContextSignalsQuery,
 } from './services/analyticsApi';
 export type {
   ActivityLog,
@@ -212,6 +224,8 @@ export type {
   GradeEntry,
   GPAComponentInput,
   GPAComponentPreview,
+  NotificationIntelligence,
+  NotificationContextSignals,
 } from './services/analyticsApi';
 export { SessionType } from './services/analyticsApi';
 export * from './services/timetableApi';

@@ -10,9 +10,11 @@ import {
     getUserXP,
     getContributionHeatmap,
     getNudges,
+    getNudgeSettings,
     markNudgeAsRead,
     markAllNudgesAsRead,
     getMorningBriefing,
+    updateNudgeSettings,
 } from "../controllers/habit.controller.js";
 
 const router = Router();
@@ -25,6 +27,8 @@ router.get("/heatmap", getContributionHeatmap);
 
 // ── Adaptive Nudges ────────────────────
 router.get("/nudges", getNudges);
+router.get("/nudges/settings", getNudgeSettings);
+router.put("/nudges/settings", updateNudgeSettings);
 router.post("/nudges/:id/read", markNudgeAsRead);
 router.post("/nudges/read-all", markAllNudgesAsRead);
 

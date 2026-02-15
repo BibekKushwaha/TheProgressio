@@ -10,6 +10,7 @@ export * from "./studyGoal";
 export * from "./timetable";
 export * from "./rotationPattern";
 export * from "./nudge";
+export * from "./notification";
 export * from "./courseGrade";
 export * from "./gradeEntry";
 export * from "./subtask";

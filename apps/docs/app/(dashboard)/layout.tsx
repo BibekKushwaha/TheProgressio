@@ -10,7 +10,7 @@ export default function DashboardLayout({
 }) {
     return (
         <AuthGuard>
-            <div className="min-h-screen bg-slate-950 text-white selection:bg-indigo-500/30">
+            <div className="min-h-screen bg-slate-950 text-white selection:bg-indigo-500/30 overflow-x-hidden">
                 <div className="fixed inset-0 z-0 pointer-events-none">
                     <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[100px]" />
                     <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-violet-500/5 rounded-full blur-[120px]" />
@@ -18,7 +18,7 @@ export default function DashboardLayout({
 
                 <Sidebar />
 
-                <main className="lg:pl-73 lg:pr-3 pt-4 min-h-screen relative z-10 transition-all duration-300">
+                <main className="lg:pl-73 lg:pr-3 pt-20 lg:pt-4 min-h-screen relative z-10 transition-all duration-300">
                     <div className="container mx-auto  max-w-7xl">
                         {children}
                     </div>

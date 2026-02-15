@@ -235,6 +235,25 @@ export interface GPAComponentPreview {
     scale: 'INDIA_10' | 'US_4' | 'PERCENTAGE';
 }
 
+export interface NotificationIntelligence {
+    bestSendHourLocal: number;
+    bestSendWindow: string;
+    topActiveWeekday: number;
+    expectedOpenRateLiftPct: number;
+    confidence: 'low' | 'medium' | 'high';
+    sampleSize: number;
+}
+
+export interface NotificationContextSignals {
+    userId: string;
+    screenActive: boolean;
+    suppressNonUrgent: boolean;
+    motionState: string;
+    brightness: number | null;
+    locationTag: string | null;
+    geoRecommendation: string | null;
+}
+
 export const analyticsApi = createApi({
     reducerPath: 'analyticsApi',
     baseQuery: fetchBaseQuery({
@@ -510,6 +529,20 @@ export const analyticsApi = createApi({
             },
             providesTags: ['Stats'],
         }),
+        getNotificationIntelligence: builder.query<{ message: string; intelligence: NotificationIntelligence }, void>({
+            query: () => '/stats/notifications/intelligence',
+            providesTags: ['Stats'],
+        }),
+        getNotificationContextSignals: builder.query<
+            { message: string; context: NotificationContextSignals },
+            { brightness?: number; motionState?: 'STATIONARY' | 'WALKING' | 'IN_TRANSIT'; locationTag?: 'LIBRARY' | 'CAMPUS' | 'HOME' | 'COACHING_CENTER' } | void
+        >({
+            query: (params) => ({
+                url: '/stats/notifications/context',
+                params: params || {},
+            }),
+            providesTags: ['Stats'],
+        }),
     }),
 });
 
@@ -544,4 +577,6 @@ export const {
     useGetTimeLeakageQuery,
     useGetPeakWindowQuery,
     useGetPredictivePerformanceQuery,
+    useGetNotificationIntelligenceQuery,
+    useGetNotificationContextSignalsQuery,
 } = analyticsApi;

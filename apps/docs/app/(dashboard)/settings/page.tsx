@@ -2,18 +2,40 @@
 
 import React from "react";
 import { User, Bell, Lock, Palette, Loader2, Moon, Wifi, MessageSquare, Smartphone, CreditCard, Clock, QrCode, Languages } from "lucide-react";
-import { useGetProfileQuery, useUpdateProfileMutation } from "@repo/store";
+import {
+    useGetProfileQuery,
+    useUpdateProfileMutation,
+    useGetNudgeSettingsQuery,
+    useUpdateNudgeSettingsMutation,
+    useGetNotificationIntelligenceQuery,
+    useGetNotificationContextSignalsQuery,
+} from "@repo/store";
 import { QuietHoursPanel } from "@/components/settings/QuietHoursPanel";
 import { PricingSection } from "@/components/settings/PricingSection";
 import { LanguageSelector } from "@/components/settings/LanguageSelector";
 import { QRAttendance } from "@/components/settings/QRAttendance";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/layout/PageHeader";
+
+// UI Components
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
     const { data: profileData, isLoading: isProfileLoading } = useGetProfileQuery();
     const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation();
+    const { data: nudgeSettingsData } = useGetNudgeSettingsQuery();
+    const [updateNudgeSettings, { isLoading: isUpdatingNudgeSettings }] = useUpdateNudgeSettingsMutation();
+    const { data: intelligenceData } = useGetNotificationIntelligenceQuery();
+    const { data: contextSignals } = useGetNotificationContextSignalsQuery({ locationTag: "CAMPUS", motionState: "WALKING", brightness: 0.7 });
 
     const user = profileData?.user;
+    const nudgeSettings = nudgeSettingsData?.settings;
 
     const handleDailyGoalChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = parseFloat(e.target.value.split(" ")[0] || "0");
@@ -49,293 +71,416 @@ export default function SettingsPage() {
     if (isProfileLoading) {
         return (
             <div className="space-y-6">
-                <Skeleton className="h-10 w-1/3 bg-white/5" />
-                <Skeleton className="h-6 w-1/2 bg-white/5" />
-                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl space-y-6">
-                    <div className="flex items-center gap-6">
-                        <Skeleton className="w-20 h-20 rounded-full bg-white/5" />
-                        <div className="flex-1 space-y-2">
-                            <Skeleton className="h-6 w-32 bg-white/5" />
-                            <Skeleton className="h-4 w-48 bg-white/5" />
+                <PageHeader
+                    title="Settings & Integrations"
+                    subtitle="Customize your experience, manage integrations, and configure quiet hours."
+                />
+                <Card variant="glass">
+                    <CardHeader className="flex flex-row items-center gap-4">
+                        <Skeleton className="w-20 h-20 rounded-full" />
+                        <div className="space-y-2">
+                            <Skeleton className="h-6 w-32" />
+                            <Skeleton className="h-4 w-48" />
                         </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Skeleton className="h-12 w-full bg-white/5" />
-                        <Skeleton className="h-12 w-full bg-white/5" />
-                    </div>
-                </div>
-                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl space-y-4">
-                    <Skeleton className="h-16 w-full bg-white/5" />
-                    <Skeleton className="h-16 w-full bg-white/5" />
-                </div>
+                    </CardHeader>
+                    <CardContent className="grid gap-6">
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
+                    </CardContent>
+                </Card>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold text-white mb-2">Settings & Integrations</h1>
-                <p className="text-slate-400">Customize your experience, manage integrations, and configure quiet hours.</p>
-            </div>
+        <div className="space-y-6 pb-20">
+            <PageHeader
+                title="Settings & Integrations"
+                subtitle="Customize your experience, manage integrations, and configure quiet hours."
+            />
 
             {/* Profile Section */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <User className="w-5 h-5 text-indigo-400" />
-                    <h2 className="text-xl font-bold text-white">Profile Information</h2>
-                </div>
-                <div className="flex items-center gap-6 mb-6">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-3xl font-bold uppercase">
-                        {user?.username?.[0] || "U"}
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <User className="w-5 h-5 text-indigo-400" />
+                        <CardTitle>Profile Information</CardTitle>
                     </div>
-                    <div className="flex-1">
-                        <div className="text-white font-bold text-xl">{user?.username}</div>
-                        <div className="text-slate-400">{user?.email}</div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center gap-6">
+                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-3xl font-bold uppercase shrink-0">
+                            {user?.username?.[0] || "U"}
+                        </div>
+                        <div className="flex-1 space-y-1">
+                            <div className="text-xl font-bold">{user?.username}</div>
+                            <div className="text-slate-400">{user?.email}</div>
+                        </div>
+                        <Button
+                            onClick={handleProfileUpdate}
+                            disabled={isUpdating}
+                            className="bg-indigo-600 hover:bg-indigo-700 w-full md:w-auto"
+                        >
+                            {isUpdating ? "Saving..." : "Save Changes"}
+                        </Button>
                     </div>
-                    <button
-                        onClick={handleProfileUpdate}
-                        disabled={isUpdating}
-                        className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg border border-indigo-400/20 transition-colors disabled:opacity-50"
-                    >
-                        {isUpdating ? "Saving..." : "Save Changes"}
-                    </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm text-slate-400 mb-2">Username</label>
-                        <input
-                            type="text"
-                            value={profileFields.username}
-                            onChange={(e) => setProfileFields(prev => ({ ...prev, username: e.target.value }))}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
-                        />
+
+                    <Separator className="bg-white/10" />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="username">Username</Label>
+                            <Input
+                                id="username"
+                                value={profileFields.username}
+                                onChange={(e) => setProfileFields(prev => ({ ...prev, username: e.target.value }))}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={profileFields.email}
+                                onChange={(e) => setProfileFields(prev => ({ ...prev, email: e.target.value }))}
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm text-slate-400 mb-2">Email</label>
-                        <input
-                            type="email"
-                            value={profileFields.email}
-                            onChange={(e) => setProfileFields(prev => ({ ...prev, email: e.target.value }))}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
-                        />
-                    </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Preferences */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <Palette className="w-5 h-5 text-indigo-400" />
-                    <h2 className="text-xl font-bold text-white">Preferences</h2>
-                </div>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                        <div>
-                            <div className="text-white font-medium">Dark Mode</div>
-                            <div className="text-sm text-slate-400">Use dark theme across the app</div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" className="sr-only peer" defaultChecked />
-                            <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
-                        </label>
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Palette className="w-5 h-5 text-indigo-400" />
+                        <CardTitle>Preferences</CardTitle>
                     </div>
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                        <div>
-                            <div className="text-white font-medium">Daily Goal</div>
-                            <div className="text-sm text-slate-400">Set your daily focus time goal</div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                        <div className="space-y-0.5">
+                            <Label className="text-base">Dark Mode</Label>
+                            <p className="text-sm text-slate-400">Use dark theme across the app</p>
+                        </div>
+                        <Switch defaultChecked />
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                        <div className="space-y-0.5">
+                            <Label className="text-base">Daily Goal</Label>
+                            <p className="text-sm text-slate-400">Set your daily focus time goal</p>
                         </div>
                         <div className="flex items-center gap-3">
                             {isUpdating && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />}
-                            <select
-                                value={`${user?.dailyGoalHours || 4} hours`}
-                                onChange={handleDailyGoalChange}
-                                disabled={isUpdating}
-                                className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                            >
-                                <option className="bg-slate-900">1 hours</option>
-                                <option className="bg-slate-900">2 hours</option>
-                                <option className="bg-slate-900">3 hours</option>
-                                <option className="bg-slate-900">4 hours</option>
-                                <option className="bg-slate-900">5 hours</option>
-                                <option className="bg-slate-900">6 hours</option>
-                                <option className="bg-slate-900">7 hours</option>
-                                <option className="bg-slate-900">8 hours</option>
-                            </select>
+                            <div className="w-[140px]">
+                                <Select
+                                    value={`${user?.dailyGoalHours || 4} hours`}
+                                    onValueChange={(val) => {
+                                        // Handle value change - adapt to match original event handler expectation if needed,
+                                        // or call the mutation directly here. 
+                                        // The original handler expects a change event, so we'll adapt.
+                                        const event = { target: { value: val } } as React.ChangeEvent<HTMLSelectElement>;
+                                        handleDailyGoalChange(event);
+                                    }}
+                                    disabled={isUpdating}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select goal" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[1, 2, 3, 4, 5, 6, 7, 8].map(h => (
+                                            <SelectItem key={h} value={`${h} hours`} className="bg-slate-900 cursor-pointer">{h} hours</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Language & Region */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <Languages className="w-5 h-5 text-indigo-400" />
-                    <h2 className="text-xl font-bold text-white">Language & Region</h2>
-                </div>
-                <LanguageSelector />
-            </div>
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Languages className="w-5 h-5 text-indigo-400" />
+                        <CardTitle>Language & Region</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <LanguageSelector />
+                </CardContent>
+            </Card>
 
             {/* Quiet Hours */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <Moon className="w-5 h-5 text-indigo-400" />
-                    <h2 className="text-xl font-bold text-white">Quiet Hours</h2>
-                </div>
-                <QuietHoursPanel />
-            </div>
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Moon className="w-5 h-5 text-indigo-400" />
+                        <CardTitle>Quiet Hours</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <QuietHoursPanel />
+                </CardContent>
+            </Card>
 
             {/* Notifications */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <Bell className="w-5 h-5 text-indigo-400" />
-                    <h2 className="text-xl font-bold text-white">Notifications</h2>
-                </div>
-                <div className="space-y-4">
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Bell className="w-5 h-5 text-indigo-400" />
+                        <CardTitle>Notifications</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
                     {[
-                        { title: "Task Reminders", description: "Get notified about upcoming tasks" },
-                        { title: "Streak Alerts", description: "Reminders to maintain your streak" },
-                        { title: "Achievement Unlocks", description: "Celebrate when you unlock new badges" },
-                    ].map((item, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                            <div>
-                                <div className="text-white font-medium">{item.title}</div>
-                                <div className="text-sm text-slate-400">{item.description}</div>
+                        { key: "URGENCY_DRIVEN", title: "Deadline Alerts", description: "Urgency-driven reminders for upcoming conflicts" },
+                        { key: "MORNING_BRIEFING", title: "Morning Briefing", description: "Top 3 priorities and schedule context" },
+                        { key: "BEHAVIORAL_NUDGE", title: "Behavioral Nudges", description: "Gentle check-ins for streaks and routines" },
+                        { key: "ADVANCE_ALERT_3WEEK", title: "Exam Advance Alerts", description: "3-week, 1-week, and 3-day reminders" },
+                        { key: "TRANSACTION_SYSTEM", title: "System Updates", description: "Attendance, sync, and confirmation updates" },
+                    ].map((item) => (
+                        <div key={item.key} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                            <div className="space-y-0.5">
+                                <Label className="text-base">{item.title}</Label>
+                                <p className="text-sm text-slate-400">{item.description}</p>
                             </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" className="sr-only peer" defaultChecked={i < 2} />
-                                <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
-                            </label>
+                            <Switch
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                checked={Boolean((nudgeSettings?.enabledBuckets as any)?.[item.key])}
+                                onCheckedChange={async (checked) => {
+                                    try {
+                                        await updateNudgeSettings({
+                                            enabledBuckets: {
+                                                ...(nudgeSettings?.enabledBuckets ?? {
+                                                    URGENCY_DRIVEN: true,
+                                                    MORNING_BRIEFING: true,
+                                                    BEHAVIORAL_NUDGE: true,
+                                                    ADVANCE_ALERT_3WEEK: true,
+                                                    TRANSACTION_SYSTEM: true,
+                                                }),
+                                                [item.key]: checked,
+                                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            } as any,
+                                        }).unwrap();
+                                    } catch (error) {
+                                        console.error("Failed to update notification bucket setting:", error);
+                                    }
+                                }}
+                            />
                         </div>
                     ))}
-                </div>
-            </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                            <Label className="text-sm text-slate-300">Grouped summaries / digests</Label>
+                            <Switch
+                                checked={Boolean(nudgeSettings?.groupedSummaries)}
+                                onCheckedChange={async (checked) => {
+                                    try {
+                                        await updateNudgeSettings({ groupedSummaries: checked }).unwrap();
+                                    } catch (error) {
+                                        console.error("Failed to update grouped summaries:", error);
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                            <Label className="text-sm text-slate-300">Positive motivation tone</Label>
+                            <Switch
+                                checked={Boolean(nudgeSettings?.positiveTone)}
+                                onCheckedChange={async (checked) => {
+                                    try {
+                                        await updateNudgeSettings({ positiveTone: checked }).unwrap();
+                                    } catch (error) {
+                                        console.error("Failed to update positive tone setting:", error);
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg space-y-2">
+                        <div className="font-medium text-indigo-300">Behavioral Intelligence</div>
+                        <div className="text-sm text-slate-300">
+                            Best send window: <span className="text-white font-semibold">{intelligenceData?.intelligence?.bestSendWindow ?? 'Loading...'}</span>
+                        </div>
+                        <div className="text-sm text-slate-400">
+                            Expected open-rate lift: {intelligenceData?.intelligence?.expectedOpenRateLiftPct ?? 0}% · Confidence: {intelligenceData?.intelligence?.confidence ?? 'low'}
+                        </div>
+                        <div className="text-xs text-slate-400/80">
+                            Active context: {contextSignals?.context?.screenActive ? 'Device active' : 'Quiet context'} · Non-urgent suppressed: {contextSignals?.context?.suppressNonUrgent ? 'Yes' : 'No'}
+                        </div>
+                    </div>
+
+                    {isUpdatingNudgeSettings && (
+                        <div className="text-xs text-indigo-300 animate-pulse">Saving notification settings...</div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* Sync Status */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <Wifi className="w-5 h-5 text-green-400" />
-                    <h2 className="text-xl font-bold text-white">Sync Status</h2>
-                </div>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Wifi className="w-5 h-5 text-green-400" />
+                        <CardTitle>Sync Status</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
                         <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
                             <div>
-                                <div className="text-white font-medium">Local-First Sync</div>
+                                <div className="font-medium">Local-First Sync</div>
                                 <div className="text-sm text-slate-400">All data is synced and up to date</div>
                             </div>
                         </div>
-                        <span className="text-xs text-green-400 font-semibold bg-green-500/10 px-3 py-1 rounded-full">Connected</span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                        <div>
-                            <div className="text-white font-medium">Pending Changes</div>
-                            <div className="text-sm text-slate-400">Changes waiting to be synced</div>
+                        <div className="text-xs font-semibold text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
+                            Connected
                         </div>
-                        <span className="text-slate-300 font-mono">0</span>
                     </div>
-                </div>
-            </div>
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                        <div>
+                            <div className="font-medium">Pending Changes</div>
+                            <div className="text-sm text-slate-400">Changes waiting to be synced to cloud</div>
+                        </div>
+                        <span className="text-lg font-mono font-bold text-slate-300">0</span>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* WhatsApp Bot Pairing */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <MessageSquare className="w-5 h-5 text-green-400" />
-                    <h2 className="text-xl font-bold text-white">WhatsApp Bot</h2>
-                </div>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                                <Smartphone className="w-6 h-6 text-green-400" />
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <MessageSquare className="w-5 h-5 text-green-400" />
+                        <CardTitle>WhatsApp Bot</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 rounded-xl bg-green-500/20 text-green-400">
+                                <Smartphone className="w-6 h-6" />
                             </div>
                             <div>
-                                <div className="text-white font-medium">Nudge Notifications</div>
-                                <div className="text-sm text-slate-400">Receive study reminders and streak alerts via WhatsApp</div>
+                                <div className="font-medium">Nudge Notifications</div>
+                                <div className="text-sm text-slate-400">Receive study reminders and streak alerts</div>
                             </div>
                         </div>
-                        <span className="text-xs text-slate-400 font-semibold bg-white/5 px-3 py-1 rounded-full">Not Paired</span>
+                        <div className="text-xs font-semibold text-slate-400 bg-white/10 px-3 py-1 rounded-full">
+                            Not Paired
+                        </div>
                     </div>
-                    <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-lg">
-                        <p className="text-sm text-slate-300 mb-3">To pair your WhatsApp:</p>
-                        <ol className="text-sm text-slate-400 space-y-1.5 list-decimal list-inside">
-                            <li>Save <span className="text-green-400 font-mono">+91 XXXX-XXXX</span> as &quot;Study Bot&quot;</li>
+
+                    <div className="p-6 bg-green-950/20 border border-green-500/20 rounded-xl space-y-4">
+                        <div className="text-sm text-slate-300 font-medium">To pair your WhatsApp:</div>
+                        <ol className="text-sm text-slate-400 space-y-2 list-decimal list-inside pl-2">
+                            <li>Save <span className="text-green-400 font-mono bg-green-950/40 px-1 rounded">+91 XXXX-XXXX</span> as &quot;Study Bot&quot;</li>
                             <li>Send the pairing code below to the bot</li>
                             <li>You&apos;ll receive a confirmation message</li>
                         </ol>
-                        <div className="mt-3 flex items-center gap-3">
-                            <code className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-green-400 font-mono text-lg tracking-widest">PAIR-{Math.random().toString(36).slice(2, 8).toUpperCase()}</code>
-                            <button className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition-colors">
+                        <div className="flex items-center gap-3 pt-2">
+                            <code className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-lg text-green-400 font-mono text-lg tracking-widest text-center">
+                                PAIR-{Math.random().toString(36).slice(2, 8).toUpperCase()}
+                            </code>
+                            <Button className="bg-green-600 hover:bg-green-700 h-full">
                                 Copy Code
-                            </button>
+                            </Button>
                         </div>
                     </div>
-                </div>
-                {/* Nudge Schedule */}
-                <div className="mt-4 p-4 bg-white/5 rounded-lg">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Clock className="w-4 h-4 text-green-400" />
-                        <span className="text-white font-medium">Smart Nudge Schedule</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                            <div>
-                                <div className="text-sm text-white">Pre-deadline reminder</div>
-                                <div className="text-xs text-slate-400">Days before due date</div>
+
+                    <Separator className="bg-white/10" />
+
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-green-400" />
+                            <span className="font-medium">Smart Nudge Schedule</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+                                <div>
+                                    <div className="text-sm font-medium">Pre-deadline</div>
+                                    <div className="text-xs text-slate-400">Days before due date</div>
+                                </div>
+                                <div className="w-[100px]">
+                                    <Select defaultValue="2 days">
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1 day">1 day</SelectItem>
+                                            <SelectItem value="2 days">2 days</SelectItem>
+                                            <SelectItem value="3 days">3 days</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                            <select className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-green-500">
-                                <option className="bg-slate-900">1 day</option>
-                                <option className="bg-slate-900" selected>2 days</option>
-                                <option className="bg-slate-900">3 days</option>
-                                <option className="bg-slate-900">5 days</option>
-                            </select>
-                        </div>
-                        <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                            <div>
-                                <div className="text-sm text-white">Streak reminder</div>
-                                <div className="text-xs text-slate-400">Daily reminder time</div>
+                            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+                                <div>
+                                    <div className="text-sm font-medium">Streak check</div>
+                                    <div className="text-xs text-slate-400">Daily reminder time</div>
+                                </div>
+                                <div className="w-[110px]">
+                                    <Select defaultValue="9:00 AM">
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="8:00 AM">8:00 AM</SelectItem>
+                                            <SelectItem value="9:00 AM">9:00 AM</SelectItem>
+                                            <SelectItem value="6:00 PM">6:00 PM</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                            <select className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-green-500">
-                                <option className="bg-slate-900">8:00 AM</option>
-                                <option className="bg-slate-900" selected>9:00 AM</option>
-                                <option className="bg-slate-900">10:00 AM</option>
-                                <option className="bg-slate-900">6:00 PM</option>
-                            </select>
                         </div>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Premium Upgrade */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <CreditCard className="w-5 h-5 text-yellow-400" />
-                    <h2 className="text-xl font-bold text-white">Premium Upgrade</h2>
-                </div>
-                <PricingSection />
-            </div>
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <CreditCard className="w-5 h-5 text-yellow-400" />
+                        <CardTitle>Premium Upgrade</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <PricingSection />
+                </CardContent>
+            </Card>
 
             {/* QR Attendance */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <QrCode className="w-5 h-5 text-indigo-400" />
-                    <h2 className="text-xl font-bold text-white">QR Attendance</h2>
-                </div>
-                <QRAttendance />
-            </div>
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <QrCode className="w-5 h-5 text-indigo-400" />
+                        <CardTitle>QR Attendance</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <QRAttendance />
+                </CardContent>
+            </Card>
 
             {/* Security */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                    <Lock className="w-5 h-5 text-indigo-400" />
-                    <h2 className="text-xl font-bold text-white">Security</h2>
-                </div>
-                <button className="w-full md:w-auto px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10 transition-colors">
-                    Change Password
-                </button>
-            </div>
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Lock className="w-5 h-5 text-indigo-400" />
+                        <CardTitle>Security</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Button variant="outline" className="w-full md:w-auto border-white/10 hover:bg-white/5">
+                        Change Password
+                    </Button>
+                </CardContent>
+            </Card>
         </div>
     );
 }

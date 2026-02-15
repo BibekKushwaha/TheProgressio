@@ -10,7 +10,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 // import { Field, FieldGroup } from "@/components/ui/field" // removing unused/complex for now
-import { Select } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Slider } from "../ui/slider"
 
@@ -18,15 +18,16 @@ import { Slider } from "../ui/slider"
 import { useRouter } from 'next/navigation';
 import { useGetTasksQuery, TaskStatus } from '@repo/store';
 
+import { useState } from "react";
+
 export function AiSuggestedDialog() {
     const router = useRouter();
     const { data: tasks, isLoading } = useGetTasksQuery({ status: TaskStatus.PENDING });
+    const [selectedFocusGoal, setSelectedFocusGoal] = useState("");
 
     const handleGenerate = (e: React.FormEvent) => {
         e.preventDefault();
-        // Extract form data if needed, for now just redirect
-        const focusGoalElement = (document.getElementById('focusGoal') as HTMLSelectElement);
-        const focusGoal = focusGoalElement?.value || 'Study Session';
+        const focusGoal = selectedFocusGoal || 'Study Session';
         router.push(`/focus-session?goal=${encodeURIComponent(focusGoal)}&duration=45`);
     };
 
@@ -49,17 +50,21 @@ export function AiSuggestedDialog() {
                     <div className="py-4 space-y-4">
                         <div>
                             <Label htmlFor="focusGoal" className="text-sm font-medium text-slate-300 mb-2 block">Focus Goal</Label>
-                            <Select name="focusGoal" id="focusGoal" defaultValue="">
-                                <option value="" disabled className="bg-slate-900">Select a task</option>
-                                {isLoading ? (
-                                    <option value="" disabled className="bg-slate-900">Loading tasks...</option>
-                                ) : (
-                                    tasks?.map(task => (
-                                        <option key={task.id} value={task.title} className="bg-slate-900">
-                                            {task.title}
-                                        </option>
-                                    ))
-                                )}
+                            <Select value={selectedFocusGoal} onValueChange={setSelectedFocusGoal}>
+                                <SelectTrigger id="focusGoal" className="bg-slate-900 border-white/10 text-white">
+                                    <SelectValue placeholder="Select a task" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                    {isLoading ? (
+                                        <SelectItem value="loading" disabled>Loading tasks...</SelectItem>
+                                    ) : (
+                                        tasks?.map(task => (
+                                            <SelectItem key={task.id} value={task.title}>
+                                                {task.title}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
                             </Select>
                         </div>
                         {/* SessionLengthSelector placeholder */}

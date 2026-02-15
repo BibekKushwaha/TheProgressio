@@ -5,7 +5,7 @@ import { HabitActionMenu } from './HabitActionMenu';
 import { useToast } from '@/components/ui/toast-provider';
 
 export function HabitCard({ habit }: { habit: Habit }) {
-        const hasNewTrophy = Boolean((habit as { newTrophy?: boolean }).newTrophy);
+    const hasNewTrophy = Boolean((habit as { newTrophy?: boolean }).newTrophy);
     // Determine the color theme. If the habit has an RTK-saved color (gradient), use it.
     // Otherwise fallback to a default purple gradient.
     const colorTheme = habit.color || "from-purple-600 to-pink-600";
@@ -26,7 +26,7 @@ export function HabitCard({ habit }: { habit: Habit }) {
     };
 
     return (
-        <div className="group relative bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 transition-all duration-300">
             {/* Background glow using the habit's color */}
             <div className={cn(
                 "absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-20 transition-opacity bg-gradient-to-br",

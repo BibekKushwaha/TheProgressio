@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Bell, Moon, Clock, ChevronDown, Sparkles } from 'lucide-react';
+import { useGetNudgeSettingsQuery, useUpdateNudgeSettingsMutation } from '@repo/store';
 
 interface QuietHoursSettings {
     enabled: boolean;
@@ -12,6 +13,8 @@ interface QuietHoursSettings {
 }
 
 export function QuietHoursPanel() {
+    const { data } = useGetNudgeSettingsQuery();
+    const [updateNudgeSettings] = useUpdateNudgeSettingsMutation();
     const [settings, setSettings] = useState<QuietHoursSettings>({
         enabled: false,
         startTime: '22:00',
@@ -24,22 +27,34 @@ export function QuietHoursPanel() {
 
     // Load from localStorage on mount
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('quiet-hours-settings');
-            if (saved) {
-                try {
-                    setSettings(JSON.parse(saved));
-                } catch (e) {
-                    console.error('Failed to parse settings', e);
-                }
-            }
-        }
-    }, []);
+        const firstWindow = data?.settings?.quietHours?.[0];
+        if (!firstWindow) return;
+
+        setSettings((prev) => ({
+            ...prev,
+            enabled: true,
+            startTime: firstWindow.start,
+            endTime: firstWindow.end,
+            gentleNudges: Boolean(data?.settings?.positiveTone),
+        }));
+    }, [data?.settings]);
 
     // Save to localStorage on change
     const update = <K extends keyof QuietHoursSettings>(key: K, value: QuietHoursSettings[K]) => {
         const newSettings = { ...settings, [key]: value };
         setSettings(newSettings);
+
+        const effectiveQuietHours = newSettings.enabled
+            ? [{ start: newSettings.startTime, end: newSettings.endTime }]
+            : [];
+
+        updateNudgeSettings({
+            quietHours: effectiveQuietHours,
+            positiveTone: newSettings.gentleNudges,
+        }).catch((error) => {
+            console.error('Failed to persist quiet hour settings', error);
+        });
+
         if (typeof window !== 'undefined') {
             localStorage.setItem('quiet-hours-settings', JSON.stringify(newSettings));
         }

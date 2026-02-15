@@ -56,7 +56,7 @@ export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange
                             <p className="text-sm text-slate-400">Strengths, Weaknesses, Opportunities, Threats</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 hidden md:flex">
                         <Input
                             placeholder="Search subjects..."
                             value={searchQuery}
