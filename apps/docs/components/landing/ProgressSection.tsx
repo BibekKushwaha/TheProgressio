@@ -4,6 +4,30 @@ import { motion } from 'framer-motion';
 import { Trophy, Flame, Clock, Zap } from 'lucide-react';
 
 export function ProgressSection() {
+  const stats = [
+    {
+      icon: Flame,
+      value: '21',
+      label: 'Day Streak',
+      cardTone: 'from-purple-900/30 to-purple-950/20 border-purple-500/20',
+      iconTone: 'bg-purple-600/20 text-orange-400',
+    },
+    {
+      icon: Clock,
+      value: '156',
+      label: 'Hours Studied',
+      cardTone: 'from-indigo-900/30 to-indigo-950/20 border-indigo-500/20',
+      iconTone: 'bg-indigo-600/20 text-indigo-400',
+    },
+    {
+      icon: Zap,
+      value: '3,420',
+      label: 'XP Earned',
+      cardTone: 'from-pink-900/30 to-pink-950/20 border-pink-500/20',
+      iconTone: 'bg-pink-600/20 text-yellow-400',
+    },
+  ];
+
   return (
     <section className="relative py-32 px-6">
       <div className="max-w-6xl mx-auto">
@@ -33,38 +57,22 @@ export function ProgressSection() {
           className="max-w-3xl mx-auto bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-lg border border-white/10 rounded-3xl p-8 shadow-2xl"
         >
           <div className="grid md:grid-cols-3 gap-6 mb-8">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-gradient-to-br from-purple-900/30 to-purple-950/20 rounded-2xl p-6 border border-purple-500/20"
-            >
-              <div className="w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center mb-4">
-                <Flame className="w-6 h-6 text-orange-400" />
-              </div>
-              <div className="text-3xl font-bold mb-1">21</div>
-              <div className="text-sm text-slate-400">Day Streak</div>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-gradient-to-br from-indigo-900/30 to-indigo-950/20 rounded-2xl p-6 border border-indigo-500/20"
-            >
-              <div className="w-12 h-12 bg-indigo-600/20 rounded-xl flex items-center justify-center mb-4">
-                <Clock className="w-6 h-6 text-indigo-400" />
-              </div>
-              <div className="text-3xl font-bold mb-1">156</div>
-              <div className="text-sm text-slate-400">Hours Studied</div>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-gradient-to-br from-pink-900/30 to-pink-950/20 rounded-2xl p-6 border border-pink-500/20"
-            >
-              <div className="w-12 h-12 bg-pink-600/20 rounded-xl flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-yellow-400" />
-              </div>
-              <div className="text-3xl font-bold mb-1">3,420</div>
-              <div className="text-sm text-slate-400">XP Earned</div>
-            </motion.div>
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <motion.div
+                  key={stat.label}
+                  whileHover={{ scale: 1.05 }}
+                  className={`bg-gradient-to-br ${stat.cardTone} rounded-2xl p-6 border`}
+                >
+                  <div className={`w-12 h-12 ${stat.iconTone} rounded-xl flex items-center justify-center mb-4`}>
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <div className="text-3xl font-bold mb-1">{stat.value}</div>
+                  <div className="text-sm text-slate-400">{stat.label}</div>
+                </motion.div>
+              );
+            })}
           </div>
 
           <div className="bg-slate-800/40 rounded-2xl p-6 border border-white/5">

@@ -42,6 +42,32 @@ export function ProductivityInsights() {
     const leakage = leakageData?.report;
     const peak = peakData?.data as PeakData | undefined;
     const performance = (performanceData?.data || []) as PerformanceItem[];
+    const leakageStats = leakage
+        ? [
+              {
+                  label: 'Total Leakage',
+                  value: `${leakage.totalLeakageMinutes} min`,
+                  valueClass: 'text-red-400',
+                  note: `${leakage.leakagePercentage.toFixed(1)}% of planned time`,
+              },
+              {
+                  label: 'Planned Time',
+                  value: `${leakage.totalPlannedMinutes} min`,
+                  valueClass: 'text-white',
+              },
+              {
+                  label: 'Actual Time',
+                  value: `${leakage.totalActualMinutes} min`,
+                  valueClass: 'text-green-400',
+              },
+          ]
+        : [];
+    const getPaceTone = (pace: string) =>
+        pace === 'accelerating'
+            ? 'bg-green-500/20 text-green-400'
+            : pace === 'steady'
+              ? 'bg-blue-500/20 text-blue-400'
+              : 'bg-red-500/20 text-red-400';
 
     return (
         <div className="space-y-6">
@@ -59,19 +85,13 @@ export function ProductivityInsights() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                            <div className="text-sm text-slate-400 mb-1">Total Leakage</div>
-                            <div className="text-2xl font-bold text-red-400">{leakage.totalLeakageMinutes} min</div>
-                            <div className="text-xs text-slate-500 mt-1">{leakage.leakagePercentage.toFixed(1)}% of planned time</div>
-                        </div>
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                            <div className="text-sm text-slate-400 mb-1">Planned Time</div>
-                            <div className="text-2xl font-bold text-white">{leakage.totalPlannedMinutes} min</div>
-                        </div>
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                            <div className="text-sm text-slate-400 mb-1">Actual Time</div>
-                            <div className="text-2xl font-bold text-green-400">{leakage.totalActualMinutes} min</div>
-                        </div>
+                        {leakageStats.map((item) => (
+                            <div key={item.label} className="bg-white/5 border border-white/10 rounded-lg p-4">
+                                <div className="text-sm text-slate-400 mb-1">{item.label}</div>
+                                <div className={`text-2xl font-bold ${item.valueClass}`}>{item.value}</div>
+                                {item.note && <div className="text-xs text-slate-500 mt-1">{item.note}</div>}
+                            </div>
+                        ))}
                     </div>
 
                     {leakage.suggestion && (
@@ -193,10 +213,7 @@ export function ProductivityInsights() {
 
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="text-xs text-slate-400 uppercase tracking-wider">Pace</span>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${subject.pace === 'accelerating' ? 'bg-green-500/20 text-green-400' :
-                                        subject.pace === 'steady' ? 'bg-blue-500/20 text-blue-400' :
-                                            'bg-red-500/20 text-red-400'
-                                        }`}>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPaceTone(subject.pace)}`}>
                                         {subject.pace}
                                     </span>
                                 </div>

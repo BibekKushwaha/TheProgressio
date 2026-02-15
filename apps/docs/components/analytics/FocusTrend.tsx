@@ -1,6 +1,16 @@
 import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 
+const DEFAULT_TRENDS = [
+    { date: 'Mon', hours: 0 },
+    { date: 'Tue', hours: 0 },
+    { date: 'Wed', hours: 0 },
+    { date: 'Thu', hours: 0 },
+    { date: 'Fri', hours: 0 },
+    { date: 'Sat', hours: 0 },
+    { date: 'Sun', hours: 0 },
+];
+
 export function FocusTrends({ pastDays }: { pastDays: string }) {
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
     const chartWidth = 600;
@@ -16,15 +26,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
         return compact.length <= 3 ? compact : compact.slice(0, 3);
     };
 
-    const rawData = trendsData?.data || [
-        { date: 'Mon', hours: 0 },
-        { date: 'Tue', hours: 0 },
-        { date: 'Wed', hours: 0 },
-        { date: 'Thu', hours: 0 },
-        { date: 'Fri', hours: 0 },
-        { date: 'Sat', hours: 0 },
-        { date: 'Sun', hours: 0 },
-    ];
+    const rawData = trendsData?.data || DEFAULT_TRENDS;
 
     const maxPoints = pastDays === "7" ? 14 : 7;
     const visibleRawData = rawData.slice(-maxPoints);
@@ -76,7 +78,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
 
                             {data.map((point, index) => (
                                 <circle
-                                    key={index}
+                                    key={`${point.day}-${index}`}
                                     cx={index * xStep}
                                     cy={chartHeight - (point.hours / maxHours) * 200}
                                     r="5"
@@ -88,7 +90,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
 
                         <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-xs text-slate-400">
                             {data.map((point, index) => (
-                                <div key={index} className="flex flex-col items-center">
+                                <div key={`${point.day}-${point.hours}-${index}`} className="flex flex-col items-center">
                                     <span>{point.day}</span>
                                     <span className="text-cyan-400 font-semibold mt-1">{point.hours}h</span>
                                 </div>

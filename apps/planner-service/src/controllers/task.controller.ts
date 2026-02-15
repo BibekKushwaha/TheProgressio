@@ -16,6 +16,28 @@ import { recoveryService } from "../services/recovery.service.js";
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || "http://localhost:4003";
 
+const SIDE_EFFECT_OUTAGE_BACKOFF_MS = Number(process.env.SIDE_EFFECT_OUTAGE_BACKOFF_MS || 30000);
+const sideEffectOutageUntil: Record<"habit" | "analytics", number> = {
+    habit: 0,
+    analytics: 0,
+};
+const sideEffectNextLogAt: Record<"habit" | "analytics", number> = {
+    habit: 0,
+    analytics: 0,
+};
+
+const isTemporarilyUnavailable = (service: "habit" | "analytics"): boolean =>
+    Date.now() < sideEffectOutageUntil[service];
+
+const markServiceUnavailable = (service: "habit" | "analytics", reason: string): void => {
+    const now = Date.now();
+    sideEffectOutageUntil[service] = now + SIDE_EFFECT_OUTAGE_BACKOFF_MS;
+    if (now >= sideEffectNextLogAt[service]) {
+        sideEffectNextLogAt[service] = now + SIDE_EFFECT_OUTAGE_BACKOFF_MS;
+        console.warn(`⚠️ ${service} side-effects unavailable (${reason}). Suppressing retries for ${Math.ceil(SIDE_EFFECT_OUTAGE_BACKOFF_MS / 1000)}s.`);
+    }
+};
+
 const notifyHabitCategoryCompletion = async (params: {
     userId: string;
     categoryId: string | null;
@@ -23,6 +45,7 @@ const notifyHabitCategoryCompletion = async (params: {
 }): Promise<void> => {
     if (process.env.NODE_ENV === "test") return;
     if (!params.categoryId) return;
+    if (isTemporarilyUnavailable("habit")) return;
 
     try {
         const response = await fetch(`${HABIT_SERVICE_URL}/api/habits/events`, {
@@ -43,8 +66,9 @@ const notifyHabitCategoryCompletion = async (params: {
                 `⚠️ Habit automation event failed (${response.status}): ${errorText || "Unknown error"}`
             );
         }
-    } catch (error) {
-        console.warn("⚠️ Habit automation endpoint unreachable:", error);
+    } catch (error: any) {
+        const reason = error?.cause?.code || error?.code || error?.name || "fetch_failed";
+        markServiceUnavailable("habit", String(reason));
     }
 };
 
@@ -52,6 +76,7 @@ const notifyAnalyticsTaskCompletion = async (params: {
     taskId: string;
 }): Promise<void> => {
     if (process.env.NODE_ENV === "test") return;
+    if (isTemporarilyUnavailable("analytics")) return;
     try {
         const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
             method: "POST",
@@ -68,8 +93,9 @@ const notifyAnalyticsTaskCompletion = async (params: {
                 `⚠️ Analytics completion event failed (${response.status}): ${errorText || "Unknown error"}`
             );
         }
-    } catch (error) {
-        console.warn("⚠️ Analytics completion endpoint unreachable:", error);
+    } catch (error: any) {
+        const reason = error?.cause?.code || error?.code || error?.name || "fetch_failed";
+        markServiceUnavailable("analytics", String(reason));
     }
 };
 
@@ -79,6 +105,7 @@ const notifyAnalyticsTaskUpdate = async (params: {
     changedFields: Record<string, unknown>;
 }): Promise<void> => {
     if (process.env.NODE_ENV === "test") return;
+    if (isTemporarilyUnavailable("analytics")) return;
     try {
         const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
             method: "POST",
@@ -97,8 +124,9 @@ const notifyAnalyticsTaskUpdate = async (params: {
                 `⚠️ Analytics update event failed (${response.status}): ${errorText || "Unknown error"}`
             );
         }
-    } catch (error) {
-        console.warn("⚠️ Analytics update endpoint unreachable:", error);
+    } catch (error: any) {
+        const reason = error?.cause?.code || error?.code || error?.name || "fetch_failed";
+        markServiceUnavailable("analytics", String(reason));
     }
 };
 
@@ -107,6 +135,7 @@ const notifyAnalyticsTaskDeletion = async (params: {
     userId: string;
 }): Promise<void> => {
     if (process.env.NODE_ENV === "test") return;
+    if (isTemporarilyUnavailable("analytics")) return;
     try {
         const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
             method: "POST",
@@ -124,8 +153,9 @@ const notifyAnalyticsTaskDeletion = async (params: {
                 `⚠️ Analytics deletion event failed (${response.status}): ${errorText || "Unknown error"}`
             );
         }
-    } catch (error) {
-        console.warn("⚠️ Analytics deletion endpoint unreachable:", error);
+    } catch (error: any) {
+        const reason = error?.cause?.code || error?.code || error?.name || "fetch_failed";
+        markServiceUnavailable("analytics", String(reason));
     }
 };
 
@@ -550,8 +580,8 @@ export const applyRecoveryPlan = async (req: AuthenticatedRequest, res: Response
             });
         }
 
-        const anchorDate = parsed.data.anchorDate ?? new Date();
-        const result = await recoveryService.apply(req.user.id, anchorDate);
+        const { anchorDate, taskIds, overrides } = parsed.data;
+        const result = await recoveryService.apply(req.user.id, anchorDate, taskIds, overrides);
 
         return res.status(200).json(result);
     } catch (error) {

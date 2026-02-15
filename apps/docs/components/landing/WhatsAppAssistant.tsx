@@ -10,16 +10,22 @@ export function WhatsAppAssistant() {
     { text: 'Heat Engines (Carnot)...', from: 'ai' },
     { text: 'Generate Quiz', from: 'user' },
   ];
+  const sideMotion = (x: number) => ({
+    initial: { opacity: 0, x },
+    whileInView: { opacity: 1, x: 0 },
+    viewport: { once: true },
+    transition: { duration: 0.6, ease: 'easeOut' as const },
+  });
+  const bubbleClass = (from: string) =>
+    from === 'user' ? 'bg-purple-600' : 'bg-white/10 border border-white/20';
+  const rowClass = (from: string) => (from === 'user' ? 'justify-end' : 'justify-start');
 
   return (
     <section className="relative pt-32 px-6">
       <div className="max-w-6xl mx-auto">
         <div className="grid md:grid-cols-2 gap-16 items-center">
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
+            {...sideMotion(-50)}
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-600/20 border border-green-500/30 rounded-full mb-6">
               <MessageCircle className="w-4 h-4 text-green-400" />
@@ -41,10 +47,7 @@ export function WhatsAppAssistant() {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
+            {...sideMotion(50)}
             className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6"
           >
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
@@ -63,20 +66,14 @@ export function WhatsAppAssistant() {
             <div className="space-y-3">
               {messages.map((msg, i) => (
                 <motion.div
-                  key={i}
+                  key={`${msg.from}-${msg.text}`}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: i * 0.2, ease: 'easeOut' }}
-                  className={`flex ${msg.from === 'user' ? 'justify-end' : 'justify-start'}`}
+                  transition={{ duration: 0.4, delay: i * 0.2, ease: 'easeOut' as const }}
+                  className={`flex ${rowClass(msg.from)}`}
                 >
-                  <div
-                    className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                      msg.from === 'user'
-                        ? 'bg-purple-600'
-                        : 'bg-white/10 border border-white/20'
-                    }`}
-                  >
+                  <div className={`max-w-[80%] px-4 py-3 rounded-2xl ${bubbleClass(msg.from)}`}>
                     {msg.text}
                   </div>
                 </motion.div>

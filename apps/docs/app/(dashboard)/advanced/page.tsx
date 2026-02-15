@@ -26,12 +26,12 @@ const TAB_ITEMS: Array<{
     icon: ComponentType<{ className?: string }>;
     tone: string;
 }> = [
-    { id: 'gpa', label: 'GPA Lab', icon: GraduationCap, tone: 'from-indigo-500/20 to-violet-500/10 border-indigo-400/20' },
-    { id: 'swot', label: 'SWOT Matrix', icon: Target, tone: 'from-blue-500/20 to-cyan-500/10 border-blue-400/20' },
-    { id: 'insights', label: 'Productivity AI', icon: TrendingUp, tone: 'from-fuchsia-500/20 to-purple-500/10 border-fuchsia-400/20' },
-    { id: 'notifications', label: 'Nudge Center', icon: Bell, tone: 'from-pink-500/20 to-rose-500/10 border-pink-400/20' },
-    { id: 'rotations', label: 'Rotation Ops', icon: RotateCw, tone: 'from-cyan-500/20 to-sky-500/10 border-cyan-400/20' },
-];
+        { id: 'gpa', label: 'GPA Lab', icon: GraduationCap, tone: 'from-indigo-500/20 to-violet-500/10 border-indigo-400/20' },
+        { id: 'swot', label: 'SWOT Matrix', icon: Target, tone: 'from-blue-500/20 to-cyan-500/10 border-blue-400/20' },
+        { id: 'insights', label: 'Productivity AI', icon: TrendingUp, tone: 'from-fuchsia-500/20 to-purple-500/10 border-fuchsia-400/20' },
+        { id: 'notifications', label: 'Nudge Center', icon: Bell, tone: 'from-pink-500/20 to-rose-500/10 border-pink-400/20' },
+        { id: 'rotations', label: 'Rotation Ops', icon: RotateCw, tone: 'from-cyan-500/20 to-sky-500/10 border-cyan-400/20' },
+    ];
 
 export default function AdvancedFeaturesPage() {
     const [activeTab, setActiveTab] = useState<TabId>('gpa');

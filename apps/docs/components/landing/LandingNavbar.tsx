@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from 'react';
 
 import { selectCurrentUser, useAppSelector, useLogoutMutation } from '@repo/store';
 import { motion } from 'framer-motion';
@@ -18,35 +18,23 @@ import { useRouter } from 'next/navigation';
 export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
   const [mounted, setMounted] = useState(false);
+  const [logout] = useLogoutMutation();
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-
-  const [logout] = useLogoutMutation();
   const navLinks = [
     { label: 'Features', href: '/dashboard' },
     { label: 'How it Works', href: '/signup' },
     { label: 'Pricing', href: '#' },
   ];
-  const router = useRouter();
-
-
+  const goTo = (path: string) => () => router.push(path);
   const handleLogout = async () => {
     await logout();
-    router.push('/'); // Redirect to homepage after logout
+    router.push('/');
   };
-
-  const handleDashboard = () => {
-    router.push('/dashboard');
-  };
-
-  const handleSettings = () => {
-    router.push('/settings');
-  };
-
-
 
   return (
     <motion.nav
@@ -87,11 +75,11 @@ export function Navbar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem className="flex items-center gap-2" onClick={handleDashboard}>
+                  <DropdownMenuItem className="flex items-center gap-2" onClick={goTo('/dashboard')}>
                     <User className="w-4 h-4" />
                     Dashboard
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center gap-2" onClick={handleSettings}>
+                  <DropdownMenuItem className="flex items-center gap-2" onClick={goTo('/settings')}>
                     <Settings className="w-4 h-4" />
                     Settings
                   </DropdownMenuItem>
@@ -104,7 +92,7 @@ export function Navbar() {
               </DropdownMenu>
             ) : (
               <Button
-                onClick={() => router.push("/login")}
+                onClick={goTo('/login')}
                 className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-300">
                 Get Started
               </Button>
@@ -113,10 +101,6 @@ export function Navbar() {
           </div>
         </div>
       </div>
-
-
-      {/* Mobile Menu */}
-
     </motion.nav>
   );
 }

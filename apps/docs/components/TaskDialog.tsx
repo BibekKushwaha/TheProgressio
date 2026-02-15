@@ -39,6 +39,7 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
             : new Date().toISOString().split('T')[0]) || ""
     );
     const [priority, setPriority] = useState<Priority>(task?.priority || PriorityEnum.MEDIUM);
+    const [isRecurring, setIsRecurring] = useState<boolean>(task?.isRecurring ?? false);
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
@@ -111,6 +112,7 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                 title: taskName.trim(),
                 description: description.trim() || undefined,
                 dueDate: new Date(dueDate),
+                isRecurring,
                 categoryId: categoryId || undefined,
                 priority: priority,
             });
@@ -281,6 +283,19 @@ export function TaskDialog({ onClose, onSubmit, task }: TaskDialogProps) {
                                     </select>
                                 </Field>
                             </div>
+                            <Field>
+                                <Label htmlFor="isRecurring">Recurring</Label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        id="isRecurring"
+                                        type="checkbox"
+                                        checked={isRecurring}
+                                        onChange={(e) => setIsRecurring(e.target.checked)}
+                                        className="h-4 w-4 rounded border-white/20 bg-white/5"
+                                    />
+                                    <p className="text-sm text-slate-400">Automatically repeat this task</p>
+                                </div>
+                            </Field>
                         </FieldGroup>
                     )}
                     {errors.form && <p className="text-red-400 text-sm mb-4">{errors.form}</p>}

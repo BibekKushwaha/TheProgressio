@@ -1,4 +1,4 @@
-import { Kafka, logLevel, CompressionTypes } from "kafkajs";
+import { Kafka, logLevel, CompressionTypes, Partitioners } from "kafkajs";
 import type { Producer } from "kafkajs";
 
 // ─── Event Types ────────────────────────────────────────────────────────────────
@@ -51,6 +51,7 @@ class RealKafkaProducer {
 
         this.producer = this.kafka.producer({
             allowAutoTopicCreation: true,
+            createPartitioner: Partitioners.LegacyPartitioner,
             transactionTimeout: 30000,
         });
 

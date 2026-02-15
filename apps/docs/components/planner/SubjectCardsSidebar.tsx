@@ -51,6 +51,12 @@ interface SubjectCardsSidebarProps {
 
 export function SubjectCardsSidebar({ selectedCategoryId, onSelectCategory }: SubjectCardsSidebarProps) {
     const { data: categories, isLoading } = useGetCategoriesQuery();
+    const getItemClass = (isSelected: boolean) =>
+        `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+            isSelected
+                ? 'bg-white/15 border border-purple-500/40 shadow-sm shadow-purple-500/10'
+                : 'bg-white/5 border border-transparent hover:bg-white/10'
+        }`;
 
     if (isLoading) {
         return (
@@ -72,10 +78,7 @@ export function SubjectCardsSidebar({ selectedCategoryId, onSelectCategory }: Su
                 {/* All categories option */}
                 <button
                     onClick={() => onSelectCategory(undefined)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${!selectedCategoryId
-                            ? 'bg-white/15 border border-purple-500/40 shadow-sm shadow-purple-500/10'
-                            : 'bg-white/5 border border-transparent hover:bg-white/10'
-                        }`}
+                    className={getItemClass(!selectedCategoryId)}
                 >
                     <div className="w-8 h-8 bg-gradient-to-br from-purple-600/40 to-pink-600/40 rounded-lg flex items-center justify-center">
                         <GraduationCap className="w-4 h-4 text-white" />
@@ -92,10 +95,7 @@ export function SubjectCardsSidebar({ selectedCategoryId, onSelectCategory }: Su
                         <button
                             key={cat.id}
                             onClick={() => onSelectCategory(isSelected ? undefined : cat.id)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${isSelected
-                                    ? 'bg-white/15 border border-purple-500/40 shadow-sm shadow-purple-500/10'
-                                    : 'bg-white/5 border border-transparent hover:bg-white/10'
-                                }`}
+                            className={getItemClass(isSelected)}
                         >
                             <div className={`w-8 h-8 bg-gradient-to-br ${gradient} rounded-lg flex items-center justify-center`}>
                                 <Icon className="w-4 h-4 text-white" />

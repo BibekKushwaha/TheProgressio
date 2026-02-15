@@ -1,4 +1,4 @@
-import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Edit, Paperclip, Sparkles } from 'lucide-react';
+import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Edit, Paperclip, Sparkles, Loader2 } from 'lucide-react';
 import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation, useGenerateSubtasksMutation } from '@repo/store';
 import {
     DropdownMenu,
@@ -9,6 +9,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface TaskCardProps {
     task: Task;
@@ -45,16 +46,30 @@ export function TaskCard({ task, completed }: TaskCardProps) {
     const categoryName = task.category?.name || 'No Category';
 
 
-    const handleDelete = (e: React.MouseEvent) => {
+    const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm('Are you sure you want to delete this task?')) {
-            deleteTask(task.id);
+            try {
+                await deleteTask(task.id).unwrap();
+                toast.success('Task deleted');
+            } catch (err) {
+                toast.error('Failed to delete task');
+                console.error(err);
+            }
         }
     };
 
-    const handleToggle = (e: React.MouseEvent) => {
+    const handleToggle = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        toggleTask(task.id);
+        try {
+            const result = await toggleTask(task.id).unwrap();
+            const statusLabel = result.status === TaskStatus.COMPLETED ? 'completed' :
+                result.status === TaskStatus.IN_PROGRESS ? 'started' : 'reset';
+            toast.success(`Task ${statusLabel}`);
+        } catch (err) {
+            toast.error('Failed to update task status');
+            console.error(err);
+        }
     };
 
     const handleEdit = (e: React.MouseEvent) => {
@@ -66,9 +81,15 @@ export function TaskCard({ task, completed }: TaskCardProps) {
         router.push(`/tasks/${task.id}`);
     };
 
-    const handleBreakDown = (e: React.MouseEvent) => {
+    const handleBreakDown = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        generateSubtasks(task.id);
+        try {
+            await generateSubtasks(task.id).unwrap();
+            toast.success('Task broken down into subtasks');
+        } catch (err) {
+            toast.error('AI breakdown failed');
+            console.error(err);
+        }
     };
 
     return (
@@ -181,7 +202,7 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                         disabled={isBreakingDown}
                         className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg transition-all disabled:opacity-50"
                     >
-                        <Sparkles className="w-3.5 h-3.5" />
+                        {isBreakingDown ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                         {isBreakingDown ? 'Breaking down...' : '✨ Break it down'}
                     </button>
                 )}

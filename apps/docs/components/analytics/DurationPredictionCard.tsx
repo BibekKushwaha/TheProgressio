@@ -2,7 +2,7 @@
 
 import { useGetPredictionQuery } from '@repo/store';
 import { Clock, TrendingUp, AlertCircle } from 'lucide-react';
-import { AnalyticsCard } from './AnalyticsCard';
+import { StatCard } from '@/components/ui/stat-card';
 
 export function DurationPredictionCard({ taskId }: { taskId?: string }) {
     const { data, isLoading, error } = useGetPredictionQuery(taskId ? { taskId } : undefined, {
@@ -11,23 +11,24 @@ export function DurationPredictionCard({ taskId }: { taskId?: string }) {
 
     if (!taskId) {
         return (
-            <AnalyticsCard
+            <StatCard
                 title="ML Duration Prediction"
                 description="Select a task to see predicted completion time."
                 icon={Clock}
                 iconColor="text-blue-400"
                 iconBgColor="bg-blue-500/10"
+                variant="default" // Using default to match previous style
             >
                 <div className="h-20 flex items-center justify-center text-sm text-slate-500 italic">
                     Waiting for selection...
                 </div>
-            </AnalyticsCard>
+            </StatCard>
         );
     }
 
     if (error || !data?.prediction) {
         return (
-            <AnalyticsCard
+            <StatCard
                 title="Duration Prediction"
                 description="Not enough data to predict duration yet."
                 icon={AlertCircle}
@@ -35,6 +36,7 @@ export function DurationPredictionCard({ taskId }: { taskId?: string }) {
                 iconBgColor="bg-slate-500/10"
                 error={true}
                 emptyMessage="Not enough data to predict duration yet."
+                variant="default"
             />
         );
     }
@@ -42,12 +44,13 @@ export function DurationPredictionCard({ taskId }: { taskId?: string }) {
     const pred = data.prediction;
 
     return (
-        <AnalyticsCard
+        <StatCard
             title="Smart Duration Prediction"
             icon={TrendingUp}
             iconColor="text-white"
             iconBgColor="bg-gradient-to-br from-blue-500 to-cyan-500"
             isLoading={isLoading}
+            variant="default"
         >
             <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="bg-white/5 border border-white/10 rounded-lg p-3 text-center">
@@ -68,6 +71,6 @@ export function DurationPredictionCard({ taskId }: { taskId?: string }) {
                 <span>Confidence: <span className="text-white font-semibold">{pred.confidence}</span></span>
                 <span>Sample: {pred.sampleSize} tasks</span>
             </div>
-        </AnalyticsCard>
+        </StatCard>
     );
 }

@@ -10,18 +10,31 @@ export const metadata: Metadata = {
   description: "Frictionless task management for students",
 };
 
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased font-sans">
         <StoreProvider>
-          <TooltipProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </TooltipProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <TooltipProvider>
+              <ToastProvider>
+                {children}
+                <Toaster richColors position="bottom-right" />
+              </ToastProvider>
+            </TooltipProvider>
+          </ThemeProvider>
         </StoreProvider>
       </body>
     </html>

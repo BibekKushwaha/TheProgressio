@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, Moon, Clock, ChevronDown, Sparkles } from 'lucide-react';
 import { useGetNudgeSettingsQuery, useUpdateNudgeSettingsMutation } from '@repo/store';
+import { toast } from 'sonner';
 
 interface QuietHoursSettings {
     enabled: boolean;
@@ -51,8 +52,17 @@ export function QuietHoursPanel() {
         updateNudgeSettings({
             quietHours: effectiveQuietHours,
             positiveTone: newSettings.gentleNudges,
+        }).then(() => {
+            if (key === 'enabled') {
+                toast.success(value ? "Quiet hours enabled" : "Quiet hours disabled");
+            } else if (key === 'gentleNudges') {
+                toast.success(value ? "Gentle nudges enabled" : "Gentle nudges disabled");
+            } else if (key === 'snoozeMinutes') {
+                toast.success(`Snooze duration set to ${value}m`);
+            }
         }).catch((error) => {
             console.error('Failed to persist quiet hour settings', error);
+            toast.error("Failed to update settings");
         });
 
         if (typeof window !== 'undefined') {

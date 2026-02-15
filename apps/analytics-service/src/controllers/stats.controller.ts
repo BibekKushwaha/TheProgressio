@@ -847,7 +847,7 @@ export const getSWOTAnalysis = async (req: AuthenticatedRequest, res: Response):
             overallReadiness: raw.overallReadiness,
             topPriorityChapters: raw.topPriorityChapters.map((chapter) => chapter.chapter),
             subjects: raw.subjects.map((subject) => ({
-                subject: subject.subjectName,
+                subject: subject.subject,
                 strengths: subject.strengths.map((item) => ({
                     chapter: item.chapter,
                     score: item.successRate,

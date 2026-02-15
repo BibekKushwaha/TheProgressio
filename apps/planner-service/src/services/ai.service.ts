@@ -1,5 +1,7 @@
 
 import { Mistral } from "@mistralai/mistralai";
+import PQueue from "p-queue";
+import { createHash } from "node:crypto";
 
 const API_KEY = process.env.MISTRAL_API_KEY;
 
@@ -29,15 +31,419 @@ export interface ParsedSyllabusItem {
 
 export class AIService {
     private client = API_KEY ? new Mistral({ apiKey: API_KEY }) : null;
+    private unsupportedVisionModels = new Set<string>();
+    private visionQueue = new PQueue({
+        concurrency: 1,
+        interval: 15000,
+        intervalCap: 1,
+    });
 
     // Primary model for Vision/Screenshots
-    private modelIdentifier = "pixtral-12b-2409";
+    private modelIdentifier = process.env.MISTRAL_VISION_MODEL || "pixtral-12b-2409";
 
     // Specialized model for OCR/PDFs
-    private ocrModelIdentifier = "mistral-ocr-latest";
+    private ocrModelIdentifier =
+        process.env.MISTRAL_OCR_MODEL ||
+        process.env.MISTRAL_VISION_FALLBACK_MODEL ||
+        "pixtral-large-latest";
 
     // Text-only model for parsing and subtask generation
     private textModelIdentifier = "open-mistral-nemo"; // Reliable, fast, and widely available
+    private readonly minPdfTextChars = 500;
+    private readonly scannedPdfThresholdChars = 200;
+    private readonly maxTextCharsPerChunk = 12000;
+    private readonly scanCacheTtlMs = (() => {
+        const raw = Number(process.env.MISTRAL_SCAN_CACHE_TTL_MS ?? 6 * 60 * 60 * 1000);
+        return Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : 6 * 60 * 60 * 1000;
+    })();
+    private readonly scanCacheMaxEntries = (() => {
+        const raw = Number(process.env.MISTRAL_SCAN_CACHE_MAX_ENTRIES ?? 200);
+        return Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : 200;
+    })();
+    private syllabusScanCache = new Map<string, { items: ParsedSyllabusItem[]; expiresAt: number }>();
+
+    private sleep(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    private extractStatusCode(err: any): number | undefined {
+        return err?.statusCode ?? err?.status ?? err?.response?.status;
+    }
+
+    private extractErrorCode(err: any): string | undefined {
+        const body = err?.body;
+        if (typeof body !== "string") return undefined;
+        try {
+            const parsed = JSON.parse(body) as { code?: string | number };
+            return parsed.code !== undefined ? String(parsed.code) : undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
+    private extractRetryAfterMs(err: any): number | undefined {
+        const raw = err?.headers?.get?.("retry-after");
+        if (!raw) return undefined;
+        const secs = Number(raw);
+        if (Number.isFinite(secs) && secs > 0) {
+            return secs * 1000;
+        }
+        return undefined;
+    }
+
+    private isRateLimitError(err: any): boolean {
+        const status = this.extractStatusCode(err);
+        return status === 429 || this.extractErrorCode(err) === "1300";
+    }
+
+    private isInvalidModelError(err: any): boolean {
+        const status = this.extractStatusCode(err);
+        const code = this.extractErrorCode(err);
+        const message = String(err?.message || "");
+        return status === 400 && (code === "1500" || /invalid model/i.test(message));
+    }
+
+    private toErrorSummary(err: any): string {
+        const status = this.extractStatusCode(err);
+        const code = this.extractErrorCode(err);
+        const message = err?.message || "Unknown error";
+        return [status ? `status=${status}` : null, code ? `code=${code}` : null, message]
+            .filter(Boolean)
+            .join(" | ");
+    }
+
+    private decodeBase64Payload(payload: string): string {
+        if (!payload) return "";
+        if (payload.startsWith("data:")) {
+            const parts = payload.split(",");
+            return parts[1] ?? "";
+        }
+        return payload;
+    }
+
+    private chunkText(text: string, size: number): string[] {
+        const chunks: string[] = [];
+        for (let index = 0; index < text.length; index += size) {
+            chunks.push(text.slice(index, index + size));
+        }
+        return chunks;
+    }
+
+    private cloneSyllabusItems(items: ParsedSyllabusItem[]): ParsedSyllabusItem[] {
+        return items.map((item) => {
+            const cloned: ParsedSyllabusItem = {
+                title: item.title,
+                ...(item.priority ? { priority: item.priority } : {}),
+                ...(item.subject ? { subject: item.subject } : {}),
+            };
+
+            if (item.dueDate) {
+                cloned.dueDate = new Date(item.dueDate);
+            }
+
+            return cloned;
+        });
+    }
+
+    private buildScanCacheKey(base64Payload: string, mimeType: string): string {
+        const hash = createHash("sha256")
+            .update(base64Payload)
+            .digest("hex");
+        return `${mimeType}|${hash}`;
+    }
+
+    private pruneScanCache(now = Date.now()) {
+        for (const [key, entry] of this.syllabusScanCache.entries()) {
+            if (entry.expiresAt <= now) {
+                this.syllabusScanCache.delete(key);
+            }
+        }
+
+        while (this.syllabusScanCache.size > this.scanCacheMaxEntries) {
+            const oldestKey = this.syllabusScanCache.keys().next().value;
+            if (!oldestKey) break;
+            this.syllabusScanCache.delete(oldestKey);
+        }
+    }
+
+    private getCachedScanResult(cacheKey: string): ParsedSyllabusItem[] | null {
+        const now = Date.now();
+        this.pruneScanCache(now);
+
+        const entry = this.syllabusScanCache.get(cacheKey);
+        if (!entry || entry.expiresAt <= now) {
+            if (entry) {
+                this.syllabusScanCache.delete(cacheKey);
+            }
+            return null;
+        }
+
+        return this.cloneSyllabusItems(entry.items);
+    }
+
+    private setCachedScanResult(cacheKey: string, items: ParsedSyllabusItem[]) {
+        if (!items.length) {
+            return;
+        }
+
+        const now = Date.now();
+        this.pruneScanCache(now);
+        this.syllabusScanCache.set(cacheKey, {
+            items: this.cloneSyllabusItems(items),
+            expiresAt: now + this.scanCacheTtlMs,
+        });
+        this.pruneScanCache(now);
+    }
+
+    private normalizeSyllabusItems(parsed: unknown): ParsedSyllabusItem[] {
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        const normalized: ParsedSyllabusItem[] = [];
+        for (const item of parsed) {
+            if (!item || typeof item !== "object") continue;
+            const record = item as Record<string, unknown>;
+
+            const title = typeof record.title === "string" ? record.title.trim() : "";
+            if (!title) continue;
+
+            const priority = record.priority;
+            const safePriority =
+                priority === "HIGH" || priority === "MEDIUM" || priority === "LOW"
+                    ? priority
+                    : undefined;
+
+            const dueDate =
+                typeof record.dueDate === "string" && record.dueDate.trim()
+                    ? new Date(record.dueDate)
+                    : undefined;
+
+            const normalizedItem: ParsedSyllabusItem = { title };
+            if (dueDate && !Number.isNaN(dueDate.getTime())) {
+                normalizedItem.dueDate = dueDate;
+            }
+            if (safePriority) {
+                normalizedItem.priority = safePriority;
+            }
+            if (typeof record.subject === "string" && record.subject.trim()) {
+                normalizedItem.subject = record.subject.trim();
+            }
+
+            normalized.push(normalizedItem);
+        }
+
+        return normalized.slice(0, 40);
+    }
+
+    private extractJsonArray(textResponse: string): unknown[] {
+        const start = textResponse.indexOf("[");
+        const end = textResponse.lastIndexOf("]");
+        if (start === -1 || end === -1 || end < start) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(textResponse.slice(start, end + 1));
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+
+    private async extractPdfTextFromBase64(fileBase64: string): Promise<string> {
+        try {
+            const normalizedBase64 = this.decodeBase64Payload(fileBase64);
+            if (!normalizedBase64) return "";
+            const fileBuffer = Buffer.from(normalizedBase64, "base64");
+            const pdfParseModule = await import("pdf-parse");
+            const parser = new pdfParseModule.PDFParse({ data: fileBuffer });
+            const textResult = await parser.getText();
+            await parser.destroy();
+            return typeof textResult?.text === "string" ? textResult.text.trim() : "";
+        } catch (error) {
+            console.warn("⚠️ Local PDF text extraction failed:", this.toErrorSummary(error));
+            return "";
+        }
+    }
+
+    private async extractFromTextModel(extractedText: string): Promise<ParsedSyllabusItem[]> {
+        if (!this.client) {
+            return [];
+        }
+
+        const chunks = this.chunkText(extractedText, this.maxTextCharsPerChunk);
+        const aggregate: ParsedSyllabusItem[] = [];
+
+        for (let index = 0; index < chunks.length; index++) {
+            const chunk = chunks[index];
+            if (!chunk || !chunk.trim()) continue;
+
+            const prompt = `
+            You are an academic planning assistant.
+            Extract assignment, exam, and study milestones from the syllabus text.
+            Return ONLY a JSON array where each item has:
+            - title (string, required)
+            - dueDate (ISO 8601 string, optional)
+            - priority ("LOW" | "MEDIUM" | "HIGH", optional)
+            - subject (string, optional)
+
+            If there are no milestones, return [] only.
+            `;
+
+            try {
+                const response = await this.client.chat.complete({
+                    model: this.textModelIdentifier,
+                    messages: [
+                        { role: "system", content: "Extract tasks from syllabus text." },
+                        { role: "user", content: `${prompt}\n\nSyllabus Text:\n${chunk}` },
+                    ],
+                });
+
+                const textResponse = response.choices?.[0]?.message?.content;
+                if (typeof textResponse !== "string") {
+                    continue;
+                }
+
+                const parsedArray = this.extractJsonArray(textResponse);
+                const normalized = this.normalizeSyllabusItems(parsedArray);
+                aggregate.push(...normalized);
+            } catch (error) {
+                console.warn(`⚠️ Text-model syllabus extraction failed on chunk ${index + 1}/${chunks.length}: ${this.toErrorSummary(error)}`);
+            }
+
+            if (index < chunks.length - 1) {
+                await this.sleep(4000);
+            }
+        }
+
+        const deduped = new Map<string, ParsedSyllabusItem>();
+        for (const item of aggregate) {
+            const key = `${item.title.toLowerCase()}|${item.subject?.toLowerCase() ?? ""}|${item.dueDate?.toISOString() ?? ""}`;
+            if (!deduped.has(key)) {
+                deduped.set(key, item);
+            }
+        }
+
+        return Array.from(deduped.values()).slice(0, 40);
+    }
+
+    private async extractFromVisionModel(imageBase64: string, mimeType: string): Promise<ParsedSyllabusItem[]> {
+        if (!this.client) {
+            return [];
+        }
+
+        const prompt = `
+        You are an academic planning assistant.
+        Read this syllabus image and extract assignment/exam/study milestones into a JSON array.
+        Each item must include:
+        - title (string, required)
+        - dueDate (ISO 8601 string, optional)
+        - priority ("LOW" | "MEDIUM" | "HIGH", optional)
+        - subject (string, optional)
+
+        Rules:
+        - Extract ALL topics, chapters, assignments, or exam dates found.
+        - If it looks like a list of topics, treat them as study items.
+        - If date appears without year, assume current year ${new Date().getFullYear()}.
+        - Return ONLY valid JSON array.
+        `;
+
+        let imageUrl = imageBase64;
+        if (!imageBase64.startsWith("data:")) {
+            imageUrl = `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+        }
+
+        const modelsToTry = Array.from(new Set([this.modelIdentifier, this.ocrModelIdentifier]))
+            .filter((model): model is string => Boolean(model && model.trim()))
+            .filter((model) => !this.unsupportedVisionModels.has(model));
+
+        if (modelsToTry.length === 0) {
+            console.warn("⚠️ No available vision models configured for syllabus scan.");
+            return [];
+        }
+
+        const configuredRetries = Number(process.env.MISTRAL_VISION_MAX_RETRIES ?? 3);
+        const maxRetries = Number.isFinite(configuredRetries)
+            ? Math.min(Math.max(Math.trunc(configuredRetries), 1), 5)
+            : 3;
+
+        let result: any = null;
+
+        for (const model of modelsToTry) {
+            let attempt = 0;
+            while (attempt < maxRetries) {
+                try {
+                    result = await this.client.chat.complete({
+                        model,
+                        messages: [
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: prompt },
+                                    {
+                                        type: "image_url",
+                                        imageUrl,
+                                    },
+                                ],
+                            },
+                        ],
+                    });
+
+                    if (attempt > 0 || model !== this.modelIdentifier) {
+                        console.log(`✅ Syllabus scan succeeded with model=${model} after ${attempt + 1} attempt(s).`);
+                    }
+                    break;
+                } catch (err: any) {
+                    const status = this.extractStatusCode(err);
+                    attempt++;
+
+                    if (status === 503 || this.isRateLimitError(err)) {
+                        const retryAfterMs = this.extractRetryAfterMs(err);
+                        const exponentialMs = 5000 * Math.pow(2, attempt - 1);
+                        const jitterMs = Math.floor(Math.random() * 1000);
+                        const delayMs = Math.max(retryAfterMs ?? 0, exponentialMs + jitterMs);
+
+                        console.warn(`⚠️ Syllabus scan model=${model} limited (status=${status ?? "unknown"}). Retry ${attempt}/${maxRetries} in ${Math.ceil(delayMs / 1000)}s.`);
+
+                        if (attempt >= maxRetries) {
+                            console.warn("⚠️ Vision model retries exhausted. Returning empty result for this request.");
+                            return [];
+                        }
+
+                        await this.sleep(delayMs);
+                        continue;
+                    }
+
+                    if (this.isInvalidModelError(err)) {
+                        this.unsupportedVisionModels.add(model);
+                        console.warn(`⚠️ Disabling unsupported vision model=${model}. ${this.toErrorSummary(err)}`);
+                        break;
+                    }
+
+                    console.warn(`⚠️ Syllabus scan model=${model} failed: ${this.toErrorSummary(err)}`);
+                    break;
+                }
+            }
+
+            if (result) {
+                break;
+            }
+        }
+
+        if (!result) {
+            return [];
+        }
+
+        const textResponse = result.choices?.[0]?.message?.content;
+        if (!textResponse || typeof textResponse !== "string") {
+            console.warn("⚠️ Empty response from Mistral vision model");
+            return [];
+        }
+
+        const parsedArray = this.extractJsonArray(textResponse);
+        return this.normalizeSyllabusItems(parsedArray);
+    }
 
     /**
      * Parses raw text to extract task metadata using Mistral.
@@ -296,123 +702,42 @@ export class AIService {
             return [];
         }
 
-        const prompt = `
-        You are an academic planning assistant.
-        Read this syllabus image and extract assignment/exam/study milestones into a JSON array.
-        Each item must include:
-        - title (string, required)
-        - dueDate (ISO 8601 string, optional)
-        - priority ("LOW" | "MEDIUM" | "HIGH", optional)
-        - subject (string, optional)
-
-        Rules:
-        - Extract ALL topics, chapters, assignments, or exam dates found.
-        - If it looks like a list of topics, treat them as study items.
-        - If date appears without year, assume current year ${new Date().getFullYear()}.
-        - Return ONLY valid JSON array.
-        `;
-
-        try {
-            // Ensure the base64 string has the data URL prefix for Mistral
-            let imageUrl = imageBase64;
-            if (!imageBase64.startsWith('data:')) {
-                imageUrl = `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`;
-            }
-
-            let attempt = 0;
-            const maxRetries = 3;
-            let result;
-
-            while (attempt < maxRetries) {
-                try {
-                    result = await this.client.chat.complete({
-                        model: this.modelIdentifier,
-                        messages: [
-                            {
-                                role: "user",
-                                content: [
-                                    { type: "text", text: prompt },
-                                    {
-                                        type: "image_url",
-                                        imageUrl: imageUrl,
-                                    },
-                                ],
-                            },
-                        ],
-                    });
-                    break; // Success
-                } catch (err: any) {
-                    const status = err.status || err.statusCode || err.response?.status;
-                    if (status === 429 || status === 503) {
-                        attempt++;
-                        console.warn(`⚠️ Mistral Rate Limit (${status}). Retrying attempt ${attempt}/${maxRetries} in ${5 * attempt}s...`);
-                        if (attempt >= maxRetries) throw err;
-                        await new Promise(res => setTimeout(res, 5000 * Math.pow(2, attempt - 1)));
-                    } else {
-                        throw err;
-                    }
-                }
-            }
-
-            if (!result) throw new Error("Failed to get response after retries");
-
-            const textResponse = result.choices?.[0]?.message?.content;
-            if (!textResponse || typeof textResponse !== "string") {
-                console.warn("⚠️ Empty response from Mistral vision model");
-                return [];
-            }
-
-            console.log("🔍 Raw AI Response:", textResponse);
-
-            const start = textResponse.indexOf("[");
-            const end = textResponse.lastIndexOf("]");
-            if (start === -1 || end === -1) {
-                return [];
-            }
-
-            const parsed = JSON.parse(textResponse.slice(start, end + 1));
-            if (!Array.isArray(parsed)) {
-                return [];
-            }
-
-            const normalized: ParsedSyllabusItem[] = [];
-            for (const item of parsed) {
-                if (!item || typeof item !== "object") continue;
-                const record = item as Record<string, unknown>;
-
-                const title = typeof record.title === "string" ? record.title.trim() : "";
-                if (!title) continue;
-
-                const priority = record.priority;
-                const safePriority =
-                    priority === "HIGH" || priority === "MEDIUM" || priority === "LOW"
-                        ? priority
-                        : undefined;
-
-                const dueDate =
-                    typeof record.dueDate === "string" && record.dueDate.trim()
-                        ? new Date(record.dueDate)
-                        : undefined;
-
-                const normalizedItem: ParsedSyllabusItem = { title };
-                if (dueDate && !Number.isNaN(dueDate.getTime())) {
-                    normalizedItem.dueDate = dueDate;
-                }
-                if (safePriority) {
-                    normalizedItem.priority = safePriority;
-                }
-                if (typeof record.subject === "string" && record.subject.trim()) {
-                    normalizedItem.subject = record.subject.trim();
-                }
-
-                normalized.push(normalizedItem);
-            }
-
-            return normalized.slice(0, 40);
-        } catch (error) {
-            console.warn("⚠️ Syllabus image scan failed:", error);
+        const normalizedMimeType = (mimeType || "image/jpeg").toLowerCase();
+        const normalizedBase64Payload = this.decodeBase64Payload(imageBase64);
+        if (!normalizedBase64Payload) {
             return [];
         }
+
+        const cacheKey = this.buildScanCacheKey(normalizedBase64Payload, normalizedMimeType);
+        const cachedResult = this.getCachedScanResult(cacheKey);
+        if (cachedResult) {
+            return cachedResult;
+        }
+
+        const isPdf = normalizedMimeType.includes("pdf");
+
+        if (isPdf) {
+            const extractedText = await this.extractPdfTextFromBase64(imageBase64);
+            if (extractedText.length >= this.minPdfTextChars) {
+                const textResult = await this.extractFromTextModel(extractedText);
+                this.setCachedScanResult(cacheKey, textResult);
+                return textResult;
+            }
+
+            if (extractedText.length >= this.scannedPdfThresholdChars) {
+                const textResult = await this.extractFromTextModel(extractedText);
+                this.setCachedScanResult(cacheKey, textResult);
+                return textResult;
+            }
+        }
+
+        const queuedResult = await this.visionQueue.add(async () => {
+            return this.extractFromVisionModel(imageBase64, mimeType);
+        });
+
+        const finalResult = queuedResult ?? [];
+        this.setCachedScanResult(cacheKey, finalResult);
+        return finalResult;
     }
 
     /**

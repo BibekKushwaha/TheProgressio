@@ -26,7 +26,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 
+import { useTheme } from "next-themes";
+import { toast } from "sonner";
+
 export default function SettingsPage() {
+    const { theme, setTheme } = useTheme();
     const { data: profileData, isLoading: isProfileLoading } = useGetProfileQuery();
     const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation();
     const { data: nudgeSettingsData } = useGetNudgeSettingsQuery();
@@ -37,12 +41,16 @@ export default function SettingsPage() {
     const user = profileData?.user;
     const nudgeSettings = nudgeSettingsData?.settings;
 
-    const handleDailyGoalChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const value = parseFloat(e.target.value.split(" ")[0] || "0");
+    const [pairingCode] = React.useState(() => `PAIR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`);
+
+    const handleDailyGoalChange = async (val: string) => {
+        const value = parseFloat(val.split(" ")[0] || "4");
         try {
             await updateProfile({ dailyGoalHours: value }).unwrap();
+            toast.success(`Daily goal updated to ${value} hours`);
         } catch (error) {
             console.error("Failed to update daily goal:", error);
+            toast.error("Failed to update daily goal");
         }
     };
 
@@ -63,9 +71,16 @@ export default function SettingsPage() {
     const handleProfileUpdate = async () => {
         try {
             await updateProfile(profileFields).unwrap();
+            toast.success("Profile updated successfully");
         } catch (error) {
             console.error("Failed to update profile:", error);
+            toast.error("Failed to update profile");
         }
+    };
+
+    const copyPairingCode = () => {
+        navigator.clipboard.writeText(pairingCode);
+        toast.success("Pairing code copied to clipboard");
     };
 
     if (isProfileLoading) {
@@ -163,7 +178,10 @@ export default function SettingsPage() {
                             <Label className="text-base">Dark Mode</Label>
                             <p className="text-sm text-slate-400">Use dark theme across the app</p>
                         </div>
-                        <Switch defaultChecked />
+                        <Switch
+                            checked={theme === 'dark'}
+                            onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+                        />
                     </div>
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
                         <div className="space-y-0.5">
@@ -175,13 +193,7 @@ export default function SettingsPage() {
                             <div className="w-[140px]">
                                 <Select
                                     value={`${user?.dailyGoalHours || 4} hours`}
-                                    onValueChange={(val) => {
-                                        // Handle value change - adapt to match original event handler expectation if needed,
-                                        // or call the mutation directly here. 
-                                        // The original handler expects a change event, so we'll adapt.
-                                        const event = { target: { value: val } } as React.ChangeEvent<HTMLSelectElement>;
-                                        handleDailyGoalChange(event);
-                                    }}
+                                    onValueChange={handleDailyGoalChange}
                                     disabled={isUpdating}
                                 >
                                     <SelectTrigger>
@@ -189,7 +201,7 @@ export default function SettingsPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {[1, 2, 3, 4, 5, 6, 7, 8].map(h => (
-                                            <SelectItem key={h} value={`${h} hours`} className="bg-slate-900 cursor-pointer">{h} hours</SelectItem>
+                                            <SelectItem key={h} value={`${h} hours`} className="cursor-pointer">{h} hours</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -264,8 +276,10 @@ export default function SettingsPage() {
                                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                             } as any,
                                         }).unwrap();
+                                        toast.success("Notification setting updated");
                                     } catch (error) {
                                         console.error("Failed to update notification bucket setting:", error);
+                                        toast.error("Failed to update setting");
                                     }
                                 }}
                             />
@@ -280,8 +294,10 @@ export default function SettingsPage() {
                                 onCheckedChange={async (checked) => {
                                     try {
                                         await updateNudgeSettings({ groupedSummaries: checked }).unwrap();
+                                        toast.success("Digest settings updated");
                                     } catch (error) {
                                         console.error("Failed to update grouped summaries:", error);
+                                        toast.error("Failed to update setting");
                                     }
                                 }}
                             />
@@ -293,8 +309,10 @@ export default function SettingsPage() {
                                 onCheckedChange={async (checked) => {
                                     try {
                                         await updateNudgeSettings({ positiveTone: checked }).unwrap();
+                                        toast.success("Motivation tone updated");
                                     } catch (error) {
                                         console.error("Failed to update positive tone setting:", error);
+                                        toast.error("Failed to update setting");
                                     }
                                 }}
                             />
@@ -384,9 +402,9 @@ export default function SettingsPage() {
                         </ol>
                         <div className="flex items-center gap-3 pt-2">
                             <code className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-lg text-green-400 font-mono text-lg tracking-widest text-center">
-                                PAIR-{Math.random().toString(36).slice(2, 8).toUpperCase()}
+                                {pairingCode}
                             </code>
-                            <Button className="bg-green-600 hover:bg-green-700 h-full">
+                            <Button className="bg-green-600 hover:bg-green-700 h-full" onClick={copyPairingCode}>
                                 Copy Code
                             </Button>
                         </div>
@@ -476,7 +494,11 @@ export default function SettingsPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Button variant="outline" className="w-full md:w-auto border-white/10 hover:bg-white/5">
+                    <Button
+                        variant="outline"
+                        className="w-full md:w-auto border-white/10 hover:bg-white/5"
+                        onClick={() => toast.info("Password change feature is coming soon")}
+                    >
                         Change Password
                     </Button>
                 </CardContent>

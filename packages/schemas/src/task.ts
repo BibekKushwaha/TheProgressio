@@ -29,6 +29,8 @@ export const scanSyllabusImageSchema = z.object({
 
 export const recoveryPlanSchema = z.object({
   anchorDate: z.coerce.date().optional(),
+  taskIds: z.array(z.string()).optional(),
+  overrides: z.record(z.string(), z.string()).optional(),
 });
 
 export type TaskInput = z.infer<typeof taskSchema>;

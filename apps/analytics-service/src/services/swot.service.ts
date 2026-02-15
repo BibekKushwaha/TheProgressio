@@ -22,7 +22,7 @@ export interface ChapterAnalysis {
 }
 
 export interface SubjectSWOT {
-    subjectName: string;
+    subject: string;
     overallScore: number;
     strengths: ChapterAnalysis[];
     weaknesses: ChapterAnalysis[];
@@ -54,19 +54,22 @@ export async function generateSWOT(userId: string, examType: string): Promise<Fu
         };
     }
 
-    // Group by subject → chapter
+    // Group by subject (normalized) → chapter
+    // Map<normalizedSubject, Map<chapter, ChapterAnalysis>>
     const subjectMap = new Map<string, Map<string, ChapterAnalysis>>();
 
     for (const entry of entries) {
-        if (!subjectMap.has(entry.subjectName)) {
-            subjectMap.set(entry.subjectName, new Map());
+        const normalizedSubject = entry.subjectName.trim().toLowerCase();
+
+        if (!subjectMap.has(normalizedSubject)) {
+            subjectMap.set(normalizedSubject, new Map());
         }
-        const chapterMap = subjectMap.get(entry.subjectName)!;
+        const chapterMap = subjectMap.get(normalizedSubject)!;
         const chapterKey = entry.chapter ?? "General";
 
         if (!chapterMap.has(chapterKey)) {
             chapterMap.set(chapterKey, {
-                subjectName: entry.subjectName,
+                subjectName: entry.subjectName.trim(), // Keep the first display name encountered (or user provided)
                 chapter: chapterKey,
                 totalAttempts: 0,
                 totalMarks: 0,
@@ -89,8 +92,15 @@ export async function generateSWOT(userId: string, examType: string): Promise<Fu
     const allChapters: ChapterAnalysis[] = [];
     const subjects: SubjectSWOT[] = [];
 
-    for (const [subjectName, chapterMap] of subjectMap.entries()) {
+    for (const [, chapterMap] of subjectMap.entries()) {
         const chapters: ChapterAnalysis[] = [];
+
+        // Get display name from the first chapter analysis
+        let displaySubjectName = "Unknown Subject";
+        const firstChapter = chapterMap.values().next().value;
+        if (firstChapter) {
+            displaySubjectName = firstChapter.subjectName;
+        }
 
         for (const [, analysis] of chapterMap.entries()) {
             analysis.successRate = analysis.totalMarks > 0
@@ -115,7 +125,7 @@ export async function generateSWOT(userId: string, examType: string): Promise<Fu
             : 0;
 
         subjects.push({
-            subjectName,
+            subject: displaySubjectName,
             overallScore,
             strengths: chapters.filter(c => c.rating === "strength"),
             weaknesses: chapters.filter(c => c.rating === "weakness"),
@@ -141,7 +151,13 @@ export async function generateSWOT(userId: string, examType: string): Promise<Fu
 
 export async function getSubjectPerformance(userId: string, subjectName: string) {
     const entries = await prisma.gradeEntry.findMany({
-        where: { userId, subjectName },
+        where: {
+            userId,
+            subjectName: {
+                equals: subjectName.trim(),
+                mode: 'insensitive'
+            }
+        },
         orderBy: { createdAt: "asc" },
     });
 
