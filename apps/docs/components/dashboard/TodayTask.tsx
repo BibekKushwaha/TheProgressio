@@ -1,6 +1,5 @@
 "use client";
 
-import React from 'react';
 import { ChevronRight, Clock, CheckCircle2, Circle } from 'lucide-react';
 import { useGetTasksQuery, useToggleTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
 import Link from 'next/link';
@@ -57,6 +56,32 @@ export function TodaysTasks() {
     const top3 = incompleteTasks.slice(0, 3);
     const rest = incompleteTasks.slice(3);
     const completedTasks = sortedTasks.filter(t => t.status === TaskStatus.COMPLETED);
+    const sections = [
+        {
+            key: 'top3',
+            title: '🎯 Focus on these first',
+            titleClass: 'text-purple-400/80',
+            className: 'space-y-3',
+            tasks: top3,
+            isTop3: true,
+        },
+        {
+            key: 'rest',
+            title: 'Other tasks',
+            titleClass: 'text-slate-500',
+            className: 'space-y-3 mt-4 pt-4 border-t border-white/5',
+            tasks: rest,
+            isTop3: false,
+        },
+        {
+            key: 'completed',
+            title: '✓ Completed',
+            titleClass: 'text-green-500/60',
+            className: 'space-y-3 mt-4 pt-4 border-t border-white/5',
+            tasks: completedTasks,
+            isTop3: false,
+        },
+    ] as const;
 
     const renderTask = (task: typeof sortedTasks[0], isTop3: boolean, index: number) => (
         <div
@@ -128,28 +153,13 @@ export function TodaysTasks() {
                     </div>
                 ) : sortedTasks.length > 0 ? (
                     <>
-                        {/* Top 3 Focus */}
-                        {top3.length > 0 && (
-                            <div className="space-y-3">
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-400/80">🎯 Focus on these first</p>
-                                {top3.map((task, i) => renderTask(task, true, i))}
-                            </div>
-                        )}
-
-                        {/* Remaining tasks */}
-                        {rest.length > 0 && (
-                            <div className="space-y-3 mt-4 pt-4 border-t border-white/5">
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Other tasks</p>
-                                {rest.map((task, i) => renderTask(task, false, i))}
-                            </div>
-                        )}
-
-                        {/* Completed */}
-                        {completedTasks.length > 0 && (
-                            <div className="space-y-3 mt-4 pt-4 border-t border-white/5">
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-500/60">✓ Completed</p>
-                                {completedTasks.map((task, i) => renderTask(task, false, i))}
-                            </div>
+                        {sections.map((section) =>
+                            section.tasks.length > 0 ? (
+                                <div key={section.key} className={section.className}>
+                                    <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${section.titleClass}`}>{section.title}</p>
+                                    {section.tasks.map((task, i) => renderTask(task, section.isTop3, i))}
+                                </div>
+                            ) : null
                         )}
                     </>
                 ) : (

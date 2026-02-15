@@ -2,7 +2,7 @@
 
 import { useGetPredictivePerformanceQuery } from '@repo/store';
 import { TrendingUp, TrendingDown, Minus, Trophy, Target } from 'lucide-react';
-import { AnalyticsCard } from './AnalyticsCard';
+import { StatCard } from '@/components/ui/stat-card';
 
 export function PredictiveScoreCard() {
     const { data, isLoading } = useGetPredictivePerformanceQuery('JEE');
@@ -10,7 +10,7 @@ export function PredictiveScoreCard() {
 
     if (isLoading) {
         return (
-            <AnalyticsCard
+            <StatCard
                 title="Predictive Score Indicator"
                 description="Based on your learning pace and historical performance"
                 icon={Trophy}
@@ -18,30 +18,33 @@ export function PredictiveScoreCard() {
                 iconBgColor="bg-gradient-to-br from-emerald-500 to-teal-500"
                 isLoading={true}
                 loadingHeight="h-64"
+                variant="default"
             />
         );
     }
 
     if (subjects.length === 0) {
         return (
-            <AnalyticsCard
+            <StatCard
                 title="No Predictions Yet"
                 icon={Target}
                 iconColor="text-slate-600"
                 iconBgColor="bg-transparent"
                 error={true}
                 emptyMessage="Add grade entries to see predictive scores based on your learning pace."
+                variant="default"
             />
         );
     }
 
     return (
-        <AnalyticsCard
+        <StatCard
             title="Predictive Score Indicator"
             description="Based on your learning pace and historical performance"
             icon={Trophy}
             iconColor="text-white"
             iconBgColor="bg-gradient-to-br from-emerald-500 to-teal-500"
+            variant="default"
         >
             <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
                 Model {data?.modelVersion ?? 'unknown'} • subject confidence labels are shown per row
@@ -82,6 +85,6 @@ export function PredictiveScoreCard() {
                     );
                 })}
             </div>
-        </AnalyticsCard>
+        </StatCard>
     );
 }

@@ -385,7 +385,7 @@ export const tasksApi = createApi({
             }),
             invalidatesTags: [],
         }),
-        applyRecoveryPlan: builder.mutation<{ message: string; plan: RecoveryPlan; updatedCount: number }, { anchorDate?: string } | void>({
+        applyRecoveryPlan: builder.mutation<{ message: string; plan: RecoveryPlan; updatedCount: number }, { anchorDate?: string; taskIds?: string[]; overrides?: Record<string, string> } | void>({
             query: (body) => ({
                 url: '/tasks/recovery/apply',
                 method: 'POST',

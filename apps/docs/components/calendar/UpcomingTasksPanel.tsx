@@ -2,11 +2,13 @@
 
 import { useMemo } from "react";
 import { Calendar, Clock } from "lucide-react";
+import Link from "next/link";
 import { useGetTasksQuery, Task } from "@repo/store";
 import { getTodayDateKey, toLocalDateKey, formatRelativeDate } from "@/lib/date";
 
 export function UpcomingTasksPanel() {
     const { data: tasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
+    const formatTaskTitle = (title: string) => title.charAt(0).toUpperCase() + title.slice(1);
 
     const upcomingTasks = useMemo(() => {
         if (!tasks) return [] as Task[];
@@ -44,19 +46,25 @@ export function UpcomingTasksPanel() {
             ) : (
                 <div className="space-y-3">
                     {upcomingTasks.map((task) => (
-                        <div key={task.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                            <div className="mt-1 h-2 w-2 rounded-full bg-violet-400" />
+                        <Link
+                            key={task.id}
+                            href={`/tasks/${task.id}`}
+                            className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-violet-400/30 transition-all group"
+                        >
+                            <div className="mt-1 h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.5)] group-hover:scale-110 transition-transform" />
                             <div className="min-w-0 flex-1">
-                                <div className="text-sm font-semibold text-white truncate">{task.title.charAt(0).toUpperCase() + task.title.slice(1)}</div>
+                                <div className="text-sm font-semibold text-white truncate group-hover:text-violet-300 transition-colors">
+                                    {formatTaskTitle(task.title)}
+                                </div>
                                 {task.description && (
                                     <div className="text-xs text-slate-400 line-clamp-1 mt-0.5">{task.description}</div>
                                 )}
                                 <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-                                    <Clock className="w-3 h-3" />
+                                    <Clock className="w-3 h-3 group-hover:text-violet-400 transition-colors" />
                                     <span>{task.dueDate ? formatRelativeDate(task.dueDate) : "No due date"}</span>
                                 </div>
                             </div>
-                        </div>
+                        </Link>
                     ))}
                 </div>
             )}

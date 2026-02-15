@@ -61,7 +61,7 @@ const Sidebar = () => {
             href: "/planner",
             menuKey: "planner",
             children: [
-                { name: "Create Task", href: "/createtask" },
+                { name: "Create New", href: "/createtask" },
                 { name: "Task Board", href: "/tasks" },
                 { name: "ReOpen Tasks", href: "/planner" },
                 { name: "Syllabus Digitizer", href: "/syllabus-digitizer" },
@@ -69,7 +69,6 @@ const Sidebar = () => {
         },
         { name: "Timetable", icon: Calendar, href: "/calendar" },
         { name: "Habit Gallery", icon: Flame, href: "/habits" },
-        { name: "Achievements", icon: Award, href: "/achievement" },
         {
             name: "Analytics",
             icon: BarChart2,
@@ -92,6 +91,7 @@ const Sidebar = () => {
             ],
         },
         { name: "Subject Library", icon: BookOpen, href: "/subjects" },
+        { name: "Achievements", icon: Award, href: "/achievement" },
         { name: "Family Connect", icon: Users, href: "/family-connect" },
     ];
 

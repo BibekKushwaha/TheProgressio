@@ -113,7 +113,7 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <FieldGroup className="py-4 space-y-6">
+                    <FieldGroup className="py-2 space-y-4">
                         <div className="flex gap-4 items-end">
                             <div className="flex-1">
                                 <Field>

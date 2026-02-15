@@ -80,6 +80,9 @@ export function LiveActivityWidget() {
     const minutes = Math.floor(elapsed / 60);
     const seconds = elapsed % 60;
     const progress = session.duration > 0 ? Math.min((elapsed / 60 / session.duration) * 100, 100) : 0;
+    const SessionStatusIcon = session.isPaused ? Pause : Play;
+    const sessionStatusText = session.isPaused ? 'Paused' : 'Active';
+    const sessionStatusClass = session.isPaused ? 'text-yellow-400' : 'text-emerald-400';
 
     return (
         <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500/20 via-teal-500/15 to-cyan-500/20 backdrop-blur-md border border-emerald-500/30 rounded-2xl p-5">
@@ -109,15 +112,9 @@ export function LiveActivityWidget() {
                         </span>
                     </div>
                     <div className="flex items-center gap-1 mt-1 justify-end">
-                        {session.isPaused ? (
-                            <span className="flex items-center gap-1 text-xs text-yellow-400">
-                                <Pause className="w-3 h-3" /> Paused
-                            </span>
-                        ) : (
-                            <span className="flex items-center gap-1 text-xs text-emerald-400">
-                                <Play className="w-3 h-3" /> Active
-                            </span>
-                        )}
+                        <span className={`flex items-center gap-1 text-xs ${sessionStatusClass}`}>
+                            <SessionStatusIcon className="w-3 h-3" /> {sessionStatusText}
+                        </span>
                     </div>
                 </div>
             </div>

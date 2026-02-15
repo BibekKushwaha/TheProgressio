@@ -10,10 +10,6 @@ export function WelcomeHeader() {
     const router = useRouter();
     const username = user?.username?.trim() || 'there';
 
-    const handleViewSchedule = () => {
-        router.push('/calendar');
-    };
-
     const today = new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
@@ -27,7 +23,7 @@ export function WelcomeHeader() {
             subtitle={`Let's make today productive. It's ${today}`}
         >
             <Button
-                onClick={handleViewSchedule}
+                onClick={() => router.push('/calendar')}
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-purple-500/25 h-12 px-6 rounded-xl font-bold"
             >
                 <CalendarDays className="w-5 h-5 mr-2" />

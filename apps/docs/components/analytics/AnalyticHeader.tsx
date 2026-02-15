@@ -9,12 +9,12 @@ interface AnalyticsHeaderProps {
     onExport?: () => void;
 }
 
-export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHeaderProps) {
-    const PAST_DAYS_OPTIONS = [
-        { label: "Daily", value: "1" },
-        { label: "Weekly", value: "7" },
-    ] as const;
+const PAST_DAYS_OPTIONS = [
+    { label: "Daily", value: "1" },
+    { label: "Weekly", value: "7" },
+] as const;
 
+export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHeaderProps) {
     return (
         <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-4 md:p-6 mb-6">
             <div className="max-w-7xl mx-auto">

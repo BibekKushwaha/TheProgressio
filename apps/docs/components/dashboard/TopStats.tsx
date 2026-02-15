@@ -30,6 +30,29 @@ export function TopStats() {
         date.setDate(date.getDate() - daysAgo);
         return activeDates.includes(toLocalDateKey(date));
     };
+    const scoreBreakdown = [
+        {
+            label: 'Consistency',
+            value: focusScoreData?.stats?.breakdown?.consistency || 0,
+            max: 40,
+            textColor: 'text-indigo-400',
+            barColor: 'bg-indigo-500',
+        },
+        {
+            label: 'Intensity',
+            value: focusScoreData?.stats?.breakdown?.intensity || 0,
+            max: 30,
+            textColor: 'text-pink-400',
+            barColor: 'bg-pink-500',
+        },
+        {
+            label: 'Depth',
+            value: focusScoreData?.stats?.breakdown?.depth || 0,
+            max: 30,
+            textColor: 'text-purple-400',
+            barColor: 'bg-purple-500',
+        },
+    ];
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -106,29 +129,17 @@ export function TopStats() {
                 <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md p-6 flex flex-col justify-center gap-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none">
                     <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">Focus Breakdown</div>
                     <div className="space-y-2">
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-slate-300">Consistency</span>
-                            <span className="font-mono text-indigo-400 font-bold">{focusScoreData?.stats?.breakdown?.consistency || 0}/40</span>
-                        </div>
-                        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500" style={{ width: `${((focusScoreData?.stats?.breakdown?.consistency || 0) / 40) * 100}%` }}></div>
-                        </div>
-
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-slate-300">Intensity</span>
-                            <span className="font-mono text-pink-400 font-bold">{focusScoreData?.stats?.breakdown?.intensity || 0}/30</span>
-                        </div>
-                        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-pink-500" style={{ width: `${((focusScoreData?.stats?.breakdown?.intensity || 0) / 30) * 100}%` }}></div>
-                        </div>
-
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-slate-300">Depth</span>
-                            <span className="font-mono text-purple-400 font-bold">{focusScoreData?.stats?.breakdown?.depth || 0}/30</span>
-                        </div>
-                        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-purple-500" style={{ width: `${((focusScoreData?.stats?.breakdown?.depth || 0) / 30) * 100}%` }}></div>
-                        </div>
+                        {scoreBreakdown.map((item) => (
+                            <div key={item.label}>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-300">{item.label}</span>
+                                    <span className={`font-mono ${item.textColor} font-bold`}>{item.value}/{item.max}</span>
+                                </div>
+                                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                                    <div className={`h-full ${item.barColor}`} style={{ width: `${(item.value / item.max) * 100}%` }}></div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

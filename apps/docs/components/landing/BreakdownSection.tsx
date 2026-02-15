@@ -10,15 +10,18 @@ export function BreakdownSection() {
     { name: 'Module 2: Governance of Institutions', progress: 75 },
     { name: 'Module 3: Civil Service Values', progress: 40 },
   ];
+  const inViewUp = (y = 20, delay = 0) => ({
+    initial: { opacity: 0, y },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true },
+    transition: { duration: 0.6, delay, ease: 'easeOut' as const },
+  });
 
   return (
     <section className="relative pt-32 px-6">
       <div className="max-w-6xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
+          {...inViewUp()}
           className="text-center mb-16"
         >
           <h2 className="text-5xl md:text-6xl font-bold mb-4">
@@ -30,10 +33,7 @@ export function BreakdownSection() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
+          {...inViewUp(50)}
           whileHover={{ y: -10 }}
           className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-8 max-w-3xl mx-auto"
         >
@@ -51,7 +51,7 @@ export function BreakdownSection() {
           <div className="space-y-4">
             {modules.map((module, i) => (
               <motion.div
-                key={i}
+                key={module.name}
                 initial={{ opacity: 0, x: -20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}

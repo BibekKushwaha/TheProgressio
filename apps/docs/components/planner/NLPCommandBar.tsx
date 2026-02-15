@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import { Sparkles, Loader2, ArrowRight, X } from 'lucide-react';
 import { useParseTaskMutation, useCreateTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
 
+import { toast } from 'sonner';
+
 export function NLPCommandBar() {
     const [input, setInput] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -24,8 +26,10 @@ export function NLPCommandBar() {
         try {
             const result = await parseTask({ text: input }).unwrap();
             setParsedResult(result);
-        } catch {
-            console.error('Failed to parse task');
+            toast.success('Task parsed successfully');
+        } catch (err) {
+            console.error('Failed to parse task', err);
+            toast.error('Failed to parse natural language');
         }
     };
 
@@ -44,11 +48,13 @@ export function NLPCommandBar() {
                 priority: parsedResult.priority ?? PriorityEnum.MEDIUM,
                 status: TaskStatus.PENDING,
             }).unwrap();
+            toast.success('Task created successfully');
             setParsedResult(null);
             setInput('');
             setIsOpen(false);
-        } catch {
-            console.error('Failed to create task');
+        } catch (err) {
+            console.error('Failed to create task', err);
+            toast.error('Failed to create task');
         }
     };
 

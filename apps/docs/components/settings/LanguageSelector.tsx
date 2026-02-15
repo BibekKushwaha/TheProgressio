@@ -21,6 +21,8 @@ const LANGUAGES: Language[] = [
     { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', flag: '🇮🇳' },
 ];
 
+import { toast } from 'sonner';
+
 export function LanguageSelector() {
     const [selected, setSelected] = useState('en');
 
@@ -32,6 +34,8 @@ export function LanguageSelector() {
     const handleSelect = (code: string) => {
         setSelected(code);
         localStorage.setItem('app-language', code);
+        const langName = LANGUAGES.find(l => l.code === code)?.name;
+        toast.success(`Language changed to ${langName}`);
     };
 
     return (
@@ -45,8 +49,8 @@ export function LanguageSelector() {
                         key={lang.code}
                         onClick={() => handleSelect(lang.code)}
                         className={`relative flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${selected === lang.code
-                                ? 'border-indigo-500/50 bg-indigo-500/10 shadow-lg shadow-indigo-500/10'
-                                : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20'
+                            ? 'border-indigo-500/50 bg-indigo-500/10 shadow-lg shadow-indigo-500/10'
+                            : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20'
                             }`}
                     >
                         <span className="text-2xl">{lang.flag}</span>

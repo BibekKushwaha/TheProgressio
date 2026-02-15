@@ -1,4 +1,3 @@
-
 import { Clock, MoreVertical, Trash2, CheckCircle, XCircle, Calendar, Edit } from 'lucide-react';
 import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation } from '@repo/store';
 import {
@@ -10,6 +9,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface TaskListCardProps {
     task: Task;
@@ -41,16 +41,30 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
         return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
-    const handleDelete = (e: React.MouseEvent) => {
+    const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm('Are you sure you want to delete this task?')) {
-            deleteTask(task.id);
+            try {
+                await deleteTask(task.id).unwrap();
+                toast.success('Task deleted');
+            } catch (err) {
+                toast.error('Failed to delete task');
+                console.error(err);
+            }
         }
     };
 
-    const handleToggle = (e: React.MouseEvent) => {
+    const handleToggle = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        toggleTask(task.id);
+        try {
+            const result = await toggleTask(task.id).unwrap();
+            const statusLabel = result.status === TaskStatus.COMPLETED ? 'completed' :
+                result.status === TaskStatus.IN_PROGRESS ? 'started' : 'reset';
+            toast.success(`Task ${statusLabel}`);
+        } catch (err) {
+            toast.error('Failed to update task status');
+            console.error(err);
+        }
     };
 
     const handleEdit = (e: React.MouseEvent) => {
@@ -62,11 +76,18 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
         router.push(`/tasks/${task.id}`);
     };
 
+    const toggleActionByStatus = {
+        [TaskStatus.PENDING]: { icon: Clock, iconClass: 'text-blue-400', label: 'Start Task' },
+        [TaskStatus.IN_PROGRESS]: { icon: CheckCircle, iconClass: 'text-green-400', label: 'Complete Task' },
+        [TaskStatus.COMPLETED]: { icon: XCircle, iconClass: 'text-slate-400', label: 'Reset Task' },
+    } as const;
+    const toggleAction = toggleActionByStatus[task.status];
+
     return (
         <div
-            className={`group flex items-center justify-between bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer ${completed ? 'opacity-60' : ''}`}
+            className={`group relative flex items-center justify-between bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer ${completed ? 'opacity-60' : ''}`}
         >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 relative z-10">
                 <div className={`w-2 h-2 rounded-full ${STATUS_COLOR[task.status] || 'bg-slate-400'}`} />
 
                 <div className="space-y-1">
@@ -106,7 +127,7 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                 </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 relative z-10">
                 <div className="hidden sm:flex items-center gap-2 text-sm text-slate-400">
                     <Calendar className="w-4 h-4" />
                     <span>{formatDate(task.dueDate)}</span>
@@ -124,7 +145,6 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                     <DropdownMenuContent align="end" className="bg-slate-900 border-white/10 text-slate-200">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator className="bg-white/10" />
-                        <DropdownMenuSeparator className="bg-white/10" />
                         <DropdownMenuItem onClick={handleEdit} className="focus:bg-white/10 focus:text-white cursor-pointer">
                             <Edit className="w-4 h-4 mr-2" />
                             Edit Details
@@ -134,22 +154,10 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                             Focus
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleToggle} className="focus:bg-white/10 focus:text-white cursor-pointer">
-                            {task.status === TaskStatus.PENDING && (
+                            {toggleAction && (
                                 <>
-                                    <Clock className="w-4 h-4 mr-2 text-blue-400" />
-                                    <span>Start Task</span>
-                                </>
-                            )}
-                            {task.status === TaskStatus.IN_PROGRESS && (
-                                <>
-                                    <CheckCircle className="w-4 h-4 mr-2 text-green-400" />
-                                    <span>Complete Task</span>
-                                </>
-                            )}
-                            {task.status === TaskStatus.COMPLETED && (
-                                <>
-                                    <XCircle className="w-4 h-4 mr-2 text-slate-400" />
-                                    <span>Reset Task</span>
+                                    <toggleAction.icon className={`w-4 h-4 mr-2 ${toggleAction.iconClass}`} />
+                                    <span>{toggleAction.label}</span>
                                 </>
                             )}
                         </DropdownMenuItem>

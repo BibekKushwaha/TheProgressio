@@ -8,6 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 export function WeeklyActivity() {
     const [viewType, setViewType] = useState<'week' | 'month'>('week');
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
+    const periodOptions = [
+        { value: 'week' as const, label: 'Week' },
+        { value: 'month' as const, label: 'Month' },
+    ];
+    const yAxisLabels = ['4h', '3h', '2h', '1h', '0h'];
 
     const rawData = trendsData?.data || [];
     const filteredData = viewType === 'week' ? rawData.slice(-7) : rawData.slice(-30);
@@ -65,42 +70,33 @@ export function WeeklyActivity() {
                     </p>
                 </div>
                 <div className="flex gap-2 bg-white/5 border border-white/10 rounded-xl p-1">
-                    <button 
-                        onClick={() => setViewType('week')}
-                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                            viewType === 'week'
-                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
-                                : 'text-slate-500 hover:text-white'
-                        }`}
-                    >
-                        Week
-                    </button>
-                    <button 
-                        onClick={() => setViewType('month')}
-                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                            viewType === 'month'
-                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
-                                : 'text-slate-500 hover:text-white'
-                        }`}
-                    >
-                        Month
-                    </button>
+                    {periodOptions.map((option) => (
+                        <button
+                            key={option.value}
+                            onClick={() => setViewType(option.value)}
+                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                viewType === option.value
+                                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
+                                    : 'text-slate-500 hover:text-white'
+                            }`}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
             <div className="relative h-64 mb-8 group pl-8">
                 {/* Y-Axis Goal Line */}
                 <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-[10px] font-bold text-slate-600 pr-2 pointer-events-none">
-                    <span>4h</span>
-                    <span>3h</span>
-                    <span>2h</span>
-                    <span>1h</span>
-                    <span className="opacity-0">0h</span>
+                    {yAxisLabels.map((label) => (
+                        <span key={label} className={label === '0h' ? 'opacity-0' : undefined}>{label}</span>
+                    ))}
                 </div>
 
                 {/* Horizontal Grid Lines */}
                 <div className="absolute inset-0 flex flex-col justify-between opacity-5 pointer-events-none">
-                    {[0, 1, 2, 3, 4].map(i => <div key={i} className="border-t border-white w-full h-0"></div>)}
+                    {yAxisLabels.map((label) => <div key={label} className="border-t border-white w-full h-0"></div>)}
                 </div>
 
                 <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 600 256">

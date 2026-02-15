@@ -43,6 +43,8 @@ export function HabitStreaks() {
                     ) : (
                         habitsList.slice(0, 5).map((habit, index) => {
                             const streak = habit.currentStreak;
+                            const goalProgress = Math.min(100, (streak / 7) * 100);
+                            const goalProgressRounded = Math.min(100, Math.round((streak / 7) * 100));
 
                             return (
                                 <motion.div
@@ -94,7 +96,7 @@ export function HabitStreaks() {
                                     <div className="relative h-2 w-full bg-white/5 rounded-full overflow-hidden">
                                         <motion.div
                                             initial={{ width: 0 }}
-                                            animate={{ width: `${Math.min(100, (streak / 7) * 100)}%` }}
+                                            animate={{ width: `${goalProgress}%` }}
                                             transition={{ duration: 1, delay: 0.5 + index * 0.1 }}
                                             className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 via-purple-500 to-pink-500 rounded-full"
                                         />
@@ -102,7 +104,7 @@ export function HabitStreaks() {
 
                                     <div className="mt-2 flex justify-between items-center text-[10px] text-slate-500 uppercase font-bold tracking-widest">
                                         <span>7 Day Goal Progress</span>
-                                        <span>{Math.min(100, Math.round((streak / 7) * 100))}%</span>
+                                        <span>{goalProgressRounded}%</span>
                                     </div>
                                 </motion.div>
                             );

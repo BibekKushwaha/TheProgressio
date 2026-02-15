@@ -18,6 +18,7 @@ interface GradeEntryManagerProps {
 export function GradeEntryManager({ examType: controlledExamType, allowExamTypeEdit = true }: GradeEntryManagerProps) {
     const [examType, setExamType] = useState(controlledExamType || '');
     const [subjectName, setSubjectName] = useState('');
+    const [chapter, setChapter] = useState('');
     const [obtainedMarks, setObtainedMarks] = useState('');
     const [totalMarks, setTotalMarks] = useState('100');
     const [addGradeEntry, { isLoading: isAdding }] = useAddGradeEntryMutation();
@@ -44,10 +45,12 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
         await addGradeEntry({
             examType: activeExamType,
             subjectName,
+            chapter: chapter || undefined,
             obtainedMarks: parseFloat(obtainedMarks),
             totalMarks: parseFloat(totalMarks),
         });
         setSubjectName('');
+        setChapter('');
         setObtainedMarks('');
     };
 
@@ -76,6 +79,12 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
                     value={subjectName}
                     onChange={e => setSubjectName(e.target.value)}
                     placeholder="Subject Name"
+                    className="bg-white/5 border-white/10"
+                />
+                <Input
+                    value={chapter}
+                    onChange={e => setChapter(e.target.value)}
+                    placeholder="Chapter (Optional)"
                     className="bg-white/5 border-white/10"
                 />
                 <div className="flex gap-2 flex-1">

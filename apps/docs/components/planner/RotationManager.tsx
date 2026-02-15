@@ -14,8 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/components/ui/toast-provider';
-import { Calendar, Plus, Edit, Trash2, RotateCw, CheckCircle, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { Calendar as CalendarIcon, Plus, Edit, Trash2, RotateCw, CheckCircle, XCircle, CalendarDays } from 'lucide-react';
 
 export function RotationManager() {
     const { data: patternsData, isLoading } = useGetRotationPatternsQuery();
@@ -23,7 +23,6 @@ export function RotationManager() {
     const [createPattern] = useCreateRotationPatternMutation();
     const [updatePattern] = useUpdateRotationPatternMutation();
     const [deletePattern] = useDeleteRotationPatternMutation();
-    const { toast } = useToast();
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -52,11 +51,11 @@ export function RotationManager() {
                 cycleLengthDays: formData.cycleLengthDays ? parseInt(formData.cycleLengthDays) : undefined,
             }).unwrap();
 
-            toast('Rotation pattern created successfully!', 'success');
+            toast.success('Rotation pattern created successfully!');
             setIsCreateOpen(false);
             resetForm();
         } catch {
-            toast('Failed to create rotation pattern', 'error');
+            toast.error('Failed to create rotation pattern');
         }
     };
 
@@ -73,11 +72,11 @@ export function RotationManager() {
                 cycleLengthDays: formData.cycleLengthDays ? parseInt(formData.cycleLengthDays) : undefined,
             }).unwrap();
 
-            toast('Rotation pattern updated successfully!', 'success');
+            toast.success('Rotation pattern updated successfully!');
             setIsEditOpen(false);
             resetForm();
         } catch {
-            toast('Failed to update rotation pattern', 'error');
+            toast.error('Failed to update rotation pattern');
         }
     };
 
@@ -86,9 +85,9 @@ export function RotationManager() {
 
         try {
             await deletePattern(id).unwrap();
-            toast('Rotation pattern deleted successfully!', 'success');
+            toast.success('Rotation pattern deleted successfully!');
         } catch {
-            toast('Failed to delete rotation pattern', 'error');
+            toast.error('Failed to delete rotation pattern');
         }
     };
 
@@ -99,9 +98,9 @@ export function RotationManager() {
                 isActive: !pattern.isActive,
             }).unwrap();
 
-            toast(`Rotation pattern ${!pattern.isActive ? 'activated' : 'deactivated'}!`, 'success');
+            toast.success(`Rotation pattern ${!pattern.isActive ? 'activated' : 'deactivated'}!`);
         } catch {
-            toast('Failed to update rotation pattern', 'error');
+            toast.error('Failed to update rotation pattern');
         }
     };
 
@@ -185,26 +184,69 @@ export function RotationManager() {
                     </Dialog>
                 </div>
 
-                {/* Today's Rotation */}
-                {todayRotation && (
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <div className="text-sm text-slate-400 mb-1">Today&apos;s Rotation</div>
-                                <div className="text-3xl font-bold text-cyan-400">{todayRotation.rotation}</div>
-                                {todayRotation.pattern && (
-                                    <div className="text-xs text-slate-500 mt-1">{todayRotation.pattern.name}</div>
-                                )}
+                {/* Today's Rotation & Next Week Preview */}
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_2.5fr] gap-6">
+                    {/* Active Status */}
+                    {todayRotation && (
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <RotateCw className="w-16 h-16" />
                             </div>
-                            <div className="text-right">
-                                <div className="text-xs text-slate-400 mb-1">Source</div>
-                                <div className="text-sm text-slate-300 capitalize">
-                                    {todayRotation.source.replace('-', ' ')}
+                            <div className="relative">
+                                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Current State</div>
+                                <div className="text-4xl font-black text-cyan-400 mb-1">{todayRotation.rotation}</div>
+                                {todayRotation.pattern && (
+                                    <div className="text-sm font-medium text-slate-300">{todayRotation.pattern.name}</div>
+                                )}
+                                <div className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 bg-cyan-500/10 rounded-full text-[10px] font-bold text-cyan-400 border border-cyan-500/20">
+                                    <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse" />
+                                    Live Sync
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {/* Next 7 Days Forecast */}
+                    <div className="bg-black/20 border border-white/5 rounded-2xl p-5 overflow-hidden">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                <CalendarDays className="w-4 h-4 text-cyan-500" />
+                                Projection • Next 7 Days
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-7 gap-2 h-full">
+                            {(() => {
+                                const activePattern = patterns.find(p => p.isActive);
+                                if (!activePattern) return <div className="col-span-7 flex items-center justify-center text-slate-500 text-xs py-4 italic">No active pattern to forecast.</div>;
+
+                                return Array.from({ length: 7 }).map((_, i) => {
+                                    const date = new Date();
+                                    date.setDate(date.getDate() + i + 1);
+
+                                    const start = new Date(activePattern.startDate);
+                                    const diffDays = Math.floor((date.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                                    const cycleLength = activePattern.cycleLengthDays || 1;
+                                    const cycleIndex = Math.floor(diffDays / cycleLength) % activePattern.pattern.length;
+                                    const rotation = activePattern.pattern[cycleIndex < 0 ? 0 : cycleIndex];
+
+                                    return (
+                                        <div key={i} className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 border border-white/5 hover:border-cyan-500/30 transition-colors group/day">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase mb-2 group-hover/day:text-cyan-400 transition-colors">
+                                                {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                                            </span>
+                                            <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 font-bold text-lg mb-1">
+                                                {rotation}
+                                            </div>
+                                            <span className="text-[9px] text-slate-600 font-medium">
+                                                {date.getDate()} {date.toLocaleDateString('en-US', { month: 'short' })}
+                                            </span>
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
                     </div>
-                )}
+                </div>
             </Card>
 
             {/* Rotation Patterns List */}
@@ -274,7 +316,7 @@ export function RotationManager() {
                 </div>
             ) : (
                 <Card className="bg-white/5 backdrop-blur-md border-white/10 p-12 text-center">
-                    <Calendar className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                    <CalendarIcon className="w-12 h-12 text-slate-500 mx-auto mb-4" />
                     <p className="text-slate-400">No rotation patterns yet. Create your first pattern to get started!</p>
                 </Card>
             )}

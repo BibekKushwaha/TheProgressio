@@ -14,7 +14,8 @@ import type { Nudge } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, CheckCircle, AlertCircle, Info, TrendingUp, Link2, Send } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, Info, TrendingUp, Link2, Send, Award, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 
 const parseNudgeMetadata = (metadata: Nudge['metadata']): Record<string, unknown> => {
     if (!metadata) return {};
@@ -56,13 +57,15 @@ export function NotificationCenter() {
     const [postDirectReply, { isLoading: isReplying }] = usePostNotificationDirectReplyMutation();
     const [updateTask] = useUpdateTaskMutation();
     const [generateSubtasks] = useGenerateSubtasksMutation();
-    const [filter, setFilter] = useState<'all' | 'unread'>('unread');
+    const [filter, setFilter] = useState<'all' | 'unread' | string>('all');
     const [replyDraft, setReplyDraft] = useState<Record<string, string>>({});
 
     const nudges = data?.nudges || [];
-    const filteredNudges = filter === 'unread'
-        ? nudges.filter((n: Nudge) => !n.isRead)
-        : nudges;
+    const filteredNudges = nudges.filter((n: Nudge) => {
+        if (filter === 'unread') return !n.isRead;
+        if (filter === 'all') return true;
+        return n.type === filter;
+    });
 
     const unreadCount = nudges.filter((n: Nudge) => !n.isRead).length;
 
@@ -183,28 +186,35 @@ export function NotificationCenter() {
                             size="sm"
                             disabled={isMarkingAllRead}
                             onClick={handleMarkAllRead}
-                            className="bg-white/5 border-white/10 hover:bg-white/10"
+                            className="bg-white/5 border-white/10 hover:bg-white/10 text-xs"
                         >
                             {isMarkingAllRead ? 'Marking...' : 'Mark all read'}
                         </Button>
                     )}
-                    <Button
-                        variant={filter === 'unread' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('unread')}
-                        className={filter === 'unread' ? 'bg-purple-500' : 'bg-white/5 border-white/10'}
-                    >
-                        Unread
-                    </Button>
-                    <Button
-                        variant={filter === 'all' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('all')}
-                        className={filter === 'all' ? 'bg-purple-500' : 'bg-white/5 border-white/10'}
-                    >
-                        All
-                    </Button>
                 </div>
+            </div>
+
+            {/* Categories Filter */}
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                {[
+                    { id: 'all', label: 'All', icon: Bell },
+                    { id: 'streak_reminder', label: 'Streaks', icon: TrendingUp },
+                    { id: 'urgency_driven', label: 'Priority', icon: AlertCircle },
+                    { id: 'suggestion', label: 'Tips', icon: Sparkles },
+                    { id: 'achievement', label: 'Awards', icon: Award },
+                ].map((cat) => (
+                    <button
+                        key={cat.id}
+                        onClick={() => setFilter(cat.id)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-medium transition-all whitespace-nowrap ${filter === cat.id
+                            ? 'bg-purple-500 border-purple-400 text-white shadow-lg shadow-purple-500/20'
+                            : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                            }`}
+                    >
+                        <cat.icon className="w-3.5 h-3.5" />
+                        {cat.label}
+                    </button>
+                ))}
             </div>
 
             {filteredNudges.length > 0 ? (
@@ -222,6 +232,13 @@ export function NotificationCenter() {
                                     return typeof cast.id === 'string' && typeof cast.label === 'string' && typeof cast.actionType === 'string';
                                 })
                                 .slice(0, 3);
+
+                            const snoozeActions = [
+                                { label: '30m', value: 30 },
+                                { label: '2h', value: 120 },
+                                { label: '1d', value: 1440 }
+                            ];
+
                             const anatomy = metadata.anatomy;
                             const richMedia = anatomy && typeof anatomy === 'object' && !Array.isArray(anatomy)
                                 ? (anatomy as Record<string, unknown>).richMedia
@@ -291,21 +308,49 @@ export function NotificationCenter() {
                                                     )}
                                                 </div>
 
-                                                <div className="mt-3 flex flex-wrap gap-2">
-                                                    {actions.map((action) => (
-                                                        <Button
-                                                            key={action.id}
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => runAction(nudge, action.actionType)}
-                                                            className="bg-white/5 border-white/10 hover:bg-white/10"
-                                                        >
-                                                            {action.label}
-                                                        </Button>
-                                                    ))}
-                                                    <a href={deepLink} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20">
-                                                        <Link2 className="w-3 h-3" /> Open
-                                                    </a>
+                                                <div className="mt-4 flex flex-wrap items-center gap-3">
+                                                    <div className="flex gap-2">
+                                                        {actions.map((action) => (
+                                                            <Button
+                                                                key={action.id}
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => runAction(nudge, action.actionType)}
+                                                                className="bg-white/5 border-white/10 hover:bg-white/10 text-xs h-8"
+                                                            >
+                                                                {action.label}
+                                                            </Button>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="h-4 w-px bg-white/10" />
+
+                                                    <div className="flex items-center gap-1.5 p-1 bg-black/20 rounded-lg border border-white/5">
+                                                        <span className="text-[10px] text-slate-500 px-1 font-semibold uppercase tracking-wider">Snooze</span>
+                                                        {snoozeActions.map((snooze) => (
+                                                            <button
+                                                                key={snooze.label}
+                                                                onClick={() => {
+                                                                    const dueDate = new Date();
+                                                                    dueDate.setMinutes(dueDate.getMinutes() + snooze.value);
+                                                                    updateTask({
+                                                                        id: (metadata as Record<string, unknown>).taskId as string,
+                                                                        dueDate: dueDate.toISOString()
+                                                                    });
+                                                                    toast.success(`Snoozed for ${snooze.label}`);
+                                                                }}
+                                                                className="px-2 py-1 text-[10px] font-bold text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                                                            >
+                                                                {snooze.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="ml-auto flex gap-2">
+                                                        <a href={deepLink} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition-colors">
+                                                            <Link2 className="w-3 h-3" /> View
+                                                        </a>
+                                                    </div>
                                                 </div>
 
                                                 <div className="mt-3 flex items-center gap-2">

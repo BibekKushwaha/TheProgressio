@@ -1,9 +1,10 @@
-
 "use client"
 
 import { useGetDailyScheduleQuery, TimetableEntry } from "@repo/store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, Calendar, Clock, MapPin, User } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { RotationManager } from "./RotationManager";
 
 export function TimetableView() {
     const { data: schedule, isLoading, error } = useGetDailyScheduleQuery();
@@ -26,7 +27,22 @@ export function TimetableView() {
             <div className="flex flex-col items-center justify-center p-12 text-slate-400 bg-white/5 rounded-2xl border border-white/10">
                 <Calendar className="w-12 h-12 mb-4 opacity-50" />
                 <p>No schedule available for today.</p>
-                {/* <p className="text-xs mt-2 opacity-50">{(error as any)?.data?.message || 'Server error'}</p> */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <button className="mt-4 text-sm text-purple-400 hover:text-purple-300 underline font-medium">
+                            Setup Rotation Pattern
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl bg-slate-900 border-white/10 text-white p-0 overflow-hidden">
+                        <DialogHeader className="p-6 pb-0 sr-only">
+                            <DialogTitle>Setup Rotation Pattern</DialogTitle>
+                            <DialogDescription>Configure your study rotation patterns here.</DialogDescription>
+                        </DialogHeader>
+                        <div className="p-6 overflow-y-auto max-h-[80vh]">
+                            <RotationManager />
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         );
     }
@@ -49,6 +65,24 @@ export function TimetableView() {
                         )}
                     </p>
                 </div>
+
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/10 transition-all">
+                            <Clock className="w-4 h-4 text-purple-400" />
+                            Manage Rotations
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl bg-slate-900 border-white/10 text-white p-0 overflow-hidden">
+                        <DialogHeader className="p-6 pb-0 sr-only">
+                            <DialogTitle>Manage Rotations</DialogTitle>
+                            <DialogDescription>View and manage your current rotation schedules.</DialogDescription>
+                        </DialogHeader>
+                        <div className="p-6 overflow-y-auto max-h-[80vh]">
+                            <RotationManager />
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             {schedule.conflicts?.length > 0 && (

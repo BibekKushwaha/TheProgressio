@@ -162,28 +162,43 @@ export class RecoveryService {
         return this.createPlan(overdueTasks, anchorDate);
     }
 
-    async apply(userId: string, anchorDate = new Date()) {
+    async apply(userId: string, anchorDate = new Date(), taskIds?: string[], overrides?: Record<string, string>) {
         const plan = await this.preview(userId, anchorDate);
         if (plan.items.length === 0) {
             return { plan, updatedCount: 0 };
         }
 
+        // Filter by taskIds if provided
+        let itemsToUpdate = plan.items;
+        if (taskIds && taskIds.length > 0) {
+            itemsToUpdate = itemsToUpdate.filter(item => taskIds.includes(item.taskId));
+        }
+
+        if (itemsToUpdate.length === 0) {
+            return { plan, updatedCount: 0 };
+        }
+
         await prisma.$transaction(
-            plan.items.map((item) =>
-                prisma.task.updateMany({
+            itemsToUpdate.map((item) => {
+                const overrideDate = overrides?.[item.taskId];
+                const finalDate = overrideDate
+                    ? new Date(overrideDate)
+                    : new Date(item.newDueDate);
+
+                return prisma.task.updateMany({
                     where: {
                         id: item.taskId,
                         userId,
                         status: { not: Status.COMPLETED },
                     },
-                    data: { dueDate: new Date(item.newDueDate) },
-                }),
-            ),
+                    data: { dueDate: finalDate },
+                });
+            }),
         );
 
         return {
             plan,
-            updatedCount: plan.items.length,
+            updatedCount: itemsToUpdate.length,
         };
     }
 }

@@ -11,6 +11,8 @@ export function InsightsSection() {
     { name: 'Mechanics (Force and Torque)', score: 45, color: 'bg-red-500' },
     { name: 'Math - Calculus', score: 88, color: 'bg-green-500' },
   ];
+  const scoreTone = (score: number) =>
+    score >= 80 ? 'text-green-400' : score >= 60 ? 'text-yellow-400' : 'text-red-400';
 
   return (
     <section className="relative py-32 px-6">
@@ -58,7 +60,7 @@ export function InsightsSection() {
             <div className="space-y-4">
               {chapters.map((chapter, i) => (
                 <motion.div
-                  key={i}
+                  key={chapter.name}
                   initial={{ opacity: 0, width: 0 }}
                   whileInView={{ opacity: 1, width: '100%' }}
                   viewport={{ once: true }}
@@ -66,11 +68,7 @@ export function InsightsSection() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-slate-300">{chapter.name}</span>
-                    <span className={`text-sm font-semibold ${
-                      chapter.score >= 80 ? 'text-green-400' :
-                      chapter.score >= 60 ? 'text-yellow-400' :
-                      'text-red-400'
-                    }`}>
+                    <span className={`text-sm font-semibold ${scoreTone(chapter.score)}`}>
                       {chapter.score}% Mastery
                     </span>
                   </div>

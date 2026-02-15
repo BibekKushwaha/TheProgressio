@@ -36,7 +36,7 @@ const makeEntry = (subject: string, chapter: string, obtained: number, total: nu
 // ─── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('SWOT Service — generateSWOT', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => { vi.clearAllMocks(); });
 
     it('returns empty SWOT when no grade entries exist', async () => {
         mockPrisma.gradeEntry.findMany.mockResolvedValue([]);
@@ -60,7 +60,7 @@ describe('SWOT Service — generateSWOT', () => {
         const result = await generateSWOT('u1', 'JEE');
 
         expect(result.subjects.length).toBeGreaterThanOrEqual(1);
-        const physics = result.subjects.find(s => s.subjectName === 'Physics');
+        const physics = result.subjects.find(s => s.subject === 'Physics');
         expect(physics).toBeDefined();
 
         // Verify strength chapters (≥80%)
@@ -83,7 +83,7 @@ describe('SWOT Service — generateSWOT', () => {
         const result = await generateSWOT('u1', 'JEE');
 
         expect(result.subjects.length).toBe(3);
-        const subjectNames = result.subjects.map(s => s.subjectName);
+        const subjectNames = result.subjects.map(s => s.subject);
         expect(subjectNames).toContain('Physics');
         expect(subjectNames).toContain('Chemistry');
         expect(subjectNames).toContain('Maths');
@@ -110,7 +110,7 @@ describe('SWOT Service — generateSWOT', () => {
 });
 
 describe('SWOT Service — getSubjectPerformance', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => { vi.clearAllMocks(); });
 
     it('returns null for unknown subject', async () => {
         mockPrisma.gradeEntry.findMany.mockResolvedValue([]);

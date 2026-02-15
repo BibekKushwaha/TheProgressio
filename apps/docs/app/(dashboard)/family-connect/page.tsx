@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { StatCard } from '@/components/family-connect/StatCard';
+import { StatCard } from '@/components/ui/stat-card';
 import { TaskListItem } from '@/components/family-connect/TaskListItem';
 import { HabitListItem } from '@/components/family-connect/HabitListItem';
 
@@ -82,7 +82,7 @@ export default function FamilyConnectPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950/40 to-slate-950 text-white p-6 md:p-8">
-            <div className="max-w-5xl mx-auto space-y-8">
+            <div className="max-w-5xl mx-auto space-y-6">
                 {/* Header */}
                 <PageHeader
                     title="Family Connect"
@@ -110,31 +110,39 @@ export default function FamilyConnectPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <StatCard
                         icon={CheckCircle}
-                        value={`${completionRate}%`}
-                        label="Tasks Completed"
-                        sublabel={`${completedTasks}/${totalTasks} total`}
-                        colorClass="text-green-400"
+                        title={`${completionRate}%`}
+                        description="Tasks Completed"
+                        subDescription={`${completedTasks}/${totalTasks} total`}
+                        iconColor="text-green-400"
+                        variant="glass"
+                        className="text-center p-5"
                     />
                     <StatCard
                         icon={Flame}
-                        value={habits.length}
-                        label="Active Habits"
-                        sublabel="tracked daily"
-                        colorClass="text-orange-400"
+                        title={habits.length}
+                        description="Active Habits"
+                        subDescription="tracked daily"
+                        iconColor="text-orange-400"
+                        variant="glass"
+                        className="text-center p-5"
                     />
                     <StatCard
                         icon={Clock}
-                        value={`${summary?.totalMinutes ? Math.round(summary.totalMinutes / 60) : 0}h`}
-                        label="Focus Time (7d)"
-                        sublabel="deep work logged"
-                        colorClass="text-blue-400"
+                        title={`${summary?.totalMinutes ? Math.round(summary.totalMinutes / 60) : 0}h`}
+                        description="Focus Time (7d)"
+                        subDescription="deep work logged"
+                        iconColor="text-blue-400"
+                        variant="glass"
+                        className="text-center p-5"
                     />
                     <StatCard
                         icon={AlertTriangle}
-                        value={workloadIntensity}
-                        label="Workload (3d)"
-                        sublabel={`${upcomingTasks.length} tasks due`}
-                        colorClass={workloadIntensity === 'High' ? 'text-red-400' : workloadIntensity === 'Medium' ? 'text-yellow-400' : 'text-green-400'}
+                        title={workloadIntensity}
+                        description="Workload (3d)"
+                        subDescription={`${upcomingTasks.length} tasks due`}
+                        iconColor={workloadIntensity === 'High' ? 'text-red-400' : workloadIntensity === 'Medium' ? 'text-yellow-400' : 'text-green-400'}
+                        variant="glass"
+                        className="text-center p-5"
                     />
                 </div>
 

@@ -10,7 +10,7 @@ import { PrioritySelector } from '@/components/createtask/PrioritySelector';
 import { EffortSelector } from '@/components/createtask/EffortSelector';
 import { AISubtaskPanel } from '@/components/createtask/AiSubTaskPanel';
 import { PageActions } from '@/components/createtask/PageAction';
-import { Edit, Calendar as CalendarIcon, FileText } from 'lucide-react';
+import { Edit, Calendar as CalendarIcon, FileText, GraduationCap, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toast-provider';
@@ -26,6 +26,7 @@ import {
     addTask,
     useGetCategoriesQuery,
     useCreateCategoryMutation,
+    useAddGradeEntryMutation,
     useAppDispatch
 } from '@repo/store';
 
@@ -42,6 +43,16 @@ function CreateTaskPageContent() {
     const [selectedPriority, setSelectedPriority] = useState('Routine');
     const [selectedEffort, setSelectedEffort] = useState('1h');
     const [subtasks, setSubtasks] = useState<{ id: string | number; text: string; completed: boolean; loading?: boolean }[]>([]);
+    const [isRecurring, setIsRecurring] = useState<boolean>(false);
+
+    // Exam Mode State
+    const [entryType, setEntryType] = useState<'task' | 'exam'>('task');
+    const [examType, setExamType] = useState('Midterm');
+    const [obtainedMarks, setObtainedMarks] = useState('');
+    const [totalMarks, setTotalMarks] = useState('100');
+    const [chapter, setChapter] = useState('');
+
+    const [addGradeEntry, { isLoading: isAddingGrade }] = useAddGradeEntryMutation();
 
     const { data: existingTask, isLoading: isLoadingTask } = useGetTaskByIdQuery(taskId || '', {
         skip: !taskId,
@@ -73,6 +84,7 @@ function CreateTaskPageContent() {
                     completed: s.completed
                 })));
             }
+            setIsRecurring(Boolean(existingTask.isRecurring));
         }
     }, [existingTask]);
 
@@ -142,6 +154,33 @@ function CreateTaskPageContent() {
                 }
             }
 
+            if (entryType === 'exam') {
+                if (!taskDescription) {
+                    toast('Please enter a subject name', 'error');
+                    return;
+                }
+                const marks = parseFloat(obtainedMarks);
+                const total = parseFloat(totalMarks);
+
+                if (isNaN(marks) || isNaN(total) || total <= 0) {
+                    toast('Please enter valid marks', 'error');
+                    return;
+                }
+
+                await addGradeEntry({
+                    examType,
+                    subjectName: parsedMeta.subject || taskDescription, // Prefer parsed subject if available
+                    chapter: chapter || undefined,
+                    obtainedMarks: marks,
+                    totalMarks: total,
+                }).unwrap();
+
+                toast('✅ Exam result logged!', 'success');
+                if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
+                router.push('/exam-warroom');
+                return;
+            }
+
 
             // Map string priority to Enum
             let priorityEnum = PriorityEnum.LOW;
@@ -193,6 +232,7 @@ function CreateTaskPageContent() {
                     priority: priorityEnum,
                     categoryId: categoryIdToUse,
                     dueDate: parsedDueDate || undefined,
+                    isRecurring,
                 }).unwrap();
             } else {
                 // If the description is long, we might want to use smart create,
@@ -204,6 +244,7 @@ function CreateTaskPageContent() {
                     status: TaskStatus.PENDING,
                     categoryId: categoryIdToUse,
                     dueDate: parsedDueDate || undefined,
+                    isRecurring,
                 }).unwrap();
                 if (createdTask) {
                     dispatch(addTask(createdTask));
@@ -252,8 +293,24 @@ function CreateTaskPageContent() {
                         <div className="text-white text-2xl font-bold text-center">Create New Task</div>
                         <div>
                             <h2 className="text-sm font-bold text-purple-400 uppercase tracking-wider mb-4">
-                                {taskId ? 'EDITING TASK' : "WHAT'S ON YOUR MIND?"}
+                                {taskId ? 'EDITING TASK' : (entryType === 'exam' ? 'LOG EXAM RESULT' : "WHAT'S ON YOUR MIND?")}
                             </h2>
+                            {!taskId && (
+                                <div className="flex gap-2 mb-4 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
+                                    <button
+                                        onClick={() => setEntryType('task')}
+                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${entryType === 'task' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        Task
+                                    </button>
+                                    <button
+                                        onClick={() => setEntryType('exam')}
+                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${entryType === 'exam' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        <GraduationCap className="w-4 h-4" /> Exam Result
+                                    </button>
+                                </div>
+                            )}
                             <TaskInputCard
                                 value={taskDescription}
                                 onChange={setTaskDescription}
@@ -283,58 +340,133 @@ function CreateTaskPageContent() {
                             categories={categories}
                         />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <PrioritySelector
-                                selectedPriority={selectedPriority}
-                                onSelect={setSelectedPriority}
-                            />
-                            <EffortSelector
-                                selectedEffort={selectedEffort}
-                                onSelect={setSelectedEffort}
-                            />
-                        </div>
+                        {entryType === 'task' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <PrioritySelector
+                                    selectedPriority={selectedPriority}
+                                    onSelect={setSelectedPriority}
+                                />
+                                <EffortSelector
+                                    selectedEffort={selectedEffort}
+                                    onSelect={setSelectedEffort}
+                                />
+                            </div>
+                        )}
+                        {entryType === 'exam' && (
+                            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4 animate-in slide-in-from-left-4 duration-300">
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                    <GraduationCap className="w-3 h-3" />
+                                    Exam Details
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-medium text-slate-400">Exam Type</Label>
+                                        <select
+                                            value={examType}
+                                            onChange={(e) => setExamType(e.target.value)}
+                                            className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                                        >
+                                            <option value="Midterm">Midterm</option>
+                                            <option value="Final">Final</option>
+                                            <option value="Quiz">Quiz</option>
+                                            <option value="Assignment">Assignment</option>
+                                            <option value="UnitTest">Unit Test</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-medium text-slate-400">Chapter (Optional)</Label>
+                                        <Input
+                                            value={chapter}
+                                            onChange={(e) => setChapter(e.target.value)}
+                                            placeholder="e.g. Thermodynamics"
+                                            className="bg-white/5 border-white/10 h-11"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-medium text-slate-400">Marks (Obtained / Total)</Label>
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="number"
+                                                value={obtainedMarks}
+                                                onChange={(e) => setObtainedMarks(e.target.value)}
+                                                placeholder="85"
+                                                className="bg-white/5 border-white/10 h-11"
+                                            />
+                                            <span className="text-slate-500">/</span>
+                                            <Input
+                                                type="number"
+                                                value={totalMarks}
+                                                onChange={(e) => setTotalMarks(e.target.value)}
+                                                placeholder="100"
+                                                className="bg-white/5 border-white/10 h-11"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-6">
-                        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <Edit className="w-3 h-3" />
-                                Manual Details
-                            </h3>
-                            <div className="space-y-2">
-                                <Label htmlFor="description" className="text-xs font-medium text-slate-400">Description</Label>
-                                <div className="relative">
-                                    <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                                    <textarea
-                                        id="description"
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="Add more details..."
-                                        className="w-full min-h-[100px] pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none transition-all"
-                                    />
+                        {entryType === 'task' ? (
+                            <>
+                                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+                                    {/* ... Manual Details Form ... */}
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                        <Edit className="w-3 h-3" />
+                                        Manual Details
+                                    </h3>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="description" className="text-xs font-medium text-slate-400">Description</Label>
+                                        <div className="relative">
+                                            <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                                            <textarea
+                                                id="description"
+                                                value={description}
+                                                onChange={(e) => setDescription(e.target.value)}
+                                                placeholder="Add more details..."
+                                                className="w-full min-h-[100px] pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="dueDate" className="text-xs font-medium text-slate-400">Due Date</Label>
+                                        <div className="relative">
+                                            <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                            <Input
+                                                id="dueDate"
+                                                type="datetime-local"
+                                                value={parsedDueDate ? new Date(new Date(parsedDueDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                                                onChange={(e) => setParsedDueDate(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                                                className="pl-10 bg-white/5 border-white/10 text-white h-11 rounded-xl"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3">
+                                        <Label htmlFor="isRecurring" className="text-xs font-medium text-slate-400">Recurring</Label>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <input id="isRecurring" type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="h-4 w-4 rounded" />
+                                            <span className="text-sm text-slate-300">Automatically repeat this task</span>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="dueDate" className="text-xs font-medium text-slate-400">Due Date</Label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                    <Input
-                                        id="dueDate"
-                                        type="datetime-local"
-                                        value={parsedDueDate ? new Date(new Date(parsedDueDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
-                                        onChange={(e) => setParsedDueDate(e.target.value ? new Date(e.target.value).toISOString() : null)}
-                                        className="pl-10 bg-white/5 border-white/10 text-white h-11 rounded-xl"
-                                    />
-                                </div>
-                            </div>
-                        </div>
 
-                        <AISubtaskPanel
-                            subtasks={subtasks}
-                            onSubtaskToggle={(id) => setSubtasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t))}
-                            isLoading={isGeneratingSubtasks}
-                            onGenerate={handleGenerateSubtasks}
-                        />
+                                <AISubtaskPanel
+                                    subtasks={subtasks}
+                                    onSubtaskToggle={(id) => setSubtasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t))}
+                                    isLoading={isGeneratingSubtasks}
+                                    onGenerate={handleGenerateSubtasks}
+                                />
+                            </>
+                        ) : (
+                            <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-2xl p-6 text-center">
+                                <CheckCircle2 className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-white mb-2">Ready to log result</h3>
+                                <p className="text-sm text-slate-400">
+                                    Logging this result will update your personalized SWOT analysis and predictive GPA model in the War Room.
+                                </p>
+                            </div>
+                        )}
 
                     </div>
                 </div>
@@ -342,8 +474,8 @@ function CreateTaskPageContent() {
                 <PageActions
                     onSubmit={handleSaveTask}
                     onCancel={() => router.back()}
-                    isSubmitting={isCreating || isSmartCreating || isUpdating}
-                    submitLabel={taskId ? "Update Task" : "Add to My Gateway"}
+                    isSubmitting={isCreating || isSmartCreating || isUpdating || isAddingGrade}
+                    submitLabel={taskId ? "Update Task" : (entryType === 'exam' ? "Log Result" : "Add to My Gateway")}
                     SubmitIcon={taskId ? Edit : undefined}
                 />
             </div>

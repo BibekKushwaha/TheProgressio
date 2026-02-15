@@ -84,16 +84,17 @@ const FEATURE_LAYERS: FeatureLayer[] = [
 ];
 
 export function ComparisonSection() {
+  const sectionIntroMotion = {
+    initial: { opacity: 0, y: 20 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true },
+    transition: { duration: 0.6, ease: 'easeOut' as const },
+  };
+
   return (
     <section className="relative px-6 py-24">
       <div className="max-w-6xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-          className="text-center mb-16"
-        >
+        <motion.div {...sectionIntroMotion} className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
             Standard Tracker vs AI Advisor
           </h2>
@@ -129,16 +130,13 @@ export function ComparisonSection() {
                 <div className="grid gap-2 md:grid-cols-2">
                   {layer.features.map((feature) => {
                     const status = STATUS_STYLES[feature.status];
+                    const StatusIcon = feature.status === 'implemented' ? CheckCircle2 : Clock3;
                     return (
                       <div key={feature.name} className="rounded-xl border border-white/10 bg-black/20 p-3">
                         <div className="mb-1 flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold text-white">{feature.name}</p>
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${status.className}`}>
-                            {feature.status === 'implemented' ? (
-                              <CheckCircle2 className="mr-1 h-3 w-3" />
-                            ) : (
-                              <Clock3 className="mr-1 h-3 w-3" />
-                            )}
+                            <StatusIcon className="mr-1 h-3 w-3" />
                             {status.label}
                           </span>
                         </div>
