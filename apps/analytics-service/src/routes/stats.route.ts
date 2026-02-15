@@ -13,6 +13,8 @@ import {
     // Phase 3 — Focus / Leakage
     getTimeLeakage, getPeakWindow, getPredictivePerformanceEndpoint,
     getInternalConsistency,
+    getNotificationIntelligence,
+    getActiveContextSignals,
 } from "../controllers/stats.controller.js";
 import { isAuth } from "../middleware/auth.middleware.js";
 
@@ -50,6 +52,8 @@ router.delete("/grade-entry/:id", isAuth, deleteGradeEntry);
 router.get("/focus/leakage", isAuth, getTimeLeakage);
 router.get("/focus/peak-window", isAuth, getPeakWindow);
 router.get("/performance/:examType", isAuth, getPredictivePerformanceEndpoint);
+router.get("/notifications/intelligence", isAuth, getNotificationIntelligence);
+router.get("/notifications/context", isAuth, getActiveContextSignals);
 
 // ── Events ─────────────────────────────────────────────────────────────
 router.post("/events/task-completed", handleTaskCompletedEvent);

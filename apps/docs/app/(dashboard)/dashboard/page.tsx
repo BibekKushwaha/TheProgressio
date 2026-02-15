@@ -6,6 +6,8 @@ import { TodaysTasks } from '@/components/dashboard/TodayTask';
 import { MorningBriefing } from '@/components/dashboard/MorningBriefing';
 import { LiveActivityWidget } from '@/components/dashboard/LiveActivityWidget';
 
+import { DashboardGrid } from '@/components/layout/DashboardGrid';
+
 export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white">
@@ -13,18 +15,18 @@ export default function DashboardPage() {
                 <WelcomeHeader />
                 <LiveActivityWidget />
                 <TopStats />
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 space-y-6">
-                        <WeeklyActivity />
-                        <TodaysTasks />
-                    </div>
-                    <div className="space-y-6">
-                        <MorningBriefing />
-                        {/* <UserLevelCard /> */}
-                        <QuickActions />
-                        {/* <HabitStreaks /> */}
-                    </div>
-                </div>
+
+                <DashboardGrid
+                    sidebar={
+                        <>
+                            <MorningBriefing />
+                            <QuickActions />
+                        </>
+                    }
+                >
+                    <WeeklyActivity />
+                    <TodaysTasks />
+                </DashboardGrid>
             </main>
         </div>
     );

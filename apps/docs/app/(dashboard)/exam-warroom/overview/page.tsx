@@ -5,6 +5,7 @@ import { PredictiveScoreCard } from '@/components/analytics/PredictiveScoreCard'
 import { Swords, Target, BookOpen, Trophy } from 'lucide-react';
 import { useGetSubjectPerformanceQuery, useGetGradeEntriesQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function ExamWarRoomPage() {
     const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('');
@@ -38,18 +39,14 @@ export default function ExamWarRoomPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-red-950/30 to-slate-950 text-white p-6 md:p-8">
             <div className="max-w-7xl mx-auto space-y-8">
-                {/* Header */}
-                <div className="flex items-center gap-4">
+                <PageHeader
+                    title="Exam War Room"
+                    subtitle="Chapter-wise SWOT, success tracking & predictive scores"
+                >
                     <div className="p-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl shadow-lg shadow-red-500/20">
                         <Swords className="w-8 h-8 text-white" />
                     </div>
-                    <div>
-                        <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
-                            Exam War Room
-                        </h1>
-                        <p className="text-slate-400 mt-1">Chapter-wise SWOT, success tracking & predictive scores </p>
-                    </div>
-                </div>
+                </PageHeader>
 
                 {/* Quick Stats Bar */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -168,7 +168,7 @@ export function GenericHeatmap({
             )}
 
             {/* Heatmap Grid */}
-            <div className="relative overflow-x-auto pb-2">
+            <div className="relative w-full overflow-x-auto pb-2">
                 <div className="inline-flex gap-[4px] min-w-max">
                     {/* Day labels column */}
                     <div className="flex flex-col gap-[4px] mr-1 mt-5">

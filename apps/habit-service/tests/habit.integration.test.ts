@@ -53,6 +53,33 @@ vi.mock('../src/services/nudge.service.js', () => ({
         conflicts: [],
     }),
     detectSlipPatterns: vi.fn().mockResolvedValue(undefined),
+    getNotificationSettings: vi.fn().mockResolvedValue({
+        enabledBuckets: {
+            URGENCY_DRIVEN: true,
+            MORNING_BRIEFING: true,
+            BEHAVIORAL_NUDGE: true,
+            ADVANCE_ALERT_3WEEK: true,
+            TRANSACTION_SYSTEM: true,
+        },
+        quietHours: [],
+        focusProfiles: [],
+        groupedSummaries: true,
+        positiveTone: true,
+    }),
+    upsertNotificationSettings: vi.fn().mockResolvedValue({
+        enabledBuckets: {
+            URGENCY_DRIVEN: true,
+            MORNING_BRIEFING: true,
+            BEHAVIORAL_NUDGE: true,
+            ADVANCE_ALERT_3WEEK: true,
+            TRANSACTION_SYSTEM: true,
+        },
+        quietHours: [],
+        focusProfiles: [],
+        groupedSummaries: true,
+        positiveTone: true,
+    }),
+    createTransactionSystemNudge: vi.fn().mockResolvedValue({ id: 'txn-1' }),
     getUserNudges: vi.fn().mockResolvedValue([
         { id: 'n1', type: 'STREAK_RISK', title: 'Streak at risk', message: 'Log now!', isRead: false },
     ]),

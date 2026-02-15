@@ -101,8 +101,40 @@ export interface Nudge {
     isRead: boolean;
     scheduledAt: string;
     expiresAt?: string;
-    metadata?: Record<string, unknown>;
+    metadata?: Record<string, unknown> | string;
+    deepLink?: string;
+    progress?: {
+        current: number;
+        total: number;
+        label?: string;
+    };
+    actions?: Array<{
+        id: string;
+        label: string;
+        actionType: string;
+    }>;
+    directReplyEnabled?: boolean;
+    richMedia?: {
+        type: 'IMAGE' | 'GIF' | 'VIDEO';
+        url: string;
+        sizeMb?: number;
+        platform?: 'ANDROID' | 'IOS' | 'WEB';
+    };
     createdAt: string;
+}
+
+export interface NotificationSettings {
+    enabledBuckets: {
+        URGENCY_DRIVEN: boolean;
+        MORNING_BRIEFING: boolean;
+        BEHAVIORAL_NUDGE: boolean;
+        ADVANCE_ALERT_3WEEK: boolean;
+        TRANSACTION_SYSTEM: boolean;
+    };
+    quietHours: Array<{ start: string; end: string }>;
+    focusProfiles: Array<{ label: string; enabled: boolean; muteNonUrgent: boolean }>;
+    groupedSummaries: boolean;
+    positiveTone: boolean;
 }
 
 export interface MorningBriefing {
@@ -285,6 +317,21 @@ export const habitsApi = createApi({
             }),
             invalidatesTags: [{ type: 'Habits', id: 'NUDGES' }],
         }),
+        getNudgeSettings: builder.query<{ message: string; settings: NotificationSettings }, void>({
+            query: () => '/nudges/settings',
+            providesTags: [{ type: 'Habits', id: 'NUDGE_SETTINGS' }],
+        }),
+        updateNudgeSettings: builder.mutation<
+            { message: string; settings: NotificationSettings },
+            Partial<NotificationSettings>
+        >({
+            query: (body) => ({
+                url: '/nudges/settings',
+                method: 'PUT',
+                body,
+            }),
+            invalidatesTags: [{ type: 'Habits', id: 'NUDGE_SETTINGS' }, { type: 'Habits', id: 'NUDGES' }],
+        }),
 
         // ── Phase 2: Morning Briefing ──────────────────────────────────────
         getMorningBriefing: builder.query<{ message: string; briefing: MorningBriefing }, void>({
@@ -308,5 +355,7 @@ export const {
     useGetNudgesQuery,
     useMarkNudgeAsReadMutation,
     useMarkAllNudgesAsReadMutation,
+    useGetNudgeSettingsQuery,
+    useUpdateNudgeSettingsMutation,
     useGetMorningBriefingQuery,
 } = habitsApi;

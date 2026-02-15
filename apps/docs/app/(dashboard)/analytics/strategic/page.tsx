@@ -3,7 +3,7 @@ import { DurationPredictionCard } from '@/components/analytics/DurationPredictio
 import { PredictiveScoreCard } from '@/components/analytics/PredictiveScoreCard';
 import { ProductivityInsights } from '@/components/analytics/ProductivityInsights';
 import { GlassHero } from '@/components/layout/GlassHero';
-import { Select } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskStatus, useGetTasksQuery } from "@repo/store";
 import { BrainCircuit, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -85,17 +85,18 @@ export default function AnalyticsStrategicPage() {
                     </div>
                     <Select
                       value={selectedPredictionTaskId}
-                      onChange={(e) => setSelectedPredictionTaskId(e.target.value)}
-                      className="bg-white/10 border-white/20 text-white"
+                      onValueChange={setSelectedPredictionTaskId}
                     >
-                      <option value="" className="bg-slate-900">
-                        Select task for prediction
-                      </option>
-                      {predictionTaskOptions.map((task) => (
-                        <option key={task.id} value={task.id} className="bg-slate-900">
-                          {task.title}
-                        </option>
-                      ))}
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectValue placeholder="Select task for prediction" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {predictionTaskOptions.map((task) => (
+                          <SelectItem key={task.id} value={task.id} className="bg-slate-900 focus:bg-slate-800">
+                            {task.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
                     <p className="mt-3 text-xs text-slate-300">
                       {selectedTask?.dueDate

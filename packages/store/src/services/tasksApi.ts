@@ -9,6 +9,38 @@ export enum TaskStatus {
     COMPLETED = 'COMPLETED',
 }
 
+export interface NotificationAction {
+    id: string;
+    label: string;
+    actionType: string;
+}
+
+export interface ComposeNotificationRequest {
+    category: 'URGENCY_DRIVEN' | 'MORNING_BRIEFING' | 'BEHAVIORAL_NUDGE' | 'ADVANCE_ALERT_3WEEK' | 'TRANSACTION_SYSTEM';
+    title: string;
+    body: string;
+    emoji?: string;
+    imageUrl?: string;
+    richMedia?: { type: 'IMAGE' | 'GIF' | 'VIDEO'; url: string; sizeMb: number; platform: 'ANDROID' | 'IOS' | 'WEB' };
+    progress?: { current: number; total: number; label?: string };
+    actions?: NotificationAction[];
+    deepLink: string;
+    directReplyEnabled?: boolean;
+    whatsappFallback?: boolean;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+    taskId?: string;
+    examId?: string;
+}
+
+export interface PlannerNotification {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    priority: string;
+    metadata?: Record<string, unknown> | string;
+}
+
 export enum PriorityEnum {
     LOW = 'LOW',
     MEDIUM = 'MEDIUM',
@@ -361,6 +393,44 @@ export const tasksApi = createApi({
             }),
             invalidatesTags: [{ type: 'Tasks', id: 'LIST' }],
         }),
+
+        composeNotification: builder.mutation<{ message: string; notification: PlannerNotification }, ComposeNotificationRequest>({
+            query: (body) => ({
+                url: '/notifications/compose',
+                method: 'POST',
+                body,
+            }),
+        }),
+        postNotificationDirectReply: builder.mutation<{ message: string }, { taskId?: string; nudgeId?: string; text: string }>({
+            query: (body) => ({
+                url: '/notifications/direct-reply',
+                method: 'POST',
+                body,
+            }),
+        }),
+        createRevisionDripCampaign: builder.mutation<
+            { message: string; campaign: PlannerNotification[] },
+            { examTitle: string; examDate: string; chapter?: string; deepLinkBase?: string }
+        >({
+            query: (body) => ({
+                url: '/notifications/drip-campaign/revision',
+                method: 'POST',
+                body,
+            }),
+        }),
+        triggerGeofencePing: builder.mutation<
+            { message: string; nudge: PlannerNotification },
+            { placeType: 'LIBRARY' | 'CAMPUS' | 'HOME' | 'COACHING_CENTER'; plannedTaskId?: string; brightness?: number; motionState?: 'STATIONARY' | 'WALKING' | 'IN_TRANSIT' }
+        >({
+            query: (body) => ({
+                url: '/notifications/geofence/ping',
+                method: 'POST',
+                body,
+            }),
+        }),
+        getNotificationDeepLink: builder.query<{ message: string; deepLink: string }, { entityType: string; entityId: string }>({
+            query: ({ entityType, entityId }) => `/notifications/deeplink/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`,
+        }),
     }),
 });
 
@@ -383,4 +453,9 @@ export const {
     useScanSyllabusMutation,
     usePreviewRecoveryPlanMutation,
     useApplyRecoveryPlanMutation,
+    useComposeNotificationMutation,
+    usePostNotificationDirectReplyMutation,
+    useCreateRevisionDripCampaignMutation,
+    useTriggerGeofencePingMutation,
+    useGetNotificationDeepLinkQuery,
 } = tasksApi;

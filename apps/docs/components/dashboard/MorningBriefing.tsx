@@ -10,6 +10,12 @@ export function MorningBriefing() {
     const briefing = data?.briefing;
     type UpcomingExam = { title: string; daysUntil: number };
     const upcomingExams = (briefing?.upcomingExams ?? []) as UpcomingExam[];
+    const weatherTip = (() => {
+        const hour = new Date().getHours();
+        if (hour < 10) return 'Carry water and review notes before your first class block.';
+        if (hour < 16) return 'Use shaded campus spots for quick recap sessions between lectures.';
+        return 'Wind down with a short evening revision sprint before dinner.';
+    })();
 
     // Compute Top 3 Priority Tasks: overdue first, then by priority + due date
     const priorityOrder: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
@@ -47,6 +53,7 @@ export function MorningBriefing() {
             <div className="flex items-center gap-2 mb-3">
                 <Sun className="w-5 h-5 text-amber-400" />
                 <h3 className="font-bold text-white">Morning Briefing</h3>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">Personalized</span>
             </div>
 
             <div className="space-y-2.5 text-sm">
@@ -112,6 +119,10 @@ export function MorningBriefing() {
                     </div>
                 </div>
             )}
+
+            <div className="mt-3 pt-3 border-t border-white/10 text-xs text-slate-400">
+                ☀️ Weather-smart tip: {weatherTip}
+            </div>
 
             {/* Upcoming Exams */}
             {upcomingExams.length > 0 && (

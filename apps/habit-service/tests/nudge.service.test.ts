@@ -27,6 +27,7 @@ vi.mock('@repo/db', () => ({
 
 import {
     NUDGE_TYPES,
+    getNotificationSettings,
     detectStreakRisks,
     detectExamWarnings,
     generateMorningBriefing,
@@ -34,6 +35,7 @@ import {
     getUserNudges,
     markNudgeRead,
     markAllNudgesRead,
+    upsertNotificationSettings,
 } from '../src/services/nudge.service';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -45,8 +47,11 @@ const hoursAgo = (h: number): Date => new Date(Date.now() - h * 3600_000);
 describe('Nudge Service — NUDGE_TYPES', () => {
     it('exports all expected nudge types', () => {
         expect(NUDGE_TYPES.STREAK_RISK).toBe('STREAK_RISK');
+        expect(NUDGE_TYPES.BEHAVIORAL_NUDGE).toBe('BEHAVIORAL_NUDGE');
         expect(NUDGE_TYPES.EXAM_WARNING).toBe('EXAM_WARNING');
+        expect(NUDGE_TYPES.ADVANCE_ALERT_3WEEK).toBe('ADVANCE_ALERT_3WEEK');
         expect(NUDGE_TYPES.MORNING_BRIEFING).toBe('MORNING_BRIEFING');
+        expect(NUDGE_TYPES.TRANSACTION_SYSTEM).toBe('TRANSACTION_SYSTEM');
         expect(NUDGE_TYPES.SLIP_DETECTION).toBe('SLIP_DETECTION');
         expect(NUDGE_TYPES.RECOVERY_SUGGESTION).toBe('RECOVERY_SUGGESTION');
     });
@@ -94,7 +99,7 @@ describe('Nudge Service — detectStreakRisks', () => {
             expect.objectContaining({
                 data: expect.objectContaining({
                     userId: 'u1',
-                    type: 'STREAK_RISK',
+                    type: 'BEHAVIORAL_NUDGE',
                 }),
             })
         );
@@ -147,10 +152,53 @@ describe('Nudge Service — detectExamWarnings', () => {
             expect.objectContaining({
                 data: expect.objectContaining({
                     userId: 'u1',
-                    type: 'EXAM_WARNING',
+                    type: 'ADVANCE_ALERT_3WEEK',
                 }),
             })
         );
+    });
+});
+
+describe('Nudge Service — notification settings', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('returns default settings when user has no settings record', async () => {
+        mockPrisma.nudge.findFirst.mockResolvedValue(null);
+
+        const settings = await getNotificationSettings('u1');
+
+        expect(settings.groupedSummaries).toBe(true);
+        expect(settings.enabledBuckets).toHaveProperty('URGENCY_DRIVEN', true);
+    });
+
+    it('upserts merged settings payload', async () => {
+        mockPrisma.nudge.findFirst.mockResolvedValue({
+            metadata: JSON.stringify({
+                settings: {
+                    enabledBuckets: {
+                        URGENCY_DRIVEN: true,
+                        MORNING_BRIEFING: true,
+                        BEHAVIORAL_NUDGE: true,
+                        ADVANCE_ALERT_3WEEK: true,
+                        TRANSACTION_SYSTEM: true,
+                    },
+                    quietHours: [],
+                    focusProfiles: [],
+                    groupedSummaries: true,
+                    positiveTone: true,
+                },
+            }),
+        });
+        mockPrisma.nudge.create.mockResolvedValue({ id: 'settings-1' });
+
+        const result = await upsertNotificationSettings('u1', {
+            groupedSummaries: false,
+            quietHours: [{ start: '22:00', end: '07:00' }],
+        });
+
+        expect(result.groupedSummaries).toBe(false);
+        expect(result.quietHours).toHaveLength(1);
+        expect(mockPrisma.nudge.create).toHaveBeenCalled();
     });
 });
 

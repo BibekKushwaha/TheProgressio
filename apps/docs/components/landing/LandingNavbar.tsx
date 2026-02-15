@@ -1,5 +1,5 @@
-// components/landing/Navbar.tsx
 'use client';
+import React, { useState, useEffect } from "react";
 
 import { selectCurrentUser, useAppSelector, useLogoutMutation } from '@repo/store';
 import { motion } from 'framer-motion';
@@ -17,6 +17,11 @@ import { useRouter } from 'next/navigation';
 
 export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
 
   const [logout] = useLogoutMutation();
@@ -70,7 +75,11 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-4">
-            {user ? (
+            {!mounted ? (
+              <Button className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-semibold opacity-0">
+                Get Started
+              </Button>
+            ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button className="text-slate-300 hover:bg-slate-700 transition-colors">
@@ -94,14 +103,11 @@ export function Navbar() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <>
-
-                <Button
-                  onClick={() => router.push("/login")}
-                  className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-300">
-                  Get Started
-                </Button>
-              </>
+              <Button
+                onClick={() => router.push("/login")}
+                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-300">
+                Get Started
+              </Button>
             )}
 
           </div>
@@ -114,4 +120,3 @@ export function Navbar() {
     </motion.nav>
   );
 }
-

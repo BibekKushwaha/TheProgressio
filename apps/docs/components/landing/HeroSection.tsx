@@ -1,4 +1,3 @@
-// components/landing/Hero.tsx
 'use client';
 
 import { motion } from 'framer-motion';
@@ -25,7 +24,7 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
         >
-          <h1 className="text-6xl md:text-5xl font-bold mb-6 leading-tight">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
             Conquer the{' '}
             <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
               Impossible.
@@ -39,9 +38,7 @@ export function HeroSection() {
           transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
           className="text-xl text-slate-300 mb-10"
         >
-          India&apos;s most advanced AI Academic Advisor for high-stakes exams like
-          <br />
-          <span className="text-purple-400 font-semibold">JEE, NEET, and UPSC.</span>
+          India&apos;s most advanced AI Academic Advisor for high-stakes exams
         </motion.p>
 
         <motion.div
