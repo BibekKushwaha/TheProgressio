@@ -8,10 +8,26 @@ import { useGetDailySummaryQuery, useGetWeeklyTrendsQuery, useGetFocusScoreQuery
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ReportsPage() {
-    const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery('7');
-    const { data: trendsData, isLoading: isTrendsLoading } = useGetWeeklyTrendsQuery();
-    const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery();
-    const { data: streakData, isLoading: isStreakLoading } = useGetUserStreakQuery();
+    const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery('7', {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+    const { data: trendsData, isLoading: isTrendsLoading } = useGetWeeklyTrendsQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+    const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+    const { data: streakData, isLoading: isStreakLoading } = useGetUserStreakQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
 
     const weeklyData = trendsData?.data || [];
 

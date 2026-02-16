@@ -2,17 +2,39 @@
 
 // components/dashboard/TopStats.tsx
 import { Target, Flame } from 'lucide-react';
-import { useGetDailySummaryQuery, useGetFocusScoreQuery, useGetUserStreakQuery } from '@repo/store';
+import { useGetDailySummaryQuery, useGetFocusScoreQuery, useGetUserStreakQuery, useGetActiveLiveSessionQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toLocalDateKey } from '@/lib/date';
+import { toLocalDateKey, normalizeDateInput } from '@/lib/date';
 
 export function TopStats() {
-    const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery("1");
-    const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery();
-    const { data: streakData, isLoading: isStreakLoading } = useGetUserStreakQuery();
+    // Enable light polling and refetch-on-focus so the dashboard reflects recent changes
+    const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery("1", {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+    const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+    const { data: streakData, isLoading: isStreakLoading } = useGetUserStreakQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
 
     const stats = summaryData?.stats;
-    const totalHours = stats?.totalHours ?? 0;
+    const totalHoursRaw = stats?.totalHours ?? 0;
+
+    // include currently active live session time provisionally so the dashboard reflects running sessions
+    const { data: activeLive } = useGetActiveLiveSessionQuery(undefined, {
+        pollingInterval: 5000,
+        refetchOnFocus: true,
+    });
+
+    const activeElapsedMinutes = activeLive?.session?.elapsedSeconds ? Math.floor(activeLive.session.elapsedSeconds / 60) : 0;
+    const totalHours = Math.round(( ( (stats?.totalMinutes ?? 0) + activeElapsedMinutes ) / 60 ) * 100) / 100 || totalHoursRaw;
     const dailyGoalHours = stats?.dailyGoalHours ?? 4; // fallback to 4h if not set
     const normalizedGoalHours = dailyGoalHours > 0 ? dailyGoalHours : 4;
     const progress = Math.min(100, Math.round((totalHours / normalizedGoalHours) * 100));
@@ -24,11 +46,49 @@ export function TopStats() {
     const currentStreak = streakData?.streak ?? 0;
     const activeDates = streakData?.activeDates || [];
 
+    // Normalize activeDates provided by the API into a Set of YYYY-MM-DD keys
+    const activeDateSet = new Set<string>(
+        (activeDates || []).map((d: string | number | Date | Record<string, unknown>) => {
+            if (d && d instanceof Date) {
+                return Number.isNaN(d.getTime()) ? '' : toLocalDateKey(d);
+            }
+
+            if (typeof d === 'string') {
+                const trimmed = d.trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+                const norm = normalizeDateInput(trimmed);
+                if (norm) return norm;
+                const parsed = new Date(trimmed);
+                return Number.isNaN(parsed.getTime()) ? '' : toLocalDateKey(parsed);
+            }
+
+            if (typeof d === 'number') {
+                const parsed = new Date(d);
+                return Number.isNaN(parsed.getTime()) ? '' : toLocalDateKey(parsed);
+            }
+
+            if (d && typeof d === 'object') {
+                const value = (d as Record<string, unknown>).date
+                    ?? (d as Record<string, unknown>).day
+                    ?? (d as Record<string, unknown>).value;
+                if (typeof value === 'string' || typeof value === 'number') {
+                    const norm = normalizeDateInput(String(value));
+                    if (norm) return norm;
+                    const parsed = new Date(value);
+                    return Number.isNaN(parsed.getTime()) ? '' : toLocalDateKey(parsed);
+                }
+            }
+
+            return '';
+        }).filter(Boolean)
+    );
+
     // Helper to check if a date (relative to today) was active
     const isActiveDate = (daysAgo: number) => {
         const date = new Date();
         date.setDate(date.getDate() - daysAgo);
-        return activeDates.includes(toLocalDateKey(date));
+        const key = toLocalDateKey(date);
+        return activeDateSet.has(key);
     };
     const scoreBreakdown = [
         {

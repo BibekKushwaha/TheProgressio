@@ -2,6 +2,7 @@
 
 import { Play, Target } from 'lucide-react';
 import { useState } from 'react';
+import DurationSelect from '@/components/ui/DurationSelect';
 import { useParams, useRouter } from 'next/navigation';
 import { useGetTasksQuery, TaskStatus, Task } from '@repo/store';
 
@@ -18,6 +19,7 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
     const [showTaskSelector, setShowTaskSelector] = useState(false);
 
     const { data: tasks } = useGetTasksQuery({ status: TaskStatus.PENDING });
+    const [selectedDuration, setSelectedDuration] = useState<number>(25);
 
     const handleStart = () => {
         if (!taskId) {
@@ -29,7 +31,7 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
         const task = tasks?.find((t: Task) => t.id === taskId);
         const taskTitle = task ? task.title : 'Focus Session';
 
-        router.push(`/focus-session?taskId=${taskId}&task=${encodeURIComponent(taskTitle)}&duration=25`);
+        router.push(`/focus-session?taskId=${taskId}&task=${encodeURIComponent(taskTitle)}&duration=${selectedDuration}`);
     };
 
     // If no taskId and we're in the floating/fixed mode, we usually hide? 
@@ -58,7 +60,7 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
                             onClick={() => {
                                 setActiveTaskId(task.id);
                                 setShowTaskSelector(false);
-                                router.push(`/focus-session?taskId=${task.id}&task=${encodeURIComponent(task.title)}&duration=25`);
+                                router.push(`/focus-session?taskId=${task.id}&task=${encodeURIComponent(task.title)}&duration=${selectedDuration}`);
                             }}
                             className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-500/20 text-xs truncate transition-colors text-slate-300 hover:text-white border border-transparent hover:border-purple-500/30"
                         >
@@ -80,10 +82,11 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
     }
 
     return (
-        <button
-            onClick={handleStart}
-            className={isInline ? `${baseStyles} ${inactiveColors}` : `${buttonClass} ${inactiveColors}`}
-        >
+        <div className={isInline ? 'w-full' : 'flex items-center gap-3'}>
+            <button
+                onClick={handleStart}
+                className={isInline ? `${baseStyles} ${inactiveColors}` : `${buttonClass} ${inactiveColors}`}
+            >
             <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 bg-white/20 rounded-full flex items-center justify-center`}>
                     <Play className="w-5 h-5 fill-current ml-1" />
@@ -92,11 +95,17 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
                     <span className={isInline ? "text-base font-bold" : "text-lg font-mono"}>Start Focus Session</span>
                     {!isInline && (
                         <span className="text-xs uppercase tracking-wider text-indigo-200">
-                            25:00 • Pomodoro
+                            {String(selectedDuration).padStart(2, '0')}:00 • Pomodoro
                         </span>
                     )}
                 </div>
             </div>
         </button>
+            {!isInline && (
+                <div className="hidden md:flex items-center gap-2">
+                    <DurationSelect value={selectedDuration} onChange={setSelectedDuration} />
+                </div>
+            )}
+        </div>
     );
 }

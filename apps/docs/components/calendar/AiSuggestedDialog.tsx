@@ -19,16 +19,19 @@ import { useRouter } from 'next/navigation';
 import { useGetTasksQuery, TaskStatus } from '@repo/store';
 
 import { useState } from "react";
+import DurationSelect from '@/components/ui/DurationSelect';
 
 export function AiSuggestedDialog() {
     const router = useRouter();
     const { data: tasks, isLoading } = useGetTasksQuery({ status: TaskStatus.PENDING });
     const [selectedFocusGoal, setSelectedFocusGoal] = useState("");
 
+    const [selectedDuration, setSelectedDuration] = useState<number>(45);
+
     const handleGenerate = (e: React.FormEvent) => {
         e.preventDefault();
         const focusGoal = selectedFocusGoal || 'Study Session';
-        router.push(`/focus-session?goal=${encodeURIComponent(focusGoal)}&duration=45`);
+        router.push(`/focus-session?goal=${encodeURIComponent(focusGoal)}&duration=${selectedDuration}`);
     };
 
     return (
@@ -67,7 +70,10 @@ export function AiSuggestedDialog() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        {/* SessionLengthSelector placeholder */}
+                        <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium text-slate-300 mb-2 block">Session Length</Label>
+                            <DurationSelect value={selectedDuration} onChange={setSelectedDuration} />
+                        </div>
                         <div className="flex items-center gap-2">
                             <Label className="text-sm font-medium text-slate-300 mb-2 block">Intensity</Label>
                             <Slider

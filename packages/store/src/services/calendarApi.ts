@@ -30,6 +30,19 @@ export interface ScheduleItem {
 export interface DailyScheduleResponse {
     date: string;
     dayOfWeek: number;
+    isHoliday?: boolean;
+    holidayName?: string | null;
+    pauseNotifications?: boolean;
+    conflicts?: Array<{
+        id: string;
+        type: 'CLASS_OVERLAP' | 'EXAM_OVERLAP';
+        severity: 'warning' | 'high';
+        message: string;
+        startsAt: string;
+        endsAt: string;
+        classEntryIds?: string[];
+        examId?: string;
+    }>;
     items: ScheduleItem[];
 }
 

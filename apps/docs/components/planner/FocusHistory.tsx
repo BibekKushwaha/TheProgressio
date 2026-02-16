@@ -4,7 +4,11 @@ import { useParams } from 'next/navigation';
 
 export function FocusHistory() {
     const { id: taskId } = useParams();
-    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(taskId as string);
+    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(taskId as string, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
 
     const days = (trendsData?.data || []).map((d) => {
         const date = new Date(d.date);

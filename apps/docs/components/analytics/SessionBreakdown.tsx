@@ -2,7 +2,11 @@ import { useGetDailySummaryQuery, SessionType } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function SessionBreakdown({ pastDays }: { pastDays: string }) {
-    const { data: summaryData, isLoading } = useGetDailySummaryQuery(pastDays);
+    const { data: summaryData, isLoading } = useGetDailySummaryQuery(pastDays, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
 
     const colors: Record<SessionType, string> = {
         [SessionType.DEEP_WORK]: 'rgb(6, 182, 212)', // Cyan

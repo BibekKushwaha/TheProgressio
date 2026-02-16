@@ -2,6 +2,10 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import CreateHolidayForm from './CreateHolidayForm';
+import { toLocalDateKey } from '@/lib/date';
+import React from 'react';
 
 const views = ['Day', 'Month'];
 
@@ -13,6 +17,7 @@ interface CalendarHeaderProps {
 }
 
 export function CalendarHeader({ selectedView, setSelectedView, currentDate, onDateChange }: CalendarHeaderProps) {
+    const [holidayOpen, setHolidayOpen] = React.useState(false);
     const handlePreviousMonth = () => {
         const newDate = new Date(currentDate);
         newDate.setMonth(newDate.getMonth() - 1);
@@ -25,9 +30,7 @@ export function CalendarHeader({ selectedView, setSelectedView, currentDate, onD
         onDateChange(newDate);
     };
 
-    const handleToday = () => {
-        onDateChange(new Date());
-    };
+    // 'Today' action was removed from UI; handler not required
 
     return (
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -49,12 +52,24 @@ export function CalendarHeader({ selectedView, setSelectedView, currentDate, onD
             </div>
 
             <div className="flex items-center gap-3">
-                <button
-                    onClick={handleToday}
-                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-all duration-300"
-                >
-                    Today
-                </button>
+                <Dialog open={holidayOpen} onOpenChange={setHolidayOpen}>
+                    <DialogTrigger asChild>
+                        <button
+                            className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-all duration-300"
+                        >
+                            Holiday
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Create Holiday</DialogTitle>
+                        </DialogHeader>
+                        <div>
+                            <CreateHolidayForm defaultDate={toLocalDateKey(currentDate)} onCreated={() => setHolidayOpen(false)} />
+                        </div>
+                        <DialogFooter />
+                    </DialogContent>
+                </Dialog>
 
                 <div className="flex items-center gap-2">
                     <button

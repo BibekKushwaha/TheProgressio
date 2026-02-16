@@ -7,9 +7,21 @@ interface StatsGridProps {
 }
 
 export function StatsGrid({ taskTitle }: StatsGridProps = {}) {
-    const { data: summaryData } = useGetDailySummaryQuery('1');
-    const { data: focusData } = useGetFocusScoreQuery();
-    const { data: streakData } = useGetUserStreakQuery();
+    const { data: summaryData } = useGetDailySummaryQuery('1', {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+    const { data: focusData } = useGetFocusScoreQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+    const { data: streakData } = useGetUserStreakQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
 
     const focusScore = focusData?.stats?.score ?? 0;
     const dailyHours = summaryData?.stats?.totalHours ?? 0;

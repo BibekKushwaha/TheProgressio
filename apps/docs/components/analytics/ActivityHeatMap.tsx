@@ -6,7 +6,11 @@ export function ActivityHeatmap({ pastDays }: { pastDays: string }) {
     const parsedDays = Number.parseInt(pastDays, 10);
     const weeks = Number.isFinite(parsedDays) && parsedDays > 0 ? Math.ceil(parsedDays / 7) : 12;
 
-    const { data: trendsResponse, isLoading } = useGetWeeklyTrendsQuery();
+    const { data: trendsResponse, isLoading } = useGetWeeklyTrendsQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
 
     const trendsByDate = useMemo(() => {
         const map = new Map<string, number>();

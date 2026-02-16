@@ -2,16 +2,16 @@
 import { Timer, ArrowRight } from 'lucide-react';
 import { StatsGrid } from './StatsGrid';
 import { RewardCard } from './RewardCard';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useGetUserStreakQuery } from '@repo/store';
 
 export function SessionComplete() {
     const searchParams = useSearchParams();
     const durationParam = Number(searchParams.get('duration')) || 25;
     const taskTitle = searchParams.get('task') || searchParams.get('goal') || 'Deep Work Session';
-
     const { data: streakData } = useGetUserStreakQuery();
     const streak = streakData?.streak ?? 0;
+    const router = useRouter();
 
     // XP is earned based on session duration: 1 XP per 2 minutes
     const xpEarned = Math.round(durationParam / 2);
@@ -60,7 +60,9 @@ export function SessionComplete() {
                 <RewardCard />
             </div>
 
-            <button className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-bold text-lg shadow-xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 hover:-translate-y-0.5 flex items-center gap-2">
+            <button 
+                onClick={() => router.push('/dashboard')}
+                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-bold text-lg shadow-xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 hover:-translate-y-0.5 flex items-center gap-2">
                 Continue to Dashboard
                 <ArrowRight className="w-5 h-5" />
             </button>
