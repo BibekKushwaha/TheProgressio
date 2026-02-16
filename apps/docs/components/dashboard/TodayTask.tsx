@@ -7,7 +7,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function TodaysTasks() {
     const today = new Date().toISOString().split('T')[0];
-    const { data: tasks, isLoading } = useGetTasksQuery({ date: today });
+    const { data: tasks, isLoading } = useGetTasksQuery({ date: today }, {
+        pollingInterval: 15000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
     const [toggleTask] = useToggleTaskMutation();
 
     const PRIORITY_RANK: Record<string, number> = {

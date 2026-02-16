@@ -12,7 +12,11 @@ const DEFAULT_TRENDS = [
 ];
 
 export function FocusTrends({ pastDays }: { pastDays: string }) {
-    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
+    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
     const chartWidth = 600;
     const chartHeight = 256;
 

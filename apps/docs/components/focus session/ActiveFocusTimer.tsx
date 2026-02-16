@@ -7,6 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { CircularProgress } from './CircularProgress';
 import { AmbiencePanel } from './AmbiencePanel';
 import { StrictModeToggle } from './StrictModeToggle';
+import DurationSelect from '@/components/ui/DurationSelect';
 import {
     useHeartbeatLiveSessionMutation,
     useLogSessionMutation,
@@ -24,9 +25,9 @@ interface ActiveFocusTimerProps {
 export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const taskTitle = searchParams.get('task') || searchParams.get('goal') || 'Deep Work Session';
+    const paramTaskTitle = searchParams.get('task') || searchParams.get('goal') || 'Deep Work Session';
     const taskId = searchParams.get('taskId') || '';
-    const durationParam = Number(searchParams.get('duration')) || 25;
+    const paramDuration = Number(searchParams.get('duration')) || 25;
     const intensityParam = Number(searchParams.get('intensity')) || 75;
     const avoidBackToBack = searchParams.get('avoidBackToBack') !== '0';
     const prioritizeMorning = searchParams.get('prioritizeMorning') !== '0';
@@ -34,12 +35,15 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const recommendedEnd = searchParams.get('recommendedEnd') || '';
 
     // Check if duration is a valid number
-    const initialMinutes = isNaN(durationParam) ? 25 : durationParam;
+    const initialMinutesFromParams = isNaN(paramDuration) ? 25 : paramDuration;
     const sessionIntensity = Math.max(0, Math.min(100, isNaN(intensityParam) ? 75 : intensityParam));
 
-    const [timeLeft, setTimeLeft] = useState(initialMinutes * 60);
+    const [currentTaskTitle, setCurrentTaskTitle] = useState<string>(paramTaskTitle);
+    const [initialMinutes, setInitialMinutes] = useState<number>(initialMinutesFromParams);
+    const [timeLeft, setTimeLeft] = useState(initialMinutesFromParams * 60);
     const [isPaused, setIsPaused] = useState(false);
     const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+    // restoredFromStorage flag not required; removed to avoid unused-var warning
     const totalTime = initialMinutes * 60;
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
@@ -53,6 +57,56 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const [heartbeatLiveSession] = useHeartbeatLiveSessionMutation();
     const [stopLiveSession] = useStopLiveSessionMutation();
 
+    const onDurationChange = (minutes: number) => {
+        // preserve elapsed time proportionally when changing planned duration
+        const oldTotal = initialMinutes * 60;
+        const elapsed = Math.max(0, oldTotal - timeLeft);
+        const newTotal = Math.max(1, Math.min(360, Math.floor(minutes))) * 60;
+        const newTimeLeft = Math.max(0, newTotal - elapsed);
+        setInitialMinutes(newTotal / 60);
+        setTimeLeft(newTimeLeft);
+    };
+
+    // Try to restore an active session from localStorage (so LiveActivityWidget can resume)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            const raw = localStorage.getItem('activeFocusSession');
+            if (!raw) return;
+            const parsed = JSON.parse(raw) as unknown;
+            if (!parsed || typeof parsed !== 'object') return;
+
+            const parsedObj = parsed as Record<string, unknown>;
+            if (!parsedObj.startTime) return;
+
+            const start = new Date(parsedObj.startTime as string).getTime();
+            if (Number.isNaN(start)) return;
+
+            const savedDuration = typeof parsedObj.duration === 'number' ? parsedObj.duration : initialMinutesFromParams;
+            const savedIsPaused = typeof parsedObj.isPaused === 'boolean' ? parsedObj.isPaused : false;
+            const savedTaskTitle = typeof parsedObj.taskTitle === 'string' ? parsedObj.taskTitle : paramTaskTitle;
+            const savedSessionId = typeof parsedObj.sessionId === 'string' ? parsedObj.sessionId : null;
+
+            const now = Date.now();
+            const secondsElapsed = Math.floor((now - start) / 1000);
+            const remaining = Math.max(0, savedDuration * 60 - secondsElapsed);
+
+            setCurrentTaskTitle(savedTaskTitle);
+            setInitialMinutes(savedDuration);
+            setTimeLeft(remaining);
+            setIsPaused(savedIsPaused);
+            setLiveSessionId(savedSessionId);
+            if (savedSessionId) {
+                // prevent booting a new live session
+                liveBootstrapRef.current = true;
+            }
+            // set startTimeRef to the saved start time so logging uses correct value
+            if (parsedObj.startTime) startTimeRef.current = String(parsedObj.startTime);
+        } catch {
+            void 0; // ignore parse/restore errors
+        }
+    }, [initialMinutesFromParams, paramTaskTitle]);
+
     useEffect(() => {
         if (!taskId || liveBootstrapRef.current) return;
         liveBootstrapRef.current = true;
@@ -61,7 +115,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             try {
                 const response = await startLiveSession({
                     taskId,
-                    taskTitle,
+                    taskTitle: currentTaskTitle,
                     plannedDurationMinutes: initialMinutes,
                     sessionType: SessionType.DEEP_WORK,
                     source: 'web-dashboard',
@@ -79,7 +133,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
         };
 
         void boot();
-    }, [taskId, taskTitle, initialMinutes, recommendedStart, recommendedEnd, startLiveSession]);
+    }, [taskId, currentTaskTitle, initialMinutes, recommendedStart, recommendedEnd, startLiveSession]);
 
     const handleSessionEnd = useCallback(async () => {
         let handledByLiveContract = false;
@@ -103,7 +157,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             if ('Notification' in window && Notification.permission === 'granted') {
                 try {
                     new Notification('Focus session complete', {
-                        body: `${taskTitle} finished`,
+                        body: `${currentTaskTitle} finished`,
                     });
                 } catch {
                     // no-op if browser blocks direct notifications
@@ -127,7 +181,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             }
         }
         onComplete();
-    }, [liveSessionId, stopLiveSession, taskId, taskTitle, totalTime, timeLeft, logSession, onComplete]);
+    }, [liveSessionId, stopLiveSession, taskId, currentTaskTitle, totalTime, timeLeft, logSession, onComplete]);
 
     useEffect(() => {
         if (isPaused) return;
@@ -164,13 +218,13 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     useEffect(() => {
         if (typeof window === 'undefined') return;
         localStorage.setItem('activeFocusSession', JSON.stringify({
-            taskTitle,
+            taskTitle: currentTaskTitle,
             startTime: startTimeRef.current,
             duration: initialMinutes,
             isPaused,
             ...(liveSessionId && { sessionId: liveSessionId }),
         }));
-    }, [taskTitle, initialMinutes, isPaused, timeLeft, liveSessionId]);
+    }, [currentTaskTitle, initialMinutes, isPaused, timeLeft, liveSessionId]);
 
     useEffect(() => {
         if (typeof document === 'undefined') return;
@@ -201,6 +255,11 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
         router.back();
     };
 
+    // Navigate back without stopping or clearing the active session
+    const handleBackNav = () => {
+        router.back();
+    };
+
     const togglePause = async () => {
         const nextPaused = !isPaused;
         setIsPaused(nextPaused);
@@ -225,8 +284,11 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full">
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
                     <span className="text-sm">
-                        Currently Focusing on: <span className="font-semibold">{taskTitle}</span>
+                        Currently Focusing on: <span className="font-semibold">{currentTaskTitle}</span>
                     </span>
+                    <div className="ml-3">
+                        <DurationSelect value={initialMinutes} onChange={onDurationChange} />
+                    </div>
                 </div>
                 <div className="mt-2 text-center text-xs text-slate-400">
                     Intensity {sessionIntensity}% • {avoidBackToBack ? 'Break-friendly' : 'Back-to-back allowed'} • {prioritizeMorning ? 'Morning priority' : 'Flexible timing'}
@@ -247,6 +309,14 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             </div>
 
             <div className="flex items-center gap-4 mb-16">
+                <button
+                    className="w-12 h-12 bg-white/5 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-300 shadow-lg"
+                    aria-label="Back"
+                    onClick={handleBackNav}
+                >
+                    ←
+                </button>
+
                 <button
                     className="w-16 h-16 bg-white/5 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-300 shadow-lg"
                     aria-label="Skip"

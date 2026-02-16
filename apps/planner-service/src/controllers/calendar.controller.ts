@@ -3,6 +3,21 @@ import { prisma } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { timetableService } from "../services/timetable.service.js";
 
+// Helpers
+const toLocalIsoDate = (d: Date) => {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const parseYMDToLocalDate = (raw: string): Date | null => {
+    const parts = raw.split('-');
+    if (parts.length !== 3) return null;
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    if (![y, m, d].every(Number.isFinite)) return null;
+    return new Date(y, m - 1, d);
+};
+
 export const getMonthlyEvents = async (req: AuthenticatedRequest, res: Response) => {
     try {
         if (!req.user || !req.user.id) {
@@ -18,9 +33,9 @@ export const getMonthlyEvents = async (req: AuthenticatedRequest, res: Response)
         const monthInt = parseInt(month as string);
         const yearInt = parseInt(year as string);
 
-        // Start of month
-        const startDate = new Date(yearInt, monthInt - 1, 1);
-        // End of month
+        // Start of month (local)
+        const startDate = new Date(yearInt, monthInt - 1, 1, 0, 0, 0, 0);
+        // End of month (local)
         const endDate = new Date(yearInt, monthInt, 0, 23, 59, 59, 999);
 
         // Fetch ALL Tasks due in this month (no grouping in DB to avoid DateTime issues)
@@ -58,18 +73,18 @@ export const getMonthlyEvents = async (req: AuthenticatedRequest, res: Response)
 
         tasks.forEach(task => {
             if (task.dueDate) {
-                const dateKey = task.dueDate.toISOString().split('T')[0];
-                if (!dateKey) return;
+                const dateKey = toLocalIsoDate(task.dueDate);
                 if (!eventMap[dateKey]) eventMap[dateKey] = { taskCount: 0, examCount: 0 };
                 eventMap[dateKey].taskCount++;
             }
         });
 
         exams.forEach(exam => {
-            const dateKey = exam.date.toISOString().split('T')[0];
-            if (!dateKey) return;
-            if (!eventMap[dateKey]) eventMap[dateKey] = { taskCount: 0, examCount: 0 };
-            eventMap[dateKey].examCount++;
+            if (exam.date) {
+                const dateKey = toLocalIsoDate(exam.date);
+                if (!eventMap[dateKey]) eventMap[dateKey] = { taskCount: 0, examCount: 0 };
+                eventMap[dateKey].examCount++;
+            }
         });
 
         return res.status(200).json(eventMap);
@@ -91,10 +106,11 @@ export const getDailySchedule = async (req: AuthenticatedRequest, res: Response)
             return res.status(400).json({ message: "Date is required" });
         }
 
-        const targetDate = new Date(date as string);
-        if (isNaN(targetDate.getTime())) {
-            return res.status(400).json({ message: "Invalid date format" });
-        }
+        // Parse incoming YYYY-MM-DD as local date to avoid UTC shift issues
+        const rawDate = String(date as string);
+        const parsed = parseYMDToLocalDate(rawDate);
+        if (!parsed) return res.status(400).json({ message: "Invalid date format" });
+        const targetDate = parsed;
 
         // 1. Get Recurring Timetable Entries
         // timetableService returns { entries: [...] }
@@ -185,13 +201,21 @@ export const getDailySchedule = async (req: AuthenticatedRequest, res: Response)
             }))
         ];
 
-        // Sort by start time
-        // Note: For tasks without time (00:00), they will appear at the top. 
-        // In a school planner, maybe strict time slots are better, but flexible tasks are fine too.
-        scheduleItems.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        // Sort by start time but push flexible all-day tasks (tasks with '00:00') to the end
+        const minuteOf = (time: string, type?: string) => {
+            if (!time) return 24 * 60;
+            // treat task all-day markers as end of day so they appear after timed classes
+            if (type === 'task' && time === '00:00') return 24 * 60;
+            const [hh = '0', mm = '0'] = time.split(':');
+            const h = Number.parseInt(hh, 10);
+            const m = Number.parseInt(mm, 10);
+            if (Number.isNaN(h) || Number.isNaN(m)) return 24 * 60;
+            return Math.max(0, Math.min(24 * 60, h * 60 + m));
+        };
 
+        scheduleItems.sort((a, b) => minuteOf(a.startTime, a.type) - minuteOf(b.startTime, b.type));
         return res.status(200).json({
-            date: targetDate.toISOString().split('T')[0],
+            date: toLocalIsoDate(targetDate),
             dayOfWeek: targetDate.getDay(),
             isHoliday: timetableData.isHoliday,
             holidayName: timetableData.holidayName,

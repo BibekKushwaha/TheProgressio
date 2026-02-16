@@ -5,10 +5,12 @@ import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { ScheduleDetailPanel } from '@/components/calendar/ScheduleDetailPanel';
 import { UpcomingTasksPanel } from '@/components/calendar/UpcomingTasksPanel';
 import { DayGrid } from '@/components/calendar/DayGrid';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useResolveRotationQuery } from '@repo/store';
 import { RotateCcw } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { normalizeDateInput } from '@/lib/date';
 
 export default function CalendarPage() {
     const [selectedView, setSelectedView] = useState('Month');
@@ -25,6 +27,26 @@ export default function CalendarPage() {
             setShowDailyDetail(false);
         }
     };
+
+    // Read optional `date` query param (YYYY-MM-DD) and apply it as local date
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        const dateParam = searchParams?.get?.('date');
+        if (!dateParam) return;
+        const normalized = normalizeDateInput(dateParam);
+        if (!normalized) return;
+        const parts = normalized.split('-');
+        if (parts.length !== 3) return;
+        const y = Number(parts[0]);
+        const m = Number(parts[1]);
+        const d = Number(parts[2]);
+        if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return;
+        // Construct a local Date (year, monthIndex, day)
+        const parsed = new Date(y, m - 1, d);
+        if (!Number.isNaN(parsed.getTime())) {
+            setSelectedDate(parsed);
+        }
+    }, [searchParams]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 text-white p-6 md:p-8">

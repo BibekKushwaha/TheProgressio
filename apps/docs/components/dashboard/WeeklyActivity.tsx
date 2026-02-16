@@ -7,7 +7,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function WeeklyActivity() {
     const [viewType, setViewType] = useState<'week' | 'month'>('week');
-    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery();
+    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
     const periodOptions = [
         { value: 'week' as const, label: 'Week' },
         { value: 'month' as const, label: 'Month' },

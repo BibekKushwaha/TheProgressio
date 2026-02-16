@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Activity, Timer, Pause, Play } from 'lucide-react';
 
 // This widget checks localStorage for an active focus session and displays it
@@ -13,41 +14,113 @@ export function LiveActivityWidget() {
     } | null>(null);
     const [elapsed, setElapsed] = useState(0);
 
-    useEffect(() => {
-        const checkSession = () => {
-            try {
-                const raw = localStorage.getItem('activeFocusSession');
-                if (raw) {
-                    const parsed = JSON.parse(raw) as {
-                        taskTitle?: unknown;
-                        startTime?: unknown;
-                        duration?: unknown;
-                        isPaused?: unknown;
-                    };
-                    if (typeof parsed.startTime === 'string') {
-                        setSession({
-                            taskTitle: typeof parsed.taskTitle === 'string' ? parsed.taskTitle : 'Focus Session',
-                            startTime: parsed.startTime,
-                            duration: typeof parsed.duration === 'number' ? parsed.duration : 0,
-                            isPaused: typeof parsed.isPaused === 'boolean' ? parsed.isPaused : false,
-                        });
-                    } else {
-                        setSession(null);
-                        setElapsed(0);
-                    }
-                } else {
-                    setSession(null);
-                    setElapsed(0);
+    const checkSession = () => {
+        try {
+            const raw = localStorage.getItem('activeFocusSession');
+            if (raw) {
+                const parsed = JSON.parse(raw) as unknown;
+
+                // tolerate a few possible field names and types
+                const parsedObj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : {};
+                const maybeStart = parsedObj.startTime ?? parsedObj.startedAt ?? parsedObj.start;
+                let startIso: string | null = null;
+                if (typeof maybeStart === 'string') startIso = maybeStart;
+                else if (typeof maybeStart === 'number') startIso = new Date(maybeStart).toISOString();
+                else if (maybeStart && typeof maybeStart === 'object' && (maybeStart as Date) instanceof Date) startIso = (maybeStart as Date).toISOString();
+
+                if (startIso) {
+                    const taskTitle = typeof parsedObj.taskTitle === 'string'
+                        ? (parsedObj.taskTitle as string)
+                        : typeof parsedObj.currentTaskTitle === 'string'
+                            ? (parsedObj.currentTaskTitle as string)
+                            : 'Focus Session';
+
+                    const dur = typeof parsedObj.duration === 'number'
+                        ? (parsedObj.duration as number)
+                        : (Number(parsedObj.duration as unknown) || 0);
+
+                    const paused = typeof parsedObj.isPaused === 'boolean' ? (parsedObj.isPaused as boolean) : false;
+
+                    setSession({
+                        taskTitle,
+                        startTime: startIso,
+                        duration: dur,
+                        isPaused: paused,
+                    });
+                    return;
                 }
-            } catch {
-                setSession(null);
-                setElapsed(0);
+            }
+            setSession(null);
+            setElapsed(0);
+        } catch {
+            setSession(null);
+            setElapsed(0);
+        }
+    };
+
+    useEffect(() => {
+        checkSession();
+
+        // quick follow-up checks to handle tight navigation timing
+        const t1 = setTimeout(checkSession, 200);
+        const t2 = setTimeout(checkSession, 1000);
+
+        const interval = setInterval(checkSession, 2000);
+
+        // helper: temporary high-frequency poll to catch late writes
+        const startShortPoll = () => {
+            let tries = 0;
+            const max = 20; // ~4 seconds at 200ms
+            const h = setInterval(() => {
+                try {
+                    checkSession();
+                } catch {
+                    void 0;
+                }
+                tries += 1;
+                if (tries >= max) clearInterval(h);
+            }, 200);
+            return h;
+        };
+
+        const onStorage = (e: StorageEvent) => {
+            if (!e.key || e.key === 'activeFocusSession' || e.key === 'activeFocusSessionId') {
+                checkSession();
+                startShortPoll();
             }
         };
 
-        checkSession();
-        const interval = setInterval(checkSession, 2000);
-        return () => clearInterval(interval);
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                checkSession();
+                startShortPoll();
+            }
+        };
+
+        // navigation events (back/forward) and pageshow help catch client-side route navs
+        const onPop = () => {
+            checkSession();
+            startShortPoll();
+        };
+        const onPageshow = () => {
+            checkSession();
+            startShortPoll();
+        };
+
+        window.addEventListener('storage', onStorage);
+        document.addEventListener('visibilitychange', onVisibility);
+        window.addEventListener('popstate', onPop);
+        window.addEventListener('pageshow', onPageshow);
+
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            clearInterval(interval);
+            window.removeEventListener('storage', onStorage);
+            document.removeEventListener('visibilitychange', onVisibility);
+            window.removeEventListener('popstate', onPop);
+            window.removeEventListener('pageshow', onPageshow);
+        };
     }, []);
 
     useEffect(() => {
@@ -75,6 +148,8 @@ export function LiveActivityWidget() {
         return () => clearInterval(interval);
     }, [session]);
 
+    const router = useRouter();
+
     if (!session) return null;
 
     const minutes = Math.floor(elapsed / 60);
@@ -85,7 +160,13 @@ export function LiveActivityWidget() {
     const sessionStatusClass = session.isPaused ? 'text-yellow-400' : 'text-emerald-400';
 
     return (
-        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500/20 via-teal-500/15 to-cyan-500/20 backdrop-blur-md border border-emerald-500/30 rounded-2xl p-5">
+        <div
+            role="button"
+            tabIndex={0}
+            onClick={() => router.push('/focus-session')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push('/focus-session'); } }}
+            className="relative overflow-hidden bg-gradient-to-r from-emerald-500/20 via-teal-500/15 to-cyan-500/20 backdrop-blur-md border border-emerald-500/30 rounded-2xl p-5 cursor-pointer"
+        >
             {/* Animated pulse */}
             <div className="absolute top-3 right-3">
                 <span className="relative flex h-3 w-3">

@@ -171,8 +171,10 @@ export class TimetableService {
         const dayOfWeek = date.getDay(); // 0 is Sunday
         const rotation = await this.getRotationForDate(userId, date);
         const holiday = await this.getHolidayForDate(userId, date);
-        const isHoliday = Boolean(holiday);
-        const pauseNotifications = holiday?.pauseNotifications ?? false;
+        // Treat every Sunday as a holiday even if no DB entry exists
+        const isSunday = date.getDay() === 0;
+        const isHoliday = Boolean(holiday) || isSunday;
+        const pauseNotifications = holiday?.pauseNotifications ?? isSunday;
         const dayStart = startOfDay(date);
         const dayEnd = endOfDay(date);
 
@@ -215,7 +217,7 @@ export class TimetableService {
             dayOfWeek,
             rotation,
             isHoliday,
-            holidayName: holiday?.name ?? null,
+            holidayName: holiday?.name ?? (isSunday ? 'Sunday' : null),
             pauseNotifications,
             conflicts,
             entries: isHoliday && pauseNotifications ? [] : entries,

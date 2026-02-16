@@ -29,6 +29,12 @@ export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps
 
     return (
         <div className="bg-gradient-to-br from-white/5 to-white/2 backdrop-blur-md border border-white/10 rounded-2xl h-[calc(100vh-12rem)] flex flex-col overflow-hidden">
+            {schedule?.isHoliday && (
+                <div className="p-3 border-b border-white/6 bg-yellow-500/5 text-yellow-200 text-sm">
+                    <strong>{schedule.holidayName ?? 'Holiday'}</strong>
+                    {schedule.pauseNotifications && <span className="ml-2">• Notifications paused</span>}
+                </div>
+            )}
             <div className="p-4 border-b border-white/10 flex justify-between items-center">
                 <div>
                     <h2 className="text-lg font-semibold text-white">Daily Schedule</h2>

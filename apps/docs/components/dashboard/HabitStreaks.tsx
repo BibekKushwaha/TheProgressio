@@ -7,7 +7,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 
 export function HabitStreaks() {
-    const { data, isLoading } = useGetHabitsQuery();
+    const { data, isLoading } = useGetHabitsQuery(undefined, {
+        pollingInterval: 60000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
     const habitsList = data?.habits || [];
 
     if (isLoading) {

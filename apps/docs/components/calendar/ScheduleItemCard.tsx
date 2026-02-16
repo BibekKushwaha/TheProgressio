@@ -42,8 +42,14 @@ const colorStyles: Record<string, { border: string; accent: string; bg: string; 
     },
 };
 
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import DurationSelect from '@/components/ui/DurationSelect';
+
 export function ScheduleItemCard({ item }: ScheduleItemCardProps) {
     const styles = colorStyles[item.color];
+    const router = useRouter();
+    const [selectedDuration, setSelectedDuration] = useState<number>(25);
 
     return (
         <div
@@ -88,13 +94,18 @@ export function ScheduleItemCard({ item }: ScheduleItemCardProps) {
                     </div>
 
                     {/* Focus Button */}
-                    <a
-                        href={`/focus-session?task=${encodeURIComponent(item.title)}&duration=25`}
-                        className="flex items-center justify-center gap-2 w-full py-1.5 text-xs font-bold uppercase tracking-wider bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg transition-colors text-slate-300 hover:text-white"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <span>Start Focus</span>
-                    </a>
+                    <div className="mt-2 flex items-center gap-2">
+                        <DurationSelect value={selectedDuration} onChange={setSelectedDuration} className="w-28" />
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/focus-session?task=${encodeURIComponent(item.title)}&duration=${selectedDuration}`);
+                            }}
+                            className="flex items-center justify-center gap-2 py-1.5 px-3 text-xs font-bold uppercase tracking-wider bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg transition-colors text-slate-300 hover:text-white"
+                        >
+                            <span>Start Focus</span>
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

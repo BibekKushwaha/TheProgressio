@@ -30,9 +30,21 @@ import { useMemo, useState } from "react";
 
 export default function AnalyticsOverviewPage() {
   const [pastDays, setPastDays] = useState("1");
-  const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery(pastDays);
-  const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery();
-  useGetWeeklyTrendsQuery();
+  const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery(pastDays, {
+    pollingInterval: 30000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
+  const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery(undefined, {
+    pollingInterval: 30000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
+  useGetWeeklyTrendsQuery(undefined, {
+    pollingInterval: 30000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
   const { data: tasks = [], isLoading: isTasksLoading } = useGetTasksQuery({ page: 1, limit: 500 });
   const { data: habitsResponse, isLoading: isHabitsLoading } = useGetHabitsQuery();
 

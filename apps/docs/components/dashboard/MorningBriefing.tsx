@@ -5,8 +5,16 @@ import { Sun, BookOpen, Flame, AlertTriangle, ChevronRight, Clock, Zap } from 'l
 import Link from 'next/link';
 
 export function MorningBriefing() {
-    const { data, isLoading } = useGetMorningBriefingQuery();
-    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 500 });
+    const { data, isLoading } = useGetMorningBriefingQuery(undefined, {
+        pollingInterval: 60000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 500 }, {
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
     const briefing = data?.briefing;
     type UpcomingExam = { title: string; daysUntil: number };
     const upcomingExams = (briefing?.upcomingExams ?? []) as UpcomingExam[];

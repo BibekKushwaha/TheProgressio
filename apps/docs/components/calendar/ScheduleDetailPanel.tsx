@@ -16,15 +16,14 @@ export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
     const dateString = `${year}-${month}-${day}`;
 
     const { data: schedule } = useGetCalendarDailyScheduleQuery({ date: dateString });
-    // Verify type: schedule is DailyScheduleResponse | undefined
 
     return (
         <div className="space-y-6">
             <div className="bg-gradient-to-br from-white/5 to-white/2 backdrop-blur-md border border-white/10 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-2xl font-bold mb-1 text-white">Schedule Detail</h2>
-                        <p className="text-purple-400 font-semibold">
+                        <h2 className="text-2xl font-bold mb-0 text-white">Schedule Detail</h2>
+                        <p className="text-purple-400 font-semibold mt-2">
                             {date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                         </p>
                     </div>
@@ -33,6 +32,8 @@ export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
                 <div className="mb-6">
                     <AiSuggestedDialog />
                 </div>
+
+                {/* Holiday creation moved to header dialog */}
 
                 <div className="space-y-4">
                     {(!schedule?.items || schedule.items.filter(i => i.type === 'task' || i.type === 'exam').length === 0) && (
@@ -62,9 +63,15 @@ export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
             <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 backdrop-blur-md border border-indigo-500/20 rounded-2xl p-6">
                 <h3 className="text-lg font-semibold mb-4 text-indigo-200">Upcoming Classes</h3>
                 <div className="space-y-3">
-                    {schedule?.items
-                        ?.filter(i => i.type === 'class')
-                        .map((item) => (
+                    {(() => {
+                        const classItems = schedule?.items?.filter(i => i.type === 'class') ?? [];
+                        if (classItems.length === 0) {
+                            return (
+                                <div className="text-center text-slate-400 py-2 text-sm">No classes today.</div>
+                            );
+                        }
+
+                        return classItems.map((item) => (
                             <div key={item.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
                                 <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs uppercase">
                                     {item.subject?.substring(0, 2) || 'CL'}
@@ -74,12 +81,21 @@ export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
                                     <div className="text-xs text-slate-400">{item.startTime} • {item.subtitle}</div>
                                 </div>
                             </div>
-                        ))}
-                    {schedule?.items.filter(i => i.type === 'class').length === 0 && (
-                        <div className="text-center text-slate-400 py-2 text-sm">No classes today.</div>
-                    )}
+                        ));
+                    })()}
                 </div>
             </div>
+            {/* Conflicts */}
+            {schedule?.conflicts && schedule.conflicts.length > 0 && (
+                <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-4">
+                    <h4 className="text-sm font-semibold text-red-300 mb-2">Scheduling Conflicts</h4>
+                    <ul className="text-xs text-red-200 space-y-1">
+                        {schedule.conflicts.map((c) => (
+                            <li key={c.id}>{c.message} — {c.startsAt} to {c.endsAt}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </div>
     );
 }
