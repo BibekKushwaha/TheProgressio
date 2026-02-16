@@ -20,7 +20,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const dispatch = useAppDispatch();
     const router = useRouter();
 
-    const { data, isLoading, isFetching, isSuccess, isError, error } = useGetProfileQuery();
+    const { data, isLoading, isFetching, isSuccess, isError } = useGetProfileQuery();
 
     useEffect(() => {
         if (isSuccess && data?.user && !isAuthenticated) {
@@ -29,13 +29,18 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }, [data, dispatch, isAuthenticated, isSuccess]);
 
     useEffect(() => {
-        if (isLoading || isFetching || !isError) return;
-
-        const status = typeof error === "object" && error && "status" in error ? error.status : undefined;
-        if (status === 401 || status === 404 || status === 'FETCH_ERROR') {
+        // Redirect if there's an auth error or if not authenticated after query completes
+        if (isError && !isLoading && !isFetching) {
             router.replace("/login");
         }
-    }, [error, isError, isFetching, isLoading, router]);
+    }, [isError, isLoading, isFetching, router]);
+
+    useEffect(() => {
+        // If we're not authenticated and query is done (not loading), redirect
+        if (!isAuthenticated && !isLoading && !isFetching && !isSuccess) {
+            router.replace("/login");
+        }
+    }, [isAuthenticated, isLoading, isFetching, isSuccess, router]);
 
     if (isLoading || isFetching) {
         return <PageLoader title="Verifying session" subtitle="Checking account and permissions..." />;
@@ -45,7 +50,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
         return <>{children}</>;
     }
 
-    if (!isAuthenticated) {
+    // Fallback: if we reach here and user isn't authenticated, stay on loader while redirect processes
+    if (!isAuthenticated || isError) {
         return <PageLoader title="Redirecting to login" subtitle="Your session has expired or is unavailable." />;
     }
 

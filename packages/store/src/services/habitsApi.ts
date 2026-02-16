@@ -180,7 +180,7 @@ export const habitsApi = createApi({
                 method: 'POST',
                 body,
             }),
-            invalidatesTags: [{ type: 'Habits', id: 'LIST' }],
+            invalidatesTags: [{ type: 'Habits', id: 'LIST' }, { type: 'Habits', id: 'XP' }],
             async onQueryStarted(_, { dispatch, queryFulfilled }) {
                 try {
                     const { data } = await queryFulfilled;
@@ -199,7 +199,7 @@ export const habitsApi = createApi({
                 method: 'PUT',
                 body,
             }),
-            invalidatesTags: (_result, _error, { id }) => [{ type: 'Habits', id }],
+            invalidatesTags: (_result, _error, { id }) => [{ type: 'Habits', id }, { type: 'Habits', id: 'XP' }],
             async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
                 const patchResult = dispatch(
                     habitsApi.util.updateQueryData('getHabits', undefined, (draft) => {
@@ -244,7 +244,7 @@ export const habitsApi = createApi({
                     ...(payload ? { body: payload } : {}),
                 };
             },
-            invalidatesTags: (_result, _error, { id }) => [{ type: 'Habits', id }],
+            invalidatesTags: (_result, _error, { id }) => [{ type: 'Habits', id }, { type: 'Habits', id: 'XP' }],
             async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
                 try {
                     const { data } = await queryFulfilled;
@@ -265,7 +265,7 @@ export const habitsApi = createApi({
                 url: `/${id}/reset`,
                 method: 'POST',
             }),
-            invalidatesTags: (_result, _error, id) => [{ type: 'Habits', id }],
+            invalidatesTags: (_result, _error, id) => [{ type: 'Habits', id }, { type: 'Habits', id: 'XP' }],
             async onQueryStarted(id, { dispatch, queryFulfilled }) {
                 try {
                     const { data } = await queryFulfilled;

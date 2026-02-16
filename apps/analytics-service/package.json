@@ -7,7 +7,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --ignore './node_modules/**' --ignore '../**/node_modules/**' --ignore '../**/dist/**' --ignore '../../packages/db/generated/**' src/index.ts",
     "build": "tsc",
     "check-types": "tsc --noEmit -p tsconfig.json"
   },
@@ -19,7 +19,7 @@
     "@repo/schemas": "*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "kafkajs": "^2.2.4",

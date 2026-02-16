@@ -2,15 +2,11 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TaskInputCard } from '@/components/createtask/TaskInputCard';
 import { MetaChips } from '@/components/createtask/MetaChips';
-import { SubjectSelector } from '@/components/createtask/SubjectSelector';
-import { PrioritySelector } from '@/components/createtask/PrioritySelector';
-import { EffortSelector } from '@/components/createtask/EffortSelector';
-import { AISubtaskPanel } from '@/components/createtask/AiSubTaskPanel';
-import { PageActions } from '@/components/createtask/PageAction';
-import { Edit, Calendar as CalendarIcon, FileText, GraduationCap, CheckCircle2 } from 'lucide-react';
+import { Edit, GraduationCap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toast-provider';
@@ -51,6 +47,8 @@ function CreateTaskPageContent() {
     const [obtainedMarks, setObtainedMarks] = useState('');
     const [totalMarks, setTotalMarks] = useState('100');
     const [chapter, setChapter] = useState('');
+    const [showManualDetails, setShowManualDetails] = useState(true);
+    const [aiSubtaskEnabled, setAiSubtaskEnabled] = useState(false);
 
     const [addGradeEntry, { isLoading: isAddingGrade }] = useAddGradeEntryMutation();
 
@@ -59,7 +57,7 @@ function CreateTaskPageContent() {
     });
 
     const [smartCreateTask, { isLoading: isSmartCreating }] = useSmartCreateTaskMutation();
-    const [previewSubtasks, { isLoading: isGeneratingSubtasks }] = usePreviewSubtasksMutation();
+    const [previewSubtasks] = usePreviewSubtasksMutation();
     const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
     const [updateTask, { isLoading: isUpdating }] = useUpdateTaskMutation();
     const [createCategory] = useCreateCategoryMutation(); // Initialize category mutation
@@ -282,89 +280,266 @@ function CreateTaskPageContent() {
         );
     }
 
+    const localDateTimeValue = parsedDueDate
+        ? new Date(new Date(parsedDueDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+        : '';
+    const dueDateValue = localDateTimeValue ? localDateTimeValue.slice(0, 10) : '';
+    const dueTimeValue = localDateTimeValue ? localDateTimeValue.slice(11, 16) : '';
+
+    const updateDueDateTime = (nextDate: string, nextTime: string) => {
+        if (!nextDate && !nextTime) {
+            setParsedDueDate(null);
+            return;
+        }
+        const safeDate = nextDate || new Date().toISOString().slice(0, 10);
+        const safeTime = nextTime || '00:00';
+        setParsedDueDate(new Date(`${safeDate}T${safeTime}`).toISOString());
+    };
+
+    const isSubmitting = isCreating || isSmartCreating || isUpdating || isAddingGrade;
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent"></div>
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent"></div>
+        <div className="min-h-screen bg-slate-950 text-white relative overflow-x-hidden selection:bg-purple-500/30">
+            <div className="fixed inset-0 z-0 pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-600/12 rounded-full blur-[140px] animate-pulse-slow" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/12 rounded-full blur-[140px] animate-pulse-slow" style={{ animationDelay: '2s' }} />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-pink-600/8 rounded-full blur-[100px]" />
+            </div>
 
-            <div className="relative max-w-6xl mx-auto p-6 md:p-12 space-y-8">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-8">
-                        <div className="text-white text-2xl font-bold text-center">Create New Task</div>
-                        <div>
-                            <h2 className="text-sm font-bold text-purple-400 uppercase tracking-wider mb-4">
-                                {taskId ? 'EDITING TASK' : (entryType === 'exam' ? 'LOG EXAM RESULT' : "WHAT'S ON YOUR MIND?")}
-                            </h2>
-                            {!taskId && (
-                                <div className="flex gap-2 mb-4 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
-                                    <button
-                                        onClick={() => setEntryType('task')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${entryType === 'task' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-400 hover:text-white'}`}
-                                    >
-                                        Task
-                                    </button>
-                                    <button
-                                        onClick={() => setEntryType('exam')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${entryType === 'exam' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-400 hover:text-white'}`}
-                                    >
-                                        <GraduationCap className="w-4 h-4" /> Exam Result
-                                    </button>
-                                </div>
-                            )}
-                            <TaskInputCard
-                                value={taskDescription}
-                                onChange={setTaskDescription}
-                                isParsing={isSmartCreating || isParsingTask}
-                                highlights={[
-                                    ...(parsedMeta.subject ? [{ text: parsedMeta.subject, type: 'subject' as const }] : []),
-                                    ...(parsedMeta.date ? [{ text: parsedMeta.date, type: 'date' as const }] : []),
-                                    ...(parsedMeta.time ? [{ text: parsedMeta.time, type: 'time' as const }] : []),
-                                ]}
-                            />
-                            {(() => {
-                                const matchedCategory = categories?.find(c => c.name.toLowerCase() === parsedMeta.subject?.toLowerCase());
-                                return (
-                                    <MetaChips
-                                        subject={parsedMeta.subject}
-                                        date={parsedMeta.date}
-                                        time={parsedMeta.time}
-                                        subjectColor={matchedCategory?.colorCode}
-                                    />
-                                );
-                            })()}
-                        </div>
+            <div className="relative z-10 max-w-6xl mx-auto px-4 py-2 md:px-8 md:py-4 pb-20 space-y-4 -mt-6 md:-mt-8">
+                <div className="flex flex-col items-center justify-center space-y-3 pt-0 md:pt-2">
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="text-center space-y-3"
+                    >
+                        <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-white via-purple-200 to-indigo-300 text-transparent bg-clip-text tracking-tight">
+                            What would you like to capture?
+                        </h1>
+                        <p className="text-sm md:text-base text-slate-400 max-w-2xl mx-auto">
+                            Add a focused task or log an exam result in under a minute.
+                        </p>
+                    </motion.div>
 
-                        <SubjectSelector
-                            selectedSubjectId={selectedSubjectId}
-                            onSelect={setSelectedSubjectId}
-                            categories={categories}
-                        />
-
-                        {entryType === 'task' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <PrioritySelector
-                                    selectedPriority={selectedPriority}
-                                    onSelect={setSelectedPriority}
-                                />
-                                <EffortSelector
-                                    selectedEffort={selectedEffort}
-                                    onSelect={setSelectedEffort}
-                                />
+                    {!taskId && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className="w-full max-w-md"
+                        >
+                            <div
+                                role="tablist"
+                                aria-label="Create mode"
+                                className="grid grid-cols-2 p-1 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-purple-500/10"
+                            >
+                                {[
+                                    { id: 'task', label: 'New Task', icon: Edit },
+                                    { id: 'exam', label: 'Exam Result', icon: GraduationCap }
+                                ].map((mode) => {
+                                    const isActive = entryType === mode.id;
+                                    return (
+                                        <button
+                                            key={mode.id}
+                                            role="tab"
+                                            aria-selected={isActive}
+                                            onClick={() => setEntryType(mode.id as 'task' | 'exam')}
+                                            className={`relative flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                                        >
+                                            {isActive && (
+                                                <motion.div
+                                                    layoutId="active-mode"
+                                                    className="absolute inset-0 bg-gradient-to-r from-purple-600 via-purple-500 to-indigo-600 rounded-xl shadow-xl shadow-purple-500/30"
+                                                    transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                                                />
+                                            )}
+                                            <mode.icon className="w-4 h-4 relative z-10" />
+                                            <span className="relative z-10">{mode.label}</span>
+                                        </button>
+                                    );
+                                })}
                             </div>
-                        )}
-                        {entryType === 'exam' && (
-                            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4 animate-in slide-in-from-left-4 duration-300">
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                    <GraduationCap className="w-3 h-3" />
-                                    Exam Details
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        </motion.div>
+                    )}
+                </div>
+
+                <div className="max-w-4xl mx-auto w-full">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={entryType}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -12 }}
+                            className="panel-surface rounded-4xl p-6 md:p-8 space-y-3"
+                        >
+                            <div className="space-y-3">
+                                <p className="text-[11px] tracking-[0.18em] font-semibold text-purple-300/90 uppercase">Task Summary</p>
+                                <TaskInputCard
+                                    value={taskDescription}
+                                    onChange={setTaskDescription}
+                                    isParsing={isSmartCreating || isParsingTask}
+                                    highlights={[
+                                        ...(parsedMeta.subject ? [{ text: parsedMeta.subject, type: 'subject' as const }] : []),
+                                        ...(parsedMeta.date ? [{ text: parsedMeta.date, type: 'date' as const }] : []),
+                                        ...(parsedMeta.time ? [{ text: parsedMeta.time, type: 'time' as const }] : []),
+                                    ]}
+                                />
+                                {(() => {
+                                    const matchedCategory = categories?.find(c => c.name.toLowerCase() === parsedMeta.subject?.toLowerCase());
+                                    return (
+                                        <MetaChips
+                                            subject={parsedMeta.subject}
+                                            date={parsedMeta.date}
+                                            time={parsedMeta.time}
+                                            subjectColor={matchedCategory?.colorCode}
+                                        />
+                                    );
+                                })()}
+                            </div>
+
+                            {entryType === 'task' ? (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="space-y-2">
+                                            <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Subject</Label>
+                                            <select
+                                                value={selectedSubjectId ? String(selectedSubjectId) : ''}
+                                                onChange={(e) => setSelectedSubjectId(e.target.value)}
+                                                className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                                            >
+                                                <option value="">Select subject</option>
+                                                {categories?.map((c) => (
+                                                    <option key={c.id} value={String(c.id)} className="text-black">{c.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Priority</Label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {['Routine', 'Medium', 'Urgent'].map((priority) => (
+                                                    <button
+                                                        key={priority}
+                                                        type="button"
+                                                        onClick={() => setSelectedPriority(priority)}
+                                                        className={`h-12 rounded-xl text-xs font-semibold border transition-all ${selectedPriority === priority
+                                                            ? 'bg-indigo-500/30 border-indigo-400/50 text-white'
+                                                            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                                                            }`}
+                                                    >
+                                                        {priority}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Effort</Label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {['30m', '1h', '2h+'].map((effort) => (
+                                                    <button
+                                                        key={effort}
+                                                        type="button"
+                                                        onClick={() => setSelectedEffort(effort)}
+                                                        className={`h-12 rounded-xl text-xs font-semibold border transition-all ${selectedEffort === effort
+                                                            ? 'bg-indigo-500/30 border-indigo-400/50 text-white'
+                                                            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                                                            }`}
+                                                    >
+                                                        {effort}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-white/10 pt-4 space-y-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowManualDetails((prev) => !prev)}
+                                            className="text-sm text-slate-300 hover:text-white transition-colors"
+                                        >
+                                            {showManualDetails ? '▾' : '▸'} Manual Overrides & Details
+                                        </button>
+
+                                        {showManualDetails && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2 md:col-span-1">
+                                                    <Label htmlFor="description" className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Detailed Description</Label>
+                                                    <textarea
+                                                        id="description"
+                                                        value={description}
+                                                        onChange={(e) => setDescription(e.target.value)}
+                                                        placeholder="Add specific instructions, links, or notes..."
+                                                        className="w-full min-h-[88px] px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Due Date</Label>
+                                                            <Input
+                                                                type="date"
+                                                                value={dueDateValue}
+                                                                onChange={(e) => updateDueDateTime(e.target.value, dueTimeValue)}
+                                                                className="h-12 bg-white/5 border-white/10"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Time</Label>
+                                                            <Input
+                                                                type="time"
+                                                                value={dueTimeValue}
+                                                                onChange={(e) => updateDueDateTime(dueDateValue, e.target.value)}
+                                                                className="h-12 bg-white/5 border-white/10"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            const next = !aiSubtaskEnabled;
+                                                            setAiSubtaskEnabled(next);
+                                                            if (next) await handleGenerateSubtasks();
+                                                        }}
+                                                        className="w-full h-11 px-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between text-sm"
+                                                    >
+                                                        <span className="text-slate-200">AI Subtask Generator</span>
+                                                        <span className={`inline-flex h-6 w-10 rounded-full p-1 transition-colors ${aiSubtaskEnabled ? 'bg-indigo-500/70' : 'bg-white/20'}`}>
+                                                            <span className={`h-4 w-4 rounded-full bg-white transition-transform ${aiSubtaskEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {aiSubtaskEnabled && subtasks.length > 0 && (
+                                            <div className="space-y-2">
+                                                {subtasks.map((subtask) => (
+                                                    <label key={subtask.id} className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={subtask.completed}
+                                                            onChange={() => setSubtasks((prev) => prev.map((t) => t.id === subtask.id ? { ...t, completed: !t.completed } : t))}
+                                                        />
+                                                        <span className={subtask.completed ? 'line-through text-slate-400' : 'text-slate-200'}>{subtask.text}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="space-y-4 border-t border-white/10 pt-4">
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-medium text-slate-400">Exam Type</Label>
+                                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Exam Type</Label>
                                         <select
                                             value={examType}
                                             onChange={(e) => setExamType(e.target.value)}
-                                            className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                                            className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
                                         >
                                             <option value="Midterm">Midterm</option>
                                             <option value="Final">Final</option>
@@ -374,110 +549,57 @@ function CreateTaskPageContent() {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-medium text-slate-400">Chapter (Optional)</Label>
+                                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Chapter (Optional)</Label>
                                         <Input
                                             value={chapter}
                                             onChange={(e) => setChapter(e.target.value)}
                                             placeholder="e.g. Thermodynamics"
-                                            className="bg-white/5 border-white/10 h-11"
+                                            className="bg-white/5 border-white/10 h-12"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-medium text-slate-400">Marks (Obtained / Total)</Label>
-                                        <div className="flex items-center gap-2">
+                                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Marks (Obtained / Total)</Label>
+                                        <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
                                             <Input
                                                 type="number"
                                                 value={obtainedMarks}
                                                 onChange={(e) => setObtainedMarks(e.target.value)}
                                                 placeholder="85"
-                                                className="bg-white/5 border-white/10 h-11"
+                                                className="bg-white/5 border-white/10 h-12"
                                             />
-                                            <span className="text-slate-500">/</span>
+                                            <span className="text-slate-400">/</span>
                                             <Input
                                                 type="number"
                                                 value={totalMarks}
                                                 onChange={(e) => setTotalMarks(e.target.value)}
                                                 placeholder="100"
-                                                className="bg-white/5 border-white/10 h-11"
+                                                className="bg-white/5 border-white/10 h-12"
                                             />
                                         </div>
                                     </div>
                                 </div>
+                            )}
+
+                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                                <button
+                                    type="button"
+                                    onClick={() => router.back()}
+                                    className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveTask}
+                                    disabled={isSubmitting}
+                                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold disabled:opacity-50"
+                                >
+                                    {isSubmitting ? 'Saving...' : (taskId ? 'Update Task' : (entryType === 'exam' ? 'Log Result' : 'Create Task'))}
+                                </button>
                             </div>
-                        )}
-                    </div>
-
-                    <div className="space-y-6">
-                        {entryType === 'task' ? (
-                            <>
-                                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
-                                    {/* ... Manual Details Form ... */}
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                        <Edit className="w-3 h-3" />
-                                        Manual Details
-                                    </h3>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description" className="text-xs font-medium text-slate-400">Description</Label>
-                                        <div className="relative">
-                                            <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                                            <textarea
-                                                id="description"
-                                                value={description}
-                                                onChange={(e) => setDescription(e.target.value)}
-                                                placeholder="Add more details..."
-                                                className="w-full min-h-[100px] pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none transition-all"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="dueDate" className="text-xs font-medium text-slate-400">Due Date</Label>
-                                        <div className="relative">
-                                            <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                            <Input
-                                                id="dueDate"
-                                                type="datetime-local"
-                                                value={parsedDueDate ? new Date(new Date(parsedDueDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
-                                                onChange={(e) => setParsedDueDate(e.target.value ? new Date(e.target.value).toISOString() : null)}
-                                                className="pl-10 bg-white/5 border-white/10 text-white h-11 rounded-xl"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="mt-3">
-                                        <Label htmlFor="isRecurring" className="text-xs font-medium text-slate-400">Recurring</Label>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <input id="isRecurring" type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="h-4 w-4 rounded" />
-                                            <span className="text-sm text-slate-300">Automatically repeat this task</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <AISubtaskPanel
-                                    subtasks={subtasks}
-                                    onSubtaskToggle={(id) => setSubtasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t))}
-                                    isLoading={isGeneratingSubtasks}
-                                    onGenerate={handleGenerateSubtasks}
-                                />
-                            </>
-                        ) : (
-                            <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-2xl p-6 text-center">
-                                <CheckCircle2 className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-bold text-white mb-2">Ready to log result</h3>
-                                <p className="text-sm text-slate-400">
-                                    Logging this result will update your personalized SWOT analysis and predictive GPA model in the War Room.
-                                </p>
-                            </div>
-                        )}
-
-                    </div>
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
-
-                <PageActions
-                    onSubmit={handleSaveTask}
-                    onCancel={() => router.back()}
-                    isSubmitting={isCreating || isSmartCreating || isUpdating || isAddingGrade}
-                    submitLabel={taskId ? "Update Task" : (entryType === 'exam' ? "Log Result" : "Add to My Gateway")}
-                    SubmitIcon={taskId ? Edit : undefined}
-                />
             </div>
         </div>
     );

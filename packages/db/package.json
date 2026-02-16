@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo 'No tests'",
-    "build": "tsc"
+    "build": "tsc",
+    "generate": "prisma generate --schema=./prisma/schema.prisma"
   },
   "keywords": [],
   "author": "",

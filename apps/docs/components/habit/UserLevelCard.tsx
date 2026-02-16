@@ -3,9 +3,44 @@
 import { Trophy, Zap, TrendingUp } from 'lucide-react';
 import { useGetUserXPQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useEffect, useRef } from 'react';
+import { useToast } from '@/components/ui/toast-provider';
+
+const getErrorMessage = (error: unknown): string => {
+    if (!error) return 'Unknown error';
+    if (typeof error === 'string') return error;
+    if (typeof error === 'object' && error !== null && 'message' in error) {
+        const message = (error as { message?: unknown }).message;
+        if (typeof message === 'string') return message;
+    }
+    return 'Unknown error';
+};
 
 export function UserLevelCard() {
-    const { data: xpData, isLoading } = useGetUserXPQuery();
+    const { data: xpData, isLoading, isError, error, refetch } = useGetUserXPQuery();
+    const { toast } = useToast();
+
+    const prevXpRef = useRef<number | null>(null);
+    const prevLevelRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        const currentXp = xpData?.xp?.xp ?? null;
+        const currentLevel = xpData?.xp?.level ?? null;
+        const prevXp = prevXpRef.current;
+        const prevLevel = prevLevelRef.current;
+
+        if (prevXp !== null && currentXp !== null && currentXp > prevXp) {
+            const delta = currentXp - prevXp;
+            if (prevLevel !== null && currentLevel !== null && currentLevel > prevLevel) {
+                toast(`+${delta} XP — Level ${prevLevel} → ${currentLevel}`, 'success');
+            } else {
+                toast(`+${delta} XP`, 'success');
+            }
+        }
+
+        prevXpRef.current = currentXp;
+        prevLevelRef.current = currentLevel;
+    }, [xpData, toast]);
 
     if (isLoading) {
         return (
@@ -14,6 +49,23 @@ export function UserLevelCard() {
                 <Skeleton className="h-16 w-full bg-white/5 mb-3" />
                 <Skeleton className="h-3 w-full bg-white/5 mb-2" />
                 <Skeleton className="h-4 w-28 bg-white/5" />
+            </div>
+        );
+    }
+
+    if (isError) {
+        return (
+            <div className="bg-gradient-to-br from-white/[0.06] via-amber-500/[0.05] to-white/[0.02] backdrop-blur-md border border-white/20 rounded-2xl p-6">
+                <div className="text-sm text-rose-400 mb-2">Failed to load XP.</div>
+                <div className="text-xs text-slate-400 mb-4">{getErrorMessage(error)}</div>
+                <div>
+                    <button
+                        onClick={() => refetch()}
+                        className="bg-amber-500 text-black px-3 py-2 rounded-lg font-semibold"
+                    >
+                        Retry
+                    </button>
+                </div>
             </div>
         );
     }
