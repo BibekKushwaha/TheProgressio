@@ -4,6 +4,7 @@ export default defineConfig({
     resolve: {
         extensions: ['.ts', '.js', '.mjs'],
     },
+    cacheDir: '.vitest-cache',
     test: {
         globals: true,
         environment: 'node',

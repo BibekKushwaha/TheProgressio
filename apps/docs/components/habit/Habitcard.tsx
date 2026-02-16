@@ -1,8 +1,9 @@
-import { Flame, Trophy } from 'lucide-react';
+import { Flame, Shield, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Habit, useLogHabitMutation } from '@repo/store';
+import { Habit, useLogHabitMutation, useUpdateHabitMutation } from '@repo/store';
 import { HabitActionMenu } from './HabitActionMenu';
 import { useToast } from '@/components/ui/toast-provider';
+import { useEffect, useState } from 'react';
 
 export function HabitCard({ habit }: { habit: Habit }) {
     const hasNewTrophy = Boolean((habit as { newTrophy?: boolean }).newTrophy);
@@ -11,7 +12,13 @@ export function HabitCard({ habit }: { habit: Habit }) {
     const colorTheme = habit.color || "from-purple-600 to-pink-600";
 
     const [logHabit, { isLoading }] = useLogHabitMutation();
+    const [updateHabit, { isLoading: isUpdatingMercy }] = useUpdateHabitMutation();
     const { toast } = useToast();
+    const [mercyDays, setMercyDays] = useState(habit.mercyDaysAllowed ?? 1);
+
+    useEffect(() => {
+        setMercyDays(habit.mercyDaysAllowed ?? 1);
+    }, [habit.id, habit.mercyDaysAllowed]);
 
     const handleCheckIn = async () => {
         try {
@@ -22,6 +29,21 @@ export function HabitCard({ habit }: { habit: Habit }) {
         } catch (error) {
             console.error("Failed to check in habit:", error);
             toast('Failed to check in habit', 'error');
+        }
+    };
+
+    const handleSaveMercyDays = async () => {
+        if (mercyDays === (habit.mercyDaysAllowed ?? 1)) {
+            toast('No changes to save', 'info');
+            return;
+        }
+
+        try {
+            await updateHabit({ id: habit.id, mercyDaysAllowed: mercyDays }).unwrap();
+            toast('✅ Mercy days updated', 'success');
+        } catch (error) {
+            console.error('Failed to update mercy days:', error);
+            toast('Failed to update mercy days', 'error');
         }
     };
 
@@ -75,6 +97,41 @@ export function HabitCard({ habit }: { habit: Habit }) {
                     className={cn("h-full bg-gradient-to-r transition-all duration-500", colorTheme)}
                     style={{ width: `${Math.min((habit.currentStreak / habit.targetValue) * 100, 100)}%` }}
                 />
+            </div>
+
+            <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3 relative z-10">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    <Shield className="w-3.5 h-3.5 text-amber-400" />
+                    Mercy Days
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                        {[0, 1, 2, 3].map((value) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => setMercyDays(value)}
+                                aria-pressed={mercyDays === value}
+                                className={cn(
+                                    'h-8 w-8 rounded-md text-xs font-bold transition-all',
+                                    mercyDays === value
+                                        ? 'bg-amber-500 text-white shadow shadow-amber-500/30'
+                                        : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                                )}
+                            >
+                                {value}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleSaveMercyDays}
+                        disabled={isUpdatingMercy || mercyDays === (habit.mercyDaysAllowed ?? 1)}
+                        className="px-3 py-1.5 rounded-md text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-400 text-black disabled:opacity-50"
+                    >
+                        {isUpdatingMercy ? 'Saving...' : 'Save'}
+                    </button>
+                </div>
             </div>
 
             <button

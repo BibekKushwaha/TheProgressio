@@ -3,8 +3,13 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, CalendarClock, RefreshCw, Sparkles, Wand2 } from 'lucide-react';
 import { Task, useApplyRecoveryPlanMutation, usePreviewRecoveryPlanMutation } from '@repo/store';
-import { Button } from '@/components/ui/button';
 import { buildRecoveryPlan, type RecoveryPlan } from '@/lib/recoveryPlan';
+import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { Calendar as CalendarIcon } from 'lucide-react';
 
 interface RecoveryModePanelProps {
     tasks: Task[];
@@ -12,14 +17,6 @@ interface RecoveryModePanelProps {
 
 const formatDate = (value: string) =>
     new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-import { toast } from 'sonner';
-
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { Calendar as CalendarIcon } from 'lucide-react';
 
 export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
     const [previewRecoveryPlan, { isLoading: isPreviewing }] = usePreviewRecoveryPlanMutation();
@@ -117,87 +114,104 @@ export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
     };
 
     return (
-        <section className="mb-6 rounded-2xl border border-amber-400/20 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent p-5 backdrop-blur-sm">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300">
-                        <Wand2 className="h-3.5 w-3.5" />
-                        AI Recovery Mode
+        <section className="space-y-6">
+            {/* Header Card */}
+            <div className="rounded-2xl border border-amber-400/20 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent p-6 backdrop-blur-sm">
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300">
+                            <Wand2 className="h-4 w-4" />
+                            AI Recovery Mode
+                        </div>
+                        <h3 className="text-2xl font-bold text-white">Auto-rebalance overdue workload</h3>
+                        <p className="max-w-2xl text-sm text-slate-300">
+                            Detects backlog pressure, prioritizes high-impact tasks, and shifts due dates to a realistic pace.
+                        </p>
                     </div>
-                    <h3 className="text-xl font-bold text-white">Auto-rebalance overdue workload</h3>
-                    <p className="max-w-2xl text-sm text-slate-300">
-                        Detects backlog pressure, prioritizes high-impact tasks, and shifts due dates to a realistic pace.
-                    </p>
-                </div>
 
-                <div className="flex flex-1 items-center justify-between gap-4 sm:ml-10">
-                    <div className="flex-shrink-0">
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
+                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            {/* Date Picker */}
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <button
+                                        className={cn(
+                                            "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all",
+                                            "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white",
+                                            "focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+                                        )}
+                                    >
+                                        <CalendarIcon className="h-4 w-4 text-amber-400" />
+                                        {format(anchorDate, "MMM d, yyyy")}
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 bg-slate-900 border-white/10 shadow-2xl" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={anchorDate}
+                                        onSelect={(date) => date && setAnchorDate(date)}
+                                        initialFocus
+                                        className="bg-slate-900 text-white"
+                                    />
+                                </PopoverContent>
+                            </Popover>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <button
+                                    onClick={handleGenerate}
+                                    disabled={isPreviewing}
                                     className={cn(
-                                        "w-[180px] md:w-[200px] justify-start text-left font-normal border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white rounded-xl",
-                                        !anchorDate && "text-muted-foreground"
+                                        "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all",
+                                        "border border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20",
+                                        "disabled:opacity-50 disabled:cursor-not-allowed",
+                                        "focus:outline-none focus:ring-2 focus:ring-amber-400/50"
                                     )}
                                 >
-                                    <CalendarIcon className="mr-2 h-4 w-4 text-amber-400" />
-                                    {anchorDate ? format(anchorDate, "MMM d, yyyy") : <span>Start Date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-slate-900 border-white/10" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={anchorDate}
-                                    onSelect={(date) => date && setAnchorDate(date)}
-                                    initialFocus
-                                    className="bg-slate-900 text-white"
-                                />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
+                                    {isPreviewing ? (
+                                        <>
+                                            <RefreshCw className="h-4 w-4 animate-spin" />
+                                            <span className="hidden sm:inline">Thinking...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="h-4 w-4" />
+                                            <span>{plan ? 'Regenerate' : 'Generate Plan'}</span>
+                                        </>
+                                    )}
+                                </button>
 
-                    <div className="flex items-center gap-2">
-                        <Button
-                            onClick={handleGenerate}
-                            disabled={isPreviewing}
-                            className="border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 rounded-xl px-4 h-10"
-                        >
-                            {isPreviewing ? (
-                                <>
-                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                    <span className="hidden sm:inline">Thinking...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles className="mr-2 h-4 w-4" />
-                                    <span>{plan ? 'Regenerate' : 'Generate'}</span>
-                                </>
-                            )}
-                        </Button>
-
-                        <Button
-                            onClick={handleApply}
-                            disabled={!hasPlan || isApplying || selectedTaskIds.size === 0}
-                            className="bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:opacity-90 disabled:opacity-50 rounded-xl px-6 h-10 shadow-lg shadow-amber-500/20"
-                        >
-                            {isApplying ? (
-                                <>
-                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                    <span>Applying...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <CalendarClock className="mr-2 h-4 w-4" />
-                                    <span>Apply ({selectedTaskIds.size})</span>
-                                </>
-                            )}
-                        </Button>
+                                <button
+                                    onClick={handleApply}
+                                    disabled={!hasPlan || isApplying || selectedTaskIds.size === 0}
+                                    className={cn(
+                                        "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all",
+                                        "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20",
+                                        "hover:shadow-lg hover:shadow-amber-500/30 hover:scale-105",
+                                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100",
+                                        "focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+                                    )}
+                                >
+                                    {isApplying ? (
+                                        <>
+                                            <RefreshCw className="h-4 w-4 animate-spin" />
+                                            <span>Applying...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CalendarClock className="h-4 w-4" />
+                                            <span>Apply ({selectedTaskIds.size})</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            {/* Metrics Cards */}
+            <div className="grid gap-4 sm:grid-cols-3">
                 <div className="group relative overflow-hidden rounded-xl border border-red-500/20 bg-gradient-to-br from-red-500/10 via-red-900/5 to-transparent p-4 transition-all hover:border-red-500/30">
                     <div className="flex items-center justify-between">
                         <p className="text-xs font-bold uppercase tracking-wider text-red-400">Backlog</p>
@@ -232,55 +246,78 @@ export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
                 </div>
             </div>
 
+            {/* Task List or Empty State */}
             {!hasPlan ? (
-                <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-3 text-sm text-emerald-200">
-                    No overdue tasks right now. Recovery mode stays ready for the moment pressure spikes.
+                <div className="rounded-xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 p-4 text-sm text-emerald-200">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 flex-shrink-0" />
+                        <span>No overdue tasks right now. Recovery mode stays ready for the moment pressure spikes.</span>
+                    </div>
                 </div>
             ) : (
-                <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-                    <div className="flex items-center justify-between mb-3 px-1">
-                        <p className="text-xs uppercase tracking-wide text-slate-400">Proposed Moves</p>
-                        <button
-                            onClick={toggleAll}
-                            className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 uppercase tracking-tighter"
-                        >
-                            {selectedTaskIds.size === activePlan.items.length ? 'Deselect All' : 'Select All'}
-                        </button>
+                <div className="rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.02] backdrop-blur-sm overflow-hidden">
+                    <div className="p-4 border-b border-white/10">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-white">Proposed Moves</p>
+                            <button
+                                onClick={toggleAll}
+                                className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors uppercase tracking-wide"
+                            >
+                                {selectedTaskIds.size === activePlan.items.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                        </div>
                     </div>
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    
+                    <div className="space-y-1 max-h-96 overflow-y-auto divide-y divide-white/5 p-3">
                         {activePlan.items.map((item) => {
                             const currentDueDate = overrides[item.taskId] || item.newDueDate;
+                            const isSelected = selectedTaskIds.has(item.taskId);
 
                             return (
                                 <div
                                     key={item.taskId}
-                                    className={`flex items-center gap-3 rounded-lg border p-2 transition-all ${selectedTaskIds.has(item.taskId)
-                                        ? 'border-cyan-500/50 bg-cyan-500/10'
-                                        : 'border-white/10 bg-white/5 hover:bg-white/10'
-                                        }`}
+                                    className={cn(
+                                        "flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer",
+                                        isSelected
+                                            ? 'bg-cyan-500/15 border border-cyan-500/40'
+                                            : 'border border-transparent hover:bg-white/5'
+                                    )}
+                                    onClick={() => toggleTaskSelection(item.taskId)}
                                 >
+                                    {/* Checkbox */}
                                     <div
-                                        onClick={() => toggleTaskSelection(item.taskId)}
-                                        className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${selectedTaskIds.has(item.taskId)
-                                            ? 'bg-cyan-500 border-cyan-500'
-                                            : 'border-slate-500'
-                                            }`}
+                                        className={cn(
+                                            "w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-all",
+                                            isSelected
+                                                ? 'bg-cyan-500 border-cyan-500'
+                                                : 'border-slate-400 hover:border-slate-300'
+                                        )}
                                     >
-                                        {selectedTaskIds.has(item.taskId) && <div className="w-2 h-2 bg-white rounded-sm" />}
+                                        {isSelected && (
+                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        )}
                                     </div>
-                                    <div className="flex-1 min-w-0" onClick={() => toggleTaskSelection(item.taskId)}>
+
+                                    {/* Task Info */}
+                                    <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-white truncate">{item.title}</p>
-                                        <p className="text-[10px] text-slate-400">{item.priority} priority</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">{item.priority} priority</p>
                                     </div>
-                                    <div className="text-right flex flex-col items-end gap-0.5">
-                                        <p className="text-slate-500 line-through text-[10px]">{formatDate(item.oldDueDate)}</p>
+
+                                    {/* Dates */}
+                                    <div className="text-right flex flex-col items-end gap-1 flex-shrink-0">
+                                        <p className="text-slate-500 line-through text-xs">{formatDate(item.oldDueDate)}</p>
                                         <Popover>
                                             <PopoverTrigger asChild>
                                                 <button
                                                     onClick={(e) => e.stopPropagation()}
                                                     className={cn(
-                                                        "font-bold text-xs transition-colors hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10",
-                                                        overrides[item.taskId] ? "text-purple-400" : "text-cyan-300"
+                                                        "font-semibold text-xs px-2 py-1 rounded transition-colors",
+                                                        overrides[item.taskId]
+                                                            ? "text-purple-400 bg-purple-500/10 hover:bg-purple-500/20"
+                                                            : "text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20"
                                                     )}
                                                 >
                                                     {formatDate(currentDueDate)}
@@ -299,8 +336,7 @@ export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
                                                                 ...prev,
                                                                 [item.taskId]: date.toISOString()
                                                             }));
-                                                            // Auto-select if a date is picked
-                                                            if (!selectedTaskIds.has(item.taskId)) {
+                                                            if (!isSelected) {
                                                                 toggleTaskSelection(item.taskId);
                                                             }
                                                         }
@@ -318,10 +354,11 @@ export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
                 </div>
             )}
 
+            {/* Warning Alert */}
             {overdueCount > 0 && !plan && (
-                <div className="mt-3 inline-flex items-center gap-2 text-xs text-amber-300">
-                    <AlertTriangle className="h-4 w-4" />
-                    {overdueCount} overdue tasks detected. Generate a recovery plan to rebalance.
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 flex items-center gap-2 text-xs text-amber-300">
+                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                    <span>{overdueCount} overdue tasks detected. Generate a recovery plan to rebalance.</span>
                 </div>
             )}
         </section>

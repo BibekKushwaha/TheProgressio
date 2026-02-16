@@ -92,7 +92,7 @@ export default function AnalyticsStrategicPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {predictionTaskOptions.map((task) => (
-                          <SelectItem key={task.id} value={task.id} className="bg-slate-900 focus:bg-slate-800">
+                          <SelectItem key={task.id} value={task.id} className="bg-slate-900 focus:bg-slate-400 text-white">
                             {task.title}
                           </SelectItem>
                         ))}

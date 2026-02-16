@@ -37,15 +37,15 @@ export default function ExamWarRoomPage() {
     const totalAttempts = difficultyStats.easy + difficultyStats.medium + difficultyStats.hard;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-red-950/30 to-slate-950 text-white p-6 md:p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-red-950/30 to-slate-950 text-white p-2 md:p-4">
+            <div className="max-w-7xl mx-auto space-y-5">
                 <PageHeader
                     title="Exam War Room"
                     subtitle="Chapter-wise SWOT, success tracking & predictive scores"
                 >
-                    <div className="p-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl shadow-lg shadow-red-500/20">
+                    {/* <div className="p-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl shadow-lg shadow-red-500/20">
                         <Swords className="w-8 h-8 text-white" />
-                    </div>
+                    </div> */}
                 </PageHeader>
 
                 {/* Quick Stats Bar */}

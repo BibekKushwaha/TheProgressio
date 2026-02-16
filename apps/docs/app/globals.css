@@ -180,3 +180,22 @@
 *::-webkit-scrollbar-thumb:hover {
   background-color: rgba(148, 163, 184, 0.6);
 }
+
+/* Global placeholder color: gray-400 (matches Tailwind's gray-400) */
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+  color: #9CA3AF !important;
+  opacity: 1 !important;
+}
+
+/* Vendor fallbacks */
+input::-webkit-input-placeholder,
+textarea::-webkit-input-placeholder,
+select::-webkit-input-placeholder { color: #9CA3AF !important; }
+input::-moz-placeholder,
+textarea::-moz-placeholder,
+select::-moz-placeholder { color: #9CA3AF !important; }
+input:-ms-input-placeholder,
+textarea:-ms-input-placeholder,
+select:-ms-input-placeholder { color: #9CA3AF !important; }

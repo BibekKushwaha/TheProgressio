@@ -3,6 +3,7 @@ import { AnalyticsHeader } from "@/components/analytics/AnalyticHeader";
 import { FocusTrends } from "@/components/analytics/FocusTrend";
 import { SessionBreakdown } from "@/components/analytics/SessionBreakdown";
 import { StatCards } from "@/components/analytics/StatCard";
+import { MetricGrid } from "@/components/analytics/MetricCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, CheckCircle, Target, TrendingUp } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -15,7 +16,6 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Empty, EmptyTitle } from "@/components/ui/empty";
-import { Badge } from "@/components/ui/badge";
 import {
   PriorityEnum,
   TaskStatus,
@@ -166,23 +166,23 @@ export default function AnalyticsOverviewPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 text-white">
-      <div className="flex">
-        <div className="flex-1 flex flex-col">
+      <div className="flex min-w-0">
+        <div className="flex-1 flex flex-col min-w-0">
           <AnalyticsHeader
             pastDays={pastDays}
             setPastDays={setPastDays}
             onExport={handleExportReport}
           />
 
-          <main className="flex-1 p-4 md:p-8 overflow-auto">
+          <main className="flex-1 p-2 md:p-4 overflow-y-auto overflow-x-hidden min-w-0">
             <div className="max-w-7xl mx-auto space-y-6">
               <div className="space-y-4">
                 <StatCards items={stats} />
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                  <div className="xl:col-span-2 min-w-0">
                     <FocusTrends pastDays={pastDays} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <SessionBreakdown pastDays={pastDays} />
                   </div>
                 </div>
@@ -201,48 +201,20 @@ export default function AnalyticsOverviewPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Total Tasks</p>
-                            <Badge className="text-xl font-bold text-white">{taskMetrics.total}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Completed</p>
-                            <Badge className="text-xl font-bold text-emerald-400">{taskMetrics.completed}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">In Progress</p>
-                            <Badge className="text-xl font-bold text-cyan-400">{taskMetrics.inProgress}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Pending</p>
-                            <Badge className="text-xl font-bold text-amber-400">{taskMetrics.pending}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Overdue</p>
-                            <Badge className="text-xl font-bold text-rose-400">{taskMetrics.overdue}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Due Today</p>
-                            <Badge className="text-xl font-bold text-violet-400">{taskMetrics.dueToday}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">High Priority</p>
-                            <Badge className="text-xl font-bold text-rose-400">{taskMetrics.highPriority}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Medium Priority</p>
-                            <Badge className="text-xl font-bold text-amber-400">{taskMetrics.mediumPriority}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Low Priority</p>
-                            <Badge className="text-xl font-bold text-sky-400">{taskMetrics.lowPriority}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">No Due Date</p>
-                            <Badge className="text-xl font-bold text-slate-300">{taskMetrics.withoutDueDate}</Badge>
-                          </div>
-                        </div>
+                        <MetricGrid
+                          metrics={[
+                            { label: "Total Tasks", value: taskMetrics.total, colorClass: "bg-slate-400" },
+                            { label: "Completed", value: taskMetrics.completed, colorClass: "bg-emerald-400" },
+                            { label: "In Progress", value: taskMetrics.inProgress, colorClass: "bg-cyan-400" },
+                            { label: "Pending", value: taskMetrics.pending, colorClass: "bg-amber-400" },
+                            { label: "Overdue", value: taskMetrics.overdue, colorClass: "bg-rose-400" },
+                            { label: "Due Today", value: taskMetrics.dueToday, colorClass: "bg-violet-400" },
+                            { label: "High Priority", value: taskMetrics.highPriority, colorClass: "bg-rose-400" },
+                            { label: "Medium Priority", value: taskMetrics.mediumPriority, colorClass: "bg-amber-400" },
+                            { label: "Low Priority", value: taskMetrics.lowPriority, colorClass: "bg-sky-400" },
+                            { label: "No Due Date", value: taskMetrics.withoutDueDate, colorClass: "bg-slate-300 text-slate-800" },
+                          ]}
+                        />
                       )}
                     </CardContent>
                   </Card>
@@ -259,44 +231,19 @@ export default function AnalyticsOverviewPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Total Habits</p>
-                            <Badge className="text-xl font-bold text-white">{habitMetrics.total}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Active Streaks</p>
-                            <Badge className="text-xl font-bold text-emerald-400">{habitMetrics.active}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Broken Streaks</p>
-                            <Badge className="text-xl font-bold text-rose-400">{habitMetrics.broken}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">At Risk</p>
-                            <Badge className="text-xl font-bold text-amber-400">{habitMetrics.atRisk}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Daily Habits</p>
-                            <Badge className="text-xl font-bold text-cyan-400">{habitMetrics.daily}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Weekly Habits</p>
-                            <Badge className="text-xl font-bold text-violet-400">{habitMetrics.weekly}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Avg Current Streak</p>
-                            <Badge className="text-xl font-bold text-sky-400">{habitMetrics.averageStreak}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
-                            <p className="text-slate-400">Longest Streak</p>
-                            <Badge className="text-xl font-bold text-fuchsia-400">{habitMetrics.longestStreak}</Badge>
-                          </div>
-                          <div className="rounded-xl bg-white/5 border border-white/10 p-3 col-span-2 flex items-center justify-between">
-                            <p className="text-slate-400">Mercy Active</p>
-                            <Badge className="text-xl font-bold text-orange-400">{habitMetrics.mercyActive}</Badge>
-                          </div>
-                        </div>
+                        <MetricGrid
+                          metrics={[
+                            { label: "Total Habits", value: habitMetrics.total, colorClass: "bg-white text-slate-800" },
+                            { label: "Active Streaks", value: habitMetrics.active, colorClass: "bg-emerald-400" },
+                            { label: "Broken Streaks", value: habitMetrics.broken, colorClass: "bg-rose-400" },
+                            { label: "At Risk", value: habitMetrics.atRisk, colorClass: "bg-amber-400" },
+                            { label: "Daily Habits", value: habitMetrics.daily, colorClass: "bg-cyan-400" },
+                            { label: "Weekly Habits", value: habitMetrics.weekly, colorClass: "bg-violet-400" },
+                            { label: "Avg Current Streak", value: habitMetrics.averageStreak, colorClass: "bg-sky-400" },
+                            { label: "Longest Streak", value: habitMetrics.longestStreak, colorClass: "bg-fuchsia-400" },
+                            { label: "Mercy Active", value: habitMetrics.mercyActive, colorClass: "bg-orange-400", colSpan: 2 },
+                          ]}
+                        />
                       )}
                     </CardContent>
                   </Card>
@@ -318,7 +265,8 @@ export default function AnalyticsOverviewPage() {
                         <EmptyTitle>No tasks found.</EmptyTitle>
                       </Empty>
                     ) : (
-                      <Table className="text-sm">
+                      <div className="w-full overflow-x-auto">
+                        <Table className="text-sm min-w-[920px]">
                         <TableHeader>
                           <TableRow className="text-left text-slate-400 border-b border-white/10">
                             <TableHead className="py-2 pr-4 text-white">Title</TableHead>
@@ -345,7 +293,8 @@ export default function AnalyticsOverviewPage() {
                             </TableRow>
                           ))}
                         </TableBody>
-                      </Table>
+                        </Table>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -366,7 +315,8 @@ export default function AnalyticsOverviewPage() {
                         <EmptyTitle>No habits found.</EmptyTitle>
                       </Empty>
                     ) : (
-                      <Table className="text-sm">
+                      <div className="w-full overflow-x-auto">
+                        <Table className="text-sm min-w-[980px]">
                         <TableHeader>
                           <TableRow className="text-left text-slate-400 border-b border-white/10">
                             <TableHead className="py-2 pr-4 text-white">Habit</TableHead>
@@ -395,7 +345,8 @@ export default function AnalyticsOverviewPage() {
                             </TableRow>
                           ))}
                         </TableBody>
-                      </Table>
+                        </Table>
+                      </div>
                     )}
                   </CardContent>
                 </Card>

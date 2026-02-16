@@ -15,15 +15,15 @@ const PAST_DAYS_OPTIONS = [
 ] as const;
 
 export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHeaderProps) {
-    return (
-        <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-4 md:p-6 mb-6">
+            return (
+                <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-1 md:p-2 mb-1">
             <div className="max-w-7xl mx-auto">
                 <PageHeader
                     title="Analytics Overview"
                     subtitle="Track your productivity trends and study habits."
                     className="mb-0" // Remove default margin as header provides padding
                 >
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap items-center justify-start md:justify-end gap-3 w-full md:w-auto min-w-0">
                         <FilterDropdown
                             value={pastDays}
                             options={PAST_DAYS_OPTIONS}
@@ -33,10 +33,10 @@ export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHe
                         />
                         <Button
                             onClick={onExport}
-                            className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:shadow-cyan-500/25 h-12 px-6 rounded-xl font-bold"
+                            className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:shadow-cyan-500/25 h-12 px-4 md:px-6 rounded-xl font-bold"
                         >
                             <Download className="w-4 h-4 mr-2" />
-                            Export Report
+                            <span className="hidden sm:inline">Export Report</span>
                         </Button>
                     </div>
                 </PageHeader>

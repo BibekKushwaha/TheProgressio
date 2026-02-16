@@ -74,35 +74,34 @@ export function TaskInputCard({ value, onChange, isParsing, highlights = [] }: T
     );
 
     return (
-        <div className="relative bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl shadow-purple-500/10">
+        <div className="group bg-slate-950/70 border border-white/10 rounded-2xl px-2 py-1 md:px-3 md:py-2 shadow-inner shadow-black/30">
             <div className="relative">
-                {/* Highlight overlay — positioned behind the textarea */}
                 <div
-                    className="absolute inset-0 text-lg leading-relaxed pointer-events-none whitespace-pre-wrap break-words text-transparent"
+                    className="absolute inset-0 text-sm md:text-sm leading-none font-medium pointer-events-none whitespace-nowrap overflow-hidden text-transparent"
                     aria-hidden="true"
                 >
                     <div className="text-white/90">{highlightedContent}</div>
                 </div>
 
                 <textarea
-                    className="w-full min-h-[120px] text-lg leading-relaxed focus:outline-none resize-none bg-transparent text-white placeholder-slate-400 relative z-10 caret-white"
-                    style={highlights.length > 0 ? { color: 'transparent', caretColor: 'white' } : {}}
+                    rows={1}
+                    className="w-full min-h-[36px] md:min-h-[40px] text-sm md:text-sm leading-none font-medium focus:outline-none resize-none bg-transparent text-white placeholder-slate-600 relative z-10 caret-purple-400 overflow-hidden"
+                    style={highlights.length > 0 ? { color: 'transparent', caretColor: '#c084fc' } : {}}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder="Describe your task..."
                 />
+            </div>
 
-                <div className="absolute bottom-0 right-0 flex items-center gap-3 z-20">
-                    <div className="text-xs text-purple-400 flex items-center gap-2">
-                        {isParsing && (
-                            <>
-                                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></div>
-                                AI Parsing…
-                            </>
-                        )}
+            <div className="flex items-center justify-between gap-2">
+                {isParsing ? (
+                    <div className="flex items-center gap-2 text-xs text-slate-300">
+                        <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" />
+                        <span className="truncate">AI is parsing…</span>
                     </div>
-                    <VoiceInput onResult={handleVoiceResult} isCompact />
-                </div>
+                ) : <span className="text-xs text-transparent select-none">status</span>}
+
+                <VoiceInput onResult={handleVoiceResult} isCompact />
             </div>
         </div>
     );

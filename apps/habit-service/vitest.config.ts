@@ -7,6 +7,7 @@ export default defineConfig({
             // Allow .js imports to resolve to .ts source
         },
     },
+    cacheDir: '.vitest-cache',
     test: {
         globals: true,
         environment: 'node',

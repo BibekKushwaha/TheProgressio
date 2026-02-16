@@ -29,11 +29,12 @@ export function MetaChips({ subject, date, time, subjectColor }: MetaChipsProps)
     if (chips.length === 0) return null;
 
     return (
-        <div className="flex flex-wrap gap-3 mt-4">
-            {chips.map((chip) => (
+        <div className="flex flex-wrap gap-2.5">
+            {chips.map((chip, index) => (
                 <div
                     key={chip.label}
-                    className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-r ${chip.color} rounded-full border border-white/20 shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-300`}
+                    className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-r ${chip.color} rounded-xl border border-white/20 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300 hover:scale-105 transition-transform`}
+                    style={{ animationDelay: `${index * 50}ms` }}
                 >
                     <chip.icon className="w-4 h-4 text-white" />
                     <span className="text-sm font-semibold text-white">{chip.value}</span>

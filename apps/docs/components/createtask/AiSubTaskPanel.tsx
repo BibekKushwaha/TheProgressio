@@ -22,11 +22,13 @@ export function AISubtaskPanel({ subtasks, onSubtaskToggle, isLoading, onGenerat
     const [enabled, setEnabled] = useState(true);
 
     return (
-        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+        <div className="bg-gradient-to-br from-white/8 to-white/4 backdrop-blur-xl border border-white/15 rounded-2xl p-6 shadow-2xl hover:border-white/20 transition-all duration-500 group">
             <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-400" />
-                    <h3 className="font-bold text-white">AI Subtask Generator</h3>
+                <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-purple-500/10 rounded-lg">
+                        <Sparkles className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <h3 className="font-bold text-white text-lg">AI Subtask Generator</h3>
                 </div>
 
                 <button
@@ -35,22 +37,22 @@ export function AISubtaskPanel({ subtasks, onSubtaskToggle, isLoading, onGenerat
                         setEnabled(newState);
                         if (newState) onGenerate();
                     }}
-                    className={`relative w-12 h-6 rounded-full transition-all duration-300 ${enabled ? 'bg-gradient-to-r from-purple-600 to-pink-600' : 'bg-white/20'
+                    className={`relative w-14 h-7 rounded-full transition-all duration-300 shadow-inner ${enabled ? 'bg-gradient-to-r from-purple-600 to-pink-600 shadow-purple-500/30' : 'bg-white/10'
                         }`}
                     aria-label="Toggle AI subtask generator"
                 >
                     <div
-                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${enabled ? 'left-7' : 'left-1'
+                        className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${enabled ? 'left-8' : 'left-1'
                             }`}
                     ></div>
                 </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
                 {subtasks.map((subtask, index) => (
                     <label
                         key={subtask.id}
-                        className={`flex items-start gap-3 p-3 bg-white/5 border border-white/10 rounded-xl transition-all animate-in slide-in-from-left-2 fade-in ${subtask.loading ? 'opacity-50' : 'hover:bg-white/10 cursor-pointer'
+                        className={`flex items-start gap-3 p-4 bg-white/5 border border-white/10 rounded-xl transition-all hover:bg-white/8 hover:border-white/15 animate-in slide-in-from-left-2 fade-in ${subtask.loading ? 'opacity-50' : 'cursor-pointer'
                             }`}
                         style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'both' }}
                     >
@@ -59,9 +61,9 @@ export function AISubtaskPanel({ subtasks, onSubtaskToggle, isLoading, onGenerat
                             checked={subtask.completed}
                             disabled={subtask.loading}
                             onChange={() => onSubtaskToggle(subtask.id)}
-                            className="w-5 h-5 mt-0.5 rounded border-2 border-purple-500 bg-transparent checked:bg-purple-500 cursor-pointer disabled:cursor-not-allowed"
+                            className="w-5 h-5 mt-0.5 rounded-lg border-2 border-purple-500/50 bg-transparent checked:bg-purple-600 checked:border-purple-600 cursor-pointer disabled:cursor-not-allowed transition-all"
                         />
-                        <span className={`flex-1 text-sm ${subtask.loading ? 'text-slate-500 italic' : 'text-slate-200'}`}>
+                        <span className={`flex-1 text-sm leading-relaxed ${subtask.loading ? 'text-slate-500 italic' : 'text-slate-200'}`}>
                             {subtask.text}
                         </span>
                         {subtask.loading && (
@@ -70,7 +72,7 @@ export function AISubtaskPanel({ subtasks, onSubtaskToggle, isLoading, onGenerat
                     </label>
                 ))}
                 {isLoading && (
-                    <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-xl opacity-50">
+                    <div className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl opacity-50">
                         <div className="w-4 h-4 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
                         <span className="text-sm text-slate-500 italic">Generating subtasks...</span>
                     </div>
