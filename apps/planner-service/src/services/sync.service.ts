@@ -1,4 +1,7 @@
 import { prisma, Priority, Status } from '@repo/db';
+import { emitTaskEvent, TaskEventType } from './producer.service.js';
+
+const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://localhost:4003';
 
 export type SyncEntityType = 'task' | 'category';
 export type SyncAction = 'UPSERT' | 'DELETE';
@@ -255,6 +258,27 @@ const applyTaskOperation = async (params: {
   vectorClock: Record<string, number> | null;
 }) => {
   if (params.action === 'DELETE') {
+    // Emit deletion event and notify analytics (HTTP fallback)
+    try {
+      await emitTaskEvent(TaskEventType.TASK_DELETED, params.entityId, params.userId, {
+        title: params.payload?.title ?? null,
+        previousStatus: params.payload?.status ?? null,
+      });
+    } catch (err) {
+      // non-blocking
+      console.warn('Failed to emit task.deleted event from sync service', err);
+    }
+
+    try {
+      await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'TASK_DELETED', taskId: params.entityId, userId: params.userId }),
+      });
+    } catch (_err) {
+      // swallow errors for robustness
+    }
+
     await prisma.task.deleteMany({
       where: {
         id: params.entityId,
@@ -297,6 +321,28 @@ const applyTaskOperation = async (params: {
         syncVectorClock,
       },
     });
+    // If status changed, emit status change event and notify analytics fallback
+    if (normalized.status !== existing.status) {
+      try {
+        await emitTaskEvent(TaskEventType.TASK_STATUS_CHANGED, params.entityId, params.userId, {
+          previousStatus: existing.status,
+          newStatus: normalized.status,
+          title: normalized.title,
+        });
+      } catch (err) {
+        console.warn('Failed to emit task.status_changed event from sync service', err);
+      }
+
+      try {
+        await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'TASK_STATUS_CHANGED', taskId: params.entityId, userId: params.userId, previousStatus: existing.status, newStatus: normalized.status }),
+        });
+      } catch (_err) {
+        // ignore
+      }
+    }
     return;
   }
 
@@ -315,6 +361,16 @@ const applyTaskOperation = async (params: {
       syncVectorClock,
     },
   });
+  // Emit created event (helps downstream consumers stay in sync)
+  try {
+    await emitTaskEvent(TaskEventType.TASK_CREATED, params.entityId, params.userId, {
+      title: normalized.title,
+      priority: normalized.priority,
+      dueDate: normalized.dueDate,
+    });
+  } catch (_err) {
+    // non-blocking
+  }
 };
 
 const applyCategoryOperation = async (params: {

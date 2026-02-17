@@ -35,7 +35,7 @@ export default function ReportsPage() {
         { category: "Consistency", value: focusScoreData.stats.breakdown.consistency * 2.5 }, // Normalize to 100-ish if needed, or just use raw points
         { category: "Intensity", value: focusScoreData.stats.breakdown.intensity * 3.3 },
         { category: "Depth", value: focusScoreData.stats.breakdown.depth * 3.3 },
-        { category: "Efficiency", value: focusScoreData.stats.score },
+        { category: "Efficiency", value: focusScoreData?.stats?.scorePercent ?? focusScoreData.stats.score },
         { category: "Balance", value: 75 }, // Mocked as not available in current API
     ] : [];
 

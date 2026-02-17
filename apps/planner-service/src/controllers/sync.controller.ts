@@ -1,6 +1,8 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { processSyncPull, processSyncPush, type IncomingSyncOperation } from '../services/sync.service.js';
+import { TryCatch } from "../utils/tryCatch.js";
+import ErrorHandler from "../utils/errorHandler.js";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -32,60 +34,44 @@ const parseIncomingOperation = (value: unknown): IncomingSyncOperation | null =>
   };
 };
 
-export const pushSyncOperations = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
+export const pushSyncOperations = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
 
-    const clientId = typeof req.body?.clientId === 'string' ? req.body.clientId.trim() : '';
-    if (!clientId) {
-      return res.status(400).json({ message: 'clientId is required' });
-    }
-
-    const operations = asArray(req.body?.operations)
-      .map(parseIncomingOperation)
-      .filter((operation): operation is IncomingSyncOperation => operation !== null);
-
-    if (operations.length === 0) {
-      return res.status(400).json({ message: 'operations must contain at least one valid operation' });
-    }
-
-    const result = await processSyncPush(userId, {
-      clientId,
-      operations,
-    });
-
-    return res.status(200).json({
-      message: 'Sync push processed',
-      ...result,
-    });
-  } catch (error) {
-    console.error('Sync push failed:', error);
-    return res.status(500).json({ message: 'Failed to process sync push' });
+  const clientId = typeof req.body?.clientId === 'string' ? req.body.clientId.trim() : '';
+  if (!clientId) {
+    throw new ErrorHandler(400, 'clientId is required');
   }
-};
 
-export const pullSyncOperations = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
+  const operations = asArray(req.body?.operations)
+    .map(parseIncomingOperation)
+    .filter((operation): operation is IncomingSyncOperation => operation !== null);
 
-    const sinceRaw = req.query.since;
-    const parsedSince = typeof sinceRaw === 'string' ? Number.parseInt(sinceRaw, 10) : 0;
-    const since = Number.isFinite(parsedSince) ? parsedSince : 0;
-
-    const result = await processSyncPull(userId, since);
-
-    return res.status(200).json({
-      message: 'Sync pull result',
-      ...result,
-    });
-  } catch (error) {
-    console.error('Sync pull failed:', error);
-    return res.status(500).json({ message: 'Failed to process sync pull' });
+  if (operations.length === 0) {
+    throw new ErrorHandler(400, 'operations must contain at least one valid operation');
   }
-};
+
+  const result = await processSyncPush(userId, {
+    clientId,
+    operations,
+  });
+
+  return res.status(200).json({
+    message: 'Sync push processed',
+    ...result,
+  });
+});
+
+export const pullSyncOperations = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+
+  const sinceRaw = req.query.since;
+  const parsedSince = typeof sinceRaw === 'string' ? Number.parseInt(sinceRaw, 10) : 0;
+  const since = Number.isFinite(parsedSince) ? parsedSince : 0;
+
+  const result = await processSyncPull(userId, since);
+
+  return res.status(200).json({
+    message: 'Sync pull result',
+    ...result,
+  });
+});

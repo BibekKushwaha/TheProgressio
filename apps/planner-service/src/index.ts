@@ -16,6 +16,7 @@ import syncRouter from "./routes/sync.route.js";
 import notificationRouter from "./routes/notification.route.js";
 import { producer } from "./services/producer.service.js";
 import { runSilentWatchSweep } from "./services/whatsapp-watch.service.js";
+import { errorMiddleware } from "./middleware/error.middleware.js";
 
 export const app = express();
 
@@ -45,6 +46,8 @@ app.use("/api/attachments", isAuth, attachmentRouter);
 app.use("/api/timetable", isAuth, timetableRouter);
 app.use("/api/calendar", isAuth, calendarRouter);
 app.use("/api/rotations", isAuth, rotationRouter);
+
+app.use(errorMiddleware);
 
 const PORT = process.env.PORT || 4001;
 

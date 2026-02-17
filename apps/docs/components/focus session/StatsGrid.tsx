@@ -23,7 +23,9 @@ export function StatsGrid({ taskTitle }: StatsGridProps = {}) {
         refetchOnReconnect: true,
     });
 
-    const focusScore = focusData?.stats?.score ?? 0;
+    // Prefer normalized scorePercent/scoreDisplay provided by the store
+    const focusScoreNumeric = Number(focusData?.stats?.scorePercent ?? focusData?.stats?.score ?? 0);
+    const focusScoreDisplay = focusData?.stats?.scoreDisplay ?? (Number.isFinite(focusScoreNumeric) ? `${Math.round(focusScoreNumeric)}.0` : '0');
     const dailyHours = summaryData?.stats?.totalHours ?? 0;
     const dailyGoal = summaryData?.stats?.dailyGoalHours ?? 4;
     const goalProgress = dailyGoal > 0 ? Math.min(100, Math.round((dailyHours / dailyGoal) * 100)) : 0;
@@ -34,8 +36,8 @@ export function StatsGrid({ taskTitle }: StatsGridProps = {}) {
         {
             id: 1,
             title: 'Focus Quality',
-            value: `${focusScore}%`,
-            subtitle: focusScore >= 80 ? 'Excellent focus today' : 'Keep improving!',
+            value: `${focusScoreDisplay}%`,
+            subtitle: Number.isFinite(focusScoreNumeric) && focusScoreNumeric >= 80 ? 'Excellent focus today' : 'Keep improving!',
             icon: Star,
             color: 'yellow',
         },

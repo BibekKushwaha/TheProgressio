@@ -1,12 +1,17 @@
 import DataUriParser from "datauri/parser.js";
 import path from "path";
 
-const getBuffer = (file: any) => {
+const getBuffer = (file: { originalname: string; buffer: Buffer }) => {
   const parser = new DataUriParser();
 
   const extName = path.extname(file.originalname).toString();
 
-  return parser.format(extName, file.buffer);
+  const result = parser.format(extName, file.buffer);
+  if (!result || !result.content) {
+    throw new Error("Unable to create data URI");
+  }
+
+  return result;
 };
 
 export default getBuffer;

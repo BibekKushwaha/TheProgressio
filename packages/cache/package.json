@@ -1,0 +1,48 @@
+{
+  "name": "@repo/cache",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./cache": {
+      "types": "./dist/cache.d.ts",
+      "import": "./dist/cache.js"
+    },
+    "./rateLimiter": {
+      "types": "./dist/rateLimiter.d.ts",
+      "import": "./dist/rateLimiter.js"
+    },
+    "./taskCache": {
+      "types": "./dist/taskCache.d.ts",
+      "import": "./dist/taskCache.js"
+    }
+    ,"./userCache": {
+      "types": "./dist/userCache.d.ts",
+      "import": "./dist/userCache.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.36.2"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "typescript": "5.9.2",
+    "vitest": "^3.2.1"
+  }
+}

@@ -256,11 +256,9 @@ export class AIService {
             const normalizedBase64 = this.decodeBase64Payload(fileBase64);
             if (!normalizedBase64) return "";
             const fileBuffer = Buffer.from(normalizedBase64, "base64");
-            const pdfParseModule = await import("pdf-parse");
-            const parser = new pdfParseModule.PDFParse({ data: fileBuffer });
-            const textResult = await parser.getText();
-            await parser.destroy();
-            return typeof textResult?.text === "string" ? textResult.text.trim() : "";
+            const pdf = (await import("pdf-parse") as any).default || (await import("pdf-parse") as any);
+            const data = await pdf(fileBuffer);
+            return typeof data?.text === "string" ? data.text.trim() : "";
         } catch (error) {
             console.warn("⚠️ Local PDF text extraction failed:", this.toErrorSummary(error));
             return "";
@@ -612,9 +610,6 @@ export class AIService {
         let dueDate: Date | undefined = undefined;
         const now = new Date();
 
-        // Regex for stripping common date terms
-        const dateTermsRegex = /\b(tomorrow|today|day after tomorrow|next week|this sunday|next monday|next tuesday|next wednesday|next thursday|next friday|next saturday|next sunday)\b/gi;
-
         // "Tomorrow", "Today"
         if (normalizedText.includes("tomorrow")) {
             dueDate = new Date(now);
@@ -655,7 +650,7 @@ export class AIService {
         // Also simple "3pm" without "at/by"
         const simpleTimeRegex = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
 
-        let timeMatch = normalizedText.match(timeRegex) || normalizedText.match(simpleTimeRegex);
+        const timeMatch = normalizedText.match(timeRegex) || normalizedText.match(simpleTimeRegex);
 
         if (timeMatch) {
             if (dueDate) {
@@ -762,7 +757,7 @@ export class AIService {
             console.warn("⚠️ Primary AI model failed for subtasks:", error);
             try {
                 return await this.generateSubtasksWithModel(this.textModelIdentifier, prompt);
-            } catch (fallbackError) {
+            } catch (_fallbackError) {
                 console.warn("⚠️ AI Subtasks failed completely. Returning generic steps.");
                 return this.fallbackSubtasks(taskTitle);
             }

@@ -16,8 +16,6 @@ import {
     revokeFamilyShareLink,
     updateProfile,
 } from '../controllers/auth.controller.js';
-import { prisma } from '@repo/db';
-import bcrypt from 'bcrypt';
 
 const router = express.Router();
 

@@ -199,3 +199,20 @@ select::-moz-placeholder { color: #9CA3AF !important; }
 input:-ms-input-placeholder,
 textarea:-ms-input-placeholder,
 select:-ms-input-placeholder { color: #9CA3AF !important; }
+
+/* One-shot pulse animation used to draw attention to a focused card */
+@keyframes pulse-once {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168,85,247,0.65);
+  }
+  60% {
+    box-shadow: 0 0 0 10px rgba(168,85,247,0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(168,85,247,0);
+  }
+}
+
+.pulse-once {
+  animation: pulse-once 1600ms cubic-bezier(.2,.9,.2,1) 1;
+}

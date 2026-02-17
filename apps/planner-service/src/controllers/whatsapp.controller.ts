@@ -22,14 +22,14 @@ import {
     sendWhatsAppText,
 } from "../services/meta-whatsapp.service.js";
 import { runSilentWatchSweep } from "../services/whatsapp-watch.service.js";
+import { TryCatch } from "../utils/tryCatch.js";
+import ErrorHandler from "../utils/errorHandler.js";
 
-const ensureAuthorized = (req: Request, res: Response): boolean => {
+const ensureAuthorized = (req: Request) => {
     const secretHeader = req.headers["x-whatsapp-secret"];
     if (!isWhatsAppCaptureAuthorized(Array.isArray(secretHeader) ? secretHeader[0] : secretHeader)) {
-        res.status(401).json({ message: "Unauthorized WhatsApp capture request" });
-        return false;
+        throw new ErrorHandler(401, "Unauthorized WhatsApp capture request");
     }
-    return true;
 };
 
 const parseAction = (actionId: string): { key: string; taskId: string | null } => {
@@ -146,196 +146,157 @@ export const verifyWhatsAppWebhook = (req: Request, res: Response) => {
     const challenge = req.query["hub.challenge"];
 
     if (mode === "subscribe" && isWhatsAppVerificationValid(token)) {
-        return res.status(200).send(typeof challenge === "string" ? challenge : "");
+        return res.status(200).send(challenge as string);
     }
 
     return res.status(403).json({ message: "WhatsApp webhook verification failed" });
 };
 
-export const captureWhatsAppTask = async (req: Request, res: Response) => {
-    try {
-        if (!ensureAuthorized(req, res)) return;
+export const captureWhatsAppTask = TryCatch(async (req: Request, res: Response) => {
+    ensureAuthorized(req);
 
-        const parsedPayload = whatsappCaptureSchema.safeParse(req.body ?? {});
-        if (!parsedPayload.success) {
-            return res.status(400).json({
-                message: "Invalid WhatsApp payload",
-                errors: parsedPayload.error.flatten(),
-            });
-        }
+    const parsedPayload = whatsappCaptureSchema.safeParse(req.body ?? {});
+    if (!parsedPayload.success) {
+        throw new ErrorHandler(400, "Invalid WhatsApp payload");
+    }
 
-        const inbound = extractWhatsAppInbound(parsedPayload.data);
-        const userId = resolveWhatsAppUserId({
-            explicitUserId: inbound.explicitUserId,
+    const inbound = extractWhatsAppInbound(parsedPayload.data);
+    const userId = resolveWhatsAppUserId({
+        explicitUserId: inbound.explicitUserId,
+        sender: inbound.sender,
+    });
+
+    if (!userId) {
+        throw new ErrorHandler(400, "User could not be resolved. Provide body.userId or configure WHATSAPP_NUMBER_USER_MAP.");
+    }
+
+    if (inbound.interactiveReplyId) {
+        const actionResult = await handleInteractiveAction({
+            userId,
+            actionId: inbound.interactiveReplyId,
             sender: inbound.sender,
         });
-
-        if (!userId) {
-            return res.status(400).json({
-                message: "User could not be resolved. Provide body.userId or configure WHATSAPP_NUMBER_USER_MAP.",
-            });
-        }
-
-        if (inbound.interactiveReplyId) {
-            const actionResult = await handleInteractiveAction({
-                userId,
-                actionId: inbound.interactiveReplyId,
-                sender: inbound.sender,
-            });
-            return res.status(actionResult.status).json(actionResult.body);
-        }
-
-        const transcription = await resolveWhatsAppTranscript(inbound);
-        const ocr = await resolveWhatsAppOcr(inbound);
-        const messageText = inbound.text ?? transcription.transcript ?? ocr.text;
-
-        if (!messageText) {
-            return res.status(400).json({ message: "No parseable text message found in payload" });
-        }
-
-        const { task, parsedData } = await createTaskFromText({
-            userId,
-            text: messageText,
-            source: inbound.text ? "whatsapp-capture" : transcription.transcript ? "whatsapp-capture-voice" : "whatsapp-capture-ocr",
-            metadata: {
-                ...(inbound.sender ? { sender: inbound.sender } : {}),
-                ...(inbound.audioUrl ? { audioUrl: inbound.audioUrl } : {}),
-                ...(inbound.audioMessageId ? { audioMessageId: inbound.audioMessageId } : {}),
-                ...(inbound.imageUrl ? { imageUrl: inbound.imageUrl } : {}),
-                ...(inbound.imageMessageId ? { imageMessageId: inbound.imageMessageId } : {}),
-                ...(inbound.imageCaption ? { imageCaption: inbound.imageCaption } : {}),
-                ...(transcription.language ? { language: transcription.language } : {}),
-                ...(transcription.confidence !== null ? { transcriptionConfidence: transcription.confidence } : {}),
-                ...(transcription.source !== "none" ? { transcriptionSource: transcription.source } : {}),
-                ...(ocr.language ? { ocrLanguage: ocr.language } : {}),
-                ...(ocr.confidence !== null ? { ocrConfidence: ocr.confidence } : {}),
-                ...(ocr.source !== "none" ? { ocrSource: ocr.source } : {}),
-            },
-        });
-
-        return res.status(201).json({
-            message: "Task captured from WhatsApp",
-            task,
-            parsedMeta: parsedData,
-        });
-    } catch (error) {
-        console.error("WhatsApp capture error:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        return res.status(actionResult.status).json(actionResult.body);
     }
-};
 
-export const sendWhatsAppTaskReminder = async (req: Request, res: Response) => {
-    try {
-        if (!ensureAuthorized(req, res)) return;
+    const transcription = await resolveWhatsAppTranscript(inbound);
+    const ocr = await resolveWhatsAppOcr(inbound);
+    const messageText = inbound.text ?? transcription.transcript ?? ocr.text;
 
-        const parsed = whatsappTaskReminderSchema.safeParse(req.body ?? {});
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "to and taskId are required",
-                errors: parsed.error.flatten(),
-            });
-        }
-
-        const { to, taskId } = parsed.data;
-
-        const task = await prisma.task.findUnique({ where: { id: taskId } });
-        if (!task) {
-            return res.status(404).json({ message: "Task not found" });
-        }
-
-        await sendWhatsAppInteractiveButtons({
-            to,
-            body: `Reminder: ${task.title}`,
-            footer: "Choose a quick action",
-            buttons: [
-                { id: `task_complete:${task.id}`, title: "Mark as Completed" },
-                { id: `task_snooze_1h:${task.id}`, title: "Snooze 1 Hour" },
-                { id: `task_breakdown:${task.id}`, title: "✨ Break it down" },
-            ],
-        });
-
-        return res.status(200).json({ message: "Interactive reminder sent", taskId: task.id });
-    } catch (error) {
-        console.error("WhatsApp reminder send error:", error);
-        return res.status(500).json({ message: "Failed to send reminder" });
+    if (!messageText) {
+        throw new ErrorHandler(400, "No parseable text message found in payload");
     }
-};
 
-export const sendWhatsAppTemplateMessage = async (req: Request, res: Response) => {
-    try {
-        if (!ensureAuthorized(req, res)) return;
+    const { task, parsedData } = await createTaskFromText({
+        userId,
+        text: messageText,
+        source: inbound.text ? "whatsapp-capture" : transcription.transcript ? "whatsapp-capture-voice" : "whatsapp-capture-ocr",
+        metadata: {
+            ...(inbound.sender ? { sender: inbound.sender } : {}),
+            ...(inbound.audioUrl ? { audioUrl: inbound.audioUrl } : {}),
+            ...(inbound.audioMessageId ? { audioMessageId: inbound.audioMessageId } : {}),
+            ...(inbound.imageUrl ? { imageUrl: inbound.imageUrl } : {}),
+            ...(inbound.imageMessageId ? { imageMessageId: inbound.imageMessageId } : {}),
+            ...(inbound.imageCaption ? { imageCaption: inbound.imageCaption } : {}),
+            ...(transcription.language ? { language: transcription.language } : {}),
+            ...(transcription.confidence !== null ? { transcriptionConfidence: transcription.confidence } : {}),
+            ...(transcription.source !== "none" ? { transcriptionSource: transcription.source } : {}),
+            ...(ocr.language ? { ocrLanguage: ocr.language } : {}),
+            ...(ocr.confidence !== null ? { ocrConfidence: ocr.confidence } : {}),
+            ...(ocr.source !== "none" ? { ocrSource: ocr.source } : {}),
+        },
+    });
 
-        const parsed = whatsappTemplateMessageSchema.safeParse(req.body ?? {});
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "to and templateName are required",
-                errors: parsed.error.flatten(),
-            });
-        }
+    return res.status(201).json({
+        message: "Task captured from WhatsApp",
+        task,
+        parsedMeta: parsedData,
+    });
+});
 
-        const { to, templateName, languageCode, bodyVariables } = parsed.data;
+export const sendWhatsAppTaskReminder = TryCatch(async (req: Request, res: Response) => {
+    ensureAuthorized(req);
 
-        await sendWhatsAppTemplate({
-            to,
-            templateName,
-            languageCode: typeof languageCode === "string" ? languageCode : "en",
-            bodyVariables: Array.isArray(bodyVariables) ? bodyVariables.map((v) => String(v)) : [],
-        });
-
-        return res.status(200).json({ message: "Template message sent" });
-    } catch (error) {
-        console.error("WhatsApp template send error:", error);
-        return res.status(500).json({ message: "Failed to send template" });
+    const parsed = whatsappTaskReminderSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "to and taskId are required");
     }
-};
 
-export const sendOutcomeNudge = async (req: Request, res: Response) => {
-    try {
-        if (!ensureAuthorized(req, res)) return;
+    const { to, taskId } = parsed.data;
 
-        const parsed = whatsappOutcomeNudgeSchema.safeParse(req.body ?? {});
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "to and userId are required",
-                errors: parsed.error.flatten(),
-            });
-        }
-
-        const { to, userId, targetPercentile = 95, chapter } = parsed.data;
-
-        const [totalTasks, completedTasks, nextPending] = await Promise.all([
-            prisma.task.count({ where: { userId } }),
-            prisma.task.count({ where: { userId, status: Status.COMPLETED } }),
-            prisma.task.findFirst({
-                where: { userId, status: { not: Status.COMPLETED } },
-                orderBy: { dueDate: "asc" },
-            }),
-        ]);
-
-        const completion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-        const nextTopic = typeof chapter === "string" && chapter.trim().length > 0
-            ? chapter.trim()
-            : nextPending?.title || "your next pending chapter";
-
-        await sendWhatsAppText(
-            to,
-            `You've completed ${completion}% of your planned syllabus. Finish '${nextTopic}' today to stay on track for your ${targetPercentile}th percentile target.`
-        );
-
-        return res.status(200).json({ message: "Outcome nudge sent", completion });
-    } catch (error) {
-        console.error("Outcome nudge send error:", error);
-        return res.status(500).json({ message: "Failed to send outcome nudge" });
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task) {
+        throw new ErrorHandler(404, "Task not found");
     }
-};
 
-export const triggerSilentWatch = async (req: Request, res: Response) => {
-    try {
-        if (!ensureAuthorized(req, res)) return;
-        const result = await runSilentWatchSweep();
-        return res.status(200).json({ message: "Silent watch sweep completed", ...result });
-    } catch (error) {
-        console.error("Silent watch sweep error:", error);
-        return res.status(500).json({ message: "Failed to run silent watch sweep" });
+    await sendWhatsAppInteractiveButtons({
+        to,
+        body: `Reminder: ${task.title}`,
+        footer: "Choose a quick action",
+        buttons: [
+            { id: `task_complete:${task.id}`, title: "Mark as Completed" },
+            { id: `task_snooze_1h:${task.id}`, title: "Snooze 1 Hour" },
+            { id: `task_breakdown:${task.id}`, title: "✨ Break it down" },
+        ],
+    });
+
+    return res.status(200).json({ message: "Interactive reminder sent", taskId: task.id });
+});
+
+export const sendWhatsAppTemplateMessage = TryCatch(async (req: Request, res: Response) => {
+    ensureAuthorized(req);
+
+    const parsed = whatsappTemplateMessageSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "to and templateName are required");
     }
-};
+
+    const { to, templateName, languageCode, bodyVariables } = parsed.data;
+
+    await sendWhatsAppTemplate({
+        to,
+        templateName,
+        languageCode: typeof languageCode === "string" ? languageCode : "en",
+        bodyVariables: Array.isArray(bodyVariables) ? bodyVariables.map((v) => String(v)) : [],
+    });
+
+    return res.status(200).json({ message: "Template message sent" });
+});
+
+export const sendOutcomeNudge = TryCatch(async (req: Request, res: Response) => {
+    ensureAuthorized(req);
+
+    const parsed = whatsappOutcomeNudgeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "to and userId are required");
+    }
+
+    const { to, userId, targetPercentile = 95, chapter } = parsed.data;
+
+    const [totalTasks, completedTasks, nextPending] = await Promise.all([
+        prisma.task.count({ where: { userId } }),
+        prisma.task.count({ where: { userId, status: Status.COMPLETED } }),
+        prisma.task.findFirst({
+            where: { userId, status: { not: Status.COMPLETED } },
+            orderBy: { dueDate: "asc" },
+        }),
+    ]);
+
+    const completion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const nextTopic = typeof chapter === "string" && chapter.trim().length > 0
+        ? chapter.trim()
+        : nextPending?.title || "your next pending chapter";
+
+    await sendWhatsAppText(
+        to,
+        `You've completed ${completion}% of your planned syllabus. Finish '${nextTopic}' today to stay on track for your ${targetPercentile}th percentile target.`
+    );
+
+    return res.status(200).json({ message: "Outcome nudge sent", completion });
+});
+
+export const triggerSilentWatch = TryCatch(async (req: Request, res: Response) => {
+    ensureAuthorized(req);
+    const result = await runSilentWatchSweep();
+    return res.status(200).json({ message: "Silent watch sweep completed", ...result });
+});

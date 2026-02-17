@@ -336,9 +336,16 @@ export const analyticsApi = createApi({
             query: (taskId) => `/stats/task/${taskId}`,
             providesTags: ['Stats'],
         }),
-        getFocusScore: builder.query<{ message: string; stats: FocusScoreStats }, void>({
+        getFocusScore: builder.query<{ message: string; stats: FocusScoreStats & { scorePercent?: number; scoreDisplay?: string } }, void>({
             query: () => '/stats/focus',
             providesTags: ['Stats'],
+            transformResponse: (response: { message: string; stats: FocusScoreStats }) => {
+                const stats = response?.stats || ({} as FocusScoreStats);
+                const raw = Number(stats?.score ?? NaN);
+                const scorePercent = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : undefined;
+                const scoreDisplay = typeof scorePercent === 'number' ? scorePercent.toFixed(1) : '—';
+                return { ...response, stats: { ...stats, scorePercent, scoreDisplay } } as { message: string; stats: FocusScoreStats & { scorePercent?: number; scoreDisplay?: string } };
+            },
         }),
         getUserStreak: builder.query<{ streak: number; activeDates: string[] }, void>({
             query: () => '/stats/streak',

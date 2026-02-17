@@ -2,8 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import crypto from "crypto";
 import { prisma } from "@repo/db";
-
-const prismaAny = prisma as any;
+import ErrorHandler from "../utils/errorHandler.js";
 
 export interface User {
     id: string;
@@ -41,7 +40,7 @@ const hashToken = (value: string): string =>
 
 const resolveShareSession = async (rawShareToken: string): Promise<{ user: User; permissions: string; linkId: string } | null> => {
     const tokenHash = hashToken(rawShareToken);
-    const link = await prismaAny.familyShareLink.findFirst({
+    const link = await (prisma as any).familyShareLink.findFirst({
         where: {
             tokenHash,
             revokedAt: null,
@@ -68,13 +67,13 @@ const resolveShareSession = async (rawShareToken: string): Promise<{ user: User;
 
     if (!user) return null;
 
-    await prismaAny.familyShareLink.update({
+    await (prisma as any).familyShareLink.update({
         where: { id: link.id },
         data: { lastUsedAt: new Date() },
     });
 
     return {
-        user,
+        user: user as User,
         permissions: link.permissions,
         linkId: link.id,
     };
@@ -95,8 +94,7 @@ export const isAuth = async (
         if (candidateShareToken) {
             const shareSession = await resolveShareSession(candidateShareToken);
             if (!shareSession) {
-                res.status(401).json({ message: "Invalid or expired share token" });
-                return;
+                return next(new ErrorHandler(401, "Invalid or expired share token"));
             }
 
             req.user = shareSession.user;
@@ -105,8 +103,7 @@ export const isAuth = async (
                 permissions: shareSession.permissions,
                 shareLinkId: shareSession.linkId,
             };
-            next();
-            return;
+            return next();
         }
 
         let token = "";
@@ -117,14 +114,12 @@ export const isAuth = async (
         }
 
         if (!token) {
-            res.status(401).json({ message: "Authentication token is missing" });
-            return;
+            return next(new ErrorHandler(401, "Authentication token is missing"));
         }
 
         const decodedPayload = jwt.verify(token, process.env.JWT_SEC as string) as JwtPayload;
         if (!decodedPayload?.id) {
-            res.status(401).json({ message: "Invalid token" });
-            return;
+            return next(new ErrorHandler(401, "Invalid token"));
         }
 
         const user = await prisma.user.findUnique({
@@ -138,16 +133,14 @@ export const isAuth = async (
         });
 
         if (!user) {
-            res.status(401).json({ message: "User associated with this token no longer exists." });
-            return;
+            return next(new ErrorHandler(401, "User no longer exists"));
         }
 
-        req.user = user;
+        req.user = user as User;
         req.authContext = { mode: "user" };
         next();
-    } catch (error) {
-        console.error(error);
-        res.status(401).json({ message: "Authentication failed. Please login again" });
+    } catch (_error) {
+        next(new ErrorHandler(401, "Authentication failed. Please login again"));
     }
 };
 
@@ -158,8 +151,7 @@ export const enforceReadOnlyWrites = (
 ): void => {
     const isWriteMethod = !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase());
     if (isWriteMethod && req.authContext?.mode === "share") {
-        res.status(403).json({ message: "Read-only access: write operations are not allowed" });
-        return;
+        throw new ErrorHandler(403, "Read-only access: write operations are not allowed");
     }
     next();
 };

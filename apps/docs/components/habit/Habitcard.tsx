@@ -5,7 +5,7 @@ import { HabitActionMenu } from './HabitActionMenu';
 import { useToast } from '@/components/ui/toast-provider';
 import { useEffect, useState } from 'react';
 
-export function HabitCard({ habit }: { habit: Habit }) {
+export function HabitCard({ habit, highlighted = false }: { habit: Habit; highlighted?: boolean }) {
     const hasNewTrophy = Boolean((habit as { newTrophy?: boolean }).newTrophy);
     // Determine the color theme. If the habit has an RTK-saved color (gradient), use it.
     // Otherwise fallback to a default purple gradient.
@@ -48,7 +48,10 @@ export function HabitCard({ habit }: { habit: Habit }) {
     };
 
     return (
-        <div className="group relative overflow-hidden bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 transition-all duration-300">
+        <div className={cn(
+            "group relative overflow-hidden bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 transition-all duration-300",
+            highlighted && 'ring-2 ring-purple-400/70 shadow-[0_0_0_1px_rgba(168,85,247,0.45)] pulse-once'
+        )}>
             {/* Background glow using the habit's color */}
             <div className={cn(
                 "absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-20 transition-opacity bg-gradient-to-br",

@@ -4,15 +4,17 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { enforceReadOnlyWrites, isAuth } from "./middleware/auth.middleware.js";
 import habitRouter from "./routes/habit.route.js";
-import { dispatchNudges, handleHabitEvent } from "./controllers/habit.controller.js";
-import { requireInternalDispatchAuth, requireInternalSignature } from "./middleware/internal.middleware.js";
+import { dispatchNudges, getInternalActiveDates, handleHabitEvent } from "./controllers/habit.controller.js";
+import { requireInternalDispatchAuth, requireInternalReadAuth, requireInternalSignature } from "./middleware/internal.middleware.js";
 import { habitConsumer, shutdownConsumer } from "./services/consumer.service.js";
 
 
 export const app = express();
 
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: FRONTEND_URL,
     credentials: true
 }));
 
@@ -22,25 +24,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (_req, res) => {
-    res.send("Habit Service API");
+    res.json({ message: "Habit Service API", status: "UP" });
 });
 
 app.post("/api/habits/events", requireInternalSignature, handleHabitEvent);
 app.post("/api/habits/nudges/dispatch", requireInternalDispatchAuth, dispatchNudges);
+app.get("/api/habits/internal/active-dates", requireInternalReadAuth, getInternalActiveDates);
 app.use("/api/habits", isAuth, enforceReadOnlyWrites, habitRouter);
 
 const PORT = process.env.PORT || 4002;
 
 if (process.env.NODE_ENV !== 'test') {
     app.listen(PORT, async () => {
-        console.log(`Server running on port ${PORT}`);
+        console.log(`🚀 Habit service running on port ${PORT}`);
+        console.log(`🔗 Accepting requests from: ${FRONTEND_URL}`);
 
         // Start Kafka consumer for async habit automation
         try {
             await habitConsumer.connect();
             await habitConsumer.run();
         } catch (error) {
-            console.error("Failed to start Kafka consumer — HTTP fallback still active:", error);
+            console.error("❌ Failed to start habit Kafka consumer — HTTP fallback still active:", error);
         }
     });
 

@@ -8,13 +8,16 @@
   "scripts": {
     "test": "vitest run",
     "dev": "tsx watch --ignore './node_modules/**' --ignore '../**/node_modules/**' --ignore '../**/dist/**' --ignore '../../packages/db/generated/**' src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@repo/cache": "*",
     "@mistralai/mistralai": "^1.14.0",
     "@repo/db": "*",
     "@repo/schemas": "*",

@@ -200,7 +200,7 @@ describe('Payment endpoints', () => {
           plan: 'PRO',
         });
 
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(404);
     });
   });
 
@@ -265,7 +265,7 @@ describe('Payment endpoints', () => {
 
       const res = await request(app).post('/api/payments/cancel');
 
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(404);
     });
   });
 

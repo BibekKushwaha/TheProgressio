@@ -10,8 +10,15 @@ import { SearchBar } from "@/components/SearchBar";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function HabitsPage() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const highlightedHabitId = searchParams.get('habitId') || '';
+    const [focusedHabitId, setFocusedHabitId] = useState('');
     const [searchQuery, setSearchQuery] = useState("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -22,6 +29,32 @@ export default function HabitsPage() {
         habit.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         habit.frequency.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    useEffect(() => {
+        if (highlightedHabitId) {
+            setFocusedHabitId(highlightedHabitId);
+        }
+    }, [highlightedHabitId]);
+
+    useEffect(() => {
+        if (!focusedHabitId) return;
+
+        const scrollToTarget = () => {
+            const element = document.getElementById(`habit-card-${focusedHabitId}`);
+            if (!element) return;
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            if (highlightedHabitId) {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete('habitId');
+                const next = params.toString();
+                router.replace(next ? `${pathname}?${next}` : pathname);
+            }
+        };
+
+        const timeoutId = window.setTimeout(scrollToTarget, 120);
+        return () => window.clearTimeout(timeoutId);
+    }, [focusedHabitId, highlightedHabitId, habits.length, pathname, router, searchParams]);
 
     return (
         <div className="space-y-2">
@@ -65,7 +98,9 @@ export default function HabitsPage() {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredHabits.map((habit) => (
-                                <HabitCard key={habit.id} habit={habit} />
+                                <div key={habit.id} id={`habit-card-${habit.id}`}>
+                                    <HabitCard habit={habit} highlighted={habit.id === focusedHabitId} />
+                                </div>
                             ))}
                         </div>
                     )}

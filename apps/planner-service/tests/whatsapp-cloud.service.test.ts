@@ -1,7 +1,7 @@
 /**
  * Unit tests for WhatsApp Cloud API service
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 
 // We test the module in mock mode (no credentials configured),
 // so sendTextMessage / sendTemplateMessage return mock results.

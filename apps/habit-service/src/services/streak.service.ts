@@ -149,7 +149,7 @@ export async function calculateGentleStreak(habitId: string): Promise<GentleStre
 
 // ── XP Award ───────────────────────────────────────────────────────────
 
-export async function awardXP(userId: string, amount: number, reason?: string): Promise<{ xp: number; level: number; levelUp: boolean }> {
+export async function awardXP(userId: string, amount: number, _reason?: string): Promise<{ xp: number; level: number; levelUp: boolean }> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error("User not found");
 

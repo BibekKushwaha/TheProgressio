@@ -49,6 +49,39 @@ model User {
   timetable        Timetable[]
   rotationPatterns RotationPattern[]
   holidays         SchoolHoliday[]
+  
+  mobileRefreshTokens MobileRefreshToken[]
+  familyShareLinks    FamilyShareLink[]
+}
+
+model MobileRefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  deviceId  String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model FamilyShareLink {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  label       String?
+  permissions String   @default("READ_ONLY") // READ_ONLY, FULL_ACCESS
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 model Achievement {
