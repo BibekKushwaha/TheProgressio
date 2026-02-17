@@ -8,8 +8,10 @@ import { analyticsConsumer, shutdownConsumer } from "./services/consumer.service
 
 export const app = express();
 
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: FRONTEND_URL,
     credentials: true
 }));
 
@@ -19,7 +21,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (_req, res) => {
-    res.send("Analytics Service API");
+    res.json({ message: "Analytics Service API", status: "UP" });
 });
 
 app.use("/api/activity", activityRouter);
@@ -31,14 +33,16 @@ if (process.env.NODE_ENV !== 'test') {
     // Start Kafka consumer
     analyticsConsumer.connect()
         .then(() => analyticsConsumer.run())
-        .catch((err) => console.error("Failed to start analytics Kafka consumer:", err));
+        .catch((err) => console.error("❌ Failed to start analytics Kafka consumer:", err));
 
     app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
+        console.log(`🚀 Analytics Service running on port ${PORT}`);
+        console.log(`🔗 Interface: ${FRONTEND_URL}`);
     });
 
     // Graceful shutdown
     const shutdown = async () => {
+        console.log("Shutting down Analytics Service...");
         await shutdownConsumer();
         process.exit(0);
     };

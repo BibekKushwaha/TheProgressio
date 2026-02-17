@@ -72,7 +72,9 @@ export const categoriesApi = createApi({
                             draft.push(newCategory);
                         })
                     );
-                } catch { }
+                } catch {
+                    /* ignore */
+                }
             },
         }),
         updateCategory: builder.mutation<Category, UpdateCategoryRequest>({

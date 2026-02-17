@@ -31,7 +31,6 @@ import {
     detectStreakRisks,
     detectExamWarnings,
     generateMorningBriefing,
-    detectSlipPatterns,
     getUserNudges,
     markNudgeRead,
     markAllNudgesRead,

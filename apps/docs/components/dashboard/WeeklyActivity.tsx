@@ -185,14 +185,14 @@ export function WeeklyActivity() {
                 </svg>
             </div>
 
-            <div className="flex justify-between px-2 pl-8 border-t border-white/5 pt-6">
+            <div className="flex justify-between px-2 pl-8 border-t border-white/5 ">
                 {data.map((point) => (
                     <div key={point.date} className="flex flex-col items-center">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{point.day}</span>
-                        <div className={`w-1 h-1 rounded-full mb-1 ${point.hours > 0 ? 'bg-purple-500' : 'bg-slate-800'}`}></div>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest ">{point.day}</span>
+                        {/* <div className={`w-1 h-1 rounded-full mb-1 ${point.hours > 0 ? 'bg-purple-500' : 'bg-slate-800'}`}></div>
                         <span className={`text-xs font-bold ${point.hours > 0 ? 'text-white' : 'text-slate-600'}`}>
                             {point.hours}h
-                        </span>
+                        </span> */}
                     </div>
                 ))}
             </div>

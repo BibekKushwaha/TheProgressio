@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { calendarApi } from './calendarApi';
+import { analyticsApi } from './analyticsApi';
 
 const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
 
@@ -182,7 +183,11 @@ export const tasksApi = createApi({
                     );
                     // Invalidate all calendar queries to show new task
                     dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
-                } catch { }
+                    // Also refresh analytics/stats (streaks, daily summaries)
+                    dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
+                } catch {
+                    /* ignore */
+                }
             },
         }),
         updateTask: builder.mutation<Task, UpdateTaskRequest>({
@@ -210,6 +215,8 @@ export const tasksApi = createApi({
                     await queryFulfilled;
                     // Invalidate calendar when task is updated (e.g., status change, date change)
                     dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
+                    // Ensure analytics reflect task updates immediately
+                    dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
                 } catch {
                     patchResult.undo();
                 }
@@ -231,6 +238,8 @@ export const tasksApi = createApi({
                     await queryFulfilled;
                     // Invalidate calendar when task is deleted
                     dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
+                    // Ensure analytics reflect task deletions immediately
+                    dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
                 } catch {
                     patchResult.undo();
                 }
@@ -260,7 +269,11 @@ export const tasksApi = createApi({
                     );
                     // Invalidate calendar when task status is toggled
                     dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
-                } catch { }
+                    // Ensure analytics/streaks refresh after a toggle
+                    dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
+                } catch {
+                    /* ignore */
+                }
             },
         }),
         createSubTask: builder.mutation<SubTask, { taskId: string; title: string }>({
@@ -272,7 +285,7 @@ export const tasksApi = createApi({
             invalidatesTags: (_result, _error, { taskId }) => [{ type: 'Tasks', id: taskId }],
         }),
         updateSubTask: builder.mutation<SubTask, { id: string; title?: string; completed?: boolean; taskId: string }>({
-            query: ({ id, taskId, ...body }) => ({
+            query: ({ id, taskId: _taskId, ...body }) => ({
                 url: `/subtasks/${id}`,
                 method: 'PATCH',
                 body,
@@ -289,6 +302,8 @@ export const tasksApi = createApi({
                 );
                 try {
                     await queryFulfilled;
+                    // Subtask completion can affect task completion/streaks — refresh analytics
+                    dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
                 } catch {
                     patchResult.undo();
                 }

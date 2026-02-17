@@ -21,7 +21,6 @@ vi.mock('@repo/db', () => ({
 }))
 
 // Mock global fetch (for sendWhatsApp)
-const originalFetch = globalThis.fetch
 beforeEach(() => {
   vi.clearAllMocks()
   // Reset env to avoid real API calls

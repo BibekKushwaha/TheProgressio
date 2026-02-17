@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { MouseEvent } from 'react';
 import {
     useGetNudgesQuery,
     useMarkNudgeAsReadMutation,
@@ -16,6 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bell, CheckCircle, AlertCircle, Info, TrendingUp, Link2, Send, Award, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAppDispatch, habitsApi } from '@repo/store';
+import { useRouter } from 'next/navigation';
 
 const parseNudgeMetadata = (metadata: Nudge['metadata']): Record<string, unknown> => {
     if (!metadata) return {};
@@ -51,13 +54,15 @@ const toProgress = (metadata: Record<string, unknown>) => {
 };
 
 export function NotificationCenter() {
-    const { data, isLoading } = useGetNudgesQuery();
+    const router = useRouter();
+    const { data, isLoading, refetch } = useGetNudgesQuery();
     const [markRead] = useMarkNudgeAsReadMutation();
     const [markAllRead, { isLoading: isMarkingAllRead }] = useMarkAllNudgesAsReadMutation();
     const [postDirectReply, { isLoading: isReplying }] = usePostNotificationDirectReplyMutation();
     const [updateTask] = useUpdateTaskMutation();
     const [generateSubtasks] = useGenerateSubtasksMutation();
     const [filter, setFilter] = useState<'all' | 'unread' | string>('all');
+    const dispatch = useAppDispatch();
     const [replyDraft, setReplyDraft] = useState<Record<string, string>>({});
 
     const nudges = data?.nudges || [];
@@ -80,6 +85,27 @@ export function NotificationCenter() {
     const handleMarkAllRead = async () => {
         try {
             await markAllRead().unwrap();
+            // Optimistically update the cached nudges list so UI reflects cleared unread count immediately
+            try {
+                dispatch(
+                    habitsApi.util.updateQueryData('getNudges', undefined, (draft) => {
+                        if (draft && Array.isArray(draft.nudges)) {
+                            draft.nudges = draft.nudges.map((n: Nudge) => ({ ...n, isRead: true }));
+                        }
+                    }),
+                );
+            } catch {
+                // ignore optimistic update failures
+            }
+
+            // Refresh nudges to ensure server state sync
+            try { await refetch(); } catch (err) {
+                console.error('Failed to refetch nudges:', err);
+            }
+
+            // Clear any pending reply drafts
+            setReplyDraft({});
+            toast.success('All notifications marked read');
         } catch (error) {
             console.error('Failed to mark all nudges as read:', error);
         }
@@ -110,18 +136,90 @@ export function NotificationCenter() {
         return Number.isNaN(date.getTime()) ? 'Unknown time' : date.toLocaleString();
     };
 
+    const resolveNudgeDeepLink = (metadata: Record<string, unknown>) => {
+        const taskIdLink = typeof metadata.taskId === 'string' ? metadata.taskId : undefined;
+        const habitIdLink = typeof metadata.habitId === 'string' ? metadata.habitId : undefined;
+        const metadataDeepLink = typeof metadata.deepLink === 'string' ? metadata.deepLink.trim() : '';
+
+        if (taskIdLink) return `/tasks?taskId=${encodeURIComponent(taskIdLink)}`;
+        if (habitIdLink) return `/habits?habitId=${encodeURIComponent(habitIdLink)}`;
+        if (!metadataDeepLink) return '/dashboard';
+        if (/^(https?:)?\/\//i.test(metadataDeepLink)) return metadataDeepLink;
+        return metadataDeepLink.startsWith('/') ? metadataDeepLink : `/${metadataDeepLink}`;
+    };
+
+    const navigateToNudgeTarget = (event: MouseEvent<HTMLAnchorElement>, deepLink: string) => {
+        event.preventDefault();
+
+        try {
+            if (/^(https?:)?\/\//i.test(deepLink)) {
+                const parsed = new URL(deepLink, window.location.origin);
+                if (parsed.origin === window.location.origin) {
+                    router.push(`${parsed.pathname}${parsed.search}${parsed.hash}`);
+                    return;
+                }
+
+                window.location.assign(parsed.toString());
+                return;
+            }
+
+            router.push(deepLink.startsWith('/') ? deepLink : `/${deepLink}`);
+        } catch {
+            window.location.assign(deepLink);
+        }
+    };
+
     const handleDirectReply = async (nudge: Nudge) => {
         const text = replyDraft[nudge.id]?.trim();
         if (!text) return;
 
         const metadata = parseNudgeMetadata(nudge.metadata);
         const taskId = typeof metadata.taskId === 'string' ? metadata.taskId : undefined;
+        const metaNudgeId = typeof metadata.nudgeId === 'string' ? metadata.nudgeId : undefined;
+
+        // Build request payload: prefer taskId, otherwise metadata.nudgeId, otherwise nudge.id if it's a valid UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const hasValidMetaNudgeId = typeof metaNudgeId === 'string' && uuidRegex.test(metaNudgeId);
+        const hasValidNudgeId = typeof nudge.id === 'string' && uuidRegex.test(nudge.id);
+
+        if (!taskId && !hasValidMetaNudgeId && !hasValidNudgeId) {
+            console.warn('Cannot send direct reply: no taskId and no valid nudge id available', { nudgeId: nudge.id, metaNudgeId });
+            toast.error('Cannot send reply: unsupported notification id');
+            return;
+        }
+
+        const payload: { taskId?: string; nudgeId?: string; text: string } = { text };
+        if (taskId) payload.taskId = taskId;
+        else if (hasValidMetaNudgeId) payload.nudgeId = metaNudgeId;
+        else payload.nudgeId = String(nudge.id);
 
         try {
-            await postDirectReply({ nudgeId: nudge.id, ...(taskId ? { taskId } : {}), text }).unwrap();
+            console.debug('Posting direct-reply payload', payload);
+            await postDirectReply(payload).unwrap();
             setReplyDraft((prev) => ({ ...prev, [nudge.id]: '' }));
         } catch (error) {
-            console.error('Failed direct reply:', error);
+            // Provide richer logging for different RTK Query error shapes and surface server message when available
+            try {
+                const info = (error && typeof error === 'object') ? JSON.stringify(error) : String(error);
+                console.error('Failed direct reply:', error, 'serialized:', info);
+            } catch {
+                console.error('Failed direct reply; also failed serializing error', error);
+            }
+
+            // Extract a friendly message if the server returned one
+            let userMessage = 'Failed to send reply';
+            if (error && typeof error === 'object') {
+                const err = error as { data?: { message?: string }; error?: string; message?: string };
+                if (err.data?.message) {
+                    userMessage = String(err.data.message);
+                } else if (err.error) {
+                    userMessage = err.error;
+                } else if (err.message) {
+                    userMessage = err.message;
+                }
+            }
+
+            toast.error(userMessage);
         }
     };
 
@@ -154,7 +252,7 @@ export function NotificationCenter() {
 
     if (isLoading) {
         return (
-            <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
+            <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6 max-w-[94vw] w-[94vw] sm:w-auto overflow-hidden">
                 <Skeleton className="h-8 w-48 bg-white/5 mb-4" />
                 <Skeleton className="h-24 w-full bg-white/5 mb-2" />
                 <Skeleton className="h-24 w-full bg-white/5" />
@@ -163,7 +261,7 @@ export function NotificationCenter() {
     }
 
     return (
-        <Card className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 backdrop-blur-md border-purple-500/20 p-6">
+        <Card className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 backdrop-blur-md border-purple-500/20 p-6 max-w-[94vw] w-[94vw] sm:w-auto overflow-hidden">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl relative">
@@ -222,7 +320,7 @@ export function NotificationCenter() {
                     {filteredNudges.map((nudge: Nudge) => (
                         (() => {
                             const metadata = parseNudgeMetadata(nudge.metadata);
-                            const deepLink = typeof metadata.deepLink === 'string' ? metadata.deepLink : '/dashboard';
+                            const deepLink = resolveNudgeDeepLink(metadata);
                             const progress = toProgress(metadata);
                             const actionsRaw = Array.isArray(metadata.actions) ? metadata.actions : [];
                             const actions = actionsRaw
@@ -257,11 +355,11 @@ export function NotificationCenter() {
                                         }`}
                                 >
                                     <div className="flex items-start justify-between gap-4">
-                                        <div className="flex items-start gap-3 flex-1">
+                                    <div className="flex items-start gap-3 flex-1 min-w-0">
                                             <div className="mt-1">
                                                 {getTypeIcon(nudge.type)}
                                             </div>
-                                            <div className="flex-1">
+                                        <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <h3 className="font-semibold text-white">{nudge.title}</h3>
                                                     {!nudge.isRead && (
@@ -347,30 +445,54 @@ export function NotificationCenter() {
                                                     </div>
 
                                                     <div className="ml-auto flex gap-2">
-                                                        <a href={deepLink} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition-colors">
+                                                        <a
+                                                            href={deepLink}
+                                                            onClick={(event) => navigateToNudgeTarget(event, deepLink)}
+                                                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition-colors"
+                                                        >
                                                             <Link2 className="w-3 h-3" /> View
                                                         </a>
                                                     </div>
                                                 </div>
 
-                                                <div className="mt-3 flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={replyDraft[nudge.id] || ''}
-                                                        onChange={(event) => setReplyDraft((prev) => ({ ...prev, [nudge.id]: event.target.value }))}
-                                                        placeholder="Quick reply from notification..."
-                                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                                                        maxLength={240}
-                                                    />
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() => handleDirectReply(nudge)}
-                                                        disabled={isReplying || !(replyDraft[nudge.id] || '').trim()}
-                                                        className="bg-indigo-500 hover:bg-indigo-600"
-                                                    >
-                                                        <Send className="w-3 h-3" />
-                                                    </Button>
-                                                </div>
+                                                {(() => {
+                                                    const metadataLocal = parseNudgeMetadata(nudge.metadata);
+                                                    const directEnabled = Boolean(metadataLocal.directReplyEnabled);
+                                                    const taskIdLocal = typeof metadataLocal.taskId === 'string' ? metadataLocal.taskId : undefined;
+                                                    const metaNudgeIdLocal = typeof metadataLocal.nudgeId === 'string' ? metadataLocal.nudgeId : undefined;
+                                                    const uuidRegexLocal = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                                                    const hasValidMetaNudgeIdLocal = typeof metaNudgeIdLocal === 'string' && uuidRegexLocal.test(metaNudgeIdLocal);
+                                                    const hasValidNudgeIdLocal = typeof nudge.id === 'string' && uuidRegexLocal.test(nudge.id);
+                                                    const canDirectReply = directEnabled || Boolean(taskIdLocal) || hasValidMetaNudgeIdLocal || hasValidNudgeIdLocal;
+
+                                                    if (!canDirectReply) {
+                                                        return (
+                                                            <div className="mt-3 text-sm text-slate-400">Direct reply not available for this notification</div>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <div className="mt-3 flex items-center gap-2">
+                                                            <input
+                                                                    type="text"
+                                                                    value={replyDraft[nudge.id] || ''}
+                                                                    onChange={(event) => setReplyDraft((prev) => ({ ...prev, [nudge.id]: event.target.value }))}
+                                                                    placeholder="Quick reply from notification..."
+                                                                    className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                                                    maxLength={240}
+                                                                />
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => handleDirectReply(nudge)}
+                                                                disabled={isReplying || !(replyDraft[nudge.id] || '').trim()}
+                                                                className="bg-indigo-500 hover:bg-indigo-600"
+                                                                title={isReplying ? 'Sending...' : 'Send reply'}
+                                                            >
+                                                                <Send className="w-3 h-3" />
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                         {!nudge.isRead && (

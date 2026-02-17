@@ -1,5 +1,3 @@
-import axios from "axios";
-import getBuffer from "../utils/buffer.js";
 import { prisma } from "@repo/db/client";
 import ErrorHandler from "../utils/errorHandler.js";
 import { TryCatch } from "../utils/tryCatch.js";
@@ -18,13 +16,58 @@ import {
 
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import crypto from "crypto";
+// Lightweight local cache type (keeps auth-service independent from cache build artifacts)
+export interface LocalUserCacheValue {
+  id: string;
+  username?: string | null;
+  email?: string | null;
+  dailyGoalHours?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+async function safeGetUserCache(userId: string): Promise<LocalUserCacheValue | null> {
+  try {
+    const mod = (await import('@repo/cache').catch(() => null)) as any;
+    if (!mod || typeof mod.getUserCache !== 'function') return null;
+    return (await mod.getUserCache(userId)) as LocalUserCacheValue | null;
+  } catch {
+    return null;
+  }
+}
+
+async function safeSetUserCache(userId: string, payload: LocalUserCacheValue, ttlSeconds?: number): Promise<void> {
+  try {
+    const mod = (await import('@repo/cache').catch(() => null)) as any;
+    if (!mod || typeof mod.setUserCache !== 'function') return;
+    await mod.setUserCache(userId, payload, ttlSeconds ?? undefined);
+  } catch {
+    // ignore cache errors
+  }
+}
+
+async function safeDeleteUserCache(userId: string): Promise<void> {
+  try {
+    const mod = (await import('@repo/cache').catch(() => null)) as any;
+    if (!mod || typeof mod.deleteUserCache !== 'function') return;
+    await mod.deleteUserCache(userId);
+  } catch {
+    // ignore
+  }
+}
 // import { forgotPasswordTemplate } from "../templete.js";
 // import { publishToTopic } from "../producer.js";
 // import { redisClient } from "../index.js";
 
 const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "15m";
 const MOBILE_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.MOBILE_REFRESH_TOKEN_DAYS ?? "30", 10);
-const prismaAny = prisma as any;
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 15 * 24 * 60 * 60 * 1000,
+};
 
 const ensureJwtSecret = (): string => {
   const secret = process.env.JWT_SEC;
@@ -55,48 +98,48 @@ const getBearerToken = (req: any): string | null => {
 };
 
 const decodeAccessToken = (token: string): { id: string } => {
-  const decoded = jwt.verify(token, ensureJwtSecret()) as jwt.JwtPayload;
-  if (!decoded?.id || typeof decoded.id !== "string") {
-    throw new ErrorHandler(401, "Invalid token payload");
+  try {
+    const decoded = jwt.verify(token, ensureJwtSecret()) as jwt.JwtPayload;
+    if (!decoded?.id || typeof decoded.id !== "string") {
+      throw new ErrorHandler(401, "Invalid token payload");
+    }
+    return { id: decoded.id };
+  } catch (err) {
+    if (err instanceof ErrorHandler) throw err;
+    throw new ErrorHandler(401, "Token expired or invalid");
   }
-  return { id: decoded.id };
 };
+
+const buildUserCachePayload = (user: any): LocalUserCacheValue => ({
+  id: user.id,
+  username: user.username ?? null,
+  email: user.email ?? null,
+  dailyGoalHours: user.dailyGoalHours ?? null,
+  createdAt: user.createdAt ? (user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt) : null,
+  updatedAt: user.updatedAt ? (user.updatedAt instanceof Date ? user.updatedAt.toISOString() : user.updatedAt) : null,
+});
 
 
 export const registerUser = TryCatch(async (req, res) => {
   const result = registerSchema.safeParse(req.body);
 
   if (!result.success) {
-    return res.status(400).json({
-      errors: result.error.flatten(),
-    });
+    return res.status(400).json({ errors: result.error.flatten() });
   }
   const { username, email, password } = result.data;
 
-  let existingUser: any = null;
-  try {
-    existingUser = await prisma.user.findFirst({
-      where: { email },
-    });
-  } catch (err) {
-    console.error('Prisma findFirst error (register)', { email }, err);
-    throw new ErrorHandler(500, 'Database error during user lookup');
-  }
-
-
+  const existingUser = await prisma.user.findFirst({ where: { email } });
   if (existingUser) {
     throw new ErrorHandler(409, "User with this email already exists");
   }
 
   const hashPassword = await bcrypt.hash(password, 10);
 
-
   const response = await prisma.user.create({
     data: {
       username,
       email,
       password: hashPassword
-
     },
     select: {
       id: true,
@@ -105,40 +148,25 @@ export const registerUser = TryCatch(async (req, res) => {
       dailyGoalHours: true,
       createdAt: true,
     },
-  })
-  if (!process.env.JWT_SEC) {
-    throw new ErrorHandler(500, "JWT secret not configured");
-  }
-  const token = jwt.sign(
-    { id: response?.id },
-    process.env.JWT_SEC as string,
-    {
-      expiresIn: "15d",
-    }
-  );
+  });
 
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  };
+  const token = issueAccessToken(response.id);
+  res.cookie('token', token, COOKIE_OPTIONS);
 
-  res.cookie('token', token, cookieOptions);
+  // best-effort cache
+  await safeSetUserCache(response.id, buildUserCachePayload(response));
 
   return res.status(201).json({
     success: true,
     message: "User registered successfully",
     user: response,
   });
-
 });
 
 export const loginUser = TryCatch(async (req, res) => {
   const result = loginSchema.safeParse(req.body);
 
   if (!result.success) {
-    console.error('[LOGIN] Validation error:', result.error.flatten());
     return res.status(400).json({
       message: 'Invalid email or password format',
       errors: result.error.flatten(),
@@ -146,72 +174,38 @@ export const loginUser = TryCatch(async (req, res) => {
   }
   const { email, password } = result.data;
 
-  let user: any = null;
-  try {
-    user = await prisma.user.findUnique({
-      where: {
-        email: email,
-      },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        password: true,
-      },
-    });
-  } catch (err) {
-    console.error('Prisma findUnique error (login)', { email }, err);
-    if ((err as any)?.code === "P2022") {
-      throw new ErrorHandler(500, "Database schema out of date. Run Prisma migrations and restart services.");
-    }
-    throw new ErrorHandler(500, 'Database error during user lookup');
-  }
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
 
-  if (!user) {
+  if (!user || !(await bcrypt.compare(password, user.password))) {
     throw new ErrorHandler(400, "Invalid credentials");
   }
 
+  const token = issueAccessToken(user.id);
+  res.cookie('token', token, COOKIE_OPTIONS);
 
-  const matchPassword = await bcrypt.compare(password, user.password);
-
-  if (!matchPassword) {
-    throw new ErrorHandler(400, "Invalid credentials");
-  }
-
-  const token = issueAccessToken(user?.id);
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  };
-
-  res.cookie('token', token, cookieOptions);
-
-  // Remove password from user object before sending response
   const { password: _, ...userWithoutPassword } = user;
 
   res.json({
     message: "user Loggedin",
     user: userWithoutPassword,
   });
+
+  await safeSetUserCache(user.id, buildUserCachePayload(user));
 });
 
 export const logoutUser = TryCatch(async (req, res) => {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path: '/',
-    maxAge: 0,
-  };
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      const { id } = decodeAccessToken(token);
+      await safeDeleteUserCache(id);
+    } catch { /* ignore */ }
+  }
 
-  res.clearCookie('token', cookieOptions);
-  res.cookie('token', '', cookieOptions);
-
-  res.json({
-    message: 'User logged out successfully',
-  });
+  res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
+  res.json({ message: 'User logged out successfully' });
 });
 
 export const getCurrentUser = TryCatch(async (req, res) => {
@@ -220,16 +214,11 @@ export const getCurrentUser = TryCatch(async (req, res) => {
     return res.status(401).json({ message: 'Not authenticated' });
   }
 
-  let decoded: any;
-  try {
-    decoded = jwt.verify(token, process.env.JWT_SEC as string);
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid token' });
-  }
+  const { id: userId } = decodeAccessToken(token);
 
-  const userId = decoded?.id;
-  if (!userId) {
-    return res.status(401).json({ message: 'Invalid token payload' });
+  const cached = await safeGetUserCache(userId);
+  if (cached) {
+    return res.json({ success: true, user: cached });
   }
 
   const user = await prisma.user.findUnique({
@@ -247,6 +236,8 @@ export const getCurrentUser = TryCatch(async (req, res) => {
     return res.status(404).json({ message: 'User not found' });
   }
 
+  await safeSetUserCache(user.id, buildUserCachePayload(user));
+
   return res.json({ success: true, user });
 });
 
@@ -256,17 +247,7 @@ export const updateProfile = TryCatch(async (req, res) => {
     return res.status(401).json({ message: 'Not authenticated' });
   }
 
-  let decoded: any;
-  try {
-    decoded = jwt.verify(token, process.env.JWT_SEC as string);
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid token' });
-  }
-
-  const userId = decoded?.id;
-  if (!userId) {
-    return res.status(401).json({ message: 'Invalid token payload' });
-  }
+  const { id: userId } = decodeAccessToken(token);
 
   const parsed = updateProfileSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -293,6 +274,8 @@ export const updateProfile = TryCatch(async (req, res) => {
       createdAt: true
     },
   });
+
+  await safeSetUserCache(updatedUser.id, buildUserCachePayload(updatedUser));
 
   return res.json({
     success: true,
@@ -377,6 +360,13 @@ export const resetPassword = TryCatch(async (req, res) => {
     data: { password: hashPassword },
   });
 
+  // invalidate cache for this user (best-effort)
+  try {
+    await safeDeleteUserCache(user.id);
+  } catch {
+    // ignore
+  }
+
   return res.json({ message: "Password changed successfully" });
 });
 
@@ -392,15 +382,10 @@ export const mobileLogin = TryCatch(async (req, res) => {
   }
 
   const { email, password, deviceId } = result.data;
-  const resolvedDeviceId = deviceId?.trim() ? deviceId.trim() : "unknown-device";
+  const resolvedDeviceId = deviceId?.trim() || "unknown-device";
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    throw new ErrorHandler(400, "Invalid credentials");
-  }
-
-  const isValid = await bcrypt.compare(password, user.password);
-  if (!isValid) {
+  if (!user || !(await bcrypt.compare(password, user.password))) {
     throw new ErrorHandler(400, "Invalid credentials");
   }
 
@@ -408,7 +393,7 @@ export const mobileLogin = TryCatch(async (req, res) => {
   const rawRefreshToken = generateOpaqueToken();
   const expiresAt = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
 
-  await prismaAny.mobileRefreshToken.create({
+  await prisma.mobileRefreshToken.create({
     data: {
       userId: user.id,
       deviceId: resolvedDeviceId,
@@ -437,11 +422,11 @@ export const mobileRefresh = TryCatch(async (req, res) => {
     });
   }
 
-  const refreshToken = parsed.data.refreshToken;
-  const requestedDeviceId = parsed.data.deviceId?.trim() ? parsed.data.deviceId.trim() : null;
+  const { refreshToken, deviceId } = parsed.data;
+  const requestedDeviceId = deviceId?.trim() || null;
 
   const tokenHash = hashOpaqueToken(refreshToken);
-  const existing = await prismaAny.mobileRefreshToken.findFirst({
+  const existing = await prisma.mobileRefreshToken.findFirst({
     where: {
       tokenHash,
       revokedAt: null,
@@ -463,11 +448,11 @@ export const mobileRefresh = TryCatch(async (req, res) => {
   const nextExpiry = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
 
   await prisma.$transaction([
-    prismaAny.mobileRefreshToken.update({
+    prisma.mobileRefreshToken.update({
       where: { id: existing.id },
       data: { revokedAt: new Date() },
     }),
-    prismaAny.mobileRefreshToken.create({
+    prisma.mobileRefreshToken.create({
       data: {
         userId: existing.userId,
         deviceId: existing.deviceId,
@@ -503,7 +488,7 @@ export const mobileLogout = TryCatch(async (req, res) => {
   const operations = [];
   if (refreshToken) {
     operations.push(
-      prismaAny.mobileRefreshToken.updateMany({
+      prisma.mobileRefreshToken.updateMany({
         where: { tokenHash: hashOpaqueToken(refreshToken), revokedAt: null },
         data: { revokedAt: new Date() },
       })
@@ -514,14 +499,13 @@ export const mobileLogout = TryCatch(async (req, res) => {
     try {
       const { id } = decodeAccessToken(authToken);
       operations.push(
-        prismaAny.mobileRefreshToken.updateMany({
+        prisma.mobileRefreshToken.updateMany({
           where: { userId: id, revokedAt: null },
           data: { revokedAt: new Date() },
         }),
       );
-    } catch {
-      // If bearer token is invalid, continue with refresh-token based revocation only.
-    }
+      await safeDeleteUserCache(id);
+    } catch { /* ignore */ }
   }
 
   if (operations.length > 0) {
@@ -584,21 +568,19 @@ export const createFamilyShareLink = TryCatch(async (req, res) => {
     });
   }
 
-  const label = parsed.data.label?.trim() ? parsed.data.label.trim() : null;
-  const permissions = parsed.data.permissions?.trim()
-    ? parsed.data.permissions.trim().toUpperCase()
-    : "READ_ONLY";
-  const expiresInDays = parsed.data.expiresInDays ?? 14;
-  const expiresAt = new Date(Date.now() + Math.max(1, expiresInDays) * 24 * 60 * 60 * 1000);
+  const { label, permissions, expiresInDays } = parsed.data;
+  const resolvedLabel = label?.trim() || null;
+  const resolvedPermissions = permissions?.trim().toUpperCase() || "READ_ONLY";
+  const expiresAt = new Date(Date.now() + Math.max(1, expiresInDays ?? 14) * 24 * 60 * 60 * 1000);
 
   const shareToken = `fml_${generateOpaqueToken()}`;
 
-  const link = await prismaAny.familyShareLink.create({
+  const link = await prisma.familyShareLink.create({
     data: {
       userId,
       tokenHash: hashOpaqueToken(shareToken),
-      label,
-      permissions,
+      label: resolvedLabel,
+      permissions: resolvedPermissions,
       expiresAt,
     },
   });
@@ -623,7 +605,7 @@ export const listFamilyShareLinks = TryCatch(async (req, res) => {
     return res.status(401).json({ message: "Not authenticated" });
   }
 
-  const links = await prismaAny.familyShareLink.findMany({
+  const links = await prisma.familyShareLink.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
     select: {
@@ -654,7 +636,7 @@ export const revokeFamilyShareLink = TryCatch(async (req, res) => {
     return res.status(400).json({ message: "Invalid share link id" });
   }
 
-  const result = await prismaAny.familyShareLink.updateMany({
+  const result = await prisma.familyShareLink.updateMany({
     where: { id, userId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
@@ -673,7 +655,7 @@ export const resolveFamilyShareLink = TryCatch(async (req, res) => {
   }
 
   const tokenHash = hashOpaqueToken(rawToken);
-  const link = await prismaAny.familyShareLink.findFirst({
+  const link = await prisma.familyShareLink.findFirst({
     where: {
       tokenHash,
       revokedAt: null,
@@ -692,7 +674,7 @@ export const resolveFamilyShareLink = TryCatch(async (req, res) => {
     return res.status(404).json({ message: "Share link is invalid or expired" });
   }
 
-  await prismaAny.familyShareLink.update({
+  await prisma.familyShareLink.update({
     where: { id: link.id },
     data: { lastUsedAt: new Date() },
   });

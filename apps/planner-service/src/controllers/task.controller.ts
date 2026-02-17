@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import { prisma, Status, Priority } from "@repo/db";
 import {
     parseTaskIntentSchema,
@@ -12,6 +12,8 @@ import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService } from "../services/ai.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/producer.service.js";
 import { recoveryService } from "../services/recovery.service.js";
+import { TryCatch } from "../utils/tryCatch.js";
+import ErrorHandler from "../utils/errorHandler.js";
 
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || "http://localhost:4003";
@@ -184,411 +186,342 @@ export const runTaskCompletionSideEffects = async (params: {
     ]);
 };
 
-export const createTask = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+export const createTask = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
 
-        const parsed = taskSchema.safeParse(req.body);
-        if (!parsed.success) {
-            const titleIssue = parsed.error.issues.find((issue) => issue.path[0] === "title");
-            return res.status(400).json({
-                message: titleIssue ? "Title is required" : "Invalid task payload",
-                errors: parsed.error.flatten(),
-            });
-        }
-
-        const { title, description, status, priority, categoryId, dueDate, isRecurring, subjectId } = parsed.data;
-
-        const task = await prisma.task.create({
-            data: {
-                title,
-                description: description ?? null,
-                status,
-                priority,
-                dueDate: dueDate ?? null,
-                isRecurring: isRecurring ?? false,
-                userId: req.user.id,
-                categoryId: categoryId || null,
-                subjectId: subjectId || null,
-            },
-        });
-
-        // Emit task-created event
-        await emitTaskEvent(TaskEventType.TASK_CREATED, task.id, req.user.id, {
-            title: task.title,
-            priority: task.priority,
-            dueDate: task.dueDate,
-            categoryId: task.categoryId,
-        });
-
-        return res.status(201).json(task);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
+    const parsed = taskSchema.safeParse(req.body);
+    if (!parsed.success) {
+        const titleIssue = parsed.error.issues.find((issue) => issue.path[0] === "title");
+        throw new ErrorHandler(400, titleIssue ? "Title is required" : "Invalid task payload");
     }
-};
 
-export const getAllTasks = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+    const { title, description, status, priority, categoryId, dueDate, isRecurring, subjectId } = parsed.data;
 
-        const {
-            page = "1",
-            limit = "10",
+    const task = await prisma.task.create({
+        data: {
+            title,
+            description: description ?? null,
             status,
             priority,
-            categoryId,
-            search,
-            date, // 👈 New date parameter
-        } = req.query;
+            dueDate: dueDate ?? null,
+            isRecurring: isRecurring ?? false,
+            userId,
+            categoryId: categoryId || null,
+            subjectId: subjectId || null,
+        },
+    });
 
-        const pageNumber = Number(page);
-        const pageSize = Number(limit);
+    // Emit task-created event
+    await emitTaskEvent(TaskEventType.TASK_CREATED, task.id, userId, {
+        title: task.title,
+        priority: task.priority,
+        dueDate: task.dueDate,
+        categoryId: task.categoryId,
+    });
 
-        const tasks = await prisma.task.findMany({
-            where: {
-                userId: req.user.id,
-                ...(status && { status: status as Status }),
-                ...(priority && { priority: priority as Priority }),
-                ...(categoryId && { categoryId: categoryId as string }),
-                ...(date && typeof date === "string" && {
-                    dueDate: {
-                        gte: new Date(`${date}T00:00:00.000Z`),
-                        lte: new Date(`${date}T23:59:59.999Z`),
-                    },
-                }),
-                ...(search && typeof search === "string" && {
-                    title: {
-                        contains: search,
-                        mode: "insensitive",
-                    },
-                }),
-            },
-            include: {
-                category: true, // 👈 includes full category object
-            },
-            orderBy: {
-                dueDate: "asc",
-            },
-            skip: (pageNumber - 1) * pageSize,
-            take: pageSize,
-        });
+    return res.status(201).json(task);
+});
 
-        return res.status(200).json(tasks);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-};
+export const getAllTasks = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
 
-export const getTaskById = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+    const {
+        page = "1",
+        limit = "10",
+        status,
+        priority,
+        categoryId,
+        search,
+        date, // 👈 New date parameter
+    } = req.query;
 
-        const { id } = req.params;
+    const pageNumber = Number(page);
+    const pageSize = Number(limit);
 
-        if (!id || typeof id !== "string") {
-            return res.status(400).json({ message: "Invalid task id" });
-        }
-
-        const task = await prisma.task.findUnique({
-            where: { id },
-            include: {
-                category: true,
-                subtasks: {
-                    orderBy: { createdAt: 'asc' }
+    const tasks = await prisma.task.findMany({
+        where: {
+            userId,
+            ...(status && { status: status as Status }),
+            ...(priority && { priority: priority as Priority }),
+            ...(categoryId && { categoryId: categoryId as string }),
+            ...(date && typeof date === "string" && {
+                dueDate: {
+                    gte: new Date(`${date}T00:00:00.000Z`),
+                    lte: new Date(`${date}T23:59:59.999Z`),
                 },
-                attachments: true
-            }
-        });
+            }),
+            ...(search && typeof search === "string" && {
+                title: {
+                    contains: search,
+                    mode: "insensitive",
+                },
+            }),
+        },
+        include: {
+            category: true, // 👈 includes full category object
+        },
+        orderBy: {
+            dueDate: "asc",
+        },
+        skip: (pageNumber - 1) * pageSize,
+        take: pageSize,
+    });
 
-        if (!task) {
-            return res.status(404).json({ message: "Task not found" });
-        }
+    return res.status(200).json(tasks);
+});
 
-        if (task.userId !== req.user.id) {
-            return res.status(403).json({ message: "Forbidden: You don't own this task" });
-        }
+export const getTaskById = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
 
-        return res.status(200).json(task);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
+    if (!id || typeof id !== "string") {
+        throw new ErrorHandler(400, "Invalid task id");
     }
-};
 
-export const updateTask = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const { id } = req.params;
-
-        if (!req.body) {
-            return res.status(400).json({
-                message: "Request body is missing. Ensure Content-Type is application/json"
-            });
-        }
-
-        const { title, description, status, priority, dueDate, isRecurring, categoryId } = req.body;
-
-        if (!id || typeof id !== "string") {
-            return res.status(400).json({ message: "Invalid task id" });
-        }
-
-        const existingTask = await prisma.task.findUnique({
-            where: { id },
-        });
-
-        if (!existingTask) {
-            return res.status(404).json({ message: "Task not found" });
-        }
-
-        if (existingTask.userId !== req.user.id) {
-            return res.status(403).json({ message: "Forbidden: You don't own this task" });
-        }
-
-        const updatedTask = await prisma.task.update({
-            where: { id },
-            data: {
-                ...(typeof title === "string" && { title }),
-                ...(typeof description === "string" && { description }),
-                ...(status && { status: status as Status }),
-                ...(priority && { priority: priority as Priority }),
-                ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
-                ...(isRecurring !== undefined && { isRecurring }),
-                ...(categoryId !== undefined && { categoryId: categoryId || null }),
+    const task = await prisma.task.findUnique({
+        where: { id },
+        include: {
+            category: true,
+            subtasks: {
+                orderBy: { createdAt: 'asc' }
             },
-        });
+            attachments: true
+        }
+    });
 
-        // Emit task-updated event with changed fields
-        const changedFields: Record<string, unknown> = {};
-        if (typeof title === "string") changedFields.title = title;
-        if (status) changedFields.status = status;
-        if (priority) changedFields.priority = priority;
-        if (dueDate !== undefined) changedFields.dueDate = dueDate;
-        if (categoryId !== undefined) changedFields.categoryId = categoryId;
+    if (!task) {
+        throw new ErrorHandler(404, "Task not found");
+    }
 
-        await emitTaskEvent(TaskEventType.TASK_UPDATED, id, req.user.id, {
-            changedFields,
-            previousStatus: existingTask.status,
-            newStatus: updatedTask.status,
-        });
+    if (task.userId !== userId) {
+        throw new ErrorHandler(403, "Forbidden: You don't own this task");
+    }
 
-        // Notify analytics of the update (fire-and-forget)
-        notifyAnalyticsTaskUpdate({
+    return res.status(200).json(task);
+});
+
+export const updateTask = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    if (!id || typeof id !== "string") {
+        throw new ErrorHandler(400, "Invalid task id");
+    }
+
+    const parsed = taskSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "Invalid update payload");
+    }
+
+    const updates = parsed.data;
+
+    const existingTask = await prisma.task.findUnique({
+        where: { id },
+    });
+
+    if (!existingTask) {
+        throw new ErrorHandler(404, "Task not found");
+    }
+
+    if (existingTask.userId !== userId) {
+        throw new ErrorHandler(403, "Forbidden: You don't own this task");
+    }
+
+    const updatedTask = await prisma.task.update({
+        where: { id },
+        data: {
+            ...(updates.title && { title: updates.title }),
+            ...(updates.description !== undefined && { description: updates.description }),
+            ...(updates.status && { status: updates.status }),
+            ...(updates.priority && { priority: updates.priority }),
+            ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
+            ...(updates.isRecurring !== undefined && { isRecurring: updates.isRecurring }),
+            ...(updates.categoryId !== undefined && { categoryId: updates.categoryId || null }),
+        },
+    });
+
+    // Emit task-updated event with changed fields
+    const changedFields: Record<string, unknown> = {};
+    if (updates.title) changedFields.title = updates.title;
+    if (updates.status) changedFields.status = updates.status;
+    if (updates.priority) changedFields.priority = updates.priority;
+    if (updates.dueDate !== undefined) changedFields.dueDate = updates.dueDate;
+    if (updates.categoryId !== undefined) changedFields.categoryId = updates.categoryId;
+
+    await emitTaskEvent(TaskEventType.TASK_UPDATED, id, userId, {
+        changedFields,
+        previousStatus: existingTask.status,
+        newStatus: updatedTask.status,
+    });
+
+    // Notify analytics of the update (fire-and-forget)
+    notifyAnalyticsTaskUpdate({
+        taskId: id,
+        userId,
+        changedFields,
+    });
+
+    // If status changed to COMPLETED, also emit a completion event
+    if (updates.status === Status.COMPLETED && existingTask.status !== Status.COMPLETED) {
+        await runTaskCompletionSideEffects({
             taskId: id,
-            userId: req.user.id,
-            changedFields,
-        });
-
-        // If status changed to COMPLETED, also emit a completion event
-        if (status && updatedTask.status === Status.COMPLETED && existingTask.status !== Status.COMPLETED) {
-            await runTaskCompletionSideEffects({
-                taskId: id,
-                userId: req.user.id,
-                title: updatedTask.title,
-                categoryId: updatedTask.categoryId ?? null,
-            });
-        }
-
-        return res.status(200).json(updatedTask);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-};
-
-export const deleteTask = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const { id } = req.params;
-
-        if (!id || typeof id !== "string") {
-            return res.status(400).json({ message: "Invalid task id" });
-        }
-
-        const existingTask = await prisma.task.findUnique({
-            where: { id },
-        });
-
-        if (!existingTask) {
-            return res.status(404).json({ message: "Task not found" });
-        }
-
-        if (existingTask.userId !== req.user.id) {
-            return res.status(403).json({ message: "Forbidden: You don't own this task" });
-        }
-
-        await prisma.task.delete({
-            where: { id },
-        });
-
-        // Emit task-deleted event
-        await emitTaskEvent(TaskEventType.TASK_DELETED, id, req.user.id, {
-            title: existingTask.title,
-            previousStatus: existingTask.status,
-        });
-
-        // Notify analytics to clean up stats (fire-and-forget)
-        notifyAnalyticsTaskDeletion({ taskId: id, userId: req.user.id });
-
-        return res.status(200).json({ message: "Task deleted successfully" });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-};
-
-export const toggleTask = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const { id } = req.params;
-
-        if (!id || typeof id !== "string") {
-            return res.status(400).json({ message: "Invalid task id" });
-        }
-
-        const existingTask = await prisma.task.findUnique({
-            where: { id },
-        });
-
-        if (!existingTask) {
-            return res.status(404).json({ message: "Task not found" });
-        }
-
-        if (existingTask.userId !== req.user.id) {
-            return res.status(403).json({ message: "Forbidden: You don't own this task" });
-        }
-
-        let newStatus: Status;
-        if (existingTask.status === Status.PENDING) {
-            newStatus = Status.IN_PROGRESS;
-        } else if (existingTask.status === Status.IN_PROGRESS) {
-            newStatus = Status.COMPLETED;
-        } else {
-            newStatus = Status.PENDING;
-        }
-
-        const updatedTask = await prisma.task.update({
-            where: { id },
-            data: {
-                status: newStatus,
-            },
-        });
-
-        // Emit status-changed event
-        await emitTaskEvent(TaskEventType.TASK_STATUS_CHANGED, id, req.user.id, {
-            previousStatus: existingTask.status,
-            newStatus: updatedTask.status,
+            userId,
             title: updatedTask.title,
+            categoryId: updatedTask.categoryId ?? null,
         });
-
-        // If toggled to COMPLETED, also emit a completion event
-        if (newStatus === Status.COMPLETED) {
-            await runTaskCompletionSideEffects({
-                taskId: id,
-                userId: req.user.id,
-                title: updatedTask.title,
-                categoryId: updatedTask.categoryId ?? null,
-            });
-        }
-
-        return res.status(200).json(updatedTask);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
     }
-};
 
-export const taskCategories = async (_req: Request, res: Response) => {
-    // Placeholder for category logic if needed, user had it in routes
-    return res.status(501).json({ message: "Not implemented" });
-};
+    return res.status(200).json(updatedTask);
+});
 
-export const scanSyllabusImage = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user?.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+export const deleteTask = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
 
-        const parsed = scanSyllabusImageSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "imageBase64 is required",
-                errors: parsed.error.flatten(),
-            });
-        }
-
-        const { imageBase64, mimeType } = parsed.data;
-        const items = await aiService.scanSyllabusImage(imageBase64, typeof mimeType === "string" ? mimeType : "image/jpeg");
-        return res.status(200).json({ items });
-    } catch (error) {
-        console.error("Scan syllabus error:", error);
-        return res.status(500).json({ message: "Internal server error" });
+    if (!id || typeof id !== "string") {
+        throw new ErrorHandler(400, "Invalid task id");
     }
-};
 
-export const previewRecoveryPlan = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user?.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+    const existingTask = await prisma.task.findUnique({
+        where: { id },
+    });
 
-        const parsed = recoveryPlanSchema.safeParse(req.body ?? {});
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Invalid recovery payload",
-                errors: parsed.error.flatten(),
-            });
-        }
-
-        const anchorDate = parsed.data.anchorDate ?? new Date();
-        const plan = await recoveryService.preview(req.user.id, anchorDate);
-
-        return res.status(200).json(plan);
-    } catch (error) {
-        console.error("Recovery preview error:", error);
-        return res.status(500).json({ message: "Internal server error" });
+    if (!existingTask) {
+        throw new ErrorHandler(404, "Task not found");
     }
-};
 
-export const applyRecoveryPlan = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user?.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const parsed = recoveryPlanSchema.safeParse(req.body ?? {});
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Invalid recovery payload",
-                errors: parsed.error.flatten(),
-            });
-        }
-
-        const { anchorDate, taskIds, overrides } = parsed.data;
-        const result = await recoveryService.apply(req.user.id, anchorDate, taskIds, overrides);
-
-        return res.status(200).json(result);
-    } catch (error) {
-        console.error("Recovery apply error:", error);
-        return res.status(500).json({ message: "Internal server error" });
+    if (existingTask.userId !== userId) {
+        throw new ErrorHandler(403, "Forbidden: You don't own this task");
     }
-};
+
+    await prisma.task.delete({
+        where: { id },
+    });
+
+    // Emit task-deleted event
+    await emitTaskEvent(TaskEventType.TASK_DELETED, id, userId, {
+        title: existingTask.title,
+    });
+
+    // Notify analytics (fire-and-forget)
+    notifyAnalyticsTaskDeletion({ taskId: id, userId });
+
+    return res.status(200).json({ message: "Task deleted" });
+});
+
+export const toggleTask = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    if (!id || typeof id !== "string") {
+        throw new ErrorHandler(400, "Invalid task id");
+    }
+
+    const existingTask = await prisma.task.findUnique({
+        where: { id },
+    });
+
+    if (!existingTask) {
+        throw new ErrorHandler(404, "Task not found");
+    }
+
+    if (existingTask.userId !== userId) {
+        throw new ErrorHandler(403, "Forbidden: You don't own this task");
+    }
+
+    let newStatus: Status;
+    if (existingTask.status === Status.PENDING) {
+        newStatus = Status.IN_PROGRESS;
+    } else if (existingTask.status === Status.IN_PROGRESS) {
+        newStatus = Status.COMPLETED;
+    } else {
+        newStatus = Status.PENDING;
+    }
+
+    const updatedTask = await prisma.task.update({
+        where: { id },
+        data: {
+            status: newStatus,
+        },
+    });
+
+    // Emit status-changed event
+    await emitTaskEvent(TaskEventType.TASK_STATUS_CHANGED, id, userId, {
+        previousStatus: existingTask.status,
+        newStatus: updatedTask.status,
+        title: updatedTask.title,
+    });
+
+    // Notify analytics of the status change (fire-and-forget HTTP fallback when Kafka is disabled)
+    notifyAnalyticsTaskUpdate({
+        taskId: id,
+        userId,
+        changedFields: { status: updatedTask.status },
+    });
+
+    // If toggled to COMPLETED, also emit a completion event
+    if (newStatus === Status.COMPLETED && existingTask.status !== Status.COMPLETED) {
+        await runTaskCompletionSideEffects({
+            taskId: id,
+            userId,
+            title: updatedTask.title,
+            categoryId: updatedTask.categoryId ?? null,
+        });
+    }
+
+    return res.status(200).json(updatedTask);
+});
+
+export const taskCategories = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+
+    const categories = await prisma.category.findMany({
+        where: { userId },
+    });
+
+    return res.status(200).json(categories);
+});
+
+export const scanSyllabusImage = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const _userId = req.user!.id;
+
+    const parsed = scanSyllabusImageSchema.safeParse(req.body);
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "Invalid scan payload");
+    }
+
+    const { imageBase64, mimeType } = parsed.data;
+    const items = await aiService.scanSyllabusImage(imageBase64, typeof mimeType === "string" ? mimeType : "image/jpeg");
+    return res.status(200).json({ items });
+});
+
+export const previewRecoveryPlan = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+
+    const parsed = recoveryPlanSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "Invalid recovery payload");
+    }
+
+    const anchorDate = parsed.data.anchorDate ?? new Date();
+    const plan = await recoveryService.preview(userId, anchorDate);
+
+    return res.status(200).json(plan);
+});
+
+export const applyRecoveryPlan = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+
+    const parsed = recoveryPlanSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "Invalid recovery payload");
+    }
+
+    const { anchorDate, taskIds, overrides } = parsed.data;
+    const result = await recoveryService.apply(userId, anchorDate, taskIds, overrides);
+
+    return res.status(200).json(result);
+});
 
 interface CreateTaskFromTextParams {
     userId: string;
@@ -628,126 +561,88 @@ export const createTaskFromText = async ({
     return { task, parsedData };
 };
 
-export const smartCreateTask = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+export const smartCreateTask = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
 
-        const parsed = smartCreateTaskSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Text input is required",
-                errors: parsed.error.flatten(),
-            });
-        }
+    const parsed = smartCreateTaskSchema.safeParse(req.body);
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "Text input is required");
+    }
 
-        const { text } = parsed.data;
+    const { text } = parsed.data;
 
-        const { task, parsedData } = await createTaskFromText({
-            userId: req.user.id,
-            text,
-            source: "nlp-smart-create",
+    const { task, parsedData } = await createTaskFromText({
+        userId: userId,
+        text,
+        source: "nlp-smart-create",
+    });
+
+    return res.status(201).json({
+        message: "Smart task created successfully",
+        task,
+        parsedMeta: parsedData
+    });
+});
+
+export const generateSubtasks = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+
+    const { id } = req.params;
+    if (!id || typeof id !== 'string') throw new ErrorHandler(400, "Task ID required");
+
+    const task = await prisma.task.findUnique({ where: { id } });
+    if (!task) throw new ErrorHandler(404, "Task not found");
+
+    if (task.userId !== userId) throw new ErrorHandler(403, "Forbidden");
+
+    // 1. Generate subtasks using Gemini
+    const subtaskTitles = await aiService.generateSubtasks(task.title, task.description || "");
+
+    // 2. Save to DB
+    if (subtaskTitles.length > 0) {
+        await prisma.subTask.createMany({
+            data: subtaskTitles.map(title => ({
+                title,
+                taskId: id,
+                completed: false
+            }))
         });
-
-        return res.status(201).json({
-            message: "Smart task created successfully",
-            task,
-            parsedMeta: parsedData
-        });
-
-    } catch (error) {
-        console.error("Smart create error:", error);
-        return res.status(500).json({ message: "Internal server error" });
     }
-};
 
-export const generateSubtasks = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+    const updatedTask = await prisma.task.findUnique({
+        where: { id },
+        include: { subtasks: true }
+    });
 
-        const { id } = req.params;
-        if (!id || typeof id !== 'string') return res.status(400).json({ message: "Task ID required" });
+    return res.status(200).json(updatedTask);
+});
 
-        const task = await prisma.task.findUnique({ where: { id } });
-        if (!task) return res.status(404).json({ message: "Task not found" });
+export const previewSubtasks = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const _userId = req.user!.id;
 
-        // 1. Generate subtasks using Gemini
-        const subtaskTitles = await aiService.generateSubtasks(task.title, task.description || "");
-
-        // 2. Save to DB
-        if (subtaskTitles.length > 0) {
-            await prisma.subTask.createMany({
-                data: subtaskTitles.map(title => ({
-                    title,
-                    taskId: id,
-                    completed: false
-                }))
-            });
-        }
-
-        const updatedTask = await prisma.task.findUnique({
-            where: { id },
-            include: { subtasks: true }
-        });
-
-        return res.status(200).json(updatedTask);
-
-    } catch (error) {
-        console.error("Generate subtasks error:", error);
-        return res.status(500).json({ message: "Internal server error" });
+    const parsed = previewSubtasksSchema.safeParse(req.body);
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "Invalid preview payload");
     }
-};
 
-export const previewSubtasks = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+    const { title, description } = parsed.data;
 
-        const parsed = previewSubtasksSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Title is required",
-                errors: parsed.error.flatten(),
-            });
-        }
+    const subtaskTitles = await aiService.generateSubtasks(title, description || "");
 
-        const { title, description } = parsed.data;
+    return res.status(200).json({ subtasks: subtaskTitles });
+});
 
-        const subtaskTitles = await aiService.generateSubtasks(title, description || "");
+export const parseTaskIntent = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const _userId = req.user!.id;
 
-        return res.status(200).json({ subtasks: subtaskTitles });
-
-    } catch (error) {
-        console.error("Preview subtasks error:", error);
-        return res.status(500).json({ message: "Internal server error" });
+    const parsed = parseTaskIntentSchema.safeParse(req.body);
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "Text input is required");
     }
-};
-export const parseTaskIntent = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
 
-        const parsed = parseTaskIntentSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Text input is required",
-                errors: parsed.error.flatten(),
-            });
-        }
+    const { text } = parsed.data;
 
-        const { text } = parsed.data;
+    const parsedData = await aiService.parseTaskIntent(text);
 
-        const parsedData = await aiService.parseTaskIntent(text);
-
-        return res.status(200).json(parsedData);
-
-    } catch (error) {
-        console.error("Parse task error:", error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-};
+    return res.status(200).json(parsedData);
+});

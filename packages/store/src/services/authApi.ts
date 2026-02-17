@@ -75,7 +75,9 @@ export const authApi = createApi({
           dispatch(
             authApi.util.updateQueryData('getProfile', undefined, () => data)
           );
-        } catch { }
+        } catch {
+          /* ignore */
+        }
       },
     }),
     login: builder.mutation<AuthResponse, LoginRequest>({
@@ -91,7 +93,9 @@ export const authApi = createApi({
           dispatch(
             authApi.util.updateQueryData('getProfile', undefined, () => data)
           );
-        } catch { }
+        } catch {
+          /* ignore */
+        }
       },
     }),
     getProfile: builder.query<AuthResponse, void>({
@@ -111,7 +115,9 @@ export const authApi = createApi({
         try {
           await queryFulfilled;
           dispatch(authApi.util.resetApiState());
-        } catch { }
+        } catch {
+          /* ignore */
+        }
       },
     }),
     updateProfile: builder.mutation<AuthResponse, Partial<User>>({
@@ -129,7 +135,9 @@ export const authApi = createApi({
               draft.user = data.user;
             })
           );
-        } catch { }
+        } catch {
+          /* ignore */
+        }
       },
     }),
     forgotPassword: builder.mutation<{ message: string }, { email: string }>({

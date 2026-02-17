@@ -9,9 +9,10 @@ interface TaskListProps {
     priority: string;
     category: string;
     tasks: Task[];
+    highlightedTaskId?: string;
 }
 
-export function TaskList({ searchQuery, status, priority, category, tasks }: TaskListProps) {
+export function TaskList({ searchQuery, status, priority, category, tasks, highlightedTaskId }: TaskListProps) {
 
     const filteredTasks = filterTasks(tasks, { searchQuery, priority, category, status });
 
@@ -27,7 +28,13 @@ export function TaskList({ searchQuery, status, priority, category, tasks }: Tas
     return (
         <div className="max-w-7xl mx-auto space-y-4">
             {filteredTasks.map((task) => (
-                <TaskListCard key={task.id} task={task} completed={task.status === 'COMPLETED'} />
+                <div
+                    key={task.id}
+                    id={`task-card-${task.id}`}
+                    className={task.id === highlightedTaskId ? 'rounded-2xl ring-2 ring-purple-400/70 shadow-[0_0_0_1px_rgba(168,85,247,0.45)] pulse-once' : ''}
+                >
+                    <TaskListCard task={task} completed={task.status === 'COMPLETED'} />
+                </div>
             ))}
         </div>
     );

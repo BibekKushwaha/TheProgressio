@@ -12,8 +12,84 @@ const startOfDay = (date: Date): Date => {
     return d;
 };
 
+const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
+const HABIT_INTERNAL_SECRET = process.env.HABIT_INTERNAL_SECRET || process.env.ANALYTICS_INTERNAL_SECRET || "";
+
 const formatDateKey = (date: Date): string => {
     return date.toISOString().split("T")[0]!;
+};
+
+const buildConsecutiveStreak = (distinctDates: string[]): number => {
+    if (distinctDates.length === 0) return 0;
+
+    const today = formatDateKey(new Date());
+    const yesterday = formatDateKey(new Date(Date.now() - 86400000));
+    if (distinctDates[0] !== today && distinctDates[0] !== yesterday) return 0;
+
+    let streak = 0;
+    const checkDate = new Date(distinctDates[0]!);
+    for (const dateStr of distinctDates) {
+        if (dateStr === formatDateKey(checkDate)) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+
+    return streak;
+};
+
+const getHabitActiveDates = async (userId: string): Promise<string[]> => {
+    if (process.env.NODE_ENV === "test") return [];
+
+    try {
+        const headers: Record<string, string> = {};
+        if (HABIT_INTERNAL_SECRET) {
+            headers["x-internal-secret"] = HABIT_INTERNAL_SECRET;
+        }
+
+        const response = await fetch(
+            `${HABIT_SERVICE_URL}/api/habits/internal/active-dates?userId=${encodeURIComponent(userId)}`,
+            { headers }
+        );
+
+        if (!response.ok) return [];
+
+        const payload = await response.json() as { activeDates?: unknown };
+        if (!Array.isArray(payload.activeDates)) return [];
+
+        return payload.activeDates
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => value.trim())
+            .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value));
+    } catch {
+        return [];
+    }
+};
+
+const getMergedActiveDates = async (userId: string): Promise<string[]> => {
+    const [activityLogs, completionStats, habitActiveDates] = await Promise.all([
+        prisma.activityLog.findMany({
+            where: { task: { userId } },
+            select: { startTime: true },
+            orderBy: { startTime: "desc" },
+        }),
+        prisma.taskCompletionStat.findMany({
+            where: { userId },
+            select: { completedAt: true },
+            orderBy: { completedAt: "desc" },
+        }),
+        getHabitActiveDates(userId),
+    ]);
+
+    const mergedSet = new Set<string>([
+        ...activityLogs.map((log) => formatDateKey(log.startTime)),
+        ...completionStats.map((stat) => formatDateKey(stat.completedAt)),
+        ...habitActiveDates,
+    ]);
+
+    return Array.from(mergedSet).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 };
 
 const inferScreenActive = (brightness: number | null, motionState: string | null): boolean => {
@@ -512,43 +588,13 @@ export const getUserStreak = async (
             return;
         }
 
-        const activityLogs = await prisma.activityLog.findMany({
-            where: {
-                task: { userId }
-            },
-            select: { startTime: true },
-            orderBy: { startTime: 'desc' }
-        });
+        const distinctDates = await getMergedActiveDates(userId);
 
-        if (activityLogs.length === 0) {
+        if (distinctDates.length === 0) {
             res.status(200).json({ streak: 0, activeDates: [] });
             return;
         }
-
-        // Get unique dates in YYYY-MM-DD format
-        const distinctDates = Array.from(new Set(activityLogs.map(log => formatDateKey(log.startTime))));
-
-        const today = formatDateKey(new Date());
-        const yesterday = formatDateKey(new Date(Date.now() - 86400000));
-
-        // If the latest activity isn't today or yesterday, the streak is broken
-        if (distinctDates[0] !== today && distinctDates[0] !== yesterday) {
-            res.status(200).json({ streak: 0, activeDates: distinctDates.slice(0, 14) });
-            return;
-        }
-
-        let streak = 0;
-        let checkDate = new Date(distinctDates[0]!); // Start from the most recent activity date
-
-        for (const dateStr of distinctDates) {
-            const expectedDateStr = formatDateKey(checkDate);
-            if (dateStr === expectedDateStr) {
-                streak++;
-                checkDate.setDate(checkDate.getDate() - 1);
-            } else {
-                break;
-            }
-        }
+        const streak = buildConsecutiveStreak(distinctDates);
 
         res.status(200).json({
             streak,
@@ -581,22 +627,8 @@ export const getAchievements = async (
             select: { durationMinutes: true, startTime: true }
         });
 
-        // Get current streak (reusing logic or simplified)
-        const distinctDates = Array.from(new Set(sessions.map(s => formatDateKey(s.startTime!))));
-        let streak = 0;
-        if (distinctDates.length > 0) {
-            const today = formatDateKey(new Date());
-            const yesterday = formatDateKey(new Date(Date.now() - 86400000));
-            if (distinctDates[0] === today || distinctDates[0] === yesterday) {
-                let checkDate = new Date(distinctDates[0]!);
-                for (const dateStr of distinctDates) {
-                    if (dateStr === formatDateKey(checkDate)) {
-                        streak++;
-                        checkDate.setDate(checkDate.getDate() - 1);
-                    } else break;
-                }
-            }
-        }
+        const distinctDates = await getMergedActiveDates(userId);
+        const streak = buildConsecutiveStreak(distinctDates);
 
         const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0);
         const maxSessionTime = sessions.reduce((max, s) => Math.max(max, s.durationMinutes ?? 0), 0);
@@ -674,7 +706,7 @@ export const handleTaskCompletedEvent = async (
     res: Response
 ): Promise<void> => {
     try {
-        const { type, taskId, userId, changedFields } = req.body ?? {};
+        const { type, taskId, userId: _userId, changedFields } = req.body ?? {};
 
         if (!taskId || typeof taskId !== "string") {
             res.status(400).json({ message: "Invalid event payload: taskId is required" });
@@ -769,6 +801,39 @@ export const handleTaskCompletedEvent = async (
                 message: "Task deletion processed — stats cleaned up",
                 taskId,
             });
+            return;
+        }
+
+        // ── TASK_STATUS_CHANGED ─────────────────────────────────────────────
+        if (type === "TASK_STATUS_CHANGED") {
+            const previousStatus = req.body.previousStatus as string | undefined ?? (req.body.payload?.previousStatus as string | undefined);
+            const newStatus = req.body.newStatus as string | undefined ?? (req.body.payload?.newStatus as string | undefined) ?? (req.body.changedFields?.status as string | undefined);
+
+            // If status changed away from COMPLETED, remove the completion stat
+            if (previousStatus === "COMPLETED" && newStatus !== "COMPLETED") {
+                await prisma.taskCompletionStat.deleteMany({ where: { taskId } });
+                res.status(200).json({ message: "Status change processed (removed completion stat)", taskId });
+                return;
+            }
+
+            // If status changed to COMPLETED, record completion stat
+            if (newStatus === "COMPLETED" && previousStatus !== "COMPLETED") {
+                const task = await prisma.task.findUnique({ where: { id: taskId }, include: { activityLogs: true } });
+                if (task) {
+                    const totalMinutes = task.activityLogs.reduce((sum, log) => sum + (log.durationMinutes ?? 0), 0);
+                    await prisma.taskCompletionStat.upsert({
+                        where: { taskId: task.id },
+                        create: { taskId: task.id, userId: task.userId, totalMinutes, completedAt: new Date() },
+                        update: { totalMinutes, completedAt: new Date() },
+                    });
+                }
+
+                res.status(200).json({ message: "Status change processed (recorded completion)", taskId });
+                return;
+            }
+
+            // No-op for other transitions
+            res.status(200).json({ message: "Status change processed (no-op)", taskId });
             return;
         }
 

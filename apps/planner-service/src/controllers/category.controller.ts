@@ -2,134 +2,109 @@ import type { Response } from "express";
 import { prisma } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { categorySchema } from "@repo/schemas/category";
+import { TryCatch } from "../utils/tryCatch.js";
+import ErrorHandler from "../utils/errorHandler.js";
 
-export const createCategory = async (req: AuthenticatedRequest, res: Response) => {
+export const createCategory = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { name, colorCode, icon } = req.body;
+
+    if (!name || typeof name !== "string") {
+        throw new ErrorHandler(400, "Name is required");
+    }
+
+    const parsed = categorySchema.safeParse({
+        name,
+        colorCode: (colorCode && /^#[0-9A-F]{6}$/i.test(colorCode)) ? colorCode : "#3B82F6",
+        icon: icon || undefined,
+    });
+    if (!parsed.success) {
+        throw new ErrorHandler(400, "Invalid category data");
+    }
+
     try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const { name, colorCode, icon } = req.body;
-
-        if (!name || typeof name !== "string") {
-            return res.status(400).json({ message: "Name is required" });
-        }
-
-        const parsed = categorySchema.safeParse({
-            name,
-            colorCode: (colorCode && /^#[0-9A-F]{6}$/i.test(colorCode)) ? colorCode : "#3B82F6",
-            icon: icon || undefined,
-        });
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Invalid category data",
-                errors: parsed.error.flatten(),
-            });
-        }
-
         const category = await prisma.category.create({
             data: {
                 name,
                 colorCode: colorCode ?? "#3B82F6",
                 icon: icon ?? null,
-                userId: req.user.id,
+                userId,
             },
         });
 
         return res.status(201).json(category);
     } catch (error: any) {
         if (error.code === 'P2002') {
-            return res.status(400).json({ message: "Category name must be unique for this user" });
+            throw new ErrorHandler(400, "Category name must be unique for this user");
         }
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
+        throw error;
     }
-};
+});
 
-export const getAllCategories = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+export const getAllCategories = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
 
-        const categories = await prisma.category.findMany({
-            where: {
-                userId: req.user.id,
-            },
-            include: {
-                _count: {
-                    select: { tasks: true }
-                }
+    const categories = await prisma.category.findMany({
+        where: { userId },
+        include: {
+            _count: {
+                select: { tasks: true }
             }
-        });
+        }
+    });
 
-        return res.status(200).json(categories);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
+    return res.status(200).json(categories);
+});
+
+export const getCategoryById = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    if (typeof id !== "string") {
+        throw new ErrorHandler(400, "Invalid category id");
     }
-};
 
-export const getCategoryById = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
+    const category = await prisma.category.findUnique({
+        where: { id },
+        include: {
+            tasks: true
         }
+    });
 
-        const { id } = req.params;
-
-        if (typeof id !== "string") {
-            return res.status(400).json({ message: "Invalid category id" });
-        }
-
-        const category = await prisma.category.findUnique({
-            where: { id },
-            include: {
-                tasks: true
-            }
-        });
-
-        if (!category) {
-            return res.status(404).json({ message: "Category not found" });
-        }
-
-        if (category.userId !== req.user.id) {
-            return res.status(403).json({ message: "Forbidden" });
-        }
-
-        return res.status(200).json(category);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
+    if (!category) {
+        throw new ErrorHandler(404, "Category not found");
     }
-};
 
-export const updateCategory = async (req: AuthenticatedRequest, res: Response) => {
+    if (category.userId !== userId) {
+        throw new ErrorHandler(403, "Forbidden");
+    }
+
+    return res.status(200).json(category);
+});
+
+export const updateCategory = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+    if (typeof id !== "string") {
+        throw new ErrorHandler(400, "Invalid category id");
+    }
+    const { name, colorCode, icon } = req.body;
+
+    const existingCategory = await prisma.category.findUnique({
+        where: { id },
+    });
+
+    if (!existingCategory) {
+        throw new ErrorHandler(404, "Category not found");
+    }
+
+    if (existingCategory.userId !== userId) {
+        throw new ErrorHandler(403, "Forbidden");
+    }
+
     try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const { id } = req.params;
-        if (typeof id !== "string") {
-            return res.status(400).json({ message: "Invalid category id" });
-        }
-        const { name, colorCode, icon } = req.body;
-
-        const existingCategory = await prisma.category.findUnique({
-            where: { id },
-        });
-
-        if (!existingCategory) {
-            return res.status(404).json({ message: "Category not found" });
-        }
-
-        if (existingCategory.userId !== req.user.id) {
-            return res.status(403).json({ message: "Forbidden" });
-        }
-
         const updatedCategory = await prisma.category.update({
-            where: { id: id as string },
+            where: { id },
             data: {
                 ...(name && { name }),
                 ...(colorCode && { colorCode }),
@@ -140,44 +115,35 @@ export const updateCategory = async (req: AuthenticatedRequest, res: Response) =
         return res.status(200).json(updatedCategory);
     } catch (error: any) {
         if (error.code === 'P2002') {
-            return res.status(400).json({ message: "Category name must be unique for this user" });
+            throw new ErrorHandler(400, "Category name must be unique for this user");
         }
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
+        throw error;
     }
-};
+});
 
-export const deleteCategory = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
+export const deleteCategory = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
 
-        const { id } = req.params;
-
-        if (typeof id !== "string") {
-            return res.status(400).json({ message: "Invalid category id" });
-        }
-
-        const existingCategory = await prisma.category.findUnique({
-            where: { id },
-        });
-
-        if (!existingCategory) {
-            return res.status(404).json({ message: "Category not found" });
-        }
-
-        if (existingCategory.userId !== req.user.id) {
-            return res.status(403).json({ message: "Forbidden" });
-        }
-
-        await prisma.category.delete({
-            where: { id: id as string },
-        });
-
-        return res.status(200).json({ message: "Category deleted successfully" });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error" });
+    if (typeof id !== "string") {
+        throw new ErrorHandler(400, "Invalid category id");
     }
-};
+
+    const existingCategory = await prisma.category.findUnique({
+        where: { id },
+    });
+
+    if (!existingCategory) {
+        throw new ErrorHandler(404, "Category not found");
+    }
+
+    if (existingCategory.userId !== userId) {
+        throw new ErrorHandler(403, "Forbidden");
+    }
+
+    await prisma.category.delete({
+        where: { id },
+    });
+
+    return res.status(200).json({ message: "Category deleted successfully" });
+});

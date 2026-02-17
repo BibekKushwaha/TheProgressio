@@ -218,11 +218,17 @@ const toDigestNudge = (userId: string, nudges: Nudge[]): Nudge => {
         .sort((a, b) => priorityOrder[b] - priorityOrder[a])[0] ?? "MEDIUM";
 
     const lines = nudges.slice(0, 4).map((item) => `• ${item.title}`);
-    const metadata = {
-        sourceNudgeIds: nudges.map((item) => item.id),
+    const sourceIds = nudges.map((item) => item.id);
+    const metadata: Record<string, unknown> = {
+        sourceNudgeIds: sourceIds,
         count: nudges.length,
         digest: true,
     };
+
+    // If any source id is a valid UUID, expose a primary nudge id for actions
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const primary = sourceIds.find((id) => typeof id === 'string' && uuidRegex.test(id));
+    if (primary) metadata.nudgeId = primary;
 
     return {
         id: `digest-${Date.now()}`,
@@ -543,7 +549,7 @@ export async function detectSlipPatterns(userId: string): Promise<{ atRisk: bool
 // ── Fetch User Nudges ──────────────────────────────────────────────────
 
 export async function getUserNudges(userId: string, unreadOnly: boolean = false): Promise<Nudge[]> {
-    const [settings, nudges] = await Promise.all([
+    const [settings, rawNudges] = await Promise.all([
         getNotificationSettings(userId),
         prisma.nudge.findMany({
             where: {
@@ -559,6 +565,22 @@ export async function getUserNudges(userId: string, unreadOnly: boolean = false)
             take: 80,
         }),
     ]);
+
+    // Ensure metadata includes a canonical nudgeId for client actions.
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const nudges = rawNudges.map((nudge) => {
+        try {
+            const parsed = parseMetadata(nudge.metadata);
+            if (!parsed.nudgeId) {
+                if (typeof nudge.id === 'string' && uuidRegex.test(nudge.id)) {
+                    parsed.nudgeId = nudge.id;
+                }
+            }
+            return { ...nudge, metadata: JSON.stringify(parsed) } as Nudge;
+        } catch {
+            return nudge;
+        }
+    });
 
     const now = new Date();
     const filtered = nudges.filter((nudge) => shouldSendWithCurrentContext(settings, nudge.type, now));

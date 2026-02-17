@@ -9,6 +9,7 @@
     "test:watch": "vitest",
     "dev": "tsx watch --ignore './node_modules/**' --ignore '../**/node_modules/**' --ignore '../**/dist/**' --ignore '../../packages/db/generated/**' src/index.ts",
     "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [],

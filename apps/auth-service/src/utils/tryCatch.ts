@@ -7,20 +7,21 @@ export const TryCatch =
       req: Request,
       res: Response,
       next: NextFunction
-    ) => Promise<any>
+    ) => Promise<void | Response>
   ): RequestHandler =>
   async (req, res, next) => {
     try {
       await controller(req, res, next);
     } catch (error: any) {
       if (error instanceof ErrorHandler) {
-        return res.status(error.statusCode).json({
+        res.status(error.statusCode).json({
           message: error.message,
         });
+        return;
       }
 
       res.status(500).json({
-        message: error.message,
+        message: error.message || "Internal Server Error",
       });
     }
   };

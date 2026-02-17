@@ -2,11 +2,14 @@
   "name": "@repo/db",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
   "scripts": {
     "test": "echo 'No tests'",
     "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit",
     "generate": "prisma generate --schema=./prisma/schema.prisma"
   },
   "keywords": [],
@@ -20,7 +23,7 @@
     "prisma": "^7.3.0"
   },
   "exports": {
-    ".": "./index.ts",
-    "./client": "./client.ts"
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js"
   }
 }

@@ -5,7 +5,7 @@ import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
 import { TimelineView } from '@/components/planner/TimelineView';
 import { LocalTask, Task, TaskStatus, useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { SearchBar } from '@/components/SearchBar';
@@ -41,7 +41,11 @@ const mergeTaskSources = (remoteTasks: Task[], localTasks: LocalTask[]): Task[] 
 };
 
 export default function TasksPage() {
+    const router = useRouter();
+    const pathname = usePathname();
     const searchParams = useSearchParams();
+    const highlightedTaskId = searchParams.get('taskId') || '';
+    const [focusedTaskId, setFocusedTaskId] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [status, setStatus] = useState('all');
     const [priority, setPriority] = useState('all');
@@ -62,6 +66,7 @@ export default function TasksPage() {
         const queryCategoryId = searchParams.get('categoryId');
         const queryCategoryName = searchParams.get('category');
         const queryStatus = searchParams.get('status');
+        const queryTaskId = searchParams.get('taskId');
 
         if (queryCategoryId) {
             setSelectedCategory(queryCategoryId);
@@ -81,7 +86,32 @@ export default function TasksPage() {
         ) {
             setStatus(queryStatus);
         }
+
+        if (queryTaskId) {
+            setFocusedTaskId(queryTaskId);
+            setView('list');
+        }
     }, [searchParams, categories]);
+
+    useEffect(() => {
+        if (!focusedTaskId || view !== 'list') return;
+
+        const scrollToTarget = () => {
+            const element = document.getElementById(`task-card-${focusedTaskId}`);
+            if (!element) return;
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            if (highlightedTaskId) {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete('taskId');
+                const next = params.toString();
+                router.replace(next ? `${pathname}?${next}` : pathname);
+            }
+        };
+
+        const timeoutId = window.setTimeout(scrollToTarget, 120);
+        return () => window.clearTimeout(timeoutId);
+    }, [focusedTaskId, highlightedTaskId, view, tasks.length, pathname, router, searchParams]);
 
     const categoryOptions = useMemo(
         () => [
@@ -150,6 +180,7 @@ export default function TasksPage() {
                                     priority={priority}
                                     category={selectedCategory}
                                     tasks={tasks}
+                                    highlightedTaskId={focusedTaskId || undefined}
                                 />
                             ) : view === 'timeline' ? (
                                 <TimelineView

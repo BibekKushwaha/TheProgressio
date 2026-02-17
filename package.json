@@ -33,15 +33,16 @@
     "packages/*"
   ],
   "dependencies": {
-    "dotenv": "^17.2.3",
-    "tsx": "^4.21.0",
     "@google/generative-ai": "^0.24.1",
     "@repo/db": "*",
     "@types/cookie-parser": "^1.4.10",
+    "@upstash/redis": "^1.36.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "tsx": "^4.21.0"
   }
 }

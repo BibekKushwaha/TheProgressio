@@ -190,7 +190,9 @@ export const habitsApi = createApi({
                             draft.habits.unshift(data.habit);
                         })
                     );
-                } catch { }
+                } catch {
+                    /* ignore */
+                }
             },
         }),
         updateHabit: builder.mutation<{ message: string; habit: Habit }, UpdateHabitRequest>({
@@ -257,7 +259,9 @@ export const habitsApi = createApi({
                             }
                         })
                     );
-                } catch { }
+                } catch {
+                    /* ignore */
+                }
             },
         }),
         resetHabit: builder.mutation<{ message: string; habit: Habit }, string>({
@@ -279,7 +283,9 @@ export const habitsApi = createApi({
                             }
                         })
                     );
-                } catch { }
+                } catch {
+                    /* ignore */
+                }
             },
         }),
 

@@ -159,7 +159,7 @@ export default function AnalyticsOverviewPage() {
     },
     {
       label: 'Overall Focus Score',
-      value: isFocusLoading ? <Skeleton className="h-8 w-24" /> : `${focusScoreData?.stats?.score ?? 0} / 100`,
+      value: isFocusLoading ? <Skeleton className="h-8 w-24" /> : `${focusScoreData?.stats?.scoreDisplay ?? (focusScoreData?.stats?.scorePercent ?? focusScoreData?.stats?.score ?? 0)} / 100`,
       trend: '+5pts',
       icon: Target,
       gradient: 'from-green-500 to-emerald-500',
