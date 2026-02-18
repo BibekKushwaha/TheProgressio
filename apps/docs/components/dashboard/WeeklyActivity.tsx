@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useGetWeeklyTrendsQuery } from '@repo/store';
+import { useGetWeeklyTrendsQuery, useGetProfileQuery } from '@repo/store';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function WeeklyActivity() {
     const [viewType, setViewType] = useState<'week' | 'month'>('week');
+    const { data: profileData } = useGetProfileQuery();
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
         pollingInterval: 30000,
         refetchOnFocus: true,
@@ -16,7 +17,15 @@ export function WeeklyActivity() {
         { value: 'week' as const, label: 'Week' },
         { value: 'month' as const, label: 'Month' },
     ];
-    const yAxisLabels = ['4h', '3h', '2h', '1h', '0h'];
+
+    const dailyLimit = profileData?.user?.dailyGoalHours || 4;
+    const yAxisLabels = [
+        `${dailyLimit}h`,
+        `${Math.round(dailyLimit * 0.75)}h`,
+        `${Math.round(dailyLimit * 0.5)}h`,
+        `${Math.round(dailyLimit * 0.25)}h`,
+        '0h'
+    ];
 
     const rawData = trendsData?.data || [];
     const filteredData = viewType === 'week' ? rawData.slice(-7) : rawData.slice(-30);
@@ -28,9 +37,8 @@ export function WeeklyActivity() {
         return {
             ...d,
             day: days[date.getDay()],
-            // Calculate percentage based on a 4-hour max for visualization
-            // Using 4 as it matches standard daily goal in the app
-            percentage: Math.min(100, Math.round((d.hours / 4) * 100))
+            // Calculate percentage based on user's daily goal for visualization
+            percentage: Math.min(100, Math.round((d.hours / dailyLimit) * 100))
         };
     });
 

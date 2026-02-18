@@ -2,6 +2,11 @@
 import { DurationPredictionCard } from '@/components/analytics/DurationPredictionCard';
 import { PredictiveScoreCard } from '@/components/analytics/PredictiveScoreCard';
 import { ProductivityInsights } from '@/components/analytics/ProductivityInsights';
+import { CycleTimeScatterPlot } from '@/components/analytics/CycleTimeScatterPlot';
+import { WhatIfGPASimulator } from '@/components/analytics/WhatIfGPASimulator';
+import { PeakProductivityCard } from '@/components/analytics/PeakProductivityCard';
+import { TimeLeakageCard } from '@/components/analytics/TimeLeakageCard';
+import { SWOTReport } from '@/components/analytics/SWOTReport';
 import { GlassHero } from '@/components/layout/GlassHero';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskStatus, useGetTasksQuery } from "@repo/store";
@@ -50,18 +55,13 @@ export default function AnalyticsStrategicPage() {
   }, [predictionTaskOptions, selectedPredictionTaskId]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 text-white">
-      <div className="flex">
-        <div className="flex-1 flex flex-col">
-
-          <main className="flex-1 p-4 md:p-8 overflow-auto">
-            <div className="max-w-7xl mx-auto space-y-8">
-              <GlassHero
-                className="bg-gradient-to-br from-cyan-500/[0.10] via-indigo-500/[0.08] to-fuchsia-500/[0.08]"
-                topGlowClassName="-top-24 -right-20 h-72 w-72 bg-cyan-500/20"
-                bottomGlowClassName="-bottom-24 -left-16 h-72 w-72 bg-fuchsia-500/15"
-              >
-                <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
+    <div className="space-y-8">
+      <GlassHero
+        className="bg-gradient-to-br from-cyan-500/[0.10] via-indigo-500/[0.08] to-fuchsia-500/[0.08]"
+        topGlowClassName="-top-24 -right-20 h-72 w-72 bg-cyan-500/20"
+        bottomGlowClassName="-bottom-24 -left-16 h-72 w-72 bg-fuchsia-500/15"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.06] px-3 py-1 text-xs text-cyan-100 mb-4">
                       <Sparkles className="w-3.5 h-3.5" />
@@ -116,6 +116,15 @@ export default function AnalyticsStrategicPage() {
                   />
                   <PredictiveScoreCard />
                 </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <PeakProductivityCard />
+                  <TimeLeakageCard />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <CycleTimeScatterPlot />
+                  <WhatIfGPASimulator />
+                </div>
+                <SWOTReport />
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-1">
                   <ProductivityInsights />
                 </div>
@@ -123,10 +132,6 @@ export default function AnalyticsStrategicPage() {
 
 
 
-            </div>
-          </main>
-        </div>
-      </div>
     </div>
   );
 }

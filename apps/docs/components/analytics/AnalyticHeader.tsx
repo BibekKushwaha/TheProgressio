@@ -15,14 +15,12 @@ const PAST_DAYS_OPTIONS = [
 ] as const;
 
 export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHeaderProps) {
-            return (
-                <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-1 md:p-2 mb-1">
-            <div className="max-w-7xl mx-auto">
-                <PageHeader
-                    title="Analytics Overview"
-                    subtitle="Track your productivity trends and study habits."
-                    className="mb-0" // Remove default margin as header provides padding
-                >
+    return (
+        <header className="mb-8">
+            <PageHeader
+                title="Analytics Overview"
+                subtitle="Track your productivity trends and study habits."
+            >
                     <div className="flex flex-wrap items-center justify-start md:justify-end gap-3 w-full md:w-auto min-w-0">
                         <FilterDropdown
                             value={pastDays}
@@ -40,7 +38,6 @@ export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHe
                         </Button>
                     </div>
                 </PageHeader>
-            </div>
         </header>
     );
 }

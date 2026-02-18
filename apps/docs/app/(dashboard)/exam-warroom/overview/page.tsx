@@ -13,14 +13,7 @@ export default function ExamWarRoomPage() {
 
     const grades = gradeData?.entries || [];
 
-    type SubjectPerformance = {
-        subjectName: string;
-        avgScore?: number;
-        entryCount?: number;
-        trend?: string;
-    };
-
-    const subjects = (performanceData?.data ?? []) as SubjectPerformance[];
+    const subjects = performanceData?.data ?? [];
 
     // Difficulty breakdown from grade entries
     const difficultyStats = grades.reduce(
@@ -37,18 +30,13 @@ export default function ExamWarRoomPage() {
     const totalAttempts = difficultyStats.easy + difficultyStats.medium + difficultyStats.hard;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-red-950/30 to-slate-950 text-white p-2 md:p-4">
-            <div className="max-w-7xl mx-auto space-y-5">
-                <PageHeader
-                    title="Exam War Room"
-                    subtitle="Chapter-wise SWOT, success tracking & predictive scores"
-                >
-                    {/* <div className="p-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl shadow-lg shadow-red-500/20">
-                        <Swords className="w-8 h-8 text-white" />
-                    </div> */}
-                </PageHeader>
+        <div className="space-y-6">
+            <PageHeader
+                title="Exam War Room"
+                subtitle="Chapter-wise SWOT, success tracking & predictive scores"
+            />
 
-                {/* Quick Stats Bar */}
+            {/* Quick Stats Bar */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-5">
                         <div className="text-sm text-slate-400 mb-1">Total Attempts</div>
@@ -114,7 +102,6 @@ export default function ExamWarRoomPage() {
                         </div>
                     </div>
                 )}
-            </div>
         </div>
     );
 }

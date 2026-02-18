@@ -3,7 +3,7 @@ import {
     getDailySummary, getAchievements, getFocusScore, getTaskEfficiency,
     getUserStreak, getWeeklyTrends, handleTaskCompletedEvent,
     // Phase 3 — Prediction
-    getPrediction, getCycleTime,
+    getPrediction, predictGradeEndpoint, getCycleTime,
     // Phase 3 — SWOT
     getSWOTAnalysis, getSubjectStats,
     // Phase 3 — GPA
@@ -12,6 +12,7 @@ import {
     addGradeEntry, getGradeEntries, deleteGradeEntry,
     // Phase 3 — Focus / Leakage
     getTimeLeakage, getPeakWindow, getPredictivePerformanceEndpoint,
+    getRevisionSchedule,
     getInternalConsistency,
     getNotificationIntelligence,
     getActiveContextSignals,
@@ -30,11 +31,13 @@ router.get("/achievements", isAuth, getAchievements);
 
 // ── Duration Prediction (PERT) ─────────────────────────────────────────
 router.get("/predict", isAuth, getPrediction);
+router.post("/grade/predict", isAuth, predictGradeEndpoint);
 router.get("/cycle-time", isAuth, getCycleTime);
 
 // ── SWOT Analysis ──────────────────────────────────────────────────────
 router.get("/swot/:examType", isAuth, getSWOTAnalysis);
 router.get("/subject/:name", isAuth, getSubjectStats);
+router.get("/revision-schedule", isAuth, getRevisionSchedule);
 
 // ── GPA Calculator ─────────────────────────────────────────────────────
 router.get("/gpa", isAuth, getGPA);

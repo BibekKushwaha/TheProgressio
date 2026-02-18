@@ -1,5 +1,5 @@
-import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Edit, Paperclip, Sparkles, Loader2 } from 'lucide-react';
-import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation, useGenerateSubtasksMutation } from '@repo/store';
+import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Edit, Paperclip, Sparkles, Loader2, BellRing, MessageSquare } from 'lucide-react';
+import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation, useGenerateSubtasksMutation, useCreateRevisionDripCampaignMutation, useComposeNotificationMutation } from '@repo/store';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -40,11 +40,14 @@ export function TaskCard({ task, completed }: TaskCardProps) {
     const [deleteTask] = useDeleteTaskMutation();
     const [toggleTask] = useToggleTaskMutation();
     const [generateSubtasks, { isLoading: isBreakingDown }] = useGenerateSubtasksMutation();
+    const [createRevisionCampaign] = useCreateRevisionDripCampaignMutation();
+    const [composeNotification] = useComposeNotificationMutation();
 
     const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[PriorityEnum.LOW];
     const categoryColor = task.category?.colorCode || '#6B7280'; // Default gray
     const categoryName = task.category?.name || 'No Category';
 
+    const isFamilyView = typeof window !== 'undefined' ? !!localStorage.getItem('family_share_token') : false;
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -92,6 +95,41 @@ export function TaskCard({ task, completed }: TaskCardProps) {
         }
     };
 
+    const handleCreateRevision = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            await createRevisionCampaign({
+                examTitle: task.title,
+                examDate: task.dueDate || new Date().toISOString(),
+                chapter: task.category?.name || 'General'
+            }).unwrap();
+            toast.success('Revision drip campaign scheduled!');
+        } catch (err) {
+            toast.error('Failed to schedule revision campaign');
+            console.error(err);
+        }
+    };
+
+    const handleSendNudge = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const message = window.prompt("Enter a nudge message for the student:");
+        if (!message) return;
+
+        try {
+            await composeNotification({
+                category: 'BEHAVIORAL_NUDGE',
+                title: `Family Nudge: ${task.title}`,
+                body: message,
+                priority: 'HIGH',
+                deepLink: '/dashboard'
+            }).unwrap();
+            toast.success('Nudge sent to student');
+        } catch (err) {
+            toast.error('Failed to send nudge');
+            console.error(err);
+        }
+    };
+
     return (
         <div
             className={`group bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-5 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 cursor-pointer ${completed ? 'opacity-60' : ''
@@ -122,10 +160,24 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                         <DropdownMenuContent align="end" className="bg-slate-900 border-white/10 text-slate-200">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-white/10" />
-                            <DropdownMenuItem onClick={handleEdit} className="focus:bg-white/10 focus:text-white cursor-pointer">
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Details
-                            </DropdownMenuItem>
+                            {!isFamilyView && (
+                                <>
+                                    <DropdownMenuItem onClick={handleEdit} className="focus:bg-white/10 focus:text-white cursor-pointer">
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        Edit Details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleCreateRevision} className="focus:bg-white/10 focus:text-white cursor-pointer">
+                                        <BellRing className="w-4 h-4 mr-2 text-yellow-400" />
+                                        Schedule Revision
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            {isFamilyView && (
+                                <DropdownMenuItem onClick={handleSendNudge} className="focus:bg-white/10 focus:text-white cursor-pointer">
+                                    <MessageSquare className="w-4 h-4 mr-2 text-blue-400" />
+                                    Send Nudge
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={handleCardClick} className="focus:bg-white/10 focus:text-white cursor-pointer">
                                 <Clock className="w-4 h-4 mr-2 text-indigo-400" />
                                 Focus
@@ -150,10 +202,12 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                                     </>
                                 )}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleDelete} className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer">
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                            </DropdownMenuItem>
+                            {!isFamilyView && (
+                                <DropdownMenuItem onClick={handleDelete} className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer">
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete
+                                </DropdownMenuItem>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

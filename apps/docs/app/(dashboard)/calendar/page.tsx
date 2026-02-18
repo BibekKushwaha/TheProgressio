@@ -49,8 +49,8 @@ export default function CalendarPage() {
     }, [searchParams]);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 text-white p-6 md:p-8">
-            <div className="max-w-[1600px] mx-auto">
+        <div className="space-y-6">
+            <div className="mx-auto">
                 <CalendarHeader
                     selectedView={selectedView}
                     setSelectedView={handleViewChange}

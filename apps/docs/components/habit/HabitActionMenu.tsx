@@ -9,7 +9,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "../ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu"
 import { Habit, useDeleteHabitMutation, useResetHabitMutation } from "@repo/store"
 import HabitDialog from "./HabitDialog"
 import { HabitStatsModal } from "./HabitStatsModal";

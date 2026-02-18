@@ -201,6 +201,8 @@ vi.mock('@repo/db', () => ({
     MEDIUM: 'MEDIUM',
     HIGH: 'HIGH',
   },
+  AttendanceStatus: { PRESENT: 'PRESENT', ABSENT: 'ABSENT', LATE: 'LATE' },
+  AttendanceMethod: { QR: 'QR', MANUAL: 'MANUAL', GEOFENCE: 'GEOFENCE' },
 }));
 
 import { processSyncPull, processSyncPush } from '../src/services/sync.service.js';

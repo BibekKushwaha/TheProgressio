@@ -15,6 +15,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useRouter } from 'next/navigation';
 
+const NAV_LINKS = [
+  { label: 'Features', href: '/dashboard' },
+  { label: 'How it Works', href: '/signup' },
+  { label: 'Pricing', href: '#' },
+];
+
 export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
   const [mounted, setMounted] = useState(false);
@@ -25,11 +31,6 @@ export function Navbar() {
     setMounted(true);
   }, []);
 
-  const navLinks = [
-    { label: 'Features', href: '/dashboard' },
-    { label: 'How it Works', href: '/signup' },
-    { label: 'Pricing', href: '#' },
-  ];
   const goTo = (path: string) => () => router.push(path);
   const handleLogout = async () => {
     await logout();
@@ -51,7 +52,7 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
+            {NAV_LINKS.map((link) => (
               <Link
                 key={link.label}
                 href={link.href}

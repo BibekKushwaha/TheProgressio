@@ -4,8 +4,8 @@ import React, { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, User } from "lucide-react";
-import GradientButton from "../../../components/auth/gradient-button";
-import Input from "../../../components/auth/input";
+import GradientButton from "@/components/auth/gradient-button";
+import Input from "@/components/auth/input";
 import { setCredentials, useAppDispatch, useRegisterMutation } from "@repo/store";
 import { registerSchema } from "@repo/schemas/auth";
 import { Card } from "@/components/ui/card";
@@ -82,21 +82,35 @@ const SignupPage = () => {
         }
       }
       router.push('/');
-    } catch (err: unknown) {
-      console.error('Signup failed:', err);
-      // Extract likely server error message if available
-      const serverMessage =
-        typeof err === 'object' && err !== null
-          ? (err as { data?: { message?: string } | string; error?: string; status?: number }).data && typeof (err as { data?: unknown }).data !== 'string'
-            ? (err as { data?: { message?: string } }).data?.message
-            : (err as { data?: string }).data || (err as { error?: string }).error
-          : null;
-      const statusMessage =
-        typeof err === 'object' && err !== null && 'status' in err
-          ? `Request failed: ${(err as { status?: number }).status}`
-          : null;
-      const fallbackMessage = statusMessage || 'Signup failed. Please try again.';
-      setErrors({ email: typeof serverMessage === 'string' ? serverMessage : fallbackMessage });
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorAny = err as any;
+      console.error('Signup failed:', errorAny);
+
+      let errorMessage = 'Signup failed. Please try again.';
+
+      if (errorAny?.data) {
+        if (typeof errorAny.data === 'string') {
+          errorMessage = errorAny.data;
+        } else if (errorAny.data.message) {
+          errorMessage = errorAny.data.message;
+        } else if (errorAny.data.errors) {
+          // Handle Zod errors from server
+          const fieldErrors = errorAny.data.errors.fieldErrors;
+          if (fieldErrors) {
+            const firstKey = Object.keys(fieldErrors)[0];
+            if (firstKey) {
+              errorMessage = fieldErrors[firstKey][0];
+            }
+          }
+        }
+      } else if (errorAny?.error) {
+        errorMessage = errorAny.error;
+      } else if (errorAny?.message) {
+        errorMessage = errorAny.message;
+      }
+
+      setErrors({ email: errorMessage });
     }
   };
 

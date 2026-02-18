@@ -160,7 +160,7 @@ function CreateTaskPageContent() {
                 const marks = parseFloat(obtainedMarks);
                 const total = parseFloat(totalMarks);
 
-                if (isNaN(marks) || isNaN(total) || total <= 0) {
+                if (Number.isNaN(marks) || Number.isNaN(total) || total <= 0) {
                     toast('Please enter valid marks', 'error');
                     return;
                 }

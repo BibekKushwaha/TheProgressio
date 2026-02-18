@@ -49,6 +49,8 @@ export {
   useGetFamilyLinksQuery,
   useRevokeFamilyLinkMutation,
   useResolveFamilyLinkQuery,
+  useGetWhatsAppPairingCodeQuery,
+  useUnpairWhatsAppMutation,
 } from './services/authApi';
 export type {
   RegisterRequest,
@@ -83,6 +85,8 @@ export {
   usePostNotificationDirectReplyMutation,
   useCreateRevisionDripCampaignMutation,
   useTriggerGeofencePingMutation,
+  useMarkAttendanceMutation,
+  useGetAttendanceHistoryQuery,
   useGetNotificationDeepLinkQuery,
 } from './services/tasksApi';
 export type {
@@ -182,8 +186,9 @@ export {
   useGetAchievementsQuery,
   // Phase 3: Advanced Analytics
   useGetPredictionQuery,
+  usePredictGradeMutation,
   useGetCycleTimeQuery,
-  useGetSWOTAnalysisQuery,
+  useGetSWOTReportQuery,
   useGetSubjectPerformanceQuery,
   useGetGPAQuery,
   useAddCourseGradeMutation,
@@ -199,6 +204,7 @@ export {
   useGetPredictivePerformanceQuery,
   useGetNotificationIntelligenceQuery,
   useGetNotificationContextSignalsQuery,
+  useGetRevisionScheduleQuery,
 } from './services/analyticsApi';
 export type {
   ActivityLog,
@@ -210,6 +216,7 @@ export type {
   HeartbeatLiveSessionRequest,
   StopLiveSessionRequest,
   DailyStats,
+  SubjectPerformance,
   Achievement,
   // Phase 3 Types
   CGPAResult,
@@ -226,6 +233,7 @@ export type {
   GPAComponentPreview,
   NotificationIntelligence,
   NotificationContextSignals,
+  RevisionScheduleResponse,
 } from './services/analyticsApi';
 export { SessionType } from './services/analyticsApi';
 export * from './services/timetableApi';

@@ -36,6 +36,48 @@ type NavItem = {
     children?: NavChild[];
 };
 
+const NAV_ITEMS: NavItem[] = [
+    { name: "Command Center", icon: LayoutDashboard, href: "/dashboard" },
+    {
+        name: "Tasks & Planning",
+        icon: CheckSquare,
+        href: "/planner",
+        menuKey: "planner",
+        children: [
+            { name: "Create New", href: "/createtask" },
+            { name: "Task Board", href: "/tasks" },
+            { name: "ReOpen Tasks", href: "/planner" },
+            { name: "Syllabus Digitizer", href: "/syllabus-digitizer" },
+        ],
+    },
+    { name: "Timetable", icon: Calendar, href: "/calendar" },
+    { name: "Habit Gallery", icon: Flame, href: "/habits" },
+    {
+        name: "Analytics",
+        icon: BarChart2,
+        href: "/analytics",
+        menuKey: "analytics",
+        children: [
+            { name: "Overview", href: "/analytics/overview" },
+            { name: "Strategic", href: "/analytics/strategic" },
+        ],
+    },
+    {
+        name: "Exam War Room",
+        icon: Swords,
+        href: "/exam-warroom",
+        menuKey: "exam-warroom",
+        children: [
+            { name: "Overview", href: "/exam-warroom/overview" },
+            { name: "Academic", href: "/exam-warroom/academic" },
+            { name: "Revision", href: "/exam-warroom/revision" },
+        ],
+    },
+    { name: "Subject Library", icon: BookOpen, href: "/subjects" },
+    { name: "Achievements", icon: Award, href: "/achievement" },
+    { name: "Family Connect", icon: Users, href: "/family-connect" },
+];
+
 const Sidebar = () => {
     const pathname = usePathname();
     const router = useRouter();
@@ -52,48 +94,6 @@ const Sidebar = () => {
         analytics: pathname.startsWith("/analytics"),
         "exam-warroom": pathname.startsWith("/exam-warroom"),
     });
-
-    const navItems: NavItem[] = [
-        { name: "Command Center", icon: LayoutDashboard, href: "/dashboard" },
-        {
-            name: "Tasks & Planning",
-            icon: CheckSquare,
-            href: "/planner",
-            menuKey: "planner",
-            children: [
-                { name: "Create New", href: "/createtask" },
-                { name: "Task Board", href: "/tasks" },
-                { name: "ReOpen Tasks", href: "/planner" },
-                { name: "Syllabus Digitizer", href: "/syllabus-digitizer" },
-            ],
-        },
-        { name: "Timetable", icon: Calendar, href: "/calendar" },
-        { name: "Habit Gallery", icon: Flame, href: "/habits" },
-        {
-            name: "Analytics",
-            icon: BarChart2,
-            href: "/analytics",
-            menuKey: "analytics",
-            children: [
-                { name: "Overview", href: "/analytics/overview" },
-                { name: "Strategic", href: "/analytics/strategic" },
-            ],
-        },
-        {
-            name: "Exam War Room",
-            icon: Swords,
-            href: "/exam-warroom",
-            menuKey: "exam-warroom",
-            children: [
-                { name: "Overview", href: "/exam-warroom/overview" },
-                { name: "Academic", href: "/exam-warroom/academic" },
-                { name: "Revision", href: "/exam-warroom/revision" },
-            ],
-        },
-        { name: "Subject Library", icon: BookOpen, href: "/subjects" },
-        { name: "Achievements", icon: Award, href: "/achievement" },
-        { name: "Family Connect", icon: Users, href: "/family-connect" },
-    ];
 
     const isActiveRoute = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -123,7 +123,7 @@ const Sidebar = () => {
 
     const renderNavItems = ({ mobile }: { mobile: boolean }) => (
         <nav className="flex-1 space-y-1 overflow-y-auto pr-2">
-            {navItems.map((item) => (
+            {NAV_ITEMS.map((item) => (
                 <div key={item.href}>
                     {item.children ? (
                         <>
@@ -213,7 +213,7 @@ const Sidebar = () => {
     return (
         <>
             {/* Desktop Sidebar */}
-            <div className="hidden lg:flex w-70 flex-col h-screen scroll fixed left-0 top-0 z-50">
+            <div className="hidden lg:flex w-72 flex-col h-screen scroll fixed left-0 top-0 z-50">
                 <Card variant="glass" className="h-full flex flex-col p-4">
                     <div className="flex items-center gap-2 px-2 mb-8 mt-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-xl">

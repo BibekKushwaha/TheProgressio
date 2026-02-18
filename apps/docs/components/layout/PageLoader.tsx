@@ -5,14 +5,20 @@ import { Loader2 } from "lucide-react";
 interface PageLoaderProps {
     title?: string;
     subtitle?: string;
+    fullScreen?: boolean;
 }
 
 export function PageLoader({
     title = "Preparing your workspace",
     subtitle = "Syncing profile and loading latest data...",
+    fullScreen = true,
 }: PageLoaderProps) {
+    const containerClasses = fullScreen
+        ? "min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.10),_transparent_42%),linear-gradient(140deg,_#020617_0%,_#0f172a_45%,_#111827_100%)] text-white flex items-center justify-center p-6 overflow-hidden"
+        : "w-full py-12 flex items-center justify-center overflow-hidden";
+
     return (
-        <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.10),_transparent_42%),linear-gradient(140deg,_#020617_0%,_#0f172a_45%,_#111827_100%)] text-white flex items-center justify-center p-6 overflow-hidden">
+        <div className={containerClasses}>
             <style>{`
                 @keyframes slideInUp {
                     from {

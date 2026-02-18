@@ -1,11 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, Timer, Pause, Play } from 'lucide-react';
+import { Activity, Pause, Play, Loader2 } from 'lucide-react';
+import { useGetActiveLiveSessionQuery } from '@repo/store';
 
-// This widget checks localStorage for an active focus session and displays it
+// This widget checks remote DB (primary) then fallback to localStorage for an active focus session
 export function LiveActivityWidget() {
+    const router = useRouter();
+    const { data: remoteData, isLoading: isRemoteLoading, refetch } = useGetActiveLiveSessionQuery(undefined, {
+        pollingInterval: 10000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+    });
+
     const [session, setSession] = useState<{
         taskTitle: string;
         startTime: string;
@@ -14,201 +22,149 @@ export function LiveActivityWidget() {
     } | null>(null);
     const [elapsed, setElapsed] = useState(0);
 
-    const checkSession = () => {
+    const checkLocalSession = useCallback(() => {
         try {
             const raw = localStorage.getItem('activeFocusSession');
             if (raw) {
-                const parsed = JSON.parse(raw) as unknown;
-
-                // tolerate a few possible field names and types
-                const parsedObj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : {};
-                const maybeStart = parsedObj.startTime ?? parsedObj.startedAt ?? parsedObj.start;
-                let startIso: string | null = null;
-                if (typeof maybeStart === 'string') startIso = maybeStart;
-                else if (typeof maybeStart === 'number') startIso = new Date(maybeStart).toISOString();
-                else if (maybeStart && typeof maybeStart === 'object' && (maybeStart as Date) instanceof Date) startIso = (maybeStart as Date).toISOString();
-
-                if (startIso) {
-                    const taskTitle = typeof parsedObj.taskTitle === 'string'
-                        ? (parsedObj.taskTitle as string)
-                        : typeof parsedObj.currentTaskTitle === 'string'
-                            ? (parsedObj.currentTaskTitle as string)
-                            : 'Focus Session';
-
-                    const dur = typeof parsedObj.duration === 'number'
-                        ? (parsedObj.duration as number)
-                        : (Number(parsedObj.duration as unknown) || 0);
-
-                    const paused = typeof parsedObj.isPaused === 'boolean' ? (parsedObj.isPaused as boolean) : false;
-
-                    setSession({
-                        taskTitle,
-                        startTime: startIso,
-                        duration: dur,
-                        isPaused: paused,
-                    });
-                    return;
+                const parsed = JSON.parse(raw);
+                const maybeStart = parsed.startTime ?? parsed.startedAt ?? parsed.start;
+                if (maybeStart) {
+                    return {
+                        taskTitle: parsed.taskTitle || 'Focus Session',
+                        startTime: new Date(maybeStart).toISOString(),
+                        duration: parsed.duration || 0,
+                        isPaused: !!parsed.isPaused,
+                    };
                 }
             }
-            setSession(null);
-            setElapsed(0);
-        } catch {
-            setSession(null);
-            setElapsed(0);
+        } catch (e) {
+            console.error('Error checking local session:', e);
         }
-    };
-
-    useEffect(() => {
-        checkSession();
-
-        // quick follow-up checks to handle tight navigation timing
-        const t1 = setTimeout(checkSession, 200);
-        const t2 = setTimeout(checkSession, 1000);
-
-        const interval = setInterval(checkSession, 2000);
-
-        // helper: temporary high-frequency poll to catch late writes
-        const startShortPoll = () => {
-            let tries = 0;
-            const max = 20; // ~4 seconds at 200ms
-            const h = setInterval(() => {
-                try {
-                    checkSession();
-                } catch {
-                    void 0;
-                }
-                tries += 1;
-                if (tries >= max) clearInterval(h);
-            }, 200);
-            return h;
-        };
-
-        const onStorage = (e: StorageEvent) => {
-            if (!e.key || e.key === 'activeFocusSession' || e.key === 'activeFocusSessionId') {
-                checkSession();
-                startShortPoll();
-            }
-        };
-
-        const onVisibility = () => {
-            if (document.visibilityState === 'visible') {
-                checkSession();
-                startShortPoll();
-            }
-        };
-
-        // navigation events (back/forward) and pageshow help catch client-side route navs
-        const onPop = () => {
-            checkSession();
-            startShortPoll();
-        };
-        const onPageshow = () => {
-            checkSession();
-            startShortPoll();
-        };
-
-        window.addEventListener('storage', onStorage);
-        document.addEventListener('visibilitychange', onVisibility);
-        window.addEventListener('popstate', onPop);
-        window.addEventListener('pageshow', onPageshow);
-
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-            clearInterval(interval);
-            window.removeEventListener('storage', onStorage);
-            document.removeEventListener('visibilitychange', onVisibility);
-            window.removeEventListener('popstate', onPop);
-            window.removeEventListener('pageshow', onPageshow);
-        };
+        return null;
     }, []);
 
+    // Sync remote and local
     useEffect(() => {
-        if (!session) return;
-        if (session.isPaused) return;
+        if (remoteData?.session) {
+            setSession({
+                taskTitle: remoteData.session.taskTitle,
+                startTime: remoteData.session.startedAt,
+                duration: remoteData.session.plannedDurationMinutes,
+                isPaused: remoteData.session.status === 'PAUSED',
+            });
+        } else {
+            const local = checkLocalSession();
+            setSession(local);
+        }
+    }, [remoteData, checkLocalSession]);
 
-        const tick = () => {
-            const start = new Date(session.startTime).getTime();
-            if (Number.isNaN(start)) {
-                setElapsed(0);
-                return;
+    // Handle visibility and storage changes
+    useEffect(() => {
+        const onSync = () => {
+            refetch();
+            const local = checkLocalSession();
+            if (!remoteData?.session) {
+                setSession(local);
             }
-            const now = Date.now();
-            const secondsElapsed = Math.floor((now - start) / 1000);
-            if (session.duration > 0 && secondsElapsed >= session.duration * 60) {
-                localStorage.removeItem('activeFocusSession');
-                setSession(null);
-                return;
-            }
-            setElapsed(secondsElapsed);
         };
 
-        tick();
-        const interval = setInterval(tick, 1000);
+        window.addEventListener('storage', onSync);
+        window.addEventListener('focus', onSync);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') onSync();
+        });
+
+        return () => {
+            window.removeEventListener('storage', onSync);
+            window.removeEventListener('focus', onSync);
+        };
+    }, [refetch, checkLocalSession, remoteData]);
+
+    // Timer logic
+    useEffect(() => {
+        if (!session || session.isPaused) return;
+
+        const start = new Date(session.startTime).getTime();
+        const update = () => {
+            const now = Date.now();
+            const seconds = Math.floor((now - start) / 1000);
+            setElapsed(seconds);
+
+            // Auto-clear if expired (plus 2 min buffer)
+            if (session.duration > 0 && seconds > (session.duration * 60 + 120)) {
+                setSession(null);
+            }
+        };
+
+        update();
+        const interval = setInterval(update, 1000);
         return () => clearInterval(interval);
     }, [session]);
 
-    const router = useRouter();
+    if (isRemoteLoading) {
+        return (
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 flex justify-center items-center h-24">
+                <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
+            </div>
+        );
+    }
 
     if (!session) return null;
 
-    const minutes = Math.floor(elapsed / 60);
-    const seconds = elapsed % 60;
-    const progress = session.duration > 0 ? Math.min((elapsed / 60 / session.duration) * 100, 100) : 0;
-    const SessionStatusIcon = session.isPaused ? Pause : Play;
-    const sessionStatusText = session.isPaused ? 'Paused' : 'Active';
-    const sessionStatusClass = session.isPaused ? 'text-yellow-400' : 'text-emerald-400';
+    const remaining = Math.max(0, session.duration * 60 - elapsed);
+    const mm = Math.floor(remaining / 60);
+    const ss = remaining % 60;
+    const progress = session.duration > 0 ? Math.min(100, (elapsed / (session.duration * 60)) * 100) : 0;
 
     return (
         <div
-            role="button"
-            tabIndex={0}
             onClick={() => router.push('/focus-session')}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push('/focus-session'); } }}
-            className="relative overflow-hidden bg-gradient-to-r from-emerald-500/20 via-teal-500/15 to-cyan-500/20 backdrop-blur-md border border-emerald-500/30 rounded-2xl p-5 cursor-pointer"
+            className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-emerald-500/10 backdrop-blur-md border border-emerald-500/20 rounded-2xl p-5 cursor-pointer hover:border-emerald-500/40 transition-all active:scale-[0.98]"
         >
-            {/* Animated pulse */}
-            <div className="absolute top-3 right-3">
-                <span className="relative flex h-3 w-3">
+            {/* Pulsing indicator */}
+            {!session.isPaused && (
+                <div className="absolute top-3 right-3 flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
-                </span>
-            </div>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </div>
+            )}
 
-            <div className="flex items-center gap-4">
-                <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl shadow-lg shadow-emerald-500/30">
-                    <Activity className="w-6 h-6 text-white" />
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">
+                        <Activity className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-white text-base truncate max-w-[150px]">{session.taskTitle}</h3>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${session.isPaused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                                {session.isPaused ? 'Paused' : 'In Progress'}
+                            </p>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">
-                        Live Session
-                    </div>
-                    <div className="text-white font-bold truncate">{session.taskTitle || 'Focus Session'}</div>
-                </div>
-                <div className="text-right">
-                    <div className="flex items-center gap-2">
-                        <Timer className="w-4 h-4 text-emerald-400" />
-                        <span className="text-2xl font-mono font-bold text-white tabular-nums">
-                            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-1 justify-end">
-                        <span className={`flex items-center gap-1 text-xs ${sessionStatusClass}`}>
-                            <SessionStatusIcon className="w-3 h-3" /> {sessionStatusText}
-                        </span>
-                    </div>
+                <div className="text-3xl font-black text-white font-mono tracking-tighter tabular-nums">
+                    {mm.toString().padStart(2, '0')}:{ss.toString().padStart(2, '0')}
                 </div>
             </div>
 
-            {/* Progress bar */}
-            {session.duration > 0 && (
-                <div className="mt-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="space-y-2">
+                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                     <div
-                        className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full transition-all duration-1000"
+                        className="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-400 transition-all duration-1000 ease-out"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
-            )}
+                <div className="flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <span>Session: {Math.round(progress)}% Complete</span>
+                    <span className="flex items-center gap-1 text-emerald-400">
+                        {session.isPaused ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5" />}
+                        {session.duration}m Total
+                    </span>
+                </div>
+            </div>
         </div>
     );
 }
+

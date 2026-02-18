@@ -132,7 +132,7 @@ export default function TasksPage() {
 
     if (isLoading && tasks.length === 0 && !localHydrated) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-8 space-y-8">
+            <div className="space-y-8">
                 <Skeleton className="h-10 w-1/3 bg-white/5" />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {[1, 2, 3].map(i => (
@@ -148,55 +148,46 @@ export default function TasksPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white">
-            <div className="flex">
-                <div className="flex-1 flex flex-col">
-
-                    <SearchBar
-                        searchQuery={searchQuery}
-                        setSearchQuery={setSearchQuery}
-                        priority={priority}
-                        setPriority={setPriority}
-                        selectedCategory={selectedCategory}
-                        setSelectedCategory={setSelectedCategory}
-                        view={view}
-                        setView={handleViewChange}
-                        CATEGORY_OPTIONS={categoryOptions}
-                    />
-                    <div className="flex flex-1">
-                        <main className="flex-1 p-4 md:p-8 overflow-auto">
-                            {view === 'kanban' ? (
-                                <KanbanBoard
-                                    searchQuery={searchQuery}
-                                    status={status}
-                                    priority={priority}
-                                    category={selectedCategory}
-                                    tasks={tasks}
-                                />
-                            ) : view === 'list' ? (
-                                <TaskList
-                                    searchQuery={searchQuery}
-                                    status={status}
-                                    priority={priority}
-                                    category={selectedCategory}
-                                    tasks={tasks}
-                                    highlightedTaskId={focusedTaskId || undefined}
-                                />
-                            ) : view === 'timeline' ? (
-                                <TimelineView
-                                    searchQuery={searchQuery}
-                                    status={status}
-                                    priority={priority}
-                                    category={selectedCategory}
-                                    tasks={tasks}
-                                />
-                            ) : (
-                                <TimetableView />
-                            )}
-                        </main>
-                    </div>
-                </div>
-            </div>
+        <div className="space-y-4">
+            <SearchBar
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                priority={priority}
+                setPriority={setPriority}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                view={view}
+                setView={handleViewChange}
+                CATEGORY_OPTIONS={categoryOptions}
+            />
+            {view === 'kanban' ? (
+                <KanbanBoard
+                    searchQuery={searchQuery}
+                    status={status}
+                    priority={priority}
+                    category={selectedCategory}
+                    tasks={tasks}
+                />
+            ) : view === 'list' ? (
+                <TaskList
+                    searchQuery={searchQuery}
+                    status={status}
+                    priority={priority}
+                    category={selectedCategory}
+                    tasks={tasks}
+                    highlightedTaskId={focusedTaskId || undefined}
+                />
+            ) : view === 'timeline' ? (
+                <TimelineView
+                    searchQuery={searchQuery}
+                    status={status}
+                    priority={priority}
+                    category={selectedCategory}
+                    tasks={tasks}
+                />
+            ) : (
+                <TimetableView />
+            )}
         </div>
     );
 }

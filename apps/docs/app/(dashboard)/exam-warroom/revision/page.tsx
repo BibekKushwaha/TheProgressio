@@ -9,68 +9,21 @@ export default function ExamWarRoomPage() {
     const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('');
     useGetGradeEntriesQuery();
 
-    type SubjectPerformance = {
-        subjectName: string;
-        avgScore?: number;
-        entryCount?: number;
-        trend?: string;
-    };
-
-    const subjects = (performanceData?.data ?? []) as SubjectPerformance[];
+    const subjects = performanceData?.data ?? [];
 
     // Difficulty breakdown calculation removed as it is currently unused and causing lint warnings.
 
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-red-950/30 to-slate-950 text-white p-6 md:p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
-                {/* Header */}
-                {/* <div className="flex items-center gap-4">
-                    <div className="p-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl shadow-lg shadow-red-500/20">
-                        <Swords className="w-8 h-8 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
-                            Exam War Room
-                        </h1>
-                        <p className="text-slate-400 mt-1">Chapter-wise SWOT, success tracking & predictive scores for JEE/NEET/UPSC</p>
-                    </div>
-                </div> */}
-
-                {/* Quick Stats Bar */}
-                {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-5">
-                        <div className="text-sm text-slate-400 mb-1">Total Attempts</div>
-                        <div className="text-3xl font-bold text-white">{totalAttempts}</div>
-                    </div>
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-5">
-                        <div className="flex items-center gap-2 text-sm text-green-400 mb-1">
-                            <Trophy className="w-4 h-4" /> Easy Solved
-                        </div>
-                        <div className="text-3xl font-bold text-green-400">{difficultyStats.easy}</div>
-                    </div>
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-5">
-                        <div className="flex items-center gap-2 text-sm text-yellow-400 mb-1">
-                            <Target className="w-4 h-4" /> Medium Solved
-                        </div>
-                        <div className="text-3xl font-bold text-yellow-400">{difficultyStats.medium}</div>
-                    </div>
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5">
-                        <div className="flex items-center gap-2 text-sm text-red-400 mb-1">
-                            <Swords className="w-4 h-4" /> Hard Solved
-                        </div>
-                        <div className="text-3xl font-bold text-red-400">{difficultyStats.hard}</div>
-                    </div>
-                </div> */}
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-4">
-                        <FileSpreadsheet className="w-4 h-4 text-cyan-300" />
-                        Revision Planner
-                    </div>
-                    <RevisionScheduler />
+        <div className="space-y-6">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-4">
+                    <FileSpreadsheet className="w-4 h-4 text-cyan-300" />
+                    Revision Planner
                 </div>
-                {/* Subject Performance Summary */}
+                <RevisionScheduler />
+            </div>
+            {/* Subject Performance Summary */}
                 {perfLoading ? (
                     <Skeleton className="h-48 w-full bg-white/5" />
                 ) : subjects.length > 0 && (
@@ -104,7 +57,6 @@ export default function ExamWarRoomPage() {
                         </div>
                     </div>
                 )}
-            </div>
         </div>
     );
 }

@@ -3,6 +3,8 @@ import {
     createFamilyShareLink,
     forgotPassword,
     getCurrentUser,
+    getWhatsAppPairingCode,
+    unpairWhatsApp,
     listFamilyShareLinks,
     loginUser,
     logoutUser,
@@ -26,6 +28,10 @@ router.get("/me", getCurrentUser);
 router.put("/profile", updateProfile);
 router.post("/forgot", forgotPassword);
 router.post("/reset/:token", resetPassword);
+
+// WhatsApp Pairing
+router.get("/whatsapp/pairing", getWhatsAppPairingCode);
+router.post("/whatsapp/unpair", unpairWhatsApp);
 
 // Mobile token lifecycle
 router.post("/mobile/login", mobileLogin);

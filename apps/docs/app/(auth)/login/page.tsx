@@ -4,9 +4,9 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
-import { Card } from "../../../components/ui/card";
-import GradientButton from "../../../components/auth/gradient-button";
-import Input from "../../../components/auth/input";
+import { Card } from "@/components/ui/card";
+import GradientButton from "@/components/auth/gradient-button";
+import Input from "@/components/auth/input";
 import { hydrateAuth, useAppDispatch, useLoginMutation } from "@repo/store";
 import { loginSchema } from "@repo/schemas/auth";
 
@@ -24,7 +24,8 @@ const LoginPage = () => {
         e.preventDefault();
         const validate = loginSchema.safeParse({ email, password });
         if (!validate.success) {
-            setError(validate.error.message || "Invalid input");
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setError((validate.error as any).message || "Invalid input");
             return;
         }
         setIsLoading(true);
@@ -43,12 +44,34 @@ const LoginPage = () => {
                 // Assuming cookie is set by backend, just redirect
                 router.push("/dashboard");
             }
-        } catch (err: unknown) {
-            const message =
-                typeof err === "object" && err !== null && "data" in err
-                    ? (err as { data?: { message?: string } }).data?.message
-                    : undefined;
-            setError(message || (err instanceof Error ? err.message : "Something went wrong"));
+        } catch (err) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const errorAny = err as any;
+            console.error('Login failed:', errorAny);
+
+            let errorMessage = 'Something went wrong';
+
+            if (errorAny?.data) {
+                if (typeof errorAny.data === 'string') {
+                    errorMessage = errorAny.data;
+                } else if (errorAny.data.message) {
+                    errorMessage = errorAny.data.message;
+                } else if (errorAny.data.errors) {
+                    const fieldErrors = errorAny.data.errors.fieldErrors;
+                    if (fieldErrors) {
+                        const firstKey = Object.keys(fieldErrors)[0];
+                        if (firstKey) {
+                            errorMessage = fieldErrors[firstKey][0];
+                        }
+                    }
+                }
+            } else if (errorAny?.error) {
+                errorMessage = errorAny.error;
+            } else if (errorAny?.message) {
+                errorMessage = errorAny.message;
+            }
+
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }

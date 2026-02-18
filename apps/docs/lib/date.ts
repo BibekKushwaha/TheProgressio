@@ -33,7 +33,7 @@ export function normalizeDateInput(raw: string): string | null {
 
 export function formatRelativeDate(dateInput: Date | string): string {
     const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return '';
+    if (Number.isNaN(date.getTime())) return '';
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

@@ -30,7 +30,7 @@ const AchievementDetailPage = ({ params }: PageProps) => {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="flex items-center justify-center p-4">
                 <div className="w-full max-w-xl space-y-4">
                     <Skeleton className="h-12 w-3/4 mx-auto bg-white/5" />
                     <Skeleton className="h-64 w-full rounded-3xl bg-white/5" />
@@ -45,7 +45,7 @@ const AchievementDetailPage = ({ params }: PageProps) => {
 
     if (isError || !achievement) {
         return (
-            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
+            <div className="flex flex-col items-center justify-center p-4 text-center">
                 <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl max-w-md">
                     <h1 className="text-2xl font-bold text-red-400 mb-2">Achievement Not Found</h1>
                     <p className="text-slate-400 mb-6">
@@ -63,7 +63,7 @@ const AchievementDetailPage = ({ params }: PageProps) => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 flex items-center justify-center p-4">
+        <div className="flex items-center justify-center p-4">
             <div className="text-center">
                 <p className="text-slate-500 mb-4">Opening details for <b>{achievement.name}</b>...</p>
                 <button

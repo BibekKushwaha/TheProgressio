@@ -2,8 +2,8 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { ActiveFocusTimer } from '@/components/focus session/ActiveFocusTimer';
-import { SessionComplete } from '@/components/focus session/SessionComplete';
+import { ActiveFocusTimer } from '@/components/focus-session/ActiveFocusTimer';
+import { SessionComplete } from '@/components/focus-session/SessionComplete';
 
 function FocusSessionContent() {
     const [isComplete, setIsComplete] = useState(false);

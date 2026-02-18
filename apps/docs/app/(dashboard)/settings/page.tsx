@@ -9,11 +9,15 @@ import {
     useUpdateNudgeSettingsMutation,
     useGetNotificationIntelligenceQuery,
     useGetNotificationContextSignalsQuery,
+    useGetWhatsAppPairingCodeQuery,
+    useUnpairWhatsAppMutation,
+    NotificationSettings,
 } from "@repo/store";
 import { QuietHoursPanel } from "@/components/settings/QuietHoursPanel";
 import { PricingSection } from "@/components/settings/PricingSection";
 import { LanguageSelector } from "@/components/settings/LanguageSelector";
 import { QRAttendance } from "@/components/settings/QRAttendance";
+import { FamilyShareManagement } from "@/components/settings/FamilyShareManagement";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 
@@ -29,6 +33,16 @@ import { Separator } from "@/components/ui/separator";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
+type BucketKey = keyof NotificationSettings['enabledBuckets'];
+
+const NOTIFICATION_BUCKETS: Array<{ key: BucketKey; title: string; description: string }> = [
+    { key: "URGENCY_DRIVEN", title: "Deadline Alerts", description: "Urgency-driven reminders for upcoming conflicts" },
+    { key: "MORNING_BRIEFING", title: "Morning Briefing", description: "Top 3 priorities and schedule context" },
+    { key: "BEHAVIORAL_NUDGE", title: "Behavioral Nudges", description: "Gentle check-ins for streaks and routines" },
+    { key: "ADVANCE_ALERT_3WEEK", title: "Exam Advance Alerts", description: "3-week, 1-week, and 3-day reminders" },
+    { key: "TRANSACTION_SYSTEM", title: "System Updates", description: "Attendance, sync, and confirmation updates" },
+];
+
 export default function SettingsPage() {
     const { theme, setTheme } = useTheme();
     const { data: profileData, isLoading: isProfileLoading } = useGetProfileQuery();
@@ -37,11 +51,11 @@ export default function SettingsPage() {
     const [updateNudgeSettings, { isLoading: isUpdatingNudgeSettings }] = useUpdateNudgeSettingsMutation();
     const { data: intelligenceData } = useGetNotificationIntelligenceQuery();
     const { data: contextSignals } = useGetNotificationContextSignalsQuery({ locationTag: "CAMPUS", motionState: "WALKING", brightness: 0.7 });
+    const { data: pairingData, isLoading: isPairingLoading } = useGetWhatsAppPairingCodeQuery();
+    const [unpairWhatsApp, { isLoading: isUnpairing }] = useUnpairWhatsAppMutation();
 
     const user = profileData?.user;
     const nudgeSettings = nudgeSettingsData?.settings;
-
-    const [pairingCode] = React.useState(() => `PAIR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`);
 
     const handleDailyGoalChange = async (val: string) => {
         const value = parseFloat(val.split(" ")[0] || "4");
@@ -79,8 +93,10 @@ export default function SettingsPage() {
     };
 
     const copyPairingCode = () => {
-        navigator.clipboard.writeText(pairingCode);
-        toast.success("Pairing code copied to clipboard");
+        if (pairingData?.pairingCode) {
+            navigator.clipboard.writeText(pairingData.pairingCode);
+            toast.success("Pairing code copied to clipboard");
+        }
     };
 
     if (isProfileLoading) {
@@ -246,21 +262,14 @@ export default function SettingsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {[
-                        { key: "URGENCY_DRIVEN", title: "Deadline Alerts", description: "Urgency-driven reminders for upcoming conflicts" },
-                        { key: "MORNING_BRIEFING", title: "Morning Briefing", description: "Top 3 priorities and schedule context" },
-                        { key: "BEHAVIORAL_NUDGE", title: "Behavioral Nudges", description: "Gentle check-ins for streaks and routines" },
-                        { key: "ADVANCE_ALERT_3WEEK", title: "Exam Advance Alerts", description: "3-week, 1-week, and 3-day reminders" },
-                        { key: "TRANSACTION_SYSTEM", title: "System Updates", description: "Attendance, sync, and confirmation updates" },
-                    ].map((item) => (
+                    {NOTIFICATION_BUCKETS.map((item) => (
                         <div key={item.key} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
                             <div className="space-y-0.5">
                                 <Label className="text-base">{item.title}</Label>
                                 <p className="text-sm text-slate-400">{item.description}</p>
                             </div>
                             <Switch
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                checked={Boolean((nudgeSettings?.enabledBuckets as any)?.[item.key])}
+                                checked={Boolean(nudgeSettings?.enabledBuckets?.[item.key])}
                                 onCheckedChange={async (checked) => {
                                     try {
                                         await updateNudgeSettings({
@@ -273,8 +282,7 @@ export default function SettingsPage() {
                                                     TRANSACTION_SYSTEM: true,
                                                 }),
                                                 [item.key]: checked,
-                                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            } as any,
+                                            },
                                         }).unwrap();
                                         toast.success("Notification setting updated");
                                     } catch (error) {
@@ -380,35 +388,69 @@ export default function SettingsPage() {
                 <CardContent className="space-y-6">
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-xl bg-green-500/20 text-green-400">
+                            <div className={`p-3 rounded-xl ${pairingData?.verified ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-slate-400'}`}>
                                 <Smartphone className="w-6 h-6" />
                             </div>
                             <div>
                                 <div className="font-medium">Nudge Notifications</div>
-                                <div className="text-sm text-slate-400">Receive study reminders and streak alerts</div>
+                                <div className="text-sm text-slate-400">
+                                    {pairingData?.verified
+                                        ? `Paired with ${pairingData.whatsappNumber || 'your number'}`
+                                        : 'Receive study reminders and streak alerts'
+                                    }
+                                </div>
                             </div>
                         </div>
-                        <div className="text-xs font-semibold text-slate-400 bg-white/10 px-3 py-1 rounded-full">
-                            Not Paired
+                        <div className={`text-xs font-semibold px-3 py-1 rounded-full ${pairingData?.verified ? 'text-green-400 bg-green-500/10 border border-green-500/20' : 'text-slate-400 bg-white/10'}`}>
+                            {pairingData?.verified ? 'Paired' : 'Not Paired'}
                         </div>
                     </div>
 
-                    <div className="p-6 bg-green-950/20 border border-green-500/20 rounded-xl space-y-4">
-                        <div className="text-sm text-slate-300 font-medium">To pair your WhatsApp:</div>
-                        <ol className="text-sm text-slate-400 space-y-2 list-decimal list-inside pl-2">
-                            <li>Save <span className="text-green-400 font-mono bg-green-950/40 px-1 rounded">+91 XXXX-XXXX</span> as &quot;Study Bot&quot;</li>
-                            <li>Send the pairing code below to the bot</li>
-                            <li>You&apos;ll receive a confirmation message</li>
-                        </ol>
-                        <div className="flex items-center gap-3 pt-2">
-                            <code className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-lg text-green-400 font-mono text-lg tracking-widest text-center">
-                                {pairingCode}
-                            </code>
-                            <Button className="bg-green-600 hover:bg-green-700 h-full" onClick={copyPairingCode}>
-                                Copy Code
+                    {!pairingData?.verified && (
+                        <div className="p-6 bg-green-950/20 border border-green-500/20 rounded-xl space-y-4">
+                            <div className="text-sm text-slate-300 font-medium">To pair your WhatsApp:</div>
+                            <ol className="text-sm text-slate-400 space-y-2 list-decimal list-inside pl-2">
+                                <li>Save <span className="text-green-400 font-mono bg-green-950/40 px-1 rounded">{process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER || "+91 99999-99999"}</span> as &quot;Study Bot&quot;</li>
+                                <li>Send the pairing code below to the bot</li>
+                                <li>You&apos;ll receive a confirmation message</li>
+                            </ol>
+                            <div className="flex items-center gap-3 pt-2">
+                                <code className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-lg text-green-400 font-mono text-lg tracking-widest text-center">
+                                    {isPairingLoading ? "Generating..." : (pairingData?.pairingCode || "---")}
+                                </code>
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700 h-full"
+                                    onClick={copyPairingCode}
+                                    disabled={isPairingLoading || !pairingData?.pairingCode}
+                                >
+                                    Copy Code
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {pairingData?.verified && (
+                        <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg flex items-center justify-between">
+                            <div className="text-sm text-indigo-300">
+                                <span className="font-medium">Active Assistant:</span> My Study Bot
+                            </div>
+                            <Button
+                                variant="ghost"
+                                className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                onClick={async () => {
+                                    try {
+                                        await unpairWhatsApp().unwrap();
+                                        toast.success("WhatsApp account unpaired");
+                                    } catch (_err) {
+                                        toast.error("Failed to unpair WhatsApp");
+                                    }
+                                }}
+                                disabled={isUnpairing}
+                            >
+                                {isUnpairing ? "Unpairing..." : "Unpair"}
                             </Button>
                         </div>
-                    </div>
+                    )}
 
                     <Separator className="bg-white/10" />
 
@@ -471,6 +513,9 @@ export default function SettingsPage() {
                     <PricingSection />
                 </CardContent>
             </Card>
+
+            {/* Family & Mentor Sharing */}
+            <FamilyShareManagement />
 
             {/* QR Attendance */}
             <Card variant="glass">

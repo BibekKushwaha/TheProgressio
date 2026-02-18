@@ -11,6 +11,7 @@ import timetableRouter from "./routes/timetable.route.js";
 import calendarRouter from "./routes/calendar.routes.js";
 import rotationRouter from "./routes/rotation.route.js";
 import whatsappRouter from "./routes/whatsapp.route.js";
+import attendanceRouter from "./routes/attendance.route.js";
 import paymentRouter from "./routes/payment.route.js";
 import syncRouter from "./routes/sync.route.js";
 import notificationRouter from "./routes/notification.route.js";
@@ -36,6 +37,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/api/integrations/whatsapp", whatsappRouter);
+app.use("/api/attendance", isAuth, attendanceRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/sync", isAuth, syncRouter);
 app.use("/api/notifications", isAuth, notificationRouter);

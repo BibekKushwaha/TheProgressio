@@ -177,22 +177,16 @@ export default function AnalyticsOverviewPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 text-white">
-      <div className="flex min-w-0">
-        <div className="flex-1 flex flex-col min-w-0">
-          <AnalyticsHeader
-            pastDays={pastDays}
-            setPastDays={setPastDays}
-            onExport={handleExportReport}
-          />
-
-          <main className="flex-1 p-2 md:p-4 overflow-y-auto overflow-x-hidden min-w-0">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <div className="space-y-4">
-                <StatCards items={stats} />
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                  <div className="xl:col-span-2 min-w-0">
-                    <FocusTrends pastDays={pastDays} />
+    <div className="space-y-8">
+      <AnalyticsHeader
+        pastDays={pastDays}
+        setPastDays={setPastDays}
+        onExport={handleExportReport}
+      />
+      <StatCards items={stats} />
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 min-w-0">
+          <FocusTrends pastDays={pastDays} />
                   </div>
                   <div className="min-w-0">
                     <SessionBreakdown pastDays={pastDays} />
@@ -362,11 +356,6 @@ export default function AnalyticsOverviewPage() {
                     )}
                   </CardContent>
                 </Card>
-              </div>
-            </div>
-          </main>
-        </div>
-      </div>
     </div>
   );
 }

@@ -137,6 +137,10 @@ const plannerBaseQuery = fetchBaseQuery({
     credentials: 'include',
     prepareHeaders: (headers) => {
         headers.set('Content-Type', 'application/json');
+        const shareToken = typeof window !== 'undefined' ? localStorage.getItem('family_share_token') : null;
+        if (shareToken) {
+            headers.set('x-family-share-token', shareToken);
+        }
         return headers;
     },
 });
@@ -144,7 +148,7 @@ const plannerBaseQuery = fetchBaseQuery({
 export const tasksApi = createApi({
     reducerPath: 'tasksApi',
     baseQuery: plannerBaseQuery,
-    tagTypes: ['Tasks'],
+    tagTypes: ['Tasks', 'Attendance'],
     endpoints: (builder) => ({
         getTasks: builder.query<Task[], { page?: number; limit?: number; status?: Status; priority?: Priority; categoryId?: string; search?: string; date?: string } | void>({
             query: (params) => ({
@@ -443,6 +447,21 @@ export const tasksApi = createApi({
                 body,
             }),
         }),
+        markAttendance: builder.mutation<
+            { message: string; attendance: any },
+            { qrCode?: string; status?: 'PRESENT' | 'ABSENT' | 'LATE'; method?: 'QR' | 'MANUAL' | 'GEOFENCE'; location?: string }
+        >({
+            query: (body) => ({
+                url: '/attendance/mark',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Attendance'],
+        }),
+        getAttendanceHistory: builder.query<{ history: any[] }, void>({
+            query: () => '/attendance/history',
+            providesTags: ['Attendance'],
+        }),
         getNotificationDeepLink: builder.query<{ message: string; deepLink: string }, { entityType: string; entityId: string }>({
             query: ({ entityType, entityId }) => `/notifications/deeplink/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`,
         }),
@@ -472,5 +491,7 @@ export const {
     usePostNotificationDirectReplyMutation,
     useCreateRevisionDripCampaignMutation,
     useTriggerGeofencePingMutation,
+    useMarkAttendanceMutation,
+    useGetAttendanceHistoryQuery,
     useGetNotificationDeepLinkQuery,
 } = tasksApi;

@@ -19,7 +19,7 @@ export function UpcomingTasksPanel() {
                 if (!task.dueDate) return false;
                 const dueDate = new Date(task.dueDate!);
                 const dueDateString = toLocalDateKey(dueDate);
-                return !isNaN(dueDate.getTime()) && dueDateString && dueDateString >= todayString;
+                return !Number.isNaN(dueDate.getTime()) && dueDateString && dueDateString >= todayString;
             })
             .sort((a, b) => {
                 const aDate = a.dueDate ? new Date(a.dueDate).getTime() : 0;

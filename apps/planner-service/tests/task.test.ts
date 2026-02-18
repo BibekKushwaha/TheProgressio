@@ -93,6 +93,8 @@ vi.mock('@repo/db', () => {
     },
     Status,
     Priority,
+    AttendanceStatus: { PRESENT: 'PRESENT', ABSENT: 'ABSENT', LATE: 'LATE' },
+    AttendanceMethod: { QR: 'QR', MANUAL: 'MANUAL', GEOFENCE: 'GEOFENCE' },
   }
 })
 
@@ -110,7 +112,7 @@ describe('Task endpoints', () => {
   // CREATE
   it('creates a new task and emits task.created event', async () => {
     const created = { id: 't1', title: 'New Task', userId: 'user-1', status: 'PENDING', priority: 'MEDIUM' }
-    ;(prisma.task.create as any).mockResolvedValue(created)
+      ; (prisma.task.create as any).mockResolvedValue(created)
 
     const res = await request(app)
       .post('/api/tasks')
@@ -136,7 +138,7 @@ describe('Task endpoints', () => {
 
   // GET ALL
   it('fetches tasks list with filters', async () => {
-    ;(prisma.task.findMany as any).mockResolvedValue([
+    ; (prisma.task.findMany as any).mockResolvedValue([
       { id: 't1', title: 'Task 1', status: 'PENDING' },
     ])
 
@@ -149,7 +151,7 @@ describe('Task endpoints', () => {
   })
 
   it('fetches tasks with search query', async () => {
-    ;(prisma.task.findMany as any).mockResolvedValue([])
+    ; (prisma.task.findMany as any).mockResolvedValue([])
 
     const res = await request(app)
       .get('/api/tasks?search=chemistry')
@@ -161,7 +163,7 @@ describe('Task endpoints', () => {
   // GET BY ID
   it('gets a task by ID', async () => {
     const task = { id: 't1', title: 'Task 1', userId: 'user-1', subtasks: [], attachments: [] }
-    ;(prisma.task.findUnique as any).mockResolvedValue(task)
+      ; (prisma.task.findUnique as any).mockResolvedValue(task)
 
     const res = await request(app).get('/api/tasks/t1')
 
@@ -170,7 +172,7 @@ describe('Task endpoints', () => {
   })
 
   it('returns 404 for non-existent task', async () => {
-    ;(prisma.task.findUnique as any).mockResolvedValue(null)
+    ; (prisma.task.findUnique as any).mockResolvedValue(null)
 
     const res = await request(app).get('/api/tasks/non-existent')
 
@@ -178,7 +180,7 @@ describe('Task endpoints', () => {
   })
 
   it('returns 403 when user does not own the task', async () => {
-    ;(prisma.task.findUnique as any).mockResolvedValue({ id: 't1', userId: 'other-user' })
+    ; (prisma.task.findUnique as any).mockResolvedValue({ id: 't1', userId: 'other-user' })
 
     const res = await request(app).get('/api/tasks/t1')
 
@@ -189,8 +191,8 @@ describe('Task endpoints', () => {
   it('updates a task and emits task.updated event', async () => {
     const existing = { id: 't1', userId: 'user-1', status: 'PENDING', title: 'Old' }
     const updated = { ...existing, title: 'Updated', status: 'PENDING' }
-    ;(prisma.task.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.task.update as any).mockResolvedValue(updated)
+      ; (prisma.task.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.task.update as any).mockResolvedValue(updated)
 
     const res = await request(app)
       .patch('/api/tasks/t1')
@@ -207,8 +209,8 @@ describe('Task endpoints', () => {
   it('emits task.completed when status changes to COMPLETED via update', async () => {
     const existing = { id: 't1', userId: 'user-1', status: 'IN_PROGRESS', title: 'Task' }
     const updated = { ...existing, status: 'COMPLETED' }
-    ;(prisma.task.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.task.update as any).mockResolvedValue(updated)
+      ; (prisma.task.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.task.update as any).mockResolvedValue(updated)
 
     const res = await request(app)
       .patch('/api/tasks/t1')
@@ -226,8 +228,8 @@ describe('Task endpoints', () => {
   // DELETE
   it('deletes a task and emits task.deleted event', async () => {
     const existing = { id: 't1', userId: 'user-1', status: 'PENDING', title: 'To Delete' }
-    ;(prisma.task.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.task.delete as any).mockResolvedValue(existing)
+      ; (prisma.task.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.task.delete as any).mockResolvedValue(existing)
 
     const res = await request(app).delete('/api/tasks/t1')
 
@@ -240,7 +242,7 @@ describe('Task endpoints', () => {
   })
 
   it('returns 404 when deleting non-existent task', async () => {
-    ;(prisma.task.findUnique as any).mockResolvedValue(null)
+    ; (prisma.task.findUnique as any).mockResolvedValue(null)
 
     const res = await request(app).delete('/api/tasks/non-existent')
 
@@ -251,8 +253,8 @@ describe('Task endpoints', () => {
   it('toggles PENDING → IN_PROGRESS and emits status_changed', async () => {
     const existing = { id: 't1', userId: 'user-1', status: 'PENDING', title: 'Task' }
     const toggled = { ...existing, status: 'IN_PROGRESS' }
-    ;(prisma.task.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.task.update as any).mockResolvedValue(toggled)
+      ; (prisma.task.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.task.update as any).mockResolvedValue(toggled)
 
     const res = await request(app).patch('/api/tasks/t1/toggle')
 
@@ -267,8 +269,8 @@ describe('Task endpoints', () => {
   it('toggles IN_PROGRESS → COMPLETED and emits both status_changed + completed', async () => {
     const existing = { id: 't1', userId: 'user-1', status: 'IN_PROGRESS', title: 'Task' }
     const toggled = { ...existing, status: 'COMPLETED' }
-    ;(prisma.task.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.task.update as any).mockResolvedValue(toggled)
+      ; (prisma.task.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.task.update as any).mockResolvedValue(toggled)
 
     const res = await request(app).patch('/api/tasks/t1/toggle')
 
@@ -285,8 +287,8 @@ describe('Task endpoints', () => {
   it('toggles COMPLETED → PENDING', async () => {
     const existing = { id: 't1', userId: 'user-1', status: 'COMPLETED', title: 'Task' }
     const toggled = { ...existing, status: 'PENDING' }
-    ;(prisma.task.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.task.update as any).mockResolvedValue(toggled)
+      ; (prisma.task.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.task.update as any).mockResolvedValue(toggled)
 
     const res = await request(app).patch('/api/tasks/t1/toggle')
 
@@ -297,7 +299,7 @@ describe('Task endpoints', () => {
   // SMART CREATE (NLP)
   it('smart-creates task from NLP input', async () => {
     const created = { id: 't2', title: 'Chemistry lab report', userId: 'user-1', status: 'PENDING', priority: 'HIGH' }
-    ;(prisma.task.create as any).mockResolvedValue(created)
+      ; (prisma.task.create as any).mockResolvedValue(created)
 
     const res = await request(app)
       .post('/api/tasks/smart-create')
@@ -352,10 +354,10 @@ describe('Task endpoints', () => {
   it('generates AI subtasks for an existing task', async () => {
     const task = { id: 't1', title: 'Term Paper', description: '', userId: 'user-1' }
     const updatedTask = { ...task, subtasks: [{ title: 'Gather materials' }, { title: 'Write introduction' }, { title: 'Complete analysis' }] }
-    ;(prisma.task.findUnique as any)
-      .mockResolvedValueOnce(task)
-      .mockResolvedValueOnce(updatedTask)
-    ;(prisma.subTask.createMany as any).mockResolvedValue({ count: 3 })
+      ; (prisma.task.findUnique as any)
+        .mockResolvedValueOnce(task)
+        .mockResolvedValueOnce(updatedTask)
+      ; (prisma.subTask.createMany as any).mockResolvedValue({ count: 3 })
 
     const res = await request(app).post('/api/tasks/t1/subtasks')
 
@@ -377,7 +379,7 @@ describe('Task endpoints', () => {
   it('captures a task from WhatsApp payload', async () => {
     process.env.WHATSAPP_WEBHOOK_SECRET = 'wa-secret'
     const created = { id: 't3', title: 'Chemistry lab report', userId: 'user-1', status: 'PENDING', priority: 'HIGH' }
-    ;(prisma.task.create as any).mockResolvedValue(created)
+      ; (prisma.task.create as any).mockResolvedValue(created)
 
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')
@@ -404,7 +406,7 @@ describe('Task endpoints', () => {
       .send({ text: 'Create task from WhatsApp' })
 
     expect(res.status).toBe(400)
-    expect(res.body.message).toContain('User could not be resolved')
+    expect(res.body.message).toContain('User not found')
   })
 
   it('verifies WhatsApp webhook challenge', async () => {
@@ -434,7 +436,7 @@ describe('Category endpoints', () => {
 
   it('creates a category with icon', async () => {
     const created = { id: 'c1', name: 'Math', colorCode: '#FF0000', icon: 'Calculator', userId: 'user-1' }
-    ;(prisma.category.create as any).mockResolvedValue(created)
+      ; (prisma.category.create as any).mockResolvedValue(created)
 
     const res = await request(app)
       .post('/api/categories')
@@ -446,7 +448,7 @@ describe('Category endpoints', () => {
 
   it('creates a category without icon (null default)', async () => {
     const created = { id: 'c2', name: 'Science', colorCode: '#3B82F6', icon: null, userId: 'user-1' }
-    ;(prisma.category.create as any).mockResolvedValue(created)
+      ; (prisma.category.create as any).mockResolvedValue(created)
 
     const res = await request(app)
       .post('/api/categories')
@@ -465,7 +467,7 @@ describe('Category endpoints', () => {
   })
 
   it('fetches all categories with task count', async () => {
-    ;(prisma.category.findMany as any).mockResolvedValue([
+    ; (prisma.category.findMany as any).mockResolvedValue([
       { id: 'c1', name: 'Math', _count: { tasks: 5 } },
     ])
 
@@ -477,7 +479,7 @@ describe('Category endpoints', () => {
   })
 
   it('gets category by ID', async () => {
-    ;(prisma.category.findUnique as any).mockResolvedValue({
+    ; (prisma.category.findUnique as any).mockResolvedValue({
       id: 'c1', name: 'Math', userId: 'user-1', tasks: []
     })
 
@@ -488,7 +490,7 @@ describe('Category endpoints', () => {
   })
 
   it('returns 403 when accessing another user\u2019s category', async () => {
-    ;(prisma.category.findUnique as any).mockResolvedValue({
+    ; (prisma.category.findUnique as any).mockResolvedValue({
       id: 'c1', name: 'Math', userId: 'other-user'
     })
 
@@ -500,8 +502,8 @@ describe('Category endpoints', () => {
   it('updates category name, color, and icon', async () => {
     const existing = { id: 'c1', userId: 'user-1', name: 'Math', colorCode: '#FF0000', icon: null }
     const updated = { ...existing, name: 'Mathematics', icon: 'BookOpen' }
-    ;(prisma.category.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.category.update as any).mockResolvedValue(updated)
+      ; (prisma.category.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.category.update as any).mockResolvedValue(updated)
 
     const res = await request(app)
       .patch('/api/categories/c1')
@@ -513,8 +515,8 @@ describe('Category endpoints', () => {
 
   it('deletes a category', async () => {
     const existing = { id: 'c1', userId: 'user-1' }
-    ;(prisma.category.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.category.delete as any).mockResolvedValue(existing)
+      ; (prisma.category.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.category.delete as any).mockResolvedValue(existing)
 
     const res = await request(app).delete('/api/categories/c1')
 
@@ -523,7 +525,7 @@ describe('Category endpoints', () => {
   })
 
   it('returns 400 on duplicate category name', async () => {
-    ;(prisma.category.create as any).mockRejectedValue({ code: 'P2002' })
+    ; (prisma.category.create as any).mockRejectedValue({ code: 'P2002' })
 
     const res = await request(app)
       .post('/api/categories')
@@ -547,7 +549,7 @@ describe('Rotation pattern endpoints', () => {
       startDate: '2026-01-05T00:00:00.000Z', cycleLengthDays: 7,
       userId: 'user-1', isActive: true
     }
-    ;(prisma.rotationPattern.create as any).mockResolvedValue(created)
+      ; (prisma.rotationPattern.create as any).mockResolvedValue(created)
 
     const res = await request(app)
       .post('/api/rotations')
@@ -575,7 +577,7 @@ describe('Rotation pattern endpoints', () => {
   })
 
   it('fetches all rotation patterns', async () => {
-    ;(prisma.rotationPattern.findMany as any).mockResolvedValue([
+    ; (prisma.rotationPattern.findMany as any).mockResolvedValue([
       { id: 'r1', name: 'Week A/B', pattern: ['A', 'B'] },
     ])
 
@@ -591,7 +593,7 @@ describe('Rotation pattern endpoints', () => {
       startDate: new Date('2026-01-05'), cycleLengthDays: 7,
       userId: 'user-1', isActive: true
     }
-    ;(prisma.rotationPattern.findFirst as any).mockResolvedValue(pattern)
+      ; (prisma.rotationPattern.findFirst as any).mockResolvedValue(pattern)
 
     const res = await request(app).get('/api/rotations/resolve?date=2026-02-10')
 
@@ -601,7 +603,7 @@ describe('Rotation pattern endpoints', () => {
   })
 
   it('falls back to algorithmic rotation when no pattern defined', async () => {
-    ;(prisma.rotationPattern.findFirst as any).mockResolvedValue(null)
+    ; (prisma.rotationPattern.findFirst as any).mockResolvedValue(null)
 
     const res = await request(app).get('/api/rotations/resolve?date=2026-02-10')
 
@@ -613,8 +615,8 @@ describe('Rotation pattern endpoints', () => {
   it('updates a rotation pattern', async () => {
     const existing = { id: 'r1', userId: 'user-1', name: 'Old', pattern: ['A', 'B'] }
     const updated = { ...existing, name: 'Block Schedule', pattern: ['1', '2', '3', '4'] }
-    ;(prisma.rotationPattern.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.rotationPattern.update as any).mockResolvedValue(updated)
+      ; (prisma.rotationPattern.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.rotationPattern.update as any).mockResolvedValue(updated)
 
     const res = await request(app)
       .patch('/api/rotations/r1')
@@ -626,8 +628,8 @@ describe('Rotation pattern endpoints', () => {
 
   it('deletes a rotation pattern', async () => {
     const existing = { id: 'r1', userId: 'user-1' }
-    ;(prisma.rotationPattern.findUnique as any).mockResolvedValue(existing)
-    ;(prisma.rotationPattern.delete as any).mockResolvedValue(existing)
+      ; (prisma.rotationPattern.findUnique as any).mockResolvedValue(existing)
+      ; (prisma.rotationPattern.delete as any).mockResolvedValue(existing)
 
     const res = await request(app).delete('/api/rotations/r1')
 
@@ -636,7 +638,7 @@ describe('Rotation pattern endpoints', () => {
   })
 
   it('returns 403 when modifying another user\u2019s pattern', async () => {
-    ;(prisma.rotationPattern.findUnique as any).mockResolvedValue({
+    ; (prisma.rotationPattern.findUnique as any).mockResolvedValue({
       id: 'r1', userId: 'other-user'
     })
 

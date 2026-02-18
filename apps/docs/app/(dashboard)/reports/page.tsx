@@ -32,11 +32,11 @@ export default function ReportsPage() {
     const weeklyData = trendsData?.data || [];
 
     const categoryData = focusScoreData?.stats?.breakdown ? [
-        { category: "Consistency", value: focusScoreData.stats.breakdown.consistency * 2.5 }, // Normalize to 100-ish if needed, or just use raw points
+        { category: "Consistency", value: focusScoreData.stats.breakdown.consistency * 2.5 }, 
         { category: "Intensity", value: focusScoreData.stats.breakdown.intensity * 3.3 },
         { category: "Depth", value: focusScoreData.stats.breakdown.depth * 3.3 },
         { category: "Efficiency", value: focusScoreData?.stats?.scorePercent ?? focusScoreData.stats.score },
-        { category: "Balance", value: 75 }, // Mocked as not available in current API
+        { category: "Balance", value: focusScoreData?.stats?.balanceScore ?? 75 }, 
     ] : [];
 
     if (isSummaryLoading || isTrendsLoading || isFocusLoading || isStreakLoading) {

@@ -5,9 +5,18 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./hooks": "./dist/hooks.js",
-    "./auth": "./dist/slices/authSlice.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./hooks": {
+      "types": "./dist/hooks.d.ts",
+      "import": "./dist/hooks.js"
+    },
+    "./auth": {
+      "types": "./dist/slices/authSlice.d.ts",
+      "import": "./dist/slices/authSlice.js"
+    }
   },
   "scripts": {
     "test": "vitest run",
