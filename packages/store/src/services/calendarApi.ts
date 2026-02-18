@@ -52,26 +52,38 @@ export const calendarApi = createApi({
         baseUrl: `${PLANNER_SERVICE_URL}/api/calendar`,
         credentials: 'include',
     }),
-    tagTypes: ['Calendar'],
+    tagTypes: ['Calendar'] as const,
     endpoints: (builder) => ({
         getMonthlyEvents: builder.query<MonthlyEvents, { month: number; year: number }>({
             query: ({ month, year }) => ({
                 url: '/month',
                 params: { month, year }
             }),
-            providesTags: ['Calendar', { type: 'Calendar', id: 'LIST' }]
+            providesTags: [{ type: 'Calendar', id: 'LIST' }]
         }),
         getCalendarDailySchedule: builder.query<DailyScheduleResponse, { date: string }>({
             query: ({ date }) => ({
                 url: '/day',
                 params: { date }
             }),
-            providesTags: (_result, _error, { date }) => [{ type: 'Calendar', id: date }, { type: 'Calendar', id: 'LIST' }]
+            providesTags: (_result, _error, { date }) => [
+                { type: 'Calendar' as const, id: date },
+                { type: 'Calendar' as const, id: 'LIST' }
+            ]
+        }),
+        createExam: builder.mutation<{ message: string; exam: any }, any>({
+            query: (body) => ({
+                url: '/exam',
+                method: 'POST',
+                body
+            }),
+            invalidatesTags: [{ type: 'Calendar', id: 'LIST' }]
         })
     })
 });
 
 export const {
     useGetMonthlyEventsQuery,
-    useGetCalendarDailyScheduleQuery
+    useGetCalendarDailyScheduleQuery,
+    useCreateExamMutation
 } = calendarApi;

@@ -26,12 +26,17 @@ function formatDueDate(dueDate?: string | null) {
     if (!dueDate) return 'No due date';
     const date = new Date(dueDate);
     const now = new Date();
-    const diff = date.getTime() - now.getTime();
-    const daysUntil = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (daysUntil < 0) return `${Math.abs(daysUntil)}d overdue`;
-    if (daysUntil === 0) return 'Due today';
-    if (daysUntil === 1) return 'Due tomorrow';
-    if (daysUntil <= 7) return `${daysUntil}d left`;
+
+    // Normalize to start of day for accurate day difference
+    const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const d2 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
+    if (diffDays === 0) return 'Due today';
+    if (diffDays === 1) return 'Due tomorrow';
+    if (diffDays <= 7) return `${diffDays}d left`;
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
@@ -262,8 +267,11 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                 )}
 
                 <div className="flex items-center justify-between mt-4">
-                    <div className="flex items-center gap-2 text-sm text-slate-400">
-                        <Clock className="w-4 h-4" />
+                    <div className={`flex items-center gap-2 text-sm ${!completed && task.dueDate && new Date(task.dueDate) < new Date() && formatDueDate(task.dueDate).includes('overdue')
+                            ? 'text-rose-400 font-bold'
+                            : 'text-slate-400'
+                        }`}>
+                        <Clock className={`w-4 h-4 ${!completed && task.dueDate && new Date(task.dueDate) < new Date() && formatDueDate(task.dueDate).includes('overdue') ? 'text-rose-400 animate-pulse' : ''}`} />
                         <span>{formatDueDate(task.dueDate)}</span>
                     </div>
                     {task.attachments && task.attachments.length > 0 && (

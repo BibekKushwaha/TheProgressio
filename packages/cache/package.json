@@ -25,8 +25,8 @@
     "./taskCache": {
       "types": "./dist/taskCache.d.ts",
       "import": "./dist/taskCache.js"
-    }
-    ,"./userCache": {
+    },
+    "./userCache": {
       "types": "./dist/userCache.d.ts",
       "import": "./dist/userCache.js"
     }

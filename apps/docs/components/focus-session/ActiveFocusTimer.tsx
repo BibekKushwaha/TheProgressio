@@ -127,8 +127,9 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                 if (typeof window !== 'undefined') {
                     localStorage.setItem('activeFocusSessionId', response.session.sessionId);
                 }
-            } catch (error) {
-                console.error('Failed to start live focus session:', error);
+            } catch (error: unknown) {
+                const err = error as { data?: { message?: string }; message?: string };
+                console.error('Failed to start live focus session:', err?.data?.message || err?.message || error);
             }
         };
 
@@ -144,8 +145,12 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                     outcome: 'COMPLETED',
                 }).unwrap();
                 handledByLiveContract = true;
-            } catch (error) {
-                console.error('Failed to stop live focus session:', error);
+            } catch (error: unknown) {
+                const err = error as { status?: number; data?: { message?: string }; message?: string };
+                // If 404, it likely means the session was already closed or expired (e.g. heartbeat timeout)
+                if (err?.status !== 404) {
+                    console.error(`Failed to stop live focus session [${liveSessionId}]:`, err?.data?.message || err?.message || err);
+                }
             }
         }
 
@@ -207,8 +212,12 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             heartbeatLiveSession({
                 sessionId: liveSessionId,
                 remainingSeconds: timeLeft,
-            }).catch((error: unknown) => {
-                console.error('Focus heartbeat failed:', error);
+            }).unwrap().catch((error: unknown) => {
+                const err = error as { status?: number; data?: { message?: string }; message?: string };
+                // Only log if not a 404 (session expired/replaced)
+                if (err?.status !== 404) {
+                    console.error('Focus heartbeat failed:', err?.data?.message || err?.message || err);
+                }
             });
         }, 15000);
 
@@ -241,8 +250,11 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                     sessionId: liveSessionId,
                     outcome: 'CANCELLED',
                 }).unwrap();
-            } catch (error) {
-                console.error('Failed to cancel live focus session:', error);
+            } catch (error: unknown) {
+                const err = error as { status?: number; data?: { message?: string }; message?: string };
+                if (err?.status !== 404) {
+                    console.error(`Failed to cancel live focus session [${liveSessionId}]:`, err?.data?.message || err?.message || err);
+                }
             }
         }
 

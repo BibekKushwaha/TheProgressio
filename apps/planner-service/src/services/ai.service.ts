@@ -1,8 +1,9 @@
-
 import { Mistral } from "@mistralai/mistralai";
 import PQueue from "p-queue";
 import { createHash } from "node:crypto";
+import { createRequire } from "module";
 
+const require = createRequire(import.meta.url);
 const API_KEY = process.env.MISTRAL_API_KEY;
 
 // Log warning if no key is provided
@@ -24,6 +25,7 @@ export interface ParsedTaskIntent {
 
 export interface ParsedSyllabusItem {
     title: string;
+    description?: string;
     dueDate?: Date;
     priority?: "LOW" | "MEDIUM" | "HIGH";
     subject?: string;
@@ -49,8 +51,7 @@ export class AIService {
 
     // Text-only model for parsing and subtask generation
     private textModelIdentifier = "open-mistral-nemo"; // Reliable, fast, and widely available
-    private readonly minPdfTextChars = 500;
-    private readonly scannedPdfThresholdChars = 200;
+    private readonly minPdfTextChars = 10;
     private readonly maxTextCharsPerChunk = 12000;
     private readonly scanCacheTtlMs = (() => {
         const raw = Number(process.env.MISTRAL_SCAN_CACHE_TTL_MS ?? 6 * 60 * 60 * 1000);
@@ -133,6 +134,7 @@ export class AIService {
         return items.map((item) => {
             const cloned: ParsedSyllabusItem = {
                 title: item.title,
+                ...(item.description ? { description: item.description } : {}),
                 ...(item.priority ? { priority: item.priority } : {}),
                 ...(item.subject ? { subject: item.subject } : {}),
             };
@@ -220,6 +222,9 @@ export class AIService {
                     : undefined;
 
             const normalizedItem: ParsedSyllabusItem = { title };
+            if (typeof record.description === "string" && record.description.trim()) {
+                normalizedItem.description = record.description.trim();
+            }
             if (dueDate && !Number.isNaN(dueDate.getTime())) {
                 normalizedItem.dueDate = dueDate;
             }
@@ -256,9 +261,28 @@ export class AIService {
             const normalizedBase64 = this.decodeBase64Payload(fileBase64);
             if (!normalizedBase64) return "";
             const fileBuffer = Buffer.from(normalizedBase64, "base64");
-            const pdf = (await import("pdf-parse") as any).default || (await import("pdf-parse") as any);
-            const data = await pdf(fileBuffer);
-            return typeof data?.text === "string" ? data.text.trim() : "";
+
+            let pdf: any;
+            try {
+                const pdfMod = require("pdf-parse");
+                pdf = pdfMod.PDFParse || pdfMod.default || (typeof pdfMod === "function" ? pdfMod : null);
+            } catch (_err) {
+                try {
+                    const imported: any = await import("pdf-parse");
+                    pdf = imported.PDFParse || imported.default || (typeof imported === "function" ? imported : null);
+                } catch (_err2) {
+                    console.error("❌ Critical: pdf-parse lib not found.");
+                    return "";
+                }
+            }
+
+            const data = await (async () => {
+                const instance = new pdf({ data: new Uint8Array(fileBuffer) });
+                return instance.getText();
+            })();
+            const text = typeof data?.text === "string" ? data.text.trim() : "";
+            console.log(`📄 Local PDF Extraction: Found ${text.length} characters.`);
+            return text;
         } catch (error) {
             console.warn("⚠️ Local PDF text extraction failed:", this.toErrorSummary(error));
             return "";
@@ -277,16 +301,27 @@ export class AIService {
             const chunk = chunks[index];
             if (!chunk || !chunk.trim()) continue;
 
+            const today = new Date();
             const prompt = `
             You are an academic planning assistant.
-            Extract assignment, exam, and study milestones from the syllabus text.
+            Reference Date (Today): ${today.toISOString()} (${today.toLocaleDateString('en-US', { weekday: 'long' })})
+
+            Extract assignments, exams, topics, and chapters from the syllabus text.
+            If the text lists modules, chapters, or learning objectives, treat each one as a separate study task.
+            
+            Date Assignment Rules:
+            1. If a specific deadline/date is mentioned in the text, use it.
+            2. If NO date is mentioned, you MUST generate a logical schedule starting from TODAY. 
+            3. Progressively space them out (e.g., every 3-4 days or 2 tasks per week) so they don't all fall on one day.
+            
             Return ONLY a JSON array where each item has:
             - title (string, required)
-            - dueDate (ISO 8601 string, optional)
-            - priority ("LOW" | "MEDIUM" | "HIGH", optional)
+            - description (string, optional. Provide context or sub-topics if available in text.)
+            - dueDate (ISO 8601 string, required)
+            - priority ("LOW" | "MEDIUM" | "HIGH", optional. Default to MEDIUM if unsure)
             - subject (string, optional)
 
-            If there are no milestones, return [] only.
+            If there are no clear milestones or topics, return [] only.
             `;
 
             try {
@@ -326,24 +361,109 @@ export class AIService {
         return Array.from(deduped.values()).slice(0, 40);
     }
 
+    private async scanPdfWithMistral(pdfBase64: string): Promise<ParsedSyllabusItem[]> {
+        if (!API_KEY) return [];
+
+        try {
+            const payload = this.decodeBase64Payload(pdfBase64);
+            console.log("🔍 [Mistral OCR] Starting process...");
+
+            let ocrResponse: any = null;
+
+            if (this.client) {
+                try {
+                    console.log("🔍 [Mistral OCR] Attempting via SDK (Direct Base64)...");
+                    const clientAny = this.client as any;
+                    ocrResponse = await clientAny.ocr.process({
+                        model: "mistral-ocr-latest",
+                        document: {
+                            type: "document_base64",
+                            document_base64: payload,
+                        }
+                    });
+                    console.log("✅ [Mistral OCR] SDK Success.");
+                } catch (_err) {
+                    try {
+                        console.log("🔍 [Mistral OCR] Direct Base64 failed, trying File Upload path...");
+                        const fileName = `syllabus_${Date.now()}.pdf`;
+                        const fileBuffer = Buffer.from(payload, "base64");
+                        const fileObj = {
+                            fileName,
+                            content: fileBuffer,
+                        };
+
+                        const uploadResponse = await (this.client as any).files.upload({
+                            file: fileObj,
+                            purpose: "ocr"
+                        });
+
+                        console.log(`✅ [Mistral OCR] File uploaded. ID: ${uploadResponse.id}`);
+
+                        ocrResponse = await (this.client as any).ocr.process({
+                            model: "mistral-ocr-latest",
+                            document: {
+                                type: "file",
+                                fileId: uploadResponse.id,
+                            }
+                        });
+                        console.log("✅ [Mistral OCR] OCR Success via File ID.");
+
+                        // Optional: Clean up the file
+                        try {
+                            await (this.client as any).files.delete({ fileId: uploadResponse.id });
+                        } catch (_delErr) {
+                            // Ignore deletion errors
+                        }
+                    } catch (ocrErr) {
+                        console.warn("⚠️ [Mistral OCR] All OCR paths failed:", this.toErrorSummary(ocrErr));
+                    }
+                }
+            }
+
+            let fullMarkdown = "";
+            if (ocrResponse?.pages && Array.isArray(ocrResponse.pages)) {
+                fullMarkdown = ocrResponse.pages.map((p: any) => p.markdown || "").join("\n\n");
+                console.log(`📄 [Mistral OCR] Extracted ${ocrResponse.pages.length} pages of content.`);
+            }
+
+            if (fullMarkdown.trim()) {
+                console.log("📝 [Mistral OCR] Sending text to Model for structuring...");
+                const items = await this.extractFromTextModel(fullMarkdown);
+                console.log(`✨ [Mistral OCR] Structuring complete. Found ${items.length} items.`);
+                return items;
+            }
+
+            console.warn("⚠️ [Mistral OCR] OCR path returned no text content.");
+            return [];
+        } catch (error) {
+            console.error("⚠️ [Mistral OCR] Unexpected failure:", this.toErrorSummary(error));
+            return [];
+        }
+    }
+
     private async extractFromVisionModel(imageBase64: string, mimeType: string): Promise<ParsedSyllabusItem[]> {
         if (!this.client) {
             return [];
         }
 
+        const today = new Date();
         const prompt = `
         You are an academic planning assistant.
+        Reference Date (Today): ${today.toISOString()} (${today.toLocaleDateString('en-US', { weekday: 'long' })})
+
         Read this syllabus image and extract assignment/exam/study milestones into a JSON array.
         Each item must include:
         - title (string, required)
-        - dueDate (ISO 8601 string, optional)
+        - description (string, optional. Include extra details from the text.)
+        - dueDate (ISO 8601 string, required)
         - priority ("LOW" | "MEDIUM" | "HIGH", optional)
         - subject (string, optional)
 
         Rules:
         - Extract ALL topics, chapters, assignments, or exam dates found.
-        - If it looks like a list of topics, treat them as study items.
-        - If date appears without year, assume current year ${new Date().getFullYear()}.
+        - If the syllabus specifies dates, use them.
+        - If NO dates are specified, you MUST generate a logical schedule starting from TODAY.
+        - Space tasks out logically (e.g., every 3-4 days) to create a roadmap.
         - Return ONLY valid JSON array.
         `;
 
@@ -524,8 +644,6 @@ export class AIService {
             if (!textResponse || typeof textResponse !== "string") {
                 throw new Error("Empty response from AI model");
             }
-
-            // console.log(`[AI] Response for "${originalText}":`, textResponse); // OPTIONAL DEBUG
 
             // Robust JSON extraction: look for the first '{' and the last '}'
             const jsonStart = textResponse.indexOf('{');
@@ -712,21 +830,31 @@ export class AIService {
         const isPdf = normalizedMimeType.includes("pdf");
 
         if (isPdf) {
-            const extractedText = await this.extractPdfTextFromBase64(imageBase64);
-            if (extractedText.length >= this.minPdfTextChars) {
-                const textResult = await this.extractFromTextModel(extractedText);
-                this.setCachedScanResult(cacheKey, textResult);
-                return textResult;
+            // 1. First, try specialized Mistral OCR (Best for all PDFs, including scanned ones)
+            const ocrResult = await this.scanPdfWithMistral(imageBase64);
+            if (ocrResult && ocrResult.length > 0) {
+                this.setCachedScanResult(cacheKey, ocrResult);
+                return ocrResult;
             }
 
-            if (extractedText.length >= this.scannedPdfThresholdChars) {
+            // 2. Fallback to Local Text extraction (Fast for digital-only PDFs)
+            const extractedText = await this.extractPdfTextFromBase64(imageBase64);
+            if (extractedText.length >= this.minPdfTextChars) {
+                console.log("📝 Sending locally extracted text to Mistral model...");
                 const textResult = await this.extractFromTextModel(extractedText);
-                this.setCachedScanResult(cacheKey, textResult);
-                return textResult;
+                if (textResult.length > 0) {
+                    this.setCachedScanResult(cacheKey, textResult);
+                    return textResult;
+                }
+                console.warn("⚠️ Mistral model found no tasks in the locally extracted text.");
+            } else {
+                console.warn("⚠️ Local extraction returned too little text, skipping text model parsing.");
             }
         }
 
+        // 3. Vision fallback for Images (or PDFs that failed text paths)
         const queuedResult = await this.visionQueue.add(async () => {
+            if (isPdf) return []; // Non-specialized vision models don't handle PDFs well via base64 URL
             return this.extractFromVisionModel(imageBase64, mimeType);
         });
 

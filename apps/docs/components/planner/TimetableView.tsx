@@ -123,12 +123,41 @@ export function TimetableView() {
 }
 
 function ClassCard({ entry }: { entry: TimetableEntry }) {
+    const isLive = (() => {
+        if (!entry.startTime || !entry.endTime) return false;
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        const startParts = entry.startTime.split(':');
+        const endParts = entry.endTime.split(':');
+
+        const startH = parseInt(startParts[0] || '0', 10);
+        const startM = parseInt(startParts[1] || '0', 10);
+        const endH = parseInt(endParts[0] || '0', 10);
+        const endM = parseInt(endParts[1] || '0', 10);
+
+        if (isNaN(startH) || isNaN(endH)) return false;
+
+        const startMinutes = startH * 60 + (startM || 0);
+        const endMinutes = endH * 60 + (endM || 0);
+
+        return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    })();
+
     return (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5 hover:bg-white/10 transition-all group relative overflow-hidden">
-            <div className={`absolute left-0 top-0 bottom-0 w-1`} style={{ backgroundColor: entry.subject.color || '#A855F7' }} />
+        <div className={`bg-white/5 border rounded-xl p-5 transition-all group relative overflow-hidden ${isLive ? 'border-purple-500/50 bg-purple-500/5 shadow-[0_0_20px_rgba(168,85,247,0.15)] ring-1 ring-purple-500/20' : 'border-white/10 hover:bg-white/10'}`}>
+            <div className={`absolute left-0 top-0 bottom-0 w-1 ${isLive ? 'bg-purple-500 animate-pulse' : ''}`} style={{ backgroundColor: !isLive ? (entry.subject.color || '#A855F7') : undefined }} />
 
             <div className="flex justify-between items-start mb-3">
-                <h3 className="font-bold text-lg text-white">{entry.subject.name}</h3>
+                <div className="flex flex-col gap-1">
+                    <h3 className="font-bold text-lg text-white">{entry.subject.name}</h3>
+                    {isLive && (
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full w-fit">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping" />
+                            LIVE NOW
+                        </span>
+                    )}
+                </div>
                 <span className="text-xs font-mono bg-white/10 px-2 py-1 rounded text-slate-300">
                     {entry.subject.code}
                 </span>
@@ -136,8 +165,8 @@ function ClassCard({ entry }: { entry: TimetableEntry }) {
 
             <div className="space-y-2 text-sm text-slate-400">
                 <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-purple-400" />
-                    <span>{formatTime(entry.startTime)} - {formatTime(entry.endTime)}</span>
+                    <Clock className={`w-4 h-4 ${isLive ? 'text-purple-400' : 'text-slate-500'}`} />
+                    <span className={isLive ? 'text-white font-bold' : ''}>{formatTime(entry.startTime)} - {formatTime(entry.endTime)}</span>
                 </div>
                 {entry.subject.room && (
                     <div className="flex items-center gap-2">

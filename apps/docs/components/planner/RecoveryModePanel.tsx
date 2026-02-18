@@ -15,8 +15,22 @@ interface RecoveryModePanelProps {
     tasks: Task[];
 }
 
-const formatDate = (value: string) =>
-    new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const formatDate = (value: string | Date | null | undefined) => {
+    if (!value) return 'No Date';
+    const date = new Date(value);
+    const now = new Date();
+
+    const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const d2 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays <= 7) return `${diffDays}d left`;
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
 
 export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
     const [previewRecoveryPlan, { isLoading: isPreviewing }] = usePreviewRecoveryPlanMutation();
@@ -267,7 +281,7 @@ export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
                             </button>
                         </div>
                     </div>
-                    
+
                     <div className="space-y-1 max-h-96 overflow-y-auto divide-y divide-white/5 p-3">
                         {activePlan.items.map((item) => {
                             const currentDueDate = overrides[item.taskId] || item.newDueDate;

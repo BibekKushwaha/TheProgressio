@@ -53,49 +53,53 @@ export function TimelineView({ searchQuery, status, priority, category, tasks }:
     const router = useRouter();
 
     const timeline = useMemo(() => {
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        monthEnd.setHours(23, 59, 59, 999);
+
         const filtered = filterTasks(tasks, { searchQuery, status, priority, category })
-            .filter((task) => Boolean(task.dueDate))
+            .filter((task) => {
+                if (!task.dueDate) return false;
+                const d = new Date(task.dueDate);
+                return d >= monthStart && d <= monthEnd;
+            })
             .sort((a, b) => new Date(a.dueDate || '').getTime() - new Date(b.dueDate || '').getTime());
 
-        const today = toStartOfDay(new Date());
+        const today = toStartOfDay(now);
+        const rangeStart = monthStart;
+        const rangeEnd = monthEnd;
+        const totalDays = diffDays(rangeStart, rangeEnd) + 1;
+        const nowPercent = ((now.getTime() - rangeStart.getTime()) / (totalDays * MS_PER_DAY)) * 100;
 
         if (filtered.length === 0) {
-            const rangeStart = today;
-            const rangeEnd = addDays(today, 14);
             return {
                 rangeStart,
                 rangeEnd,
-                totalDays: diffDays(rangeStart, rangeEnd) + 1,
+                totalDays,
+                nowPercent,
                 bars: [] as Array<{
                     task: Task;
                     leftPercent: number;
                     widthPercent: number;
                     duePercent: number;
                     dueLabel: string;
+                    isOverdue: boolean;
                 }>,
-                ticks: [],
+                ticks: [monthStart, addDays(monthStart, 7), addDays(monthStart, 14), addDays(monthStart, 21), monthEnd],
             };
         }
 
-        const dueDates = filtered.map((task) => toStartOfDay(new Date(task.dueDate as string)));
-        const earliestDue = dueDates[0] as Date;
-        const latestDue = dueDates[dueDates.length - 1] as Date;
-
-        const rangeStart = earliestDue < today ? addDays(earliestDue, -2) : today;
-        const rangeEnd = addDays(latestDue, 4);
-        const totalDays = Math.max(diffDays(rangeStart, rangeEnd) + 1, 1);
-
-        // Dynamic tick interval based on totalDays
-        let tickStep = 7;
-        if (totalDays > 180) tickStep = 30;
-        else if (totalDays > 60) tickStep = 14;
-        else if (totalDays < 14) tickStep = 2;
-
+        // Monthly ticks: Weekly intervals
         const ticks: Date[] = [];
-        let cursor = toStartOfDay(rangeStart);
-        while (cursor <= rangeEnd) {
+        let cursor = new Date(monthStart);
+        while (cursor <= monthEnd) {
             ticks.push(new Date(cursor));
-            cursor = addDays(cursor, tickStep);
+            cursor = addDays(cursor, 7);
+        }
+        const lastTick = ticks[ticks.length - 1];
+        if (lastTick && lastTick.getTime() !== monthEnd.getTime()) {
+            ticks.push(monthEnd);
         }
 
         const bars = filtered.map((task) => {
@@ -108,16 +112,19 @@ export function TimelineView({ searchQuery, status, priority, category, tasks }:
             const dueOffset = Math.max(diffDays(rangeStart, dueDate), 0);
             const widthDays = Math.max(diffDays(effectiveStart, dueDate) + 1, 1);
 
+            const isOverdue = task.status !== TaskStatus.COMPLETED && dueDate < today;
+
             return {
                 task,
                 leftPercent: (startOffset / totalDays) * 100,
                 widthPercent: Math.max((widthDays / totalDays) * 100, 3),
-                duePercent: (dueOffset / totalDays) * 100,
+                duePercent: ((dueOffset + 0.95) / totalDays) * 100,
                 dueLabel: formatTick(dueDate),
+                isOverdue,
             };
         });
 
-        return { rangeStart, rangeEnd, totalDays, bars, ticks };
+        return { rangeStart, rangeEnd, totalDays, bars, ticks, nowPercent };
     }, [tasks, searchQuery, status, priority, category]);
 
     const showYear = timeline.totalDays > 365;
@@ -131,8 +138,8 @@ export function TimelineView({ searchQuery, status, priority, category, tasks }:
                 <div className="mx-auto h-16 w-16 rounded-2xl bg-slate-800 flex items-center justify-center mb-4">
                     <CalendarDays className="h-8 w-8 text-slate-500" />
                 </div>
-                <h3 className="text-xl font-bold text-white">No dated tasks for timeline</h3>
-                <p className="mt-2 text-slate-400 max-w-sm mx-auto">Add due dates to your tasks to visualize your roadmap and detect potential workload bottlenecks.</p>
+                <h3 className="text-xl font-bold text-white">No tasks this month</h3>
+                <p className="mt-2 text-slate-400 max-w-sm mx-auto">There are no tasks with deadlines in {new Date().toLocaleDateString('en-US', { month: 'long' })}. Try adjusting your filters or adding new dated tasks.</p>
             </div>
         );
     }
@@ -141,9 +148,9 @@ export function TimelineView({ searchQuery, status, priority, category, tasks }:
         <div className="max-w-7xl mx-auto rounded-3xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-xl">
             <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h3 className="text-2xl font-black text-white tracking-tight">Timeline / Gantt View</h3>
+                    <h3 className="text-2xl font-black text-white tracking-tight">Monthly Roadmap</h3>
                     <p className="text-sm text-slate-400 font-medium">
-                        Focused schedule from <span className="text-cyan-400">{formatLabel(timeline.rangeStart)}</span> to <span className="text-indigo-400">{formatLabel(timeline.rangeEnd)}</span>
+                        Showing deadlines for <span className="text-cyan-400">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
                     </p>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
@@ -156,6 +163,17 @@ export function TimelineView({ searchQuery, status, priority, category, tasks }:
             {/* Timeline Header */}
             <div className="grid grid-cols-[30%_10%_60%] md:grid-cols-[25%_10%_65%] lg:grid-cols-[20%_8%_72%] mb-4 items-end">
                 <div className="col-start-3 relative h-10 border-b border-white/5">
+                    {/* Now Indicator (Header part) */}
+                    {timeline.nowPercent >= 0 && timeline.nowPercent <= 100 && (
+                        <div
+                            className="absolute bottom-0 z-20 flex flex-col items-center"
+                            style={{ left: `${timeline.nowPercent}%` }}
+                        >
+                            <span className="text-[9px] font-black text-rose-500 uppercase tracking-tighter bg-rose-500/10 px-1 rounded mb-1">Now</span>
+                            <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
+                        </div>
+                    )}
+
                     {timeline.ticks.map((tick) => {
                         const offset = (diffDays(timeline.rangeStart, tick) / timeline.totalDays) * 100;
                         if (offset > 100) return null;
@@ -171,39 +189,65 @@ export function TimelineView({ searchQuery, status, priority, category, tasks }:
                 </div>
             </div>
 
-            {/* Timeline Rows */}
-            <div className="space-y-3">
+            {/* Timeline Rows Container */}
+            <div className="relative space-y-3">
+                {/* Now Vertical Line (Responsive Overlay) */}
+                {timeline.nowPercent >= 0 && timeline.nowPercent <= 100 && (
+                    <div className="absolute inset-0 z-20 pointer-events-none grid grid-cols-[30%_10%_60%] md:grid-cols-[25%_10%_65%] lg:grid-cols-[20%_8%_72%] gap-2">
+                        <div className="col-start-3 relative h-full">
+                            <div
+                                className="absolute inset-y-0 w-px bg-rose-500/40"
+                                style={{ left: `${timeline.nowPercent}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {timeline.bars.map((bar) => (
                     <div key={bar.task.id} className="grid grid-cols-[30%_10%_60%] md:grid-cols-[25%_10%_65%] lg:grid-cols-[20%_8%_72%] gap-2 items-center group cursor-pointer"
                         onClick={() => router.push(`/tasks/${bar.task.id}`)}>
 
                         <div className="min-w-0">
-                            <div className="truncate text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">{bar.task.title}</div>
+                            <div className="truncate text-sm font-bold text-white group-hover:text-cyan-400 transition-colors flex items-center gap-2">
+                                {bar.task.title}
+                                {bar.isOverdue && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />}
+                            </div>
                         </div>
 
                         <div className="text-[10px] font-medium text-slate-500 whitespace-nowrap bg-white/5 rounded px-1.5 py-0.5 w-fit justify-self-center">
                             {formatTick(new Date(bar.task.dueDate as string))}
                         </div>
 
-                        <div className="relative h-10 rounded-xl border border-white/5 bg-white/[0.02] group-hover:bg-white/[0.04] transition-all overflow-hidden">
+                        <div className="relative h-10 rounded-xl border border-white/5 bg-white/[0.02] group-hover:bg-white/[0.04] transition-all overflow-hidden flex items-center">
+                            {/* Now Line Shadow (inside row) */}
+                            {timeline.nowPercent >= 0 && timeline.nowPercent <= 100 && (
+                                <div
+                                    className="absolute inset-y-0 w-px bg-rose-500/20 z-0 pointer-events-none"
+                                    style={{ left: `${timeline.nowPercent}%` }}
+                                />
+                            )}
+
                             {/* Gantt Bar */}
                             <div
                                 style={{
                                     left: `${bar.leftPercent}%`,
                                     width: `${bar.widthPercent}%`,
                                 }}
-                                className={`absolute inset-y-1.5 rounded-lg border shadow-lg bg-gradient-to-r flex items-center px-2 min-w-[24px] ${STATUS_STYLE[bar.task.status] || STATUS_STYLE.PENDING}`}
+                                className={`absolute inset-y-1.5 rounded-lg border shadow-lg bg-gradient-to-r flex items-center px-2 min-w-[24px] z-10 transition-all ${bar.isOverdue
+                                    ? 'from-rose-600 to-rose-400 border-rose-300/40'
+                                    : STATUS_STYLE[bar.task.status] || STATUS_STYLE.PENDING
+                                    }`}
                             >
-                                {bar.widthPercent > 15 && (
+                                {(bar.widthPercent > 12 || bar.isOverdue) && (
                                     <span className="text-[9px] font-black text-white/90 truncate uppercase tracking-tighter">
-                                        {bar.task.status}
+                                        {bar.isOverdue ? 'Overdue' : bar.task.status}
                                     </span>
                                 )}
                             </div>
 
                             {/* Due Date Marker */}
                             <div
-                                className="absolute inset-y-0 w-px bg-white/60 shadow-[0_0_8px_rgba(255,255,255,0.5)] z-10"
+                                className="absolute inset-y-0 w-px bg-white/60 shadow-[0_0_8px_rgba(255,255,255,0.5)] z-20"
                                 style={{ left: `${bar.duePercent}%` }}
                             />
                         </div>

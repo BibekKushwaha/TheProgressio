@@ -8,7 +8,7 @@ import { useAppDispatch } from './hooks';
 import { hydrateAuth, logout } from './slices/authSlice';
 import { syncEngine } from './sync-engine';
 
-const STORE_BUILD_VERSION = '2026-02-13-payment-api';
+const STORE_BUILD_VERSION = '2026-02-19-calendar-fix';
 
 function AuthHydrator() {
   const dispatch = useAppDispatch();
