@@ -19,9 +19,18 @@
   },
   "exports": {
     ".": "./dist/index.js",
-    "./auth": "./dist/auth.js",
-    "./task": "./dist/task.js",
-    "./habit": "./dist/habit.js",
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "import": "./dist/auth.js"
+    },
+    "./task": {
+      "types": "./dist/task.d.ts",
+      "import": "./dist/task.js"
+    },
+    "./habit": {
+      "types": "./dist/habit.d.ts",
+      "import": "./dist/habit.js"
+    },
     "./activity": "./dist/activity.js",
     "./category": "./dist/category.js",
     "./subject": "./dist/subject.js",
@@ -38,7 +47,13 @@
     "./reminder": "./dist/reminder.js",
     "./billing": "./dist/billing.js",
     "./payment": "./dist/payment.js",
-    "./sync": "./dist/sync.js",
-    "./whatsapp": "./dist/whatsapp.js"
+    "./sync": {
+      "types": "./dist/sync.d.ts",
+      "import": "./dist/sync.js"
+    },
+    "./whatsapp": {
+      "types": "./dist/whatsapp.d.ts",
+      "import": "./dist/whatsapp.js"
+    }
   }
 }
