@@ -1,3 +1,5 @@
+import { prisma } from "@repo/db";
+
 type PlainObject = Record<string, unknown>;
 
 export interface WhatsAppInbound {
@@ -159,17 +161,30 @@ export const extractWhatsAppInbound = (payload: unknown): WhatsAppInbound => {
     };
 };
 
-export const resolveWhatsAppUserId = (params: {
+export const resolveWhatsAppUserId = async (params: {
     explicitUserId: string | null;
     sender: string | null;
-}): string | null => {
+}): Promise<string | null> => {
     if (params.explicitUserId) return params.explicitUserId;
 
     const sender = normalizePhone(params.sender);
     if (!sender) return null;
 
+    // 1. Try environment mapping (priority/override)
     const mapping = readUserMapping();
-    return mapping[sender] ?? null;
+    if (mapping[sender]) return mapping[sender];
+
+    // 2. Try database lookup by whatsappNumber
+    try {
+        const user = await prisma.user.findUnique({
+            where: { whatsappNumber: sender },
+            select: { id: true }
+        });
+        return user?.id ?? null;
+    } catch (error) {
+        console.error("[WhatsApp Service] DB lookup error:", error);
+        return null;
+    }
 };
 
 export const isWhatsAppCaptureAuthorized = (secretHeader: unknown): boolean => {

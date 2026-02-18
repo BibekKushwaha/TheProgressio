@@ -1,7 +1,8 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { StoreProvider } from "@repo/store";
-
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ToastProvider } from "@/components/ui/toast-provider";
 
@@ -9,9 +10,6 @@ export const metadata: Metadata = {
   title: "Student Activity Tracker",
   description: "Frictionless task management for students",
 };
-
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "sonner";
 
 export default function RootLayout({
   children,

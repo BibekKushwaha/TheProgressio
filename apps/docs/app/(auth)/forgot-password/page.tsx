@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import GradientButton from "@/components/auth/gradient-button";
 import Input from "@/components/auth/input";
 import { useForgotPasswordMutation } from "@repo/store";
+import { getApiErrorMessage } from '@/lib/api-error';
 
 const ForgotPasswordPage = () => {
     const [email, setEmail] = useState("");
@@ -22,11 +23,7 @@ const ForgotPasswordPage = () => {
             await forgotPassword({ email }).unwrap();
             setIsSubmitted(true);
         } catch (err: unknown) {
-            const message =
-                typeof err === "object" && err !== null && "data" in err
-                    ? (err as { data?: { message?: string } }).data?.message
-                    : undefined;
-            setError(message || "Something went wrong. Please try again.");
+            setError(getApiErrorMessage(err, "Something went wrong. Please try again."));
         }
     };
 

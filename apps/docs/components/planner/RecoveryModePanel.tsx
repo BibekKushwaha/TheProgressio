@@ -328,7 +328,7 @@ export function RecoveryModePanel({ tasks }: RecoveryModePanelProps) {
                                                     mode="single"
                                                     selected={(() => {
                                                         const d = new Date(currentDueDate);
-                                                        return isNaN(d.getTime()) ? new Date() : d;
+                                                        return Number.isNaN(d.getTime()) ? new Date() : d;
                                                     })()}
                                                     onSelect={(date) => {
                                                         if (date) {

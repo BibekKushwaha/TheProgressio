@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { CalendarDays, Clock, Target, CheckCircle, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CalendarDays, Clock, Target, CheckCircle, Sparkles, Loader2 } from 'lucide-react';
+import { useGetRevisionScheduleQuery } from '@repo/store';
 
 type ExamType = 'JEE' | 'NEET' | 'UPSC' | 'CUSTOM';
 type ProblemType = 'DPP' | 'PYQ' | 'REVISION';
@@ -48,19 +49,17 @@ const EXAM_ROUTINES: Record<ExamType, { hours: number; blocks: { subject: string
     CUSTOM: { hours: 6, blocks: [] },
 };
 
-const MOCK_SCHEDULE: ScheduledBlock[] = [
-    { id: '1', subject: 'Physics', chapter: 'Mechanics — Rotational Dynamics', type: 'DPP', time: '06:00', duration: 45, completed: true },
-    { id: '2', subject: 'Chemistry', chapter: 'Organic — Alkyl Halides', type: 'PYQ', time: '07:00', duration: 60, completed: true },
-    { id: '3', subject: 'Mathematics', chapter: 'Integration — Definite Integrals', type: 'DPP', time: '09:00', duration: 50, completed: false },
-    { id: '4', subject: 'Physics', chapter: 'Optics — Wave Optics', type: 'REVISION', time: '11:00', duration: 40, completed: false },
-    { id: '5', subject: 'Chemistry', chapter: 'Physical — Electrochemistry', type: 'DPP', time: '14:00', duration: 45, completed: false },
-    { id: '6', subject: 'Mathematics', chapter: 'Probability — Bayes Theorem', type: 'PYQ', time: '16:00', duration: 60, completed: false },
-];
-
 export function RevisionScheduler() {
     const [selectedExam, setSelectedExam] = useState<ExamType>('JEE');
-    const [schedule, setSchedule] = useState<ScheduledBlock[]>(MOCK_SCHEDULE);
+    const { data: scheduleData, isLoading, refetch } = useGetRevisionScheduleQuery(selectedExam);
+    const [schedule, setSchedule] = useState<ScheduledBlock[]>([]);
     const [showRoutine, setShowRoutine] = useState(false);
+
+    useEffect(() => {
+        if (scheduleData?.schedule) {
+            setSchedule(scheduleData.schedule as ScheduledBlock[]);
+        }
+    }, [scheduleData]);
 
     const routine = EXAM_ROUTINES[selectedExam];
     const completed = schedule.filter(s => s.completed).length;
@@ -148,42 +147,53 @@ export function RevisionScheduler() {
 
                 {/* Schedule Timeline */}
                 <div className="space-y-2">
-                    {schedule.map(block => (
-                        <button
-                            key={block.id}
-                            onClick={() => toggleComplete(block.id)}
-                            className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all text-left ${block.completed
-                                    ? 'bg-white/[0.02] opacity-60'
-                                    : 'bg-white/5 hover:bg-white/10'
-                                }`}
-                        >
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${block.completed ? 'bg-green-500 border-green-500' : 'border-white/30'
-                                }`}>
-                                {block.completed && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <span className={`text-sm font-bold ${block.completed ? 'text-slate-500 line-through' : 'text-white'}`}>
-                                        {block.chapter}
-                                    </span>
+                    {isLoading ? (
+                        <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                            <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                            <p className="text-sm text-slate-400">Optimizing schedule from SWOT...</p>
+                        </div>
+                    ) : (
+                        schedule.map(block => (
+                            <button
+                                key={block.id}
+                                onClick={() => toggleComplete(block.id)}
+                                className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all text-left ${block.completed
+                                        ? 'bg-white/[0.02] opacity-60'
+                                        : 'bg-white/5 hover:bg-white/10'
+                                    }`}
+                            >
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${block.completed ? 'bg-green-500 border-green-500' : 'border-white/30'
+                                    }`}>
+                                    {block.completed && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                                 </div>
-                                <span className="text-xs text-slate-500">{block.subject}</span>
-                            </div>
-                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${typeColors[block.type]}`}>
-                                {block.type}
-                            </span>
-                            <div className="text-right flex-shrink-0">
-                                <div className="text-sm font-mono text-slate-300">{block.time}</div>
-                                <div className="text-xs text-slate-500">{block.duration} min</div>
-                            </div>
-                        </button>
-                    ))}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <span className={`text-sm font-bold ${block.completed ? 'text-slate-500 line-through' : 'text-white'}`}>
+                                            {block.chapter}
+                                        </span>
+                                    </div>
+                                    <span className="text-xs text-slate-500">{block.subject}</span>
+                                </div>
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${typeColors[block.type]}`}>
+                                    {block.type}
+                                </span>
+                                <div className="text-right flex-shrink-0">
+                                    <div className="text-sm font-mono text-slate-300">{block.time}</div>
+                                    <div className="text-xs text-slate-500">{block.duration} min</div>
+                                </div>
+                            </button>
+                        ))
+                    )}
                 </div>
 
                 {/* Auto-Generate Button */}
-                <button className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-xl text-sm font-semibold text-indigo-400 hover:from-indigo-500/30 hover:to-purple-500/30 transition-all">
+                <button
+                    onClick={() => refetch()}
+                    disabled={isLoading}
+                    className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-xl text-sm font-semibold text-indigo-400 hover:from-indigo-500/30 hover:to-purple-500/30 transition-all disabled:opacity-50"
+                >
                     <Sparkles className="w-4 h-4" />
-                    Auto-Generate Tomorrow&apos;s Schedule from SWOT Weak Areas
+                    {isLoading ? "Regenerating..." : "Auto-Generate Tomorrow's Schedule from SWOT Weak Areas"}
                 </button>
             </div>
 

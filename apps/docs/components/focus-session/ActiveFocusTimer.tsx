@@ -35,8 +35,8 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const recommendedEnd = searchParams.get('recommendedEnd') || '';
 
     // Check if duration is a valid number
-    const initialMinutesFromParams = isNaN(paramDuration) ? 25 : paramDuration;
-    const sessionIntensity = Math.max(0, Math.min(100, isNaN(intensityParam) ? 75 : intensityParam));
+    const initialMinutesFromParams = Number.isNaN(paramDuration) ? 25 : paramDuration;
+    const sessionIntensity = Math.max(0, Math.min(100, Number.isNaN(intensityParam) ? 75 : intensityParam));
 
     const [currentTaskTitle, setCurrentTaskTitle] = useState<string>(paramTaskTitle);
     const [initialMinutes, setInitialMinutes] = useState<number>(initialMinutesFromParams);

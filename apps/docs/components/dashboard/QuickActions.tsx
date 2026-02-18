@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, FileText, Sparkles } from 'lucide-react';
-import { StartFocusButton } from '../planner/StatFocusButton';
+import { StartFocusButton } from '../planner/StartFocusButton';
 import { useRouter } from 'next/navigation';
 
 export function QuickActions() {

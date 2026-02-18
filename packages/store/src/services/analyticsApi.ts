@@ -98,6 +98,7 @@ export interface FocusScoreStats {
     totalMinutes: number;
     activeDays: number;
     avgHoursPerDay: number;
+    balanceScore?: number;
 }
 
 export interface Achievement {
@@ -129,7 +130,8 @@ export interface CycleTimeData {
     p50: number;
     p85: number;
     p95: number;
-    scatterData: Array<{ completedAt: string; durationMinutes: number }>;
+    avg: number;
+    recentTasks: Array<{ title: string; cycleTimeHours: number; completedAt: string }>;
 }
 
 export interface SWOTSubject {
@@ -151,14 +153,15 @@ export interface CGPAResult {
     cgpa: number;
     totalCredits: number;
     semesterBreakdown: Array<{ semester: number; gpa: number; credits: number }>;
-    courses: Array<{ courseName: string; credits: number; gradePoint: number; grade?: string; semester?: number }>;
+    courses: Array<{ id: string; courseName: string; credits: number; gradePoint: number; grade?: string; semester?: number }>;
 }
 
 export interface WhatIfResult {
-    currentCGPA: number;
+    currentGPA: number;
     targetCGPA: number;
-    requiredGPA: number;
-    achievable: boolean;
+    requiredAverage: number;
+    projectedGPA: number;
+    isPossible: boolean;
     strategy: string;
 }
 
@@ -189,6 +192,23 @@ export interface GradeEntry {
     examType: string;
     timeTakenMins?: number;
     createdAt: string;
+}
+
+export interface ScheduledBlock {
+    id: string;
+    subject: string;
+    chapter: string;
+    type: 'DPP' | 'PYQ' | 'REVISION';
+    time: string;
+    duration: number; // minutes
+    completed: boolean;
+}
+
+export interface RevisionScheduleResponse {
+    message: string;
+    examType: string;
+    schedule: ScheduledBlock[];
+    overallReadiness: number;
 }
 
 export interface CourseGrade {
@@ -254,6 +274,13 @@ export interface NotificationContextSignals {
     geoRecommendation: string | null;
 }
 
+export interface SubjectPerformance {
+    subjectName: string;
+    avgScore?: number;
+    entryCount?: number;
+    trend?: string;
+}
+
 export const analyticsApi = createApi({
     reducerPath: 'analyticsApi',
     baseQuery: fetchBaseQuery({
@@ -261,6 +288,10 @@ export const analyticsApi = createApi({
         credentials: 'include',
         prepareHeaders: (headers) => {
             headers.set('Content-Type', 'application/json');
+            const shareToken = typeof window !== 'undefined' ? localStorage.getItem('family_share_token') : null;
+            if (shareToken) {
+                headers.set('x-family-share-token', shareToken);
+            }
             return headers;
         },
     }),
@@ -369,19 +400,48 @@ export const analyticsApi = createApi({
                 url: '/stats/cycle-time',
                 params: params || {},
             }),
+            transformResponse: (response: any) => ({
+                message: response.message,
+                data: {
+                    p50: (response.data?.p50 || 0) / 60,
+                    p85: (response.data?.p85 || 0) / 60,
+                    p95: (response.data?.p95 || 0) / 60,
+                    avg: (response.data?.mean || 0) / 60,
+                    recentTasks: (response.data?.dataPoints || []).map((p: any) => ({
+                        title: p.taskTitle,
+                        cycleTimeHours: p.minutes / 60,
+                        completedAt: p.completedAt
+                    }))
+                }
+            }),
             providesTags: ['Stats'],
+        }),
+        predictGrade: builder.mutation<{ message: string; data: { estimatedFinalExamScore: number; confidenceLabel: string; simulationRuns: number } }, { subjectId: string; hoursPerWeek: number }>({
+            query: (body) => ({
+                url: '/stats/grade/predict',
+                method: 'POST',
+                body,
+            }),
         }),
 
         // ── Phase 3: SWOT Analysis ────────────────────────────────────────
-        getSWOTAnalysis: builder.query<{ message: string; swot: FullSWOT }, string>({
+        getSWOTReport: builder.query<{ message: string; data: FullSWOT }, string>({
             query: (examType) => `/stats/swot/${examType}`,
             providesTags: ['Stats'],
+            transformResponse: (response: any) => ({
+                message: response.message,
+                data: response.swot || response.data
+            })
         }),
-        getSubjectPerformance: builder.query<{ message: string; data: any }, string>({
+        getSubjectPerformance: builder.query<{ message: string; data: SubjectPerformance[] }, string>({
             query: (name) => {
                 const safeName = name?.trim() || 'Mathematics';
                 return `/stats/subject/${encodeURIComponent(safeName)}`;
             },
+            providesTags: ['Stats'],
+        }),
+        getRevisionSchedule: builder.query<RevisionScheduleResponse, string>({
+            query: (examType) => `/stats/revision-schedule?examType=${examType}`,
             providesTags: ['Stats'],
         }),
 
@@ -569,9 +629,11 @@ export const {
     useGetAchievementsQuery,
     // Phase 3
     useGetPredictionQuery,
+    usePredictGradeMutation,
     useGetCycleTimeQuery,
-    useGetSWOTAnalysisQuery,
+    useGetSWOTReportQuery,
     useGetSubjectPerformanceQuery,
+    useGetRevisionScheduleQuery,
     useGetGPAQuery,
     useWhatIfGPAMutation,
     useAddCourseGradeMutation,

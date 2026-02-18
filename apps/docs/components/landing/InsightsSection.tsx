@@ -4,16 +4,17 @@
 import { motion } from 'framer-motion';
 import { BarChart3 } from 'lucide-react';
 
-export function InsightsSection() {
-  const chapters = [
-    { name: 'Organic Chemistry', score: 95, color: 'bg-green-500' },
-    { name: 'Geometry - Algebra', score: 78, color: 'bg-yellow-500' },
-    { name: 'Mechanics (Force and Torque)', score: 45, color: 'bg-red-500' },
-    { name: 'Math - Calculus', score: 88, color: 'bg-green-500' },
-  ];
-  const scoreTone = (score: number) =>
-    score >= 80 ? 'text-green-400' : score >= 60 ? 'text-yellow-400' : 'text-red-400';
+const CHAPTERS = [
+  { name: 'Organic Chemistry', score: 95, color: 'bg-green-500' },
+  { name: 'Geometry - Algebra', score: 78, color: 'bg-yellow-500' },
+  { name: 'Mechanics (Force and Torque)', score: 45, color: 'bg-red-500' },
+  { name: 'Math - Calculus', score: 88, color: 'bg-green-500' },
+];
 
+const getScoreTone = (score: number) =>
+  score >= 80 ? 'text-green-400' : score >= 60 ? 'text-yellow-400' : 'text-red-400';
+
+export function InsightsSection() {
   return (
     <section className="relative py-32 px-6">
       <div className="max-w-6xl mx-auto">
@@ -58,7 +59,7 @@ export function InsightsSection() {
             </div>
 
             <div className="space-y-4">
-              {chapters.map((chapter, i) => (
+              {CHAPTERS.map((chapter, i) => (
                 <motion.div
                   key={chapter.name}
                   initial={{ opacity: 0, width: 0 }}
@@ -68,7 +69,7 @@ export function InsightsSection() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-slate-300">{chapter.name}</span>
-                    <span className={`text-sm font-semibold ${scoreTone(chapter.score)}`}>
+                    <span className={`text-sm font-semibold ${getScoreTone(chapter.score)}`}>
                       {chapter.score}% Mastery
                     </span>
                   </div>

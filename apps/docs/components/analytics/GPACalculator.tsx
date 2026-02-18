@@ -1,21 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { useGetGPAQuery, useAddCourseGradeMutation, usePreviewGPAComponentsMutation } from '@repo/store';
+import { useGetGPAQuery, useAddCourseGradeMutation, useUpdateCourseGradeMutation, useDeleteCourseGradeMutation, usePreviewGPAComponentsMutation } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { GraduationCap, Plus, TrendingUp, Award } from 'lucide-react';
+import { GraduationCap, Plus, TrendingUp, Award, Edit2, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-provider';
 
 export function GPACalculator() {
     const { data, isLoading } = useGetGPAQuery();
     const [addCourse] = useAddCourseGradeMutation();
+    const [updateCourse] = useUpdateCourseGradeMutation();
+    const [deleteCourse] = useDeleteCourseGradeMutation();
     const [previewComponents, { data: componentPreview, isLoading: isPreviewingComponents }] = usePreviewGPAComponentsMutation();
     const { toast } = useToast();
     const [isAddOpen, setIsAddOpen] = useState(false);
+    const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
     const [newCourse, setNewCourse] = useState({
         courseName: '',
         credits: '',
@@ -31,24 +34,59 @@ export function GPACalculator() {
     const [componentScale, setComponentScale] = useState<'INDIA_10' | 'US_4' | 'PERCENTAGE'>('INDIA_10');
 
     type SemesterBreakdown = { semester: number; gpa?: number; credits?: number };
-    type CourseItem = { courseName: string; semester?: number; grade?: string; gradePoint?: number; credits?: number };
+    type CourseItem = { id: string; courseName: string; semester?: number; grade?: string; gradePoint?: number; credits?: number };
 
     const handleAddCourse = async () => {
         try {
-            await addCourse({
-                courseName: newCourse.courseName,
-                credits: parseFloat(newCourse.credits),
-                gradePoint: parseFloat(newCourse.gradePoint),
-                grade: newCourse.grade || undefined,
-                semester: newCourse.semester ? parseInt(newCourse.semester) : undefined,
-            }).unwrap();
+            if (editingCourseId) {
+                await updateCourse({
+                    id: editingCourseId,
+                    courseName: newCourse.courseName,
+                    credits: parseFloat(newCourse.credits),
+                    gradePoint: parseFloat(newCourse.gradePoint),
+                    grade: newCourse.grade || undefined,
+                    semester: newCourse.semester ? parseInt(newCourse.semester) : undefined,
+                }).unwrap();
+                toast('Course updated successfully!', 'success');
+            } else {
+                await addCourse({
+                    courseName: newCourse.courseName,
+                    credits: parseFloat(newCourse.credits),
+                    gradePoint: parseFloat(newCourse.gradePoint),
+                    grade: newCourse.grade || undefined,
+                    semester: newCourse.semester ? parseInt(newCourse.semester) : undefined,
+                }).unwrap();
+                toast('Course added successfully!', 'success');
+            }
 
-            toast('Course added successfully!', 'success');
             setIsAddOpen(false);
+            setEditingCourseId(null);
             setNewCourse({ courseName: '', credits: '', gradePoint: '', grade: '', semester: '' });
         } catch {
-            toast('Failed to add course', 'error');
+            toast(editingCourseId ? 'Failed to update course' : 'Failed to add course', 'error');
         }
+    };
+
+    const handleDeleteCourse = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this course grade?')) return;
+        try {
+            await deleteCourse(id).unwrap();
+            toast('Course deleted successfully!', 'success');
+        } catch {
+            toast('Failed to delete course', 'error');
+        }
+    };
+
+    const startEditing = (course: CourseItem) => {
+        setEditingCourseId(course.id);
+        setNewCourse({
+            courseName: course.courseName,
+            credits: String(course.credits ?? ''),
+            gradePoint: String(course.gradePoint ?? ''),
+            grade: course.grade ?? '',
+            semester: String(course.semester ?? ''),
+        });
+        setIsAddOpen(true);
     };
 
     if (isLoading) {
@@ -101,7 +139,13 @@ export function GPACalculator() {
                             <p className="text-sm text-slate-400">Track your academic performance</p>
                         </div>
                     </div>
-                    <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                    <Dialog open={isAddOpen} onOpenChange={(open) => {
+                        setIsAddOpen(open);
+                        if (!open) {
+                            setEditingCourseId(null);
+                            setNewCourse({ courseName: '', credits: '', gradePoint: '', grade: '', semester: '' });
+                        }
+                    }}>
                         <DialogTrigger asChild>
                             <Button className="bg-indigo-500 hover:bg-indigo-600">
                                 <Plus className="w-4 h-4 mr-2" />
@@ -110,7 +154,7 @@ export function GPACalculator() {
                         </DialogTrigger>
                         <DialogContent className="bg-slate-900 border-white/10 text-white">
                             <DialogHeader>
-                                <DialogTitle>Add Course Grade</DialogTitle>
+                                <DialogTitle>{editingCourseId ? 'Edit Course Grade' : 'Add Course Grade'}</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
                                 <Input
@@ -152,7 +196,7 @@ export function GPACalculator() {
                                     />
                                 </div>
                                 <Button onClick={handleAddCourse} className="w-full bg-indigo-500 hover:bg-indigo-600">
-                                    Add Course
+                                    {editingCourseId ? 'Update Course' : 'Add Course'}
                                 </Button>
                             </div>
                         </DialogContent>
@@ -288,12 +332,30 @@ export function GPACalculator() {
                     <h3 className="text-lg font-semibold text-white mb-4">All Courses</h3>
                     <div className="space-y-2">
                         {courses.map((course, idx) => (
-                            <div key={idx} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
+                            <div key={course.id || idx} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3 group">
                                 <div className="flex-1">
                                     <div className="font-semibold text-white">{course.courseName}</div>
                                     {course.semester && <div className="text-xs text-slate-500">Semester {course.semester}</div>}
                                 </div>
                                 <div className="flex items-center gap-4">
+                                    <div className="hidden group-hover:flex items-center gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-slate-400 hover:text-white"
+                                            onClick={() => startEditing(course)}
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-slate-400 hover:text-red-400"
+                                            onClick={() => handleDeleteCourse(course.id)}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
                                     {course.grade && (
                                         <div className="px-3 py-1 bg-indigo-500/20 border border-indigo-500/30 rounded-lg text-indigo-400 font-semibold">
                                             {course.grade}

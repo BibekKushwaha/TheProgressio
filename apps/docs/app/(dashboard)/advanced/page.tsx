@@ -43,9 +43,8 @@ export default function AdvancedFeaturesPage() {
     const ActiveTabIcon = currentTabMeta.icon;
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_36%),linear-gradient(135deg,_#020617_0%,_#111827_40%,_#0f172a_100%)] p-4 md:p-8">
-            <div className="max-w-7xl mx-auto space-y-7">
-                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/[0.10] via-indigo-500/[0.08] to-fuchsia-500/[0.10] p-6 md:p-8">
+        <div className="space-y-7">
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/[0.10] via-indigo-500/[0.08] to-fuchsia-500/[0.10] p-6 md:p-8">
                     <div className="absolute -top-16 -right-10 h-60 w-60 rounded-full bg-cyan-500/20 blur-3xl pointer-events-none" />
                     <div className="absolute -bottom-16 -left-10 h-60 w-60 rounded-full bg-violet-500/15 blur-3xl pointer-events-none" />
 
@@ -142,6 +141,5 @@ export default function AdvancedFeaturesPage() {
                     </Card>
                 </div>
             </div>
-        </div>
     );
 }

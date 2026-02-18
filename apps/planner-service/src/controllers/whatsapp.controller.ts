@@ -161,13 +161,53 @@ export const captureWhatsAppTask = TryCatch(async (req: Request, res: Response) 
     }
 
     const inbound = extractWhatsAppInbound(parsedPayload.data);
-    const userId = resolveWhatsAppUserId({
+    const userId = await resolveWhatsAppUserId({
         explicitUserId: inbound.explicitUserId,
         sender: inbound.sender,
     });
 
     if (!userId) {
-        throw new ErrorHandler(400, "User could not be resolved. Provide body.userId or configure WHATSAPP_NUMBER_USER_MAP.");
+        // If no user found, check if it's a pairing attempt
+        const transcription = await resolveWhatsAppTranscript(inbound);
+        const ocr = await resolveWhatsAppOcr(inbound);
+        const messageText = (inbound.text ?? transcription.transcript ?? ocr.text)?.trim();
+
+        if (messageText && messageText.startsWith("PAIR-")) {
+            const pairingCode = messageText;
+            const user = await prisma.user.findUnique({
+                where: { whatsappPairingCode: pairingCode }
+            });
+
+            if (user) {
+                await prisma.user.update({
+                    where: { id: user.id },
+                    data: {
+                        whatsappNumber: inbound.sender,
+                        whatsappVerified: true,
+                        whatsappPairingCode: null, // Clear after use
+                    }
+                });
+
+                if (inbound.sender) {
+                    await sendWhatsAppText(
+                        inbound.sender,
+                        "🎉 Welcome to Study OS! Pairing successful.\n\n" +
+                        "I am your AI study assistant. You can:\n" +
+                        "✅ Send me tasks like 'Math HW at 6pm'\n" +
+                        "🖼️ Send a photo of your syllabus to sync it\n" +
+                        "🎤 Send a voice note for brainstorming"
+                    );
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    message: "User paired successfully via WhatsApp",
+                    userId: user.id
+                });
+            }
+        }
+
+        throw new ErrorHandler(400, "User not found. If this is your first time, send 'PAIR-XXXXXX' using the code from your app settings.");
     }
 
     if (inbound.interactiveReplyId) {

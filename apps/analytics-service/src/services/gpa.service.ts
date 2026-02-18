@@ -57,7 +57,7 @@ export interface SemesterGPA {
     semester: number;
     gpa: number;
     totalCredits: number;
-    courses: { courseName: string; credits: number; gradePoint: number; grade: string | null }[];
+    courses: { id: string; courseName: string; credits: number; gradePoint: number; grade: string | null }[];
 }
 
 export interface CGPAResult {
@@ -139,6 +139,7 @@ export async function calculateCGPA(userId: string, scale: GradingScaleKey = "IN
             semCredits += c.credits;
             semWeighted += gp * c.credits;
             return {
+                id: c.id,
                 courseName: c.courseName,
                 credits: c.credits,
                 gradePoint: gp,

@@ -9,9 +9,8 @@ export default function AchievementsPage() {
     const [filter, setFilter] = useState('all');
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.15),_transparent_38%),linear-gradient(135deg,_#020617_0%,_#1e1b4b_45%,_#111827_100%)] text-white p-4 md:p-8">
-            <div className="max-w-7xl mx-auto space-y-7">
-                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-500/[0.16] via-fuchsia-500/[0.10] to-indigo-500/[0.10] p-6 md:p-8">
+        <div className="space-y-7">
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-500/[0.16] via-fuchsia-500/[0.10] to-indigo-500/[0.10] p-6 md:p-8">
                     <div className="absolute -top-16 -right-12 h-56 w-56 rounded-full bg-fuchsia-500/20 blur-3xl pointer-events-none" />
                     <div className="absolute -bottom-16 -left-10 h-56 w-56 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
 
@@ -59,6 +58,5 @@ export default function AchievementsPage() {
                     <BadgesGrid filter={filter} />
                 </div>
             </div>
-        </div>
     );
 }

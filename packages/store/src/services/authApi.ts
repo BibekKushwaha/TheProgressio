@@ -7,10 +7,21 @@ export interface User {
   username: string;
   email: string;
   dailyGoalHours?: number;
+  whatsappNumber?: string;
+  whatsappVerified?: boolean;
   whatsappOptIn?: boolean;
   quietHoursStart?: string | null;
   quietHoursEnd?: string | null;
   createdAt: string;
+  xp?: number;
+  level?: number;
+}
+
+export interface WhatsAppPairingResponse {
+  success: boolean;
+  pairingCode?: string;
+  verified: boolean;
+  whatsappNumber?: string;
 }
 
 export interface RegisterRequest {
@@ -57,6 +68,10 @@ export const authApi = createApi({
     credentials: 'include', // Include cookies in requests
     prepareHeaders: (headers) => {
       headers.set('Content-Type', 'application/json');
+      const shareToken = typeof window !== 'undefined' ? localStorage.getItem('family_share_token') : null;
+      if (shareToken) {
+        headers.set('x-family-share-token', shareToken);
+      }
       return headers;
     },
   }),
@@ -104,6 +119,19 @@ export const authApi = createApi({
         method: 'GET',
       }),
       providesTags: ['User'],
+    }),
+    getWhatsAppPairingCode: builder.query<WhatsAppPairingResponse, void>({
+      query: () => ({
+        url: '/whatsapp/pairing',
+        method: 'GET',
+      }),
+    }),
+    unpairWhatsApp: builder.mutation<{ success: boolean; message: string }, void>({
+      query: () => ({
+        url: '/whatsapp/unpair',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User']
     }),
     logout: builder.mutation<void, void>({
       query: () => ({
@@ -224,6 +252,8 @@ export const {
   useRegisterMutation,
   useLoginMutation,
   useGetProfileQuery,
+  useGetWhatsAppPairingCodeQuery,
+  useUnpairWhatsAppMutation,
   useLogoutMutation,
   useUpdateProfileMutation,
   useForgotPasswordMutation,

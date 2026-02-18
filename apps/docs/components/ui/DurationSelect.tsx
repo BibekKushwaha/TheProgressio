@@ -6,8 +6,9 @@ interface DurationSelectProps {
     className?: string;
 }
 
+const DURATION_OPTIONS = [15, 20, 25, 30, 45, 60];
+
 export const DurationSelect: React.FC<DurationSelectProps> = ({ value, onChange, className = '' }) => {
-    const options = [15, 20, 25, 30, 45, 60];
     return (
         <select
             value={value}
@@ -15,7 +16,7 @@ export const DurationSelect: React.FC<DurationSelectProps> = ({ value, onChange,
             className={`bg-slate-900 border border-white/10 text-white px-2 py-1 rounded-md text-sm ${className}`}
             aria-label="Session length in minutes"
         >
-            {options.map((opt) => (
+            {DURATION_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>{opt} min</option>
             ))}
         </select>

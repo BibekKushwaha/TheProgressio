@@ -38,6 +38,8 @@ vi.mock('../src/services/ai.service.js', () => ({
 vi.mock('@repo/db', () => {
   const Status = { PENDING: 'PENDING', IN_PROGRESS: 'IN_PROGRESS', COMPLETED: 'COMPLETED' };
   const Priority = { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH' };
+  const AttendanceStatus = { PRESENT: 'PRESENT', ABSENT: 'ABSENT', LATE: 'LATE' };
+  const AttendanceMethod = { QR: 'QR', MANUAL: 'MANUAL', GEOFENCE: 'GEOFENCE' };
   return {
     prisma: {
       task: {
@@ -76,6 +78,8 @@ vi.mock('@repo/db', () => {
     },
     Status,
     Priority,
+    AttendanceStatus,
+    AttendanceMethod,
   };
 });
 

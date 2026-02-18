@@ -5,7 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
@@ -18,6 +18,9 @@ model User {
   username         String     @unique
   email            String     @unique
   password         String
+  whatsappNumber   String?    @unique
+  whatsappVerified Boolean    @default(false)
+  whatsappPairingCode String? @unique
   dailyGoalHours   Float      @default(4.0)
   plan             BillingPlan   @default(FREE)
   planStatus       BillingStatus @default(INACTIVE)
@@ -41,6 +44,7 @@ model User {
   courseGrades      CourseGrade[]
   paymentEvents    PaymentEvent[]
   syncOperations   SyncOperation[]
+  attendance       Attendance[]
   
   // Academic Relations
   subjects         Subject[]
@@ -492,4 +496,29 @@ enum BillingStatus {
   ACTIVE
   PAST_DUE
   CANCELED
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime         @default(now())
+  status    AttendanceStatus @default(PRESENT)
+  method    AttendanceMethod @default(QR)
+  location  String?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, date])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+enum AttendanceMethod {
+  QR
+  MANUAL
+  GEOFENCE
 }

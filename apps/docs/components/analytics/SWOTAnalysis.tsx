@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useGetSWOTAnalysisQuery } from '@repo/store';
+import { useGetSWOTReportQuery } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,9 +25,9 @@ export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange
     }, [controlledExamType]);
 
     const activeExamType = controlledExamType || examType;
-    const { data, isLoading } = useGetSWOTAnalysisQuery(activeExamType);
+    const { data, isLoading } = useGetSWOTReportQuery(activeExamType);
 
-    const swotData = data?.swot;
+    const swotData = data?.data;
     const filteredSubjects =
         swotData?.subjects.filter(subject =>
             subject.subject.toLowerCase().includes(searchQuery.toLowerCase())

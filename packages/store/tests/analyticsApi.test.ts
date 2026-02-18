@@ -75,8 +75,8 @@ describe('analyticsApi — Endpoint Configuration', () => {
 
     // ── Phase 3: SWOT ──────────────────────────────────────────────────
 
-    it('has getSWOTAnalysis query', () => {
-        expect(endpoints).toHaveProperty('getSWOTAnalysis');
+    it('has getSWOTReport query', () => {
+        expect(endpoints).toHaveProperty('getSWOTReport');
     });
 
     it('has getSubjectPerformance query', () => {
@@ -132,6 +132,28 @@ describe('analyticsApi — Endpoint Configuration', () => {
     it('has getPredictivePerformance query', () => {
         expect(endpoints).toHaveProperty('getPredictivePerformance');
     });
+
+    // ── Additional Endpoints ───────────────────────────────────────────
+
+    it('has predictGrade mutation', () => {
+        expect(endpoints).toHaveProperty('predictGrade');
+    });
+
+    it('has getRevisionSchedule query', () => {
+        expect(endpoints).toHaveProperty('getRevisionSchedule');
+    });
+
+    it('has previewGPAComponents mutation', () => {
+        expect(endpoints).toHaveProperty('previewGPAComponents');
+    });
+
+    it('has getNotificationIntelligence query', () => {
+        expect(endpoints).toHaveProperty('getNotificationIntelligence');
+    });
+
+    it('has getNotificationContextSignals query', () => {
+        expect(endpoints).toHaveProperty('getNotificationContextSignals');
+    });
 });
 
 describe('analyticsApi — Reducer & Middleware', () => {
@@ -149,8 +171,8 @@ describe('analyticsApi — Reducer & Middleware', () => {
 });
 
 describe('analyticsApi — Total endpoint count', () => {
-    it('has exactly 31 endpoints', () => {
+    it('has exactly 33 endpoints', () => {
         const endpointCount = Object.keys(analyticsApi.endpoints).length;
-        expect(endpointCount).toBe(31);
+        expect(endpointCount).toBe(33);
     });
 });

@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
 
+const actionClasses = {
+    retry:
+        "px-4 py-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-colors inline-flex items-center justify-center gap-2",
+    dashboard:
+        "px-4 py-2 rounded-lg bg-cyan-500/20 border border-cyan-400/30 text-cyan-100 hover:bg-cyan-500/30 transition-colors",
+};
+
 export default function GlobalError({
     error,
     reset,
@@ -10,13 +17,6 @@ export default function GlobalError({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
-    const actionClasses = {
-        retry:
-            "px-4 py-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-colors inline-flex items-center justify-center gap-2",
-        dashboard:
-            "px-4 py-2 rounded-lg bg-cyan-500/20 border border-cyan-400/30 text-cyan-100 hover:bg-cyan-500/30 transition-colors",
-    };
-
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.16),_transparent_36%),linear-gradient(140deg,_#020617_0%,_#0f172a_45%,_#111827_100%)] text-white flex items-center justify-center p-6">
             <div className="w-full max-w-lg rounded-2xl border border-red-500/30 bg-red-500/10 backdrop-blur-xl p-6 text-center">

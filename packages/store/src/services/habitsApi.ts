@@ -152,6 +152,10 @@ export const habitsApi = createApi({
         credentials: 'include',
         prepareHeaders: (headers) => {
             headers.set('Content-Type', 'application/json');
+            const shareToken = typeof window !== 'undefined' ? localStorage.getItem('family_share_token') : null;
+            if (shareToken) {
+                headers.set('x-family-share-token', shareToken);
+            }
             return headers;
         },
     }),

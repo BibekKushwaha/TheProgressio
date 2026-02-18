@@ -24,6 +24,8 @@ export interface LocalUserCacheValue {
   dailyGoalHours?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  xp?: number;
+  level?: number;
 }
 
 async function safeGetUserCache(userId: string): Promise<LocalUserCacheValue | null> {
@@ -117,6 +119,8 @@ const buildUserCachePayload = (user: any): LocalUserCacheValue => ({
   dailyGoalHours: user.dailyGoalHours ?? null,
   createdAt: user.createdAt ? (user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt) : null,
   updatedAt: user.updatedAt ? (user.updatedAt instanceof Date ? user.updatedAt.toISOString() : user.updatedAt) : null,
+  xp: user.xp ?? 0,
+  level: user.level ?? 1,
 });
 
 
@@ -124,7 +128,10 @@ export const registerUser = TryCatch(async (req, res) => {
   const result = registerSchema.safeParse(req.body);
 
   if (!result.success) {
-    return res.status(400).json({ errors: result.error.flatten() });
+    return res.status(400).json({
+      message: 'Validation failed',
+      errors: result.error.flatten()
+    });
   }
   const { username, email, password } = result.data;
 
@@ -147,6 +154,8 @@ export const registerUser = TryCatch(async (req, res) => {
       email: true,
       dailyGoalHours: true,
       createdAt: true,
+      xp: true,
+      level: true,
     },
   });
 
@@ -228,7 +237,11 @@ export const getCurrentUser = TryCatch(async (req, res) => {
       username: true,
       email: true,
       dailyGoalHours: true,
-      createdAt: true
+      whatsappNumber: true,
+      whatsappVerified: true,
+      createdAt: true,
+      xp: true,
+      level: true
     },
   });
 
@@ -239,6 +252,53 @@ export const getCurrentUser = TryCatch(async (req, res) => {
   await safeSetUserCache(user.id, buildUserCachePayload(user));
 
   return res.json({ success: true, user });
+});
+
+export const getWhatsAppPairingCode = TryCatch(async (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) throw new ErrorHandler(401, 'Unauthorized');
+
+  const { id: userId } = decodeAccessToken(token);
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { whatsappPairingCode: true, whatsappVerified: true, whatsappNumber: true }
+  });
+
+  if (!user) throw new ErrorHandler(404, 'User not found');
+
+  if (user.whatsappVerified) {
+    return res.json({ success: true, verified: true, whatsappNumber: user.whatsappNumber });
+  }
+
+  let code = user.whatsappPairingCode;
+  if (!code) {
+    code = `PAIR-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    await prisma.user.update({
+      where: { id: userId },
+      data: { whatsappPairingCode: code }
+    });
+  }
+
+  return res.json({ success: true, pairingCode: code, verified: false });
+});
+
+export const unpairWhatsApp = TryCatch(async (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) throw new ErrorHandler(401, 'Unauthorized');
+
+  const { id: userId } = decodeAccessToken(token);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      whatsappNumber: null,
+      whatsappVerified: false,
+      whatsappPairingCode: null
+    }
+  });
+
+  return res.json({ success: true, message: 'WhatsApp unpaired successfully' });
 });
 
 export const updateProfile = TryCatch(async (req, res) => {

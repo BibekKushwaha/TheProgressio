@@ -30,7 +30,7 @@ export function AttachmentList({ attachments, taskId, editable = false }: Attach
     const formatFileSize = (size?: string | null) => {
         if (!size) return '';
         const bytes = parseInt(size);
-        if (isNaN(bytes)) return size;
+        if (Number.isNaN(bytes)) return size;
 
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;

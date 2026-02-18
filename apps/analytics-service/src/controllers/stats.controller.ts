@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { prisma } from "@repo/db";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
-import { predictTaskDuration, getCycleTimePercentiles } from "../services/prediction.service.js";
+import { predictTaskDuration, getCycleTimePercentiles, predictGrade } from "../services/prediction.service.js";
 import { generateSWOT, getSubjectPerformance } from "../services/swot.service.js";
 import { calculateCGPA, whatIfGPA, addCourseGrade, updateCourseGrade, deleteCourseGrade } from "../services/gpa.service.js";
 import { getPlannedVsActual, detectPeakProductivity, getPredictivePerformance } from "../services/focus.service.js";
@@ -872,6 +872,30 @@ export const getPrediction = async (req: AuthenticatedRequest, res: Response): P
     }
 };
 
+// Phase 3 — Grade Prediction (POST /stats/grade/predict)
+export const predictGradeEndpoint = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        const { subjectId, hoursPerWeek } = req.body;
+
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        if (!subjectId || !hoursPerWeek) {
+            res.status(400).json({ message: "subjectId and hoursPerWeek are required" });
+            return;
+        }
+
+        const prediction = await predictGrade(userId, subjectId as string, Number(hoursPerWeek));
+        res.status(200).json({ message: "Grade prediction generated", data: prediction });
+    } catch (error) {
+        console.error("Error predicting grade:", error);
+        res.status(500).json({ message: "Failed to predict grade", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
 // GET /stats/cycle-time
 export const getCycleTime = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
@@ -992,17 +1016,16 @@ export const getGPA = async (req: AuthenticatedRequest, res: Response): Promise<
                 credits: sem.credits ?? sem.totalCredits ?? 0,
             }));
 
-        const courses = normalizedRaw.courses
-            ? normalizedRaw.courses
-            : (normalizedRaw.semesters ?? []).flatMap((sem) =>
-                sem.courses.map((course) => ({
-                    courseName: course.courseName,
-                    credits: course.credits,
-                    gradePoint: course.gradePoint,
-                    grade: course.grade ?? undefined,
-                    semester: sem.semester,
-                }))
-            );
+        const courses = (normalizedRaw.semesters ?? []).flatMap((sem) =>
+            sem.courses.map((course) => ({
+                id: course.id,
+                courseName: course.courseName,
+                credits: course.credits,
+                gradePoint: course.gradePoint,
+                grade: course.grade ?? undefined,
+                semester: sem.semester,
+            }))
+        );
 
         // Normalize service response to UI/store contract shape.
         const result = {
@@ -1227,5 +1250,95 @@ export const getPredictivePerformanceEndpoint = async (req: AuthenticatedRequest
     } catch (error) {
         console.error("Error fetching predictive performance:", error);
         res.status(500).json({ message: "Failed to fetch predictive performance", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// Mock Exam Routines for internal generator
+const INTERNAL_EXAM_ROUTINES: Record<string, { subject: string; duration: number }[]> = {
+    JEE: [
+        { subject: 'Physics', duration: 150 },
+        { subject: 'Chemistry', duration: 120 },
+        { subject: 'Mathematics', duration: 180 },
+    ],
+    NEET: [
+        { subject: 'Physics', duration: 120 },
+        { subject: 'Chemistry', duration: 120 },
+        { subject: 'Biology (Botany)', duration: 90 },
+        { subject: 'Biology (Zoology)', duration: 90 },
+    ],
+    UPSC: [
+        { subject: 'General Studies', duration: 150 },
+        { subject: 'CSAT / Aptitude', duration: 90 },
+        { subject: 'Optional Subject', duration: 120 },
+    ],
+};
+
+/**
+ * Generates a prioritized revision schedule based on SWOT analysis.
+ * GET /stats/revision-schedule?examType=JEE
+ */
+export const getRevisionSchedule = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const examType = typeof req.query.examType === "string" ? req.query.examType : "JEE";
+        const swot = await generateSWOT(userId, examType);
+        const routine = INTERNAL_EXAM_ROUTINES[examType] || INTERNAL_EXAM_ROUTINES.JEE;
+
+        // Flatten all weaknesses and threats for selection
+        const priorityCandidates = swot.subjects.flatMap(s => [...s.weaknesses, ...s.threats]);
+
+        const blockTime = new Date();
+        blockTime.setHours(6, 0, 0, 0); // Start at 6 AM
+
+        const schedule = routine!.map((block, idx) => {
+            // Try to find a specific chapter for this subject from the priority list
+            const matchedChapter = priorityCandidates.find(c =>
+                c.subjectName.toLowerCase() === block.subject.toLowerCase()
+            );
+
+            // If no weakness found, pick a random "opportunity" or just a general review
+            const chapterName = matchedChapter?.chapter ?? "General Review";
+            const typeLabels: ("DPP" | "PYQ" | "REVISION")[] = ["DPP", "PYQ", "REVISION"];
+            const type = typeLabels[idx % 3]!;
+
+            const startTimeStr = blockTime.toTimeString().slice(0, 5);
+            blockTime.setMinutes(blockTime.getMinutes() + block.duration);
+
+            const item = {
+                id: `rev-${idx}-${Date.now()}`,
+                subject: block.subject,
+                chapter: chapterName,
+                type: type,
+                time: startTimeStr,
+                duration: block.duration,
+                completed: false
+            };
+
+            // Reset blockTime for next subject after a small break
+            blockTime.setMinutes(blockTime.getMinutes() + 15);
+
+            return item;
+        });
+
+        res.status(200).json({
+            message: `Revision schedule for ${examType} generated`,
+            examType,
+            schedule,
+            overallReadiness: swot.overallReadiness
+        });
+    } catch (error) {
+        console.error("Error generating revision schedule:", error);
+        res.status(500).json({
+            message: "Failed to generate revision schedule",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
 };

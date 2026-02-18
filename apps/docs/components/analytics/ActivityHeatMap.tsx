@@ -1,57 +1,47 @@
-import { useGetWeeklyTrendsQuery } from '@repo/store';
+import { useGetContributionHeatmapQuery } from '@repo/store';
 import { useMemo } from 'react';
-import { GenericHeatmap, type HeatmapDataPoint } from './GenericHeatmap';
+import { GenericHeatmap } from './GenericHeatmap';
 
-export function ActivityHeatmap({ pastDays }: { pastDays: string }) {
-    const parsedDays = Number.parseInt(pastDays, 10);
-    const weeks = Number.isFinite(parsedDays) && parsedDays > 0 ? Math.ceil(parsedDays / 7) : 12;
-
-    const { data: trendsResponse, isLoading } = useGetWeeklyTrendsQuery(undefined, {
-        pollingInterval: 30000,
+export function ActivityHeatmap({ _pastDays }: { _pastDays: string }) {
+    const { data: heatmapResponse, isLoading } = useGetContributionHeatmapQuery(undefined, {
+        pollingInterval: 60000,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
 
-    const trendsByDate = useMemo(() => {
-        const map = new Map<string, number>();
-        if (trendsResponse?.data) {
-            for (const entry of trendsResponse.data) {
-                map.set(entry.date, entry.minutes ?? 0);
-            }
-        }
-        return map;
-    }, [trendsResponse]);
-
     const heatmapData = useMemo(() => {
-        const data: HeatmapDataPoint[] = [];
-        const now = new Date();
-        const totalDays = weeks * 7;
+        if (!heatmapResponse?.heatmap) return [];
 
-        // Generate last N weeks of dates
-        for (let i = 0; i < totalDays; i++) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
-            const dateKey = d.toISOString().split('T')[0]!;
-
-            const minutes = trendsByDate.get(dateKey) ?? 0;
-            const intensity = minutes === 0 ? 0 : minutes < 30 ? 1 : minutes < 60 ? 2 : minutes < 120 ? 3 : 4;
-
-            data.push({
-                date: dateKey,
-                value: minutes,
-                intensity: intensity as 0 | 1 | 2 | 3 | 4
-            });
-        }
-        return data;
-    }, [trendsByDate, weeks]);
+        return heatmapResponse.heatmap.map(day => ({
+            date: day.date,
+            value: day.count,
+            intensity: day.intensity as 0 | 1 | 2 | 3 | 4
+        }));
+    }, [heatmapResponse]);
 
     return (
         <GenericHeatmap
-            title={<h2 className="text-2xl font-bold">Activity Heatmap</h2>}
+            title={
+                <div className="flex items-center justify-between w-full">
+                    <h2 className="text-2xl font-bold text-white">Activity Heatmap</h2>
+                    {heatmapResponse?.summary && (
+                        <div className="flex gap-4 text-right">
+                            <div>
+                                <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Consistency</div>
+                                <div className="text-sm font-bold text-cyan-400 font-mono">{heatmapResponse.summary.consistencyRate}%</div>
+                            </div>
+                            <div>
+                                <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Active Days</div>
+                                <div className="text-sm font-bold text-white font-mono">{heatmapResponse.summary.activeDays}</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            }
             data={heatmapData}
             isLoading={isLoading}
             colorTheme="cyan"
-            emptyMessage="No activity data recorded yet."
+            emptyMessage="No activity data recorded yet. Start tracking to see progress."
             reverseOrder={false}
         />
     );

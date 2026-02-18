@@ -1,6 +1,6 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useGetHabitStatsQuery } from "@repo/store"
 import { Loader2, Flame, Trophy, CheckCircle, Calendar, BarChart2 } from "lucide-react"
 
