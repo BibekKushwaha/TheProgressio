@@ -1,10 +1,10 @@
 "use client"
 import { useMemo, useState } from "react";
-import { HabitCard } from "@/components/habit/HabitCard";
-import HabitDialog from "@/components/habit/HabitDialog";
+import { HabitCard } from "../../../components/habit/HabitCard";
+import HabitDialog from "../../../components/habit/HabitDialog";
 import { useGetHabitsQuery } from "@repo/store";
-import { ContributionHeatmap } from "@/components/habit/ContributionHeatmap";
-import { UserLevelCard } from "@/components/habit/UserLevelCard";
+import { ContributionHeatmap } from "../../../components/habit/ContributionHeatmap";
+import { UserLevelCard } from "../../../components/habit/UserLevelCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SearchBar } from "@/components/SearchBar";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -96,24 +96,24 @@ export default function HabitsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredHabits.map((habit) => (
-                                <div key={habit.id} id={`habit-card-${habit.id}`}>
-                                    <HabitCard habit={habit} highlighted={habit.id === focusedHabitId} />
-                                </div>
-                            ))}
+                        <div key={habit.id} id={`habit-card-${habit.id}`}>
+                            <HabitCard habit={habit} highlighted={habit.id === focusedHabitId} />
                         </div>
-                    )}
+                    ))}
+                </div>
+            )}
 
 
-                    {/* Gamification & Mercy Day Row */}
-                    <div className="mt-10 mb-8">
-                        <UserLevelCard />
-                    </div>
+            {/* Gamification & Mercy Day Row */}
+            <div className="mt-10 mb-8">
+                <UserLevelCard />
+            </div>
 
 
-                    {/* Contribution Heatmap */}
-                    <div className="mb-8">
-                        <ContributionHeatmap />
-                    </div>
+            {/* Contribution Heatmap */}
+            <div className="mb-8">
+                <ContributionHeatmap />
+            </div>
         </div>
     );
 }
