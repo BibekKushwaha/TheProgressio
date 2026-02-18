@@ -1,10 +1,10 @@
 "use client"
 import { useMemo, useState } from "react";
-import { HabitCard } from "../../../components/habit/HabitCard";
-import HabitDialog from "../../../components/habit/HabitDialog";
+import { HabitCard } from "@/components/habit/HabitCard";
+import HabitDialog from "@/components/habit/HabitDialog";
 import { useGetHabitsQuery } from "@repo/store";
-import { ContributionHeatmap } from "../../../components/habit/ContributionHeatmap";
-import { UserLevelCard } from "../../../components/habit/UserLevelCard";
+import { ContributionHeatmap } from "@/components/habit/ContributionHeatmap";
+import { UserLevelCard } from "@/components/habit/UserLevelCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SearchBar } from "@/components/SearchBar";
 import { PageHeader } from "@/components/layout/PageHeader";
