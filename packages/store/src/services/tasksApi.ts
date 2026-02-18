@@ -108,6 +108,7 @@ export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
 
 export interface SyllabusScanItem {
     title: string;
+    description?: string;
     dueDate?: string;
     priority?: Priority;
     subject?: string;

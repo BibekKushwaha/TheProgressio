@@ -2,12 +2,14 @@
 
 import { useState, useRef } from 'react';
 import { Upload, FileText, Sparkles, Check, Loader2 } from 'lucide-react';
-import { useParseTaskMutation, useCreateTaskMutation, useScanSyllabusMutation, TaskStatus, PriorityEnum } from '@repo/store';
+import { useParseTaskMutation, useCreateTaskMutation, useScanSyllabusMutation, useGetCategoriesQuery, TaskStatus, PriorityEnum } from '@repo/store';
 
 interface ParsedItem {
     title: string;
+    description?: string;
     dueDate?: string;
     priority?: PriorityEnum;
+    subject?: string;
     selected: boolean;
 }
 
@@ -21,7 +23,9 @@ export function SyllabusDigitizer() {
     const [scanNotice, setScanNotice] = useState('');
     const [bulkIsRecurring, setBulkIsRecurring] = useState<boolean>(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { data: categories = [] } = useGetCategoriesQuery();
     const [parseTask] = useParseTaskMutation();
     const [scanSyllabus] = useScanSyllabusMutation();
     const [createTask] = useCreateTaskMutation();
@@ -40,8 +44,10 @@ export function SyllabusDigitizer() {
                     const result = await parseTask({ text: line }).unwrap();
                     results.push({
                         title: result.title || line.trim(),
+                        description: result.description,
                         dueDate: result.dueDate,
                         priority: result.priority,
+                        subject: result.subject,
                         selected: true,
                     });
                 } catch {
@@ -49,6 +55,15 @@ export function SyllabusDigitizer() {
                 }
             }
             setParsedItems(results);
+
+            // Auto-select category if subject matches
+            const firstSubject = results[0]?.subject;
+            if (firstSubject && categories) {
+                const match = categories.find(c =>
+                    c.name?.toLowerCase() === firstSubject.toLowerCase()
+                );
+                if (match) setSelectedCategoryId(match.id);
+            }
             if (results.length > 0) {
                 toast.success(`Extracted ${results.length} tasks from text`);
             }
@@ -96,10 +111,21 @@ export function SyllabusDigitizer() {
                     if (response.items.length > 0) {
                         setParsedItems(response.items.map((item) => ({
                             title: item.title,
+                            description: item.description,
                             dueDate: item.dueDate,
                             priority: item.priority,
+                            subject: item.subject,
                             selected: true,
                         })));
+
+                        // Auto-select category if subject matches
+                        const detectedSubject = response.items[0]?.subject;
+                        if (detectedSubject && categories) {
+                            const match = categories.find(c =>
+                                c.name?.toLowerCase() === detectedSubject.toLowerCase()
+                            );
+                            if (match) setSelectedCategoryId(match.id);
+                        }
                         setTextInput('');
                         setScanNotice(`Extracted ${response.items.length} item(s) from ${file.name}.`);
                         toast.success(`Found ${response.items.length} milestones!`, { id: 'scan-syllabus' });
@@ -156,10 +182,12 @@ export function SyllabusDigitizer() {
             for (const item of selected) {
                 const payload: CreateTaskInput = {
                     title: item.title,
+                    description: item.description,
                     dueDate: item.dueDate,
                     priority: item.priority ?? PriorityEnum.MEDIUM,
                     status: TaskStatus.PENDING,
                     isRecurring: bulkIsRecurring,
+                    categoryId: selectedCategoryId || undefined,
                 };
                 await createTask(payload).unwrap();
             }
@@ -299,6 +327,11 @@ export function SyllabusDigitizer() {
                                             }`}>
                                             {item.title}
                                         </p>
+                                        {item.description && (
+                                            <p className="text-[11px] text-slate-500 mb-2 line-clamp-2 leading-relaxed">
+                                                {item.description}
+                                            </p>
+                                        )}
                                         <div className="flex flex-wrap items-center gap-2">
                                             {item.priority && (
                                                 <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${item.priority === 'HIGH' ? 'bg-red-500/20 text-red-300' :
@@ -321,24 +354,41 @@ export function SyllabusDigitizer() {
                     )}
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between gap-4">
-                    <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-white transition-colors">
-                        <input
-                            type="checkbox"
-                            checked={bulkIsRecurring}
-                            onChange={(e) => setBulkIsRecurring(e.target.checked)}
-                            className="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/50"
-                        />
-                        <span>Mark as Recurring</span>
-                    </label>
+                <div className="mt-6 pt-4 border-t border-white/5 flex flex-col gap-4">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-white transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={bulkIsRecurring}
+                                    onChange={(e) => setBulkIsRecurring(e.target.checked)}
+                                    className="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/50"
+                                />
+                                <span>Mark as Recurring</span>
+                            </label>
 
-                    <button
-                        onClick={handleBulkCreate}
-                        disabled={isCreating || parsedItems.filter(p => p.selected).length === 0}
-                        className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-cyan-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-lg shadow-white/5"
-                    >
-                        {isCreating ? 'Creating...' : 'Create Tasks'}
-                    </button>
+                            <div className="h-4 w-px bg-white/10 hidden sm:block" />
+
+                            <select
+                                value={selectedCategoryId}
+                                onChange={(e) => setSelectedCategoryId(e.target.value)}
+                                className="bg-white/5 border border-white/10 rounded-lg text-xs text-slate-300 px-3 py-1.5 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                            >
+                                <option value="">No Category</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <button
+                            onClick={handleBulkCreate}
+                            disabled={isCreating || parsedItems.filter(p => p.selected).length === 0}
+                            className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-cyan-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-lg shadow-white/5"
+                        >
+                            {isCreating ? 'Creating...' : 'Create Tasks'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

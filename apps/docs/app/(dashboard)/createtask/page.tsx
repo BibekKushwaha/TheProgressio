@@ -23,6 +23,7 @@ import {
     useGetCategoriesQuery,
     useCreateCategoryMutation,
     useAddGradeEntryMutation,
+    useCreateExamMutation,
     useAppDispatch
 } from '@repo/store';
 
@@ -43,14 +44,18 @@ function CreateTaskPageContent() {
 
     // Exam Mode State
     const [entryType, setEntryType] = useState<'task' | 'exam'>('task');
+    const [examSubMode, setExamSubMode] = useState<'schedule' | 'result'>('schedule');
     const [examType, setExamType] = useState('Midterm');
     const [obtainedMarks, setObtainedMarks] = useState('');
     const [totalMarks, setTotalMarks] = useState('100');
     const [chapter, setChapter] = useState('');
+    const [examLocation, setExamLocation] = useState('');
+    const [examDuration, setExamDuration] = useState('120');
     const [showManualDetails, setShowManualDetails] = useState(true);
     const [aiSubtaskEnabled, setAiSubtaskEnabled] = useState(false);
 
     const [addGradeEntry, { isLoading: isAddingGrade }] = useAddGradeEntryMutation();
+    const [createExam, { isLoading: isCreatingExam }] = useCreateExamMutation();
 
     const { data: existingTask, isLoading: isLoadingTask } = useGetTaskByIdQuery(taskId || '', {
         skip: !taskId,
@@ -60,21 +65,19 @@ function CreateTaskPageContent() {
     const [previewSubtasks] = usePreviewSubtasksMutation();
     const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
     const [updateTask, { isLoading: isUpdating }] = useUpdateTaskMutation();
-    const [createCategory] = useCreateCategoryMutation(); // Initialize category mutation
+    const [createCategory] = useCreateCategoryMutation();
 
     const { data: categories } = useGetCategoriesQuery();
     useEffect(() => {
         if (existingTask) {
             setTaskDescription(existingTask.title);
             setDescription(existingTask.description || '');
-            // Map priority
             if (existingTask.priority === PriorityEnum.LOW) setSelectedPriority('Routine');
             else if (existingTask.priority === PriorityEnum.MEDIUM) setSelectedPriority('Medium');
             else if (existingTask.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
 
             if (existingTask.categoryId) setSelectedSubjectId(existingTask.categoryId);
 
-            // Set subtasks if they exist
             if (existingTask.subtasks) {
                 setSubtasks(existingTask.subtasks.map(s => ({
                     id: s.id,
@@ -103,20 +106,16 @@ function CreateTaskPageContent() {
                             time: result.dueDate ? new Date(result.dueDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : undefined
                         });
 
-                        // Only auto-update date if AI found one
                         if (result.dueDate) {
                             setParsedDueDate(result.dueDate);
                         }
 
-                        // Auto-select priority if parsed
                         if (result.priority === PriorityEnum.LOW) setSelectedPriority('Routine');
                         else if (result.priority === PriorityEnum.MEDIUM) setSelectedPriority('Medium');
                         else if (result.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
 
-                        // Auto-select effort if parsed
                         if (result.effort) setSelectedEffort(result.effort);
 
-                        // If subject matches an existing category, select it
                         if (result.subject && categories) {
                             const matchedCategory = categories.find(c => c.name.toLowerCase() === result.subject?.toLowerCase());
                             if (matchedCategory) {
@@ -129,7 +128,6 @@ function CreateTaskPageContent() {
                 }
             } else {
                 setParsedMeta({});
-                // Don't clear manually set due date even if title is short
             }
         }, 500);
 
@@ -154,28 +152,51 @@ function CreateTaskPageContent() {
 
             if (entryType === 'exam') {
                 if (!taskDescription) {
-                    toast('Please enter a subject name', 'error');
-                    return;
-                }
-                const marks = parseFloat(obtainedMarks);
-                const total = parseFloat(totalMarks);
-
-                if (Number.isNaN(marks) || Number.isNaN(total) || total <= 0) {
-                    toast('Please enter valid marks', 'error');
+                    toast('Please enter an exam title or subject', 'error');
                     return;
                 }
 
-                await addGradeEntry({
-                    examType,
-                    subjectName: parsedMeta.subject || taskDescription, // Prefer parsed subject if available
-                    chapter: chapter || undefined,
-                    obtainedMarks: marks,
-                    totalMarks: total,
-                }).unwrap();
+                if (examSubMode === 'result') {
+                    const marks = parseFloat(obtainedMarks);
+                    const total = parseFloat(totalMarks);
 
-                toast('✅ Exam result logged!', 'success');
+                    if (Number.isNaN(marks) || Number.isNaN(total) || total <= 0) {
+                        toast('Please enter valid marks', 'error');
+                        return;
+                    }
+
+                    await addGradeEntry({
+                        examType,
+                        subjectName: parsedMeta.subject || taskDescription,
+                        chapter: chapter || undefined,
+                        obtainedMarks: marks,
+                        totalMarks: total,
+                    }).unwrap();
+
+                    toast('✅ Exam result logged!', 'success');
+                    router.push('/exam-warroom');
+                } else {
+                    // Schedule Upcoming Exam
+                    if (!parsedDueDate) {
+                        toast('Please specify an exam date', 'error');
+                        return;
+                    }
+
+                    await createExam({
+                        title: taskDescription,
+                        date: parsedDueDate,
+                        durationMinutes: parseInt(examDuration),
+                        location: examLocation || undefined,
+                        subjectName: parsedMeta.subject || taskDescription,
+                        subjectId: typeof selectedSubjectId === 'string' ? selectedSubjectId : undefined,
+                        priority: 'HIGH'
+                    }).unwrap();
+
+                    toast('🗓️ Exam scheduled!', 'success');
+                    router.push('/calendar');
+                }
+
                 if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
-                router.push('/exam-warroom');
                 return;
             }
 
@@ -296,7 +317,7 @@ function CreateTaskPageContent() {
         setParsedDueDate(new Date(`${safeDate}T${safeTime}`).toISOString());
     };
 
-    const isSubmitting = isCreating || isSmartCreating || isUpdating || isAddingGrade;
+    const isSubmitting = isCreating || isSmartCreating || isUpdating || isAddingGrade || isCreatingExam;
 
     return (
         <div className="min-h-screen bg-slate-950 text-white relative overflow-x-hidden selection:bg-purple-500/30">
@@ -534,49 +555,113 @@ function CreateTaskPageContent() {
                                 </>
                             ) : (
                                 <div className="space-y-4 border-t border-white/10 pt-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Exam Type</Label>
-                                        <select
-                                            value={examType}
-                                            onChange={(e) => setExamType(e.target.value)}
-                                            className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
-                                        >
-                                            <option value="Midterm">Midterm</option>
-                                            <option value="Final">Final</option>
-                                            <option value="Quiz">Quiz</option>
-                                            <option value="Assignment">Assignment</option>
-                                            <option value="UnitTest">Unit Test</option>
-                                        </select>
+                                    <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10 mb-2">
+                                        {[
+                                            { id: 'schedule', label: 'Schedule Exam' },
+                                            { id: 'result', label: 'Log Result' }
+                                        ].map((sub) => (
+                                            <button
+                                                key={sub.id}
+                                                type="button"
+                                                onClick={() => setExamSubMode(sub.id as 'schedule' | 'result')}
+                                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${examSubMode === sub.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-400 hover:text-slate-200'}`}
+                                            >
+                                                {sub.label}
+                                            </button>
+                                        ))}
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Chapter (Optional)</Label>
-                                        <Input
-                                            value={chapter}
-                                            onChange={(e) => setChapter(e.target.value)}
-                                            placeholder="e.g. Thermodynamics"
-                                            className="bg-white/5 border-white/10 h-12"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Marks (Obtained / Total)</Label>
-                                        <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
-                                            <Input
-                                                type="number"
-                                                value={obtainedMarks}
-                                                onChange={(e) => setObtainedMarks(e.target.value)}
-                                                placeholder="85"
-                                                className="bg-white/5 border-white/10 h-12"
-                                            />
-                                            <span className="text-slate-400">/</span>
-                                            <Input
-                                                type="number"
-                                                value={totalMarks}
-                                                onChange={(e) => setTotalMarks(e.target.value)}
-                                                placeholder="100"
-                                                className="bg-white/5 border-white/10 h-12"
-                                            />
-                                        </div>
-                                    </div>
+
+                                    {examSubMode === 'result' ? (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Exam Type</Label>
+                                                <select
+                                                    value={examType}
+                                                    onChange={(e) => setExamType(e.target.value)}
+                                                    className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                                                >
+                                                    <option value="Midterm">Midterm</option>
+                                                    <option value="Final">Final</option>
+                                                    <option value="Quiz">Quiz</option>
+                                                    <option value="Assignment">Assignment</option>
+                                                    <option value="UnitTest">Unit Test</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Chapter (Optional)</Label>
+                                                <Input
+                                                    value={chapter}
+                                                    onChange={(e) => setChapter(e.target.value)}
+                                                    placeholder="e.g. Thermodynamics"
+                                                    className="bg-white/5 border-white/10 h-12"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Marks (Obtained / Total)</Label>
+                                                <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+                                                    <Input
+                                                        type="number"
+                                                        value={obtainedMarks}
+                                                        onChange={(e) => setObtainedMarks(e.target.value)}
+                                                        placeholder="85"
+                                                        className="bg-white/5 border-white/10 h-12"
+                                                    />
+                                                    <span className="text-slate-400">/</span>
+                                                    <Input
+                                                        type="number"
+                                                        value={totalMarks}
+                                                        onChange={(e) => setTotalMarks(e.target.value)}
+                                                        placeholder="100"
+                                                        className="bg-white/5 border-white/10 h-12"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-2">
+                                                    <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Exam Date</Label>
+                                                    <Input
+                                                        type="date"
+                                                        value={dueDateValue}
+                                                        onChange={(e) => updateDueDateTime(e.target.value, dueTimeValue)}
+                                                        className="h-12 bg-white/5 border-white/10"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Time</Label>
+                                                    <Input
+                                                        type="time"
+                                                        value={dueTimeValue}
+                                                        onChange={(e) => updateDueDateTime(dueDateValue, e.target.value)}
+                                                        className="h-12 bg-white/5 border-white/10"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-2">
+                                                    <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Location</Label>
+                                                    <Input
+                                                        value={examLocation}
+                                                        onChange={(e) => setExamLocation(e.target.value)}
+                                                        placeholder="e.g. Hall A"
+                                                        className="bg-white/5 border-white/10 h-12"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Duration (Mins)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={examDuration}
+                                                        onChange={(e) => setExamDuration(e.target.value)}
+                                                        placeholder="180"
+                                                        className="bg-white/5 border-white/10 h-12"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
 

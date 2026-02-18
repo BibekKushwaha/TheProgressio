@@ -36,10 +36,24 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
     const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[PriorityEnum.LOW];
     const categoryName = task.category?.name || 'No Category';
 
-    const formatDate = (dateString: string | null) => {
-        if (!dateString) return 'No Date';
-        return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const formatDueDate = (dueDate?: string | null) => {
+        if (!dueDate) return 'No due date';
+        const date = new Date(dueDate);
+        const now = new Date();
+
+        const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const d2 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
+        if (diffDays === 0) return 'Due today';
+        if (diffDays === 1) return 'Due tomorrow';
+        if (diffDays <= 7) return `${diffDays}d left`;
+
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
+
+    const isOverdue = !completed && task.dueDate && new Date(task.dueDate) < new Date() && formatDueDate(task.dueDate).includes('overdue');
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -128,9 +142,9 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
             </div>
 
             <div className="flex items-center gap-4 relative z-10">
-                <div className="hidden sm:flex items-center gap-2 text-sm text-slate-400">
-                    <Calendar className="w-4 h-4" />
-                    <span>{formatDate(task.dueDate)}</span>
+                <div className={`hidden sm:flex items-center gap-2 text-sm ${isOverdue ? 'text-rose-400 font-bold' : 'text-slate-400'}`}>
+                    <Calendar className={`w-4 h-4 ${isOverdue ? 'text-rose-400 animate-pulse' : ''}`} />
+                    <span>{formatDueDate(task.dueDate)}</span>
                 </div>
 
                 <DropdownMenu>
