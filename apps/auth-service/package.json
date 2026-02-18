@@ -17,6 +17,7 @@
   "dependencies": {
     "@repo/db": "*",
     "@repo/schemas": "*",
+    "@repo/cache": "*",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.2",
     "cookie-parser": "^1.4.7",
