@@ -71,7 +71,7 @@ Each service creates its own PrismaClient instance from its local generated clie
 ## Cross-Service Communication
 
 Services communicate via:
-- **Kafka events** (task.created, task.completed, etc.)
+- **BullMQ events** (task.created, task.completed, etc. via Redis)
 - **HTTP APIs** (service-to-service with internal auth)
 - **userId as opaque string** (no cross-DB foreign keys)
 

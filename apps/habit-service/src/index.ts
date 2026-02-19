@@ -6,7 +6,7 @@ import { enforceReadOnlyWrites, isAuth } from "./middleware/auth.middleware.js";
 import habitRouter from "./routes/habit.route.js";
 import { dispatchNudges, getInternalActiveDates, handleHabitEvent } from "./controllers/habit.controller.js";
 import { requireInternalDispatchAuth, requireInternalReadAuth, requireInternalSignature } from "./middleware/internal.middleware.js";
-import { habitConsumer, shutdownConsumer } from "./services/consumer.service.js";
+import { shutdownWorker } from "./services/worker.service.js";
 
 
 export const app = express();
@@ -38,20 +38,12 @@ if (process.env.NODE_ENV !== 'test') {
     app.listen(PORT, async () => {
         console.log(`🚀 Habit service running on port ${PORT}`);
         console.log(`🔗 Accepting requests from: ${FRONTEND_URL}`);
-
-        // Start Kafka consumer for async habit automation
-        try {
-            await habitConsumer.connect();
-            await habitConsumer.run();
-        } catch (error) {
-            console.error("❌ Failed to start habit Kafka consumer — HTTP fallback still active:", error);
-        }
     });
 
     // Graceful shutdown
     const gracefulShutdown = async () => {
         console.log("🔄 Shutting down habit-service...");
-        await shutdownConsumer();
+        await shutdownWorker();
         process.exit(0);
     };
 

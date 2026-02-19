@@ -1,5 +1,5 @@
 /**
- * Unit tests for Kafka consumer message processing
+ * Unit tests for BullMQ worker event processing
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -16,154 +16,124 @@ vi.mock('../src/services/streak.service.js', () => ({
   xpToNextLevel: vi.fn(),
 }))
 
-import { processMessage } from '../src/services/consumer.service.js'
+import { processEvent } from '../src/services/worker.service.js'
 import { autoLogHabitFromCategory } from '../src/services/streak.service.js'
 
-function makeMessage(value: Record<string, unknown> | null) {
-  return {
-    topic: 'planner.habit.triggers',
-    partition: 0,
-    message: {
-      key: null,
-      value: value ? Buffer.from(JSON.stringify(value)) : null,
-      timestamp: Date.now().toString(),
-      attributes: 0,
-      offset: '0',
-      size: 0,
-      headers: {},
-    },
-    heartbeat: vi.fn(),
-    pause: vi.fn(),
-  } as any
-}
-
-describe('processMessage', () => {
+describe('processEvent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('processes task.completed events with categoryId', async () => {
-    await processMessage(makeMessage({
+    await processEvent({
       eventType: 'task.completed',
       taskId: 'task-1',
       userId: 'user-1',
       timestamp: new Date().toISOString(),
       payload: { categoryId: 'cat-1' },
-    }))
+    } as any)
 
     expect(autoLogHabitFromCategory).toHaveBeenCalledWith('user-1', 'cat-1')
   })
 
   it('skips task.created events', async () => {
-    await processMessage(makeMessage({
+    await processEvent({
       eventType: 'task.created',
       taskId: 'task-1',
       userId: 'user-1',
       timestamp: new Date().toISOString(),
       payload: {},
-    }))
+    } as any)
 
     expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
   })
 
   it('skips events without userId', async () => {
-    await processMessage(makeMessage({
+    await processEvent({
       eventType: 'task.completed',
       taskId: 'task-1',
       userId: '',
       timestamp: new Date().toISOString(),
       payload: { categoryId: 'cat-1' },
-    }))
+    } as any)
 
     expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
   })
 
   it('skips events without categoryId', async () => {
-    await processMessage(makeMessage({
+    await processEvent({
       eventType: 'task.completed',
       taskId: 'task-1',
       userId: 'user-1',
       timestamp: new Date().toISOString(),
       payload: {},
-    }))
+    } as any)
 
     expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
   })
 
   it('skips empty messages gracefully', async () => {
-    await expect(processMessage(makeMessage(null))).resolves.toBeUndefined()
+    await expect(processEvent(null as any)).resolves.toBeUndefined()
     expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
   })
 
-  it('handles malformed JSON gracefully', async () => {
+  it('handles invalid objects gracefully', async () => {
     const payload = {
-      topic: 'planner.habit.triggers',
-      partition: 0,
-      message: {
-        key: null,
-        value: Buffer.from('NOT VALID JSON'),
-        timestamp: Date.now().toString(),
-        attributes: 0,
-        offset: '0',
-        size: 0,
-        headers: {},
-      },
-      heartbeat: vi.fn(),
-      pause: vi.fn(),
+      not_a_task_event: true,
     } as any
 
-    await expect(processMessage(payload)).resolves.toBeUndefined()
+    await expect(processEvent(payload)).resolves.toBeUndefined()
     expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
   })
 
-  it('handles autoLogHabitFromCategory errors without throwing', async () => {
+  it('handles autoLogHabitFromCategory errors by re-throwing', async () => {
     vi.mocked(autoLogHabitFromCategory).mockRejectedValueOnce(new Error('DB error'))
 
     await expect(
-      processMessage(makeMessage({
+      processEvent({
         eventType: 'task.completed',
         taskId: 'task-1',
         userId: 'user-1',
         timestamp: new Date().toISOString(),
         payload: { categoryId: 'cat-1' },
-      }))
-    ).resolves.toBeUndefined() // should not throw
+      } as any)
+    ).rejects.toThrow('DB error')
   })
 
   // ── task.updated tests ────────────────────────────────────────────────
 
   it('task.updated — auto-logs habits when categoryId changes', async () => {
-    await processMessage(makeMessage({
+    await processEvent({
       eventType: 'task.updated',
       taskId: 'task-1',
       userId: 'user-1',
       timestamp: new Date().toISOString(),
       payload: { changedFields: { categoryId: 'cat-new' } },
-    }))
+    } as any)
 
     expect(autoLogHabitFromCategory).toHaveBeenCalledWith('user-1', 'cat-new')
   })
 
   it('task.updated — skips when no categoryId change', async () => {
-    await processMessage(makeMessage({
+    await processEvent({
       eventType: 'task.updated',
       taskId: 'task-1',
       userId: 'user-1',
       timestamp: new Date().toISOString(),
       payload: { changedFields: { title: 'New Title' } },
-    }))
+    } as any)
 
     expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
   })
 
   it('task.updated — skips when categoryId is null', async () => {
-    await processMessage(makeMessage({
+    await processEvent({
       eventType: 'task.updated',
       taskId: 'task-1',
       userId: 'user-1',
       timestamp: new Date().toISOString(),
       payload: { changedFields: { categoryId: null } },
-    }))
+    } as any)
 
     expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
   })
@@ -171,13 +141,13 @@ describe('processMessage', () => {
   // ── task.deleted tests ────────────────────────────────────────────────
 
   it('task.deleted — does not log habits (audit only)', async () => {
-    await processMessage(makeMessage({
+    await processEvent({
       eventType: 'task.deleted',
       taskId: 'task-1',
       userId: 'user-1',
       timestamp: new Date().toISOString(),
       payload: {},
-    }))
+    } as any)
 
     expect(autoLogHabitFromCategory).not.toHaveBeenCalled()
   })
