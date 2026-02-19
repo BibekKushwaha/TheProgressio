@@ -195,7 +195,6 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
                     clearInterval(interval);
-                    handleSessionEnd();
                     return 0;
                 }
                 return prev - 1;
@@ -203,7 +202,14 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [isPaused, handleSessionEnd]);
+    }, [isPaused]); // Removed handleSessionEnd from deps to avoid re-triggering interval weirdly if it changes
+
+    // Handle session end when timer hits zero
+    useEffect(() => {
+        if (timeLeft <= 0 && !isPaused) {
+            handleSessionEnd();
+        }
+    }, [timeLeft, isPaused, handleSessionEnd]);
 
     useEffect(() => {
         if (!liveSessionId || isPaused) return;

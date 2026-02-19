@@ -20,6 +20,7 @@ export interface ParsedTaskIntent {
     priority?: "LOW" | "MEDIUM" | "HIGH";
     subject?: string;
     effort?: string;
+    isRecurring?: boolean;
     type?: "ASSIGNMENT" | "EXAM" | "STUDY_GOAL";
 }
 
@@ -724,6 +725,10 @@ export class AIService {
             }
         }
 
+        // Recurring Detection
+        const recurringKeywords = ["every", "weekly", "daily", "monthly", "each", "recurring", "repeat"];
+        const isRecurring = recurringKeywords.some(kw => normalizedText.includes(kw));
+
         // Date & Time Detection
         let dueDate: Date | undefined = undefined;
         const now = new Date();
@@ -797,7 +802,8 @@ export class AIService {
             priority: isHighPriority ? "HIGH" : isLowPriority ? "LOW" : "MEDIUM",
             type: isExam ? "EXAM" : isStudy ? "STUDY_GOAL" : "ASSIGNMENT",
             subject: formattedSubject,
-            effort: effort
+            effort: effort,
+            isRecurring: isRecurring,
         };
 
         if (dueDate) {

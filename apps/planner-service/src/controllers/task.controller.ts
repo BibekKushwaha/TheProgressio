@@ -195,7 +195,7 @@ export const createTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         throw new ErrorHandler(400, titleIssue ? "Title is required" : "Invalid task payload");
     }
 
-    const { title, description, status, priority, categoryId, dueDate, isRecurring, subjectId } = parsed.data;
+    const { title, description, status, priority, categoryId, dueDate, isRecurring, subjectId, effort } = parsed.data;
 
     const task = await prisma.task.create({
         data: {
@@ -205,6 +205,7 @@ export const createTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
             priority,
             dueDate: dueDate ?? null,
             isRecurring: isRecurring ?? false,
+            effort: effort ?? null,
             userId,
             categoryId: categoryId || null,
             subjectId: subjectId || null,
@@ -337,6 +338,7 @@ export const updateTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
             ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
             ...(updates.isRecurring !== undefined && { isRecurring: updates.isRecurring }),
             ...(updates.categoryId !== undefined && { categoryId: updates.categoryId || null }),
+            ...(updates.effort !== undefined && { effort: updates.effort || null }),
         },
     });
 
@@ -545,6 +547,8 @@ export const createTaskFromText = async ({
             priority: (parsedData.priority as Priority) || Priority.MEDIUM,
             status: Status.PENDING,
             dueDate: parsedData.dueDate || null,
+            effort: parsedData.effort || null,
+            isRecurring: parsedData.isRecurring || false,
             userId,
         }
     });

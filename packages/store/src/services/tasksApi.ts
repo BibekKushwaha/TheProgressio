@@ -85,6 +85,7 @@ export interface Task {
     priority: Priority;
     dueDate: string | null;
     isRecurring: boolean;
+    effort: string | null;
     userId: string;
     categoryId: string | null;
     category?: Category | null;
@@ -100,6 +101,7 @@ export interface CreateTaskRequest {
     categoryId?: string;
     dueDate?: string;
     isRecurring?: boolean;
+    effort?: string;
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
@@ -380,6 +382,7 @@ export const tasksApi = createApi({
             priority?: Priority;
             subject?: string;
             effort?: string;
+            isRecurring?: boolean;
             type?: string;
         }, { text: string }>({
             query: (body) => ({

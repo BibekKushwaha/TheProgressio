@@ -117,3 +117,95 @@ export const deleteHoliday = TryCatch(async (req: AuthenticatedRequest, res: Res
 
     return res.status(200).json({ message: "Holiday deleted" });
 });
+
+// Timetable Entry CRUD
+export const createTimetableEntry = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { dayOfWeek, startTime, endTime, subjectId, rotation } = req.body;
+
+    if (dayOfWeek === undefined || !startTime || !endTime || !subjectId) {
+        throw new ErrorHandler(400, "dayOfWeek, startTime, endTime, subjectId are required");
+    }
+
+    const entry = await timetableService.createTimetableEntry({
+        userId,
+        dayOfWeek: Number(dayOfWeek),
+        startTime,
+        endTime,
+        subjectId,
+        rotation,
+    });
+
+    return res.status(201).json(entry);
+});
+
+export const updateTimetableEntry = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+    const { dayOfWeek, startTime, endTime, subjectId, rotation } = req.body;
+
+    const data: any = {};
+    if (dayOfWeek !== undefined) data.dayOfWeek = Number(dayOfWeek);
+    if (startTime !== undefined) data.startTime = startTime;
+    if (endTime !== undefined) data.endTime = endTime;
+    if (subjectId !== undefined) data.subjectId = subjectId;
+    if (rotation !== undefined) data.rotation = rotation === "" ? null : rotation;
+
+    const entry = await timetableService.updateTimetableEntry({
+        id: id as string,
+        userId,
+        data
+    });
+
+    return res.status(200).json(entry);
+});
+
+export const deleteTimetableEntry = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    const removed = await timetableService.deleteTimetableEntry({ id: id as string, userId });
+    if (removed.count === 0) {
+        throw new ErrorHandler(404, "Entry not found");
+    }
+
+    return res.status(200).json({ message: "Entry deleted" });
+});
+
+// Subject CRUD
+export const listSubjects = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const subjects = await timetableService.listSubjects(userId);
+    return res.status(200).json(subjects);
+});
+
+export const createSubject = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { name, color, room, teacher } = req.body;
+
+    if (!name) {
+        throw new ErrorHandler(400, "name is required");
+    }
+
+    const subject = await timetableService.createSubject({
+        userId,
+        name,
+        color,
+        room,
+        teacher,
+    });
+
+    return res.status(201).json(subject);
+});
+
+export const deleteSubject = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    const removed = await timetableService.deleteSubject({ id: id as string, userId });
+    if (removed.count === 0) {
+        throw new ErrorHandler(404, "Subject not found");
+    }
+
+    return res.status(200).json({ message: "Subject deleted" });
+});

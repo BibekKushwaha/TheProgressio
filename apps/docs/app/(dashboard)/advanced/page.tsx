@@ -7,10 +7,12 @@ import { SWOTAnalysis } from '@/components/analytics/SWOTAnalysis';
 import { ProductivityInsights } from '@/components/analytics/ProductivityInsights';
 import { NotificationCenter } from '@/components/habit/NotificationCenter';
 import { RotationManager } from '@/components/planner/RotationManager';
+import { ClassManager } from '@/components/planner/ClassManager';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Bell,
+    Calendar,
     GraduationCap,
     RotateCw,
     Sparkles,
@@ -18,7 +20,7 @@ import {
     TrendingUp,
 } from 'lucide-react';
 
-type TabId = 'gpa' | 'swot' | 'insights' | 'notifications' | 'rotations';
+type TabId = 'gpa' | 'swot' | 'insights' | 'notifications' | 'rotations' | 'timetable';
 
 const TAB_ITEMS: Array<{
     id: TabId;
@@ -31,6 +33,7 @@ const TAB_ITEMS: Array<{
         { id: 'insights', label: 'Productivity AI', icon: TrendingUp, tone: 'from-fuchsia-500/20 to-purple-500/10 border-fuchsia-400/20' },
         { id: 'notifications', label: 'Nudge Center', icon: Bell, tone: 'from-pink-500/20 to-rose-500/10 border-pink-400/20' },
         { id: 'rotations', label: 'Rotation Ops', icon: RotateCw, tone: 'from-cyan-500/20 to-sky-500/10 border-cyan-400/20' },
+        { id: 'timetable', label: 'Class Master', icon: Calendar, tone: 'from-emerald-500/20 to-teal-500/10 border-emerald-400/20' },
     ];
 
 export default function AdvancedFeaturesPage() {
@@ -112,6 +115,10 @@ export default function AdvancedFeaturesPage() {
 
                     <TabsContent value="rotations" className="space-y-6">
                         <RotationManager />
+                    </TabsContent>
+
+                    <TabsContent value="timetable" className="space-y-6">
+                        <ClassManager />
                     </TabsContent>
                 </Tabs>
 

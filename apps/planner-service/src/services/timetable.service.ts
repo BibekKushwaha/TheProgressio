@@ -270,6 +270,96 @@ export class TimetableService {
             where: { id: params.id, userId: params.userId },
         });
     }
+
+    // Timetable Entry CRUD
+    async createTimetableEntry(params: {
+        userId: string;
+        dayOfWeek: number;
+        startTime: string;
+        endTime: string;
+        subjectId: string;
+        rotation?: string;
+    }) {
+        return prisma.timetable.create({
+            data: {
+                userId: params.userId,
+                dayOfWeek: params.dayOfWeek,
+                startTime: params.startTime,
+                endTime: params.endTime,
+                subjectId: params.subjectId,
+                rotation: params.rotation || null,
+            },
+            include: {
+                subject: true
+            }
+        });
+    }
+
+    async updateTimetableEntry(params: {
+        id: string;
+        userId: string;
+        data: {
+            dayOfWeek?: number;
+            startTime?: string;
+            endTime?: string;
+            subjectId?: string;
+            rotation?: string | null;
+        };
+    }) {
+        return prisma.timetable.update({
+            where: { id: params.id, userId: params.userId },
+            data: params.data,
+            include: {
+                subject: true
+            }
+        });
+    }
+
+    async deleteTimetableEntry(params: { id: string; userId: string }) {
+        return prisma.timetable.deleteMany({
+            where: { id: params.id, userId: params.userId },
+        });
+    }
+
+    // Subject CRUD
+    async listSubjects(userId: string) {
+        return prisma.subject.findMany({
+            where: { userId },
+            orderBy: { name: "asc" },
+        });
+    }
+
+    async createSubject(params: { userId: string; name: string; color?: string; room?: string; teacher?: string }) {
+        const updateData: any = {};
+        if (params.color !== undefined) updateData.color = params.color;
+        if (params.room !== undefined) updateData.room = params.room;
+        if (params.teacher !== undefined) updateData.teacher = params.teacher;
+
+        const createData: any = {
+            userId: params.userId,
+            name: params.name,
+            color: params.color || "#3B82F6",
+        };
+        if (params.room !== undefined) createData.room = params.room;
+        if (params.teacher !== undefined) createData.teacher = params.teacher;
+
+        return prisma.subject.upsert({
+            where: {
+                userId_name: {
+                    userId: params.userId,
+                    name: params.name
+                }
+            },
+            update: updateData,
+            create: createData as any
+        });
+    }
+
+    async deleteSubject(params: { id: string; userId: string }) {
+        return prisma.subject.deleteMany({
+            where: { id: params.id, userId: params.userId },
+        });
+    }
 }
 
 export const timetableService = new TimetableService();

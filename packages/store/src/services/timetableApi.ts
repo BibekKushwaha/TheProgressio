@@ -66,7 +66,7 @@ export const timetableApi = createApi({
             return headers;
         },
     }),
-    tagTypes: ['Timetable'],
+    tagTypes: ['Timetable', 'Subjects'],
     endpoints: (builder) => ({
         getDailySchedule: builder.query<DailySchedule, { date?: string } | void>({
             query: (params) => ({
@@ -76,6 +76,55 @@ export const timetableApi = createApi({
             }),
             providesTags: ['Timetable'],
         }),
+        // Timetable Entry CRUD
+        createTimetableEntry: builder.mutation<TimetableEntry, { dayOfWeek: number; startTime: string; endTime: string; subjectId: string; rotation?: string | null }>({
+            query: (body) => ({
+                url: '/entries',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Timetable'],
+        }),
+        updateTimetableEntry: builder.mutation<TimetableEntry, { id: string; dayOfWeek?: number; startTime?: string; endTime?: string; subjectId?: string; rotation?: string | null }>({
+            query: ({ id, ...body }) => ({
+                url: `/entries/${id}`,
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: ['Timetable'],
+        }),
+        deleteTimetableEntry: builder.mutation<{ message: string }, string>({
+            query: (id) => ({
+                url: `/entries/${id}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: ['Timetable'],
+        }),
+
+        // Subject CRUD
+        getSubjects: builder.query<Subject[], void>({
+            query: () => ({
+                url: '/subjects',
+                method: 'GET',
+            }),
+            providesTags: ['Subjects'],
+        }),
+        createSubject: builder.mutation<Subject, { name: string; color?: string; room?: string; teacher?: string }>({
+            query: (body) => ({
+                url: '/subjects',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Subjects'],
+        }),
+        deleteSubject: builder.mutation<{ message: string }, string>({
+            query: (id) => ({
+                url: `/subjects/${id}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: ['Subjects'],
+        }),
+
         getHolidays: builder.query<{ holidays: SchoolHoliday[] }, void>({
             query: () => ({
                 url: '/holidays',
@@ -115,4 +164,10 @@ export const {
     useCreateHolidayMutation,
     useUpdateHolidayMutation,
     useDeleteHolidayMutation,
+    useCreateTimetableEntryMutation,
+    useUpdateTimetableEntryMutation,
+    useDeleteTimetableEntryMutation,
+    useGetSubjectsQuery,
+    useCreateSubjectMutation,
+    useDeleteSubjectMutation,
 } = timetableApi;

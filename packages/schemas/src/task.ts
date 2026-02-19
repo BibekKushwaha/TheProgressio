@@ -9,6 +9,7 @@ export const taskSchema = z.object({
   categoryId: z.string().uuid().optional(),
   subjectId: z.string().uuid().optional(),
   isRecurring: z.boolean().default(false),
+  effort: z.string().optional(),
 });
 
 export const smartCreateTaskSchema = z.object({
