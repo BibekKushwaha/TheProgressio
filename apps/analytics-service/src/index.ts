@@ -4,7 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import activityRouter from "./routes/activity.route.js";
 import statsRouter from "./routes/stats.route.js";
-import { analyticsConsumer, shutdownConsumer } from "./services/consumer.service.js";
+import { shutdownWorker } from "./services/worker.service.js";
 
 export const app = express();
 
@@ -30,11 +30,6 @@ app.use("/api/stats", statsRouter);
 const PORT = process.env.PORT || 4003;
 
 if (process.env.NODE_ENV !== 'test') {
-    // Start Kafka consumer
-    analyticsConsumer.connect()
-        .then(() => analyticsConsumer.run())
-        .catch((err) => console.error("❌ Failed to start analytics Kafka consumer:", err));
-
     app.listen(PORT, () => {
         console.log(`🚀 Analytics Service running on port ${PORT}`);
         console.log(`🔗 Interface: ${FRONTEND_URL}`);
@@ -43,7 +38,7 @@ if (process.env.NODE_ENV !== 'test') {
     // Graceful shutdown
     const shutdown = async () => {
         console.log("Shutting down Analytics Service...");
-        await shutdownConsumer();
+        await shutdownWorker();
         process.exit(0);
     };
     process.on("SIGTERM", shutdown);

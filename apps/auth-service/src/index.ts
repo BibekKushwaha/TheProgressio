@@ -5,6 +5,9 @@ import cors from 'cors';
 import cookieParser from "cookie-parser";
 
 
+import { closeEmailWorker } from "./services/email.worker.js";
+import { closeEmailQueue } from "./services/email.queue.js";
+
 const app = express();
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL ?? 'http://localhost:3000';
 
@@ -30,7 +33,20 @@ if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`🚀 Auth service running on port ${PORT}`);
     console.log(`🔗 Accepting requests from: ${FRONTEND_ORIGIN}`);
+    console.log(`📧 Email worker initialized (BullMQ)`);
   });
+
+  // Graceful shutdown
+  const shutdown = async () => {
+    console.log("Shutting down Auth Service...");
+    await Promise.all([
+      closeEmailWorker(),
+      closeEmailQueue()
+    ]);
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
 export default app;

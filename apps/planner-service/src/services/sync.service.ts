@@ -1,5 +1,5 @@
 import { prisma, Priority, Status } from '@repo/db';
-import { emitTaskEvent, TaskEventType } from './producer.service.js';
+import { emitTaskEvent, TaskEventType } from './queue.service.js';
 
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://localhost:4003';
 

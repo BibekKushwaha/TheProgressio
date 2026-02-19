@@ -15,7 +15,7 @@ import attendanceRouter from "./routes/attendance.route.js";
 import paymentRouter from "./routes/payment.route.js";
 import syncRouter from "./routes/sync.route.js";
 import notificationRouter from "./routes/notification.route.js";
-import { producer } from "./services/producer.service.js";
+import { shutdownProducer } from "./services/queue.service.js";
 import { runSilentWatchSweep } from "./services/whatsapp-watch.service.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 
@@ -63,15 +63,16 @@ if (process.env.NODE_ENV !== 'test') {
         }, Math.max(5, intervalMinutes) * 60 * 1000);
     }
 
-    // Connect Kafka producer before starting the server
-    producer.connect().then(() => {
-        app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
-        });
-    }).catch((err) => {
-        console.warn("⚠️  Kafka connection failed, starting server without Kafka:", err);
-        app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT} (Kafka unavailable)`);
-        });
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
     });
+
+    const shutdown = async () => {
+        console.log("Shutting down Planner Service...");
+        await shutdownProducer();
+        process.exit(0);
+    };
+
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
 }

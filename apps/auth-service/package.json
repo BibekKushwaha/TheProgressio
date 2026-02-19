@@ -15,17 +15,20 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@repo/cache": "*",
     "@repo/db": "*",
     "@repo/schemas": "*",
-    "@repo/cache": "*",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.2",
+    "bullmq": "^5.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "datauri": "^4.1.0",
     "express": "^5.2.1",
+    "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "nodemailer": "^6.9.13"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -35,8 +38,9 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
-    "vitest": "^3.2.1",
+    "@types/nodemailer": "^7.0.10",
+    "@types/supertest": "^6.0.2",
     "supertest": "^7.1.0",
-    "@types/supertest": "^6.0.2"
+    "vitest": "^3.2.1"
   }
 }

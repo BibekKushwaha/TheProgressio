@@ -344,7 +344,9 @@ export const updateProfile = TryCatch(async (req, res) => {
   });
 });
 
-// ── Forgot Password (JWT-based, no Redis/Kafka required) ──────────────
+// ── Forgot Password (JWT-based, uses BullMQ/Redis for email worker) ────────
+
+import { addEmailToQueue } from "../services/email.queue.js";
 
 export const forgotPassword = TryCatch(async (req, res) => {
   const parsed = forgotPasswordSchema.safeParse(req.body);
@@ -372,9 +374,13 @@ export const forgotPassword = TryCatch(async (req, res) => {
 
   const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset/${resetToken}`;
 
-  // TODO: Integrate with email service (Kafka/SMTP) to send resetLink.
-  // For now, log it for development purposes.
-  console.log(`[DEV] Password reset link for ${email}: ${resetLink}`);
+  // Integrate with email service via BullMQ
+  await addEmailToQueue({
+    to: email,
+    subject: "Reset your password - Transition",
+    body: `Follow this link to reset your password: ${resetLink}`,
+    html: `<p>Please follow this link to reset your password: <a href="${resetLink}">${resetLink}</a></p>`,
+  });
 
   return res.json({ message: "If that email exists, we have sent a reset link" });
 });

@@ -12,8 +12,8 @@ vi.mock('../src/middleware/auth.middleware.js', () => ({
   enforceReadOnlyWrites: (_req: any, _res: any, next: any) => next(),
 }))
 
-// Mock Kafka producer (non-blocking)
-vi.mock('../src/services/producer.service.js', () => ({
+// Mock BullMQ producer (non-blocking)
+vi.mock('../src/services/queue.service.js', () => ({
   emitTaskEvent: vi.fn().mockResolvedValue(undefined),
   TaskEventType: {
     TASK_CREATED: 'task.created',
@@ -22,7 +22,7 @@ vi.mock('../src/services/producer.service.js', () => ({
     TASK_DELETED: 'task.deleted',
     TASK_STATUS_CHANGED: 'task.status_changed',
   },
-  producer: { connect: vi.fn(), send: vi.fn(), disconnect: vi.fn() },
+  producer: { close: vi.fn() },
 }))
 
 // Mock AI service
@@ -100,7 +100,7 @@ vi.mock('@repo/db', () => {
 
 import { app } from '../src/index.js'
 import { prisma } from '@repo/db'
-import { emitTaskEvent } from '../src/services/producer.service.js'
+import { emitTaskEvent } from '../src/services/queue.service.js'
 
 // ─── Task CRUD Tests ────────────────────────────────────────────────────────────
 

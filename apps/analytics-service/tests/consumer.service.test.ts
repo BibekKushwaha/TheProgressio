@@ -1,5 +1,5 @@
 /**
- * Unit tests for Analytics Service Kafka consumer message processing
+ * Unit tests for Analytics Service BullMQ worker event processing
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -18,28 +18,10 @@ vi.mock('@repo/db', () => ({
     },
 }))
 
-import { processMessage } from '../src/services/consumer.service.js'
+import { processEvent } from '../src/services/worker.service.js'
 import { prisma } from '@repo/db'
 
-function makeMessage(value: Record<string, unknown> | null) {
-    return {
-        topic: 'planner.task.analytics',
-        partition: 0,
-        message: {
-            key: null,
-            value: value ? Buffer.from(JSON.stringify(value)) : null,
-            timestamp: Date.now().toString(),
-            attributes: 0,
-            offset: '0',
-            size: 0,
-            headers: {},
-        },
-        heartbeat: vi.fn(),
-        pause: vi.fn(),
-    } as any
-}
-
-describe('Analytics Consumer — processMessage', () => {
+describe('Analytics Worker — processEvent', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
@@ -58,13 +40,13 @@ describe('Analytics Consumer — processMessage', () => {
 
         vi.mocked(prisma.taskCompletionStat.upsert).mockResolvedValue({} as any)
 
-        await processMessage(makeMessage({
+        await processEvent({
             eventType: 'task.completed',
             taskId: 'task-1',
             userId: 'user-1',
             timestamp: new Date().toISOString(),
             payload: {},
-        }))
+        } as any)
 
         expect(prisma.task.findUnique).toHaveBeenCalledWith({
             where: { id: 'task-1' },
@@ -86,13 +68,13 @@ describe('Analytics Consumer — processMessage', () => {
     it('task.completed — skips if task not found', async () => {
         vi.mocked(prisma.task.findUnique).mockResolvedValue(null)
 
-        await processMessage(makeMessage({
+        await processEvent({
             eventType: 'task.completed',
             taskId: 'task-missing',
             userId: 'user-1',
             timestamp: new Date().toISOString(),
             payload: {},
-        }))
+        } as any)
 
         expect(prisma.taskCompletionStat.upsert).not.toHaveBeenCalled()
     })
@@ -111,13 +93,13 @@ describe('Analytics Consumer — processMessage', () => {
 
         vi.mocked(prisma.taskCompletionStat.update).mockResolvedValue({} as any)
 
-        await processMessage(makeMessage({
+        await processEvent({
             eventType: 'task.updated',
             taskId: 'task-1',
             userId: 'user-1',
             timestamp: new Date().toISOString(),
             payload: { changedFields: { title: 'New Title' } },
-        }))
+        } as any)
 
         expect(prisma.taskCompletionStat.update).toHaveBeenCalledWith({
             where: { taskId: 'task-1' },
@@ -128,13 +110,13 @@ describe('Analytics Consumer — processMessage', () => {
     it('task.updated — no-op if task was not previously completed', async () => {
         vi.mocked(prisma.taskCompletionStat.findUnique).mockResolvedValue(null)
 
-        await processMessage(makeMessage({
+        await processEvent({
             eventType: 'task.updated',
             taskId: 'task-1',
             userId: 'user-1',
             timestamp: new Date().toISOString(),
             payload: { changedFields: { title: 'New Title' } },
-        }))
+        } as any)
 
         expect(prisma.taskCompletionStat.update).not.toHaveBeenCalled()
     })
@@ -144,13 +126,13 @@ describe('Analytics Consumer — processMessage', () => {
     it('task.deleted — cleans up TaskCompletionStat', async () => {
         vi.mocked(prisma.taskCompletionStat.deleteMany).mockResolvedValue({ count: 1 } as any)
 
-        await processMessage(makeMessage({
+        await processEvent({
             eventType: 'task.deleted',
             taskId: 'task-1',
             userId: 'user-1',
             timestamp: new Date().toISOString(),
             payload: {},
-        }))
+        } as any)
 
         expect(prisma.taskCompletionStat.deleteMany).toHaveBeenCalledWith({
             where: { taskId: 'task-1' },
@@ -162,13 +144,13 @@ describe('Analytics Consumer — processMessage', () => {
     it('task.status_changed — removes stat when un-completing', async () => {
         vi.mocked(prisma.taskCompletionStat.deleteMany).mockResolvedValue({ count: 1 } as any)
 
-        await processMessage(makeMessage({
+        await processEvent({
             eventType: 'task.status_changed',
             taskId: 'task-1',
             userId: 'user-1',
             timestamp: new Date().toISOString(),
             payload: { previousStatus: 'COMPLETED', newStatus: 'IN_PROGRESS' },
-        }))
+        } as any)
 
         expect(prisma.taskCompletionStat.deleteMany).toHaveBeenCalledWith({
             where: { taskId: 'task-1' },
@@ -178,47 +160,35 @@ describe('Analytics Consumer — processMessage', () => {
     // ── Edge cases ──────────────────────────────────────────────────────────
 
     it('unknown event type — skips without error', async () => {
-        await expect(processMessage(makeMessage({
+        await expect(processEvent({
             eventType: 'task.some_unknown',
             taskId: 'task-1',
             userId: 'user-1',
             timestamp: new Date().toISOString(),
             payload: {},
-        }))).resolves.toBeUndefined()
+        } as any)).resolves.toBeUndefined()
     })
 
     it('empty message — skips gracefully', async () => {
-        await expect(processMessage(makeMessage(null))).resolves.toBeUndefined()
+        await expect(processEvent(null)).resolves.toBeUndefined()
     })
 
-    it('malformed JSON — skips gracefully', async () => {
+    it('invalid object shape — skips gracefully', async () => {
         const payload = {
-            topic: 'planner.task.analytics',
-            partition: 0,
-            message: {
-                key: null,
-                value: Buffer.from('NOT VALID JSON'),
-                timestamp: Date.now().toString(),
-                attributes: 0,
-                offset: '0',
-                size: 0,
-                headers: {},
-            },
-            heartbeat: vi.fn(),
-            pause: vi.fn(),
+            some_garbage: true
         } as any
 
-        await expect(processMessage(payload)).resolves.toBeUndefined()
+        await expect(processEvent(payload)).resolves.toBeUndefined()
     })
 
     it('missing taskId — skips without error', async () => {
-        await expect(processMessage(makeMessage({
+        await expect(processEvent({
             eventType: 'task.completed',
             taskId: '',
             userId: 'user-1',
             timestamp: new Date().toISOString(),
             payload: {},
-        }))).resolves.toBeUndefined()
+        } as any)).resolves.toBeUndefined()
 
         expect(prisma.task.findUnique).not.toHaveBeenCalled()
     })

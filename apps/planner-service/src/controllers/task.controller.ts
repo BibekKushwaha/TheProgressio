@@ -10,7 +10,7 @@ import {
 } from "@repo/schemas/task";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService } from "../services/ai.service.js";
-import { emitTaskEvent, TaskEventType } from "../services/producer.service.js";
+import { emitTaskEvent, TaskEventType } from "../services/queue.service.js";
 import { recoveryService } from "../services/recovery.service.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import ErrorHandler from "../utils/errorHandler.js";
@@ -452,7 +452,7 @@ export const toggleTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         title: updatedTask.title,
     });
 
-    // Notify analytics of the status change (fire-and-forget HTTP fallback when Kafka is disabled)
+    // Notify analytics of the status change (redundant HTTP call, also handled via queue)
     notifyAnalyticsTaskUpdate({
         taskId: id,
         userId,
