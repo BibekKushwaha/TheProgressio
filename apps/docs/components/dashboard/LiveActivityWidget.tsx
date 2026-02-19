@@ -8,7 +8,7 @@ import { useGetActiveLiveSessionQuery } from '@repo/store';
 // This widget checks remote DB (primary) then fallback to localStorage for an active focus session
 export function LiveActivityWidget() {
     const router = useRouter();
-    const { data: remoteData, isLoading: isRemoteLoading, refetch } = useGetActiveLiveSessionQuery(undefined, {
+    const { data: remoteData, isLoading: isRemoteLoading, refetch, isUninitialized } = useGetActiveLiveSessionQuery(undefined, {
         pollingInterval: 10000,
         refetchOnFocus: true,
         refetchOnReconnect: true,
@@ -61,7 +61,14 @@ export function LiveActivityWidget() {
     // Handle visibility and storage changes
     useEffect(() => {
         const onSync = () => {
-            refetch();
+            // Guard against refetching before the query has started to avoid "Cannot refetch a query that has not been started yet"
+            if (!isUninitialized && typeof refetch === 'function') {
+                try {
+                    refetch();
+                } catch (_e) {
+                    // Ignore transient refetch errors during mount/unmount
+                }
+            }
             const local = checkLocalSession();
             if (!remoteData?.session) {
                 setSession(local);
@@ -78,7 +85,7 @@ export function LiveActivityWidget() {
             window.removeEventListener('storage', onSync);
             window.removeEventListener('focus', onSync);
         };
-    }, [refetch, checkLocalSession, remoteData]);
+    }, [refetch, checkLocalSession, remoteData, isUninitialized]);
 
     // Timer logic
     useEffect(() => {

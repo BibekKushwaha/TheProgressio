@@ -2,9 +2,10 @@
 
 import { useGetDailyScheduleQuery, TimetableEntry } from "@repo/store";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Calendar, Clock, MapPin, User } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, MapPin, User, Edit3 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RotationManager } from "./RotationManager";
+import { ClassManager } from "./ClassManager";
 
 export function TimetableView() {
     const { data: schedule, isLoading, error } = useGetDailyScheduleQuery();
@@ -66,14 +67,38 @@ export function TimetableView() {
                     </p>
                 </div>
 
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <button className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/10 transition-all">
-                            <Clock className="w-4 h-4 text-purple-400" />
-                            Manage Rotations
-                        </button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl bg-slate-900 border-white/10 text-white p-0 overflow-hidden">
+                <div className="flex items-center gap-3">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <button className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-sm font-semibold text-indigo-300 hover:bg-indigo-500/20 transition-all">
+                                <Edit3 className="w-4 h-4 text-indigo-400" />
+                                Edit Timetable
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-3xl bg-slate-950 border-white/10 text-white p-0 overflow-hidden shadow-2xl">
+                            <DialogHeader className="p-6 pb-2">
+                                <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                                    <Calendar className="w-5 h-5 text-indigo-400" />
+                                    Timetable Manager
+                                </DialogTitle>
+                                <DialogDescription className="text-slate-400">
+                                    Manage your subjects and weekly class schedule.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="p-6 pt-2">
+                                <ClassManager />
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <button className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/10 transition-all">
+                                <Clock className="w-4 h-4 text-purple-400" />
+                                Manage Rotations
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl bg-slate-900 border-white/10 text-white p-0 overflow-hidden">
                         <DialogHeader className="p-6 pb-0 sr-only">
                             <DialogTitle>Manage Rotations</DialogTitle>
                             <DialogDescription>View and manage your current rotation schedules.</DialogDescription>
@@ -83,6 +108,7 @@ export function TimetableView() {
                         </div>
                     </DialogContent>
                 </Dialog>
+            </div>
             </div>
 
             {schedule.conflicts?.length > 0 && (

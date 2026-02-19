@@ -150,6 +150,7 @@ model Task {
   priority     Priority   @default(MEDIUM)
   dueDate      DateTime?
   isRecurring  Boolean    @default(false)
+  effort       String?
   
   userId       String
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)

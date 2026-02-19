@@ -77,6 +77,7 @@ function CreateTaskPageContent() {
             else if (existingTask.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
 
             if (existingTask.categoryId) setSelectedSubjectId(existingTask.categoryId);
+            if (existingTask.effort) setSelectedEffort(existingTask.effort);
 
             if (existingTask.subtasks) {
                 setSubtasks(existingTask.subtasks.map(s => ({
@@ -115,6 +116,7 @@ function CreateTaskPageContent() {
                         else if (result.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
 
                         if (result.effort) setSelectedEffort(result.effort);
+                        if (result.isRecurring !== undefined) setIsRecurring(result.isRecurring);
 
                         if (result.subject && categories) {
                             const matchedCategory = categories.find(c => c.name.toLowerCase() === result.subject?.toLowerCase());
@@ -252,6 +254,7 @@ function CreateTaskPageContent() {
                     categoryId: categoryIdToUse,
                     dueDate: parsedDueDate || undefined,
                     isRecurring,
+                    effort: selectedEffort,
                 }).unwrap();
             } else {
                 // If the description is long, we might want to use smart create,
@@ -264,6 +267,7 @@ function CreateTaskPageContent() {
                     categoryId: categoryIdToUse,
                     dueDate: parsedDueDate || undefined,
                     isRecurring,
+                    effort: selectedEffort,
                 }).unwrap();
                 if (createdTask) {
                     dispatch(addTask(createdTask));
@@ -519,20 +523,33 @@ function CreateTaskPageContent() {
                                                         </div>
                                                     </div>
 
-                                                    <button
-                                                        type="button"
-                                                        onClick={async () => {
-                                                            const next = !aiSubtaskEnabled;
-                                                            setAiSubtaskEnabled(next);
-                                                            if (next) await handleGenerateSubtasks();
-                                                        }}
-                                                        className="w-full h-11 px-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between text-sm"
-                                                    >
-                                                        <span className="text-slate-200">AI Subtask Generator</span>
-                                                        <span className={`inline-flex h-6 w-10 rounded-full p-1 transition-colors ${aiSubtaskEnabled ? 'bg-indigo-500/70' : 'bg-white/20'}`}>
-                                                            <span className={`h-4 w-4 rounded-full bg-white transition-transform ${aiSubtaskEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                                                        </span>
-                                                    </button>
+                                                    <div className="grid grid-cols-1 gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsRecurring(!isRecurring)}
+                                                            className="w-full h-11 px-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between text-sm transition-all hover:bg-white/10"
+                                                        >
+                                                            <span className="text-slate-200">Recurring Task</span>
+                                                            <span className={`inline-flex h-6 w-10 rounded-full p-1 transition-colors ${isRecurring ? 'bg-purple-500/70' : 'bg-white/20'}`}>
+                                                                <span className={`h-4 w-4 rounded-full bg-white transition-transform ${isRecurring ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                            </span>
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                const next = !aiSubtaskEnabled;
+                                                                setAiSubtaskEnabled(next);
+                                                                if (next) await handleGenerateSubtasks();
+                                                            }}
+                                                            className="w-full h-11 px-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between text-sm transition-all hover:bg-white/10"
+                                                        >
+                                                            <span className="text-slate-200">AI Subtask Generator</span>
+                                                            <span className={`inline-flex h-6 w-10 rounded-full p-1 transition-colors ${aiSubtaskEnabled ? 'bg-indigo-500/70' : 'bg-white/20'}`}>
+                                                                <span className={`h-4 w-4 rounded-full bg-white transition-transform ${aiSubtaskEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                            </span>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}

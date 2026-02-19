@@ -29,6 +29,7 @@ model Task {
   priority     Priority   @default(MEDIUM)
   dueDate      DateTime?
   isRecurring  Boolean    @default(false)
+  effort       String?
   description  String?
   
   userId       String

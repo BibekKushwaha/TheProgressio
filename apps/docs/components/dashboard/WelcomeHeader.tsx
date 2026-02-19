@@ -1,12 +1,13 @@
 "use client"
 import { CalendarDays, Bell } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
 import { NotificationCenter } from '@/components/habit/NotificationCenter';
 import { useAppSelector, useGetNudgesQuery, Nudge, useGetUserXPQuery } from '@repo/store';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { TimetableView } from '../planner/TimetableView';
 
 export function WelcomeHeader() {
     const user = useAppSelector((state) => state.auth.user);
@@ -15,7 +16,6 @@ export function WelcomeHeader() {
     const unreadCount = nudges.filter((n: Nudge) => !n.isRead).length;
     const [sawNotifications, setSawNotifications] = useState(false);
     const displayedCount = sawNotifications ? 0 : unreadCount;
-    const router = useRouter();
     const username = user?.username?.trim() || 'there';
     const { data: xpData } = useGetUserXPQuery();
     const xp = xpData?.xp;
@@ -75,13 +75,21 @@ export function WelcomeHeader() {
                     </PopoverContent>
                 </Popover>
 
-                <Button
-                    onClick={() => router.push('/calendar')}
-                    className="hidden sm:inline-flex bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-purple-500/25 h-12 px-6 rounded-xl font-bold transition-all active:scale-95"
-                >
-                    <CalendarDays className="w-5 h-5 mr-2" />
-                    Schedule
-                </Button>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button
+                            className="hidden sm:inline-flex bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-purple-500/25 h-12 px-6 rounded-xl font-bold transition-all active:scale-95"
+                        >
+                            <CalendarDays className="w-5 h-5 mr-2" />
+                            Schedule
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl bg-slate-900 border-white/10 text-white p-0 overflow-hidden">
+                        <div className="p-6">
+                            <TimetableView />
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </PageHeader>
     );

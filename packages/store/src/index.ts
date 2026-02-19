@@ -236,9 +236,59 @@ export type {
   RevisionScheduleResponse,
 } from './services/analyticsApi';
 export { SessionType } from './services/analyticsApi';
-export * from './services/timetableApi';
-export * from './services/calendarApi';
-export * from './services/rotationsApi';
+
+// Timetable API
+export {
+  timetableApi,
+  useGetDailyScheduleQuery,
+  useGetHolidaysQuery,
+  useCreateHolidayMutation,
+  useUpdateHolidayMutation,
+  useDeleteHolidayMutation,
+  useCreateTimetableEntryMutation,
+  useUpdateTimetableEntryMutation,
+  useDeleteTimetableEntryMutation,
+  useGetSubjectsQuery,
+  useCreateSubjectMutation,
+  useDeleteSubjectMutation,
+} from './services/timetableApi';
+export type {
+  TimetableEntry,
+  TimetableConflict,
+  SchoolHoliday,
+  DailySchedule,
+  Subject,
+} from './services/timetableApi';
+
+// Calendar API
+export {
+  calendarApi,
+  useGetMonthlyEventsQuery,
+  useGetCalendarDailyScheduleQuery,
+  useCreateExamMutation,
+} from './services/calendarApi';
+export type {
+  MonthlyEvents,
+  ScheduleItem,
+  DailyScheduleResponse,
+} from './services/calendarApi';
+
+// Rotations API
+export {
+  rotationsApi,
+  useGetRotationPatternsQuery,
+  useGetRotationPatternByIdQuery,
+  useResolveRotationQuery,
+  useCreateRotationPatternMutation,
+  useUpdateRotationPatternMutation,
+  useDeleteRotationPatternMutation,
+} from './services/rotationsApi';
+export type {
+  RotationPattern,
+  CreateRotationRequest,
+  UpdateRotationRequest,
+  ResolvedRotation,
+} from './services/rotationsApi';
 
 // Payment API
 export {
