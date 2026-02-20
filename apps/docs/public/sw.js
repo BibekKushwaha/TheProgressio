@@ -1,7 +1,6 @@
 /// <reference lib="webworker" />
 
-/* global self */
-// eslint-disable-next-line no-undef
+// self is a built-in ServiceWorker global — no declaration needed
 const sw = /** @type {ServiceWorkerGlobalScope} */ (self);
 
 sw.addEventListener('push', (event) => {

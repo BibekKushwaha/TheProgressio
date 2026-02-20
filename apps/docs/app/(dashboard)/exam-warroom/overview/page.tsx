@@ -11,7 +11,9 @@ import { useMemo } from 'react';
 export default function ExamWarRoomPage() {
     const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('');
 
-    const subjects = performanceData?.data ?? [];
+    // Stable reference — prevents difficultyStats from recomputing on every render
+    // when performanceData is undefined (new [] reference each time).
+    const subjects = useMemo(() => performanceData?.data ?? [], [performanceData]);
 
     // Derive difficulty breakdown from already-fetched subject performance —
     // eliminates the useGetGradeEntriesQuery full table scan (no take/where).
