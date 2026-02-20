@@ -14,6 +14,7 @@ import { emitTaskEvent, TaskEventType } from "../services/queue.service.js";
 import { recoveryService } from "../services/recovery.service.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import ErrorHandler from "../utils/errorHandler.js";
+import { logAuditAction } from "../services/audit.service.js";
 
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || "http://localhost:4003";
@@ -212,6 +213,8 @@ export const createTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         },
     });
 
+    void logAuditAction(userId, "TASK_CREATED", "TASK", task.id, JSON.stringify({ title }));
+
     // Emit task-created event
     await emitTaskEvent(TaskEventType.TASK_CREATED, task.id, userId, {
         title: task.title,
@@ -342,6 +345,8 @@ export const updateTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         },
     });
 
+    void logAuditAction(userId, "TASK_UPDATED", "TASK", id, JSON.stringify(updates));
+
     // Emit task-updated event with changed fields
     const changedFields: Record<string, unknown> = {};
     if (updates.title) changedFields.title = updates.title;
@@ -400,6 +405,8 @@ export const deleteTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         where: { id },
     });
 
+    void logAuditAction(userId, "TASK_DELETED", "TASK", id);
+
     // Emit task-deleted event
     await emitTaskEvent(TaskEventType.TASK_DELETED, id, userId, {
         title: existingTask.title,
@@ -446,6 +453,8 @@ export const toggleTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
             status: newStatus,
         },
     });
+
+    void logAuditAction(userId, "TASK_STATUS_CHANGED", "TASK", id, JSON.stringify({ newStatus }));
 
     // Emit status-changed event
     await emitTaskEvent(TaskEventType.TASK_STATUS_CHANGED, id, userId, {
@@ -552,6 +561,8 @@ export const createTaskFromText = async ({
             userId,
         }
     });
+
+    void logAuditAction(userId, "TASK_CREATED", "TASK", task.id, JSON.stringify({ title: task.title }));
 
     await emitTaskEvent(TaskEventType.TASK_CREATED, task.id, userId, {
         title: task.title,

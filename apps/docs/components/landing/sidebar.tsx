@@ -220,7 +220,7 @@ const Sidebar = () => {
                             T
                         </div>
                         <Link href="/" className="text-xl font-bold text-white tracking-tight">
-                            Transition
+                            StudyProgressio
                         </Link>
                     </div>
 

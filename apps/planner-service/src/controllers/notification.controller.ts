@@ -9,6 +9,8 @@ import {
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import ErrorHandler from "../utils/errorHandler.js";
+// import { sendPushNotification } from "../services/push.service.js";
+import { emitPushEvent } from "../services/queue.service.js";
 
 const parseMetadata = (raw: string | null | undefined): Record<string, unknown> => {
   if (!raw) return {};
@@ -71,14 +73,76 @@ export const composeNotification = TryCatch(async (req: AuthenticatedRequest, re
   } catch (e) {
     // If update fails for any reason, fall back to returning created record with injected metadata
     console.warn('Failed to persist nudgeId into metadata, returning injected value', e);
-    return res.status(201).json({
-      message: "Rich notification composed",
-      notification: {
-        ...created,
-        metadata: parseMetadata(JSON.stringify({ ...(parseMetadata(created.metadata) || {}), nudgeId: created.id })),
-      },
-    });
   }
+
+  // Enqueue Web Push Notification (Asynchronous via BullMQ)
+  try {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const pushPayload: any = {
+      userId,
+      title: payload.title,
+      body: payload.body,
+      deepLink: payload.deepLink,
+      dedupeKey: `push-compose-${userId}-${todayStr}-${Date.now()}`, // simple dedupe for explicit composes
+    };
+    if (!payload.emoji && payload.imageUrl) {
+      pushPayload.icon = payload.imageUrl;
+    }
+
+    await emitPushEvent(pushPayload);
+  } catch (pushErr) {
+    console.error("Critical: Failed to enqueue web push:", pushErr);
+  }
+
+  return res.status(201).json({
+    message: "Rich notification composed",
+    notification: {
+      ...created,
+      metadata: parseMetadata(JSON.stringify({ ...(parseMetadata(created.metadata) || {}), nudgeId: created.id })),
+    },
+  });
+});
+
+export const subscribeToPush = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const { endpoint, keys, userAgent } = req.body;
+
+  if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+    throw new ErrorHandler(400, "Invalid subscription payload");
+  }
+
+  await prisma.webPushSubscription.upsert({
+    where: { endpoint },
+    update: {
+      userId,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+      userAgent,
+    },
+    create: {
+      userId,
+      endpoint,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+      userAgent,
+    },
+  });
+
+  return res.status(201).json({ message: "Subscribed to web push notifications" });
+});
+
+export const unsubscribeFromPush = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+  const { endpoint } = req.body;
+
+  if (!endpoint) {
+    throw new ErrorHandler(400, "Endpoint is required");
+  }
+
+  await prisma.webPushSubscription.deleteMany({
+    where: { endpoint },
+  });
+
+  return res.status(200).json({ message: "Unsubscribed from web push notifications" });
 });
 
 export const postDirectReply = TryCatch(async (req: AuthenticatedRequest, res: Response) => {

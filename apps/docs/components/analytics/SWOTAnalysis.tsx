@@ -15,8 +15,13 @@ interface SWOTAnalysisProps {
 const EXAM_TYPE_OPTIONS = ['JEE', 'NEET', 'UPSC', 'Midterm', 'Final', 'Quiz'] as const;
 
 export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange = true }: SWOTAnalysisProps) {
+    const [isMounted, setIsMounted] = useState(false);
     const [examType, setExamType] = useState(controlledExamType || 'Midterm');
     const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     useEffect(() => {
         if (controlledExamType) {
@@ -33,7 +38,7 @@ export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange
             subject.subject.toLowerCase().includes(searchQuery.toLowerCase())
         ) || [];
 
-    if (isLoading) {
+    if (!isMounted || isLoading) {
         return (
             <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
                 <Skeleton className="h-8 w-48 bg-white/5 mb-4" />

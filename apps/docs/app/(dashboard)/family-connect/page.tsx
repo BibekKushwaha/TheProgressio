@@ -1,7 +1,8 @@
 'use client';
 
 import { useGetTasksQuery, useGetHabitsQuery, useGetDailySummaryQuery, useGetProfileQuery, useComposeNotificationMutation, Task, Habit } from '@repo/store';
-import { Eye, Shield, Heart, TrendingUp, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, Share2, MessageSquare } from 'lucide-react';
+import { Eye, Shield, Heart, TrendingUp, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, Share2, MessageSquare, Download } from 'lucide-react';
+import { exportTasksToCSV, downloadCSV } from '@/lib/exportUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,13 @@ export default function FamilyConnectPage() {
             toast.error("Failed to send nudge");
         }
     };
+
+    const handleExportReport = () => {
+        const csvContent = exportTasksToCSV(tasks);
+        downloadCSV(csvContent, `family_report_${new Date().toISOString().slice(0, 10)}.csv`);
+        toast.success("Report exported to CSV successfully!");
+    };
+
     const workloadIntensity = upcomingTasks.length >= 5 ? 'High' : upcomingTasks.length >= 3 ? 'Medium' : 'Low';
 
     const isLoading = tasksLoading || habitsLoading || summaryLoading;
@@ -91,10 +99,16 @@ export default function FamilyConnectPage() {
                 <div className="p-4 bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl shadow-lg shadow-pink-500/20 mr-4 hidden md:block">
                     <Heart className="w-8 h-8 text-white" />
                 </div>
-                <Button variant="outline" className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-slate-200">
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share Link
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-slate-200">
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Share Link
+                    </Button>
+                    <Button variant="outline" onClick={handleExportReport} className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-slate-200">
+                        <Download className="w-4 h-4 mr-2" />
+                        Export Report
+                    </Button>
+                </div>
             </PageHeader>
 
             {/* Read-Only Notice */}

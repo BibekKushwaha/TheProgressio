@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     useGetDailyScheduleQuery,
     useCreateTimetableEntryMutation,
@@ -27,17 +27,30 @@ export function ClassManager() {
     const [createSubject] = useCreateSubjectMutation();
     const [deleteSubject] = useDeleteSubjectMutation();
 
+    const [dayOfWeek, setDayOfWeek] = useState<number>(0);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setDayOfWeek(new Date().getDay());
+        setIsMounted(true);
+    }, []);
+
     const [isAddingSubject, setIsAddingSubject] = useState(false);
     const [newSubject, setNewSubject] = useState({ name: '', color: '#3B82F6', room: '', teacher: '' });
 
     const [isAddingEntry, setIsAddingEntry] = useState(false);
     const [newEntry, setNewEntry] = useState({
-        dayOfWeek: new Date().getDay(),
+        dayOfWeek: 0, // Will be updated by state above or on use
         startTime: '09:00',
         endTime: '10:00',
         subjectId: '',
         rotation: '',
     });
+
+    // Update newEntry when dayOfWeek state changes
+    useEffect(() => {
+        setNewEntry(prev => ({ ...prev, dayOfWeek }));
+    }, [dayOfWeek]);
 
     // Available rotation labels from active patterns
     const rotationLabels = Array.from(new Set(patterns.filter(p => p.isActive).flatMap(p => p.pattern)));
@@ -81,6 +94,8 @@ export function ClassManager() {
             toast.error('Failed to remove class');
         }
     };
+
+    if (!isMounted) return null;
 
     return (
         <div className="space-y-8 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">

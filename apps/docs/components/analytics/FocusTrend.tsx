@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -12,10 +13,14 @@ const DEFAULT_TRENDS = [
 ];
 
 export function FocusTrends({ pastDays }: { pastDays: string }) {
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
         pollingInterval: 30000,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
+        skip: !isMounted,
     });
     const chartWidth = 600;
     const chartHeight = 256;
@@ -61,7 +66,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
             </div>
 
             <div className="relative h-64 mb-4">
-                {isLoading ? (
+                {(!isMounted || isLoading) ? (
                     <Skeleton className="w-full h-full bg-white/5" />
                 ) : (
                     <>

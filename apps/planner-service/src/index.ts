@@ -15,9 +15,12 @@ import attendanceRouter from "./routes/attendance.route.js";
 import paymentRouter from "./routes/payment.route.js";
 import syncRouter from "./routes/sync.route.js";
 import notificationRouter from "./routes/notification.route.js";
+import noteRouter from "./routes/note.route.js";
+import auditRouter from "./routes/audit.route.js";
 import { shutdownProducer } from "./services/queue.service.js";
 import { runSilentWatchSweep } from "./services/whatsapp-watch.service.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
+import { initPushWorker } from "./workers/push.worker.js";
 
 export const app = express();
 
@@ -48,10 +51,15 @@ app.use("/api/attachments", isAuth, attachmentRouter);
 app.use("/api/timetable", isAuth, timetableRouter);
 app.use("/api/calendar", isAuth, calendarRouter);
 app.use("/api/rotations", isAuth, rotationRouter);
+app.use("/api/notes", isAuth, noteRouter);
+app.use("/api/audit-logs", isAuth, auditRouter);
 
 app.use(errorMiddleware);
 
 const PORT = process.env.PORT || 4001;
+
+// Initialize workers
+const pushWorker = initPushWorker();
 
 if (process.env.NODE_ENV !== 'test') {
     if (process.env.WHATSAPP_SILENT_WATCH_CRON_ENABLED === 'true') {
@@ -70,6 +78,7 @@ if (process.env.NODE_ENV !== 'test') {
     const shutdown = async () => {
         console.log("Shutting down Planner Service...");
         await shutdownProducer();
+        if (pushWorker) await pushWorker.close();
         process.exit(0);
     };
 

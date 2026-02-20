@@ -34,6 +34,7 @@ export const QUEUE_NAMES = {
     TASK_EVENTS: "planner.task.events",
     TASK_ANALYTICS: "planner.task.analytics",
     HABIT_TRIGGERS: "planner.habit.triggers",
+    WEB_PUSH: "planner.web.push",
 } as const;
 
 // ─── Real BullMQ Producer ───────────────────────────────────────────────────────
@@ -52,9 +53,9 @@ class RealQueueProducer {
         return this.queues.get(queueName)!;
     }
 
-    async add(queueName: string, name: string, data: any): Promise<void> {
+    async add(queueName: string, name: string, data: any, jobId?: string): Promise<void> {
         const queue = this.getQueue(queueName);
-        await queue.add(name, data, {
+        const options: any = {
             removeOnComplete: true,
             removeOnFail: false, // Keep failed jobs for debugging
             attempts: 3,
@@ -62,7 +63,11 @@ class RealQueueProducer {
                 type: "exponential",
                 delay: 1000,
             },
-        });
+        };
+        if (jobId) {
+            options.jobId = jobId;
+        }
+        await queue.add(name, data, options);
     }
 
     async close(): Promise<void> {
@@ -80,8 +85,8 @@ class MockQueueProducer {
         console.log("⚠️  Using MOCK Queue Producer (set QUEUE_ENABLED=true for real Redis/BullMQ)");
     }
 
-    async add(queueName: string, name: string, data: any): Promise<void> {
-        console.log(`[MockQueue] 📨 Add job to '${queueName}': [${name}] taskId=${data.taskId}`);
+    async add(queueName: string, name: string, data: any, jobId?: string): Promise<void> {
+        console.log(`[MockQueue] 📨 Add job to '${queueName}': [${name}] taskId=${data.taskId} jobId=${jobId}`);
     }
 
     async close(): Promise<void> {
@@ -136,6 +141,29 @@ export async function emitTaskEvent(
         }
     } catch (error) {
         console.error(`⚠️  Failed to queue ${eventType} for task ${taskId}:`, error);
+    }
+}
+
+// ─── Helper: Emit a push event into BullMQ with deduplication ─────────────────
+export interface PushPayload {
+    userId: string;
+    title: string;
+    body: string;
+    icon?: string;
+    deepLink?: string;
+    dedupeKey?: string; // e.g., "daily-summary-user123"
+}
+
+export async function emitPushEvent(payload: PushPayload): Promise<void> {
+    try {
+        await producer.add(
+            QUEUE_NAMES.WEB_PUSH,
+            "sendPush",
+            payload,
+            payload.dedupeKey // BullMQ automatically drops jobs with matching active/waiting jobIds
+        );
+    } catch (error) {
+        console.error(`⚠️  Failed to queue push notification for user ${payload.userId}:`, error);
     }
 }
 

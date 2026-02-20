@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGetGPAQuery, useAddCourseGradeMutation, useUpdateCourseGradeMutation, useDeleteCourseGradeMutation, usePreviewGPAComponentsMutation } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,12 @@ import { GraduationCap, Plus, TrendingUp, Award, Edit2, Trash2 } from 'lucide-re
 import { useToast } from '@/components/ui/toast-provider';
 
 export function GPACalculator() {
+    const [isMounted, setIsMounted] = useState(false);
     const { data, isLoading } = useGetGPAQuery();
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
     const [addCourse] = useAddCourseGradeMutation();
     const [updateCourse] = useUpdateCourseGradeMutation();
     const [deleteCourse] = useDeleteCourseGradeMutation();
@@ -89,7 +94,7 @@ export function GPACalculator() {
         setIsAddOpen(true);
     };
 
-    if (isLoading) {
+    if (!isMounted || isLoading) {
         return (
             <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border-white/20 p-6">
                 <Skeleton className="h-8 w-48 bg-white/5 mb-4" />

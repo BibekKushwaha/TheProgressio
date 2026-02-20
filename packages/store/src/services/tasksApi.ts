@@ -135,6 +135,24 @@ export interface RecoveryPlan {
     items: RecoveryPlanItem[];
 }
 
+export interface Note {
+    id: string;
+    userId: string;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AuditLog {
+    id: string;
+    userId: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    details?: string | null;
+    createdAt: string;
+}
+
 const plannerBaseQuery = fetchBaseQuery({
     baseUrl: `${PLANNER_SERVICE_URL}/api`,
     credentials: 'include',
@@ -151,7 +169,7 @@ const plannerBaseQuery = fetchBaseQuery({
 export const tasksApi = createApi({
     reducerPath: 'tasksApi',
     baseQuery: plannerBaseQuery,
-    tagTypes: ['Tasks', 'Attendance'],
+    tagTypes: ['Tasks', 'Attendance', 'Notes', 'AuditLogs'],
     endpoints: (builder) => ({
         getTasks: builder.query<Task[], { page?: number; limit?: number; status?: Status; priority?: Priority; categoryId?: string; search?: string; date?: string } | void>({
             query: (params) => ({
@@ -469,6 +487,51 @@ export const tasksApi = createApi({
         getNotificationDeepLink: builder.query<{ message: string; deepLink: string }, { entityType: string; entityId: string }>({
             query: ({ entityType, entityId }) => `/notifications/deeplink/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`,
         }),
+
+        // ── Notes ──────────────────────────────────────────────
+        getNotes: builder.query<{ notes: Note[] }, void>({
+            query: () => '/notes',
+            providesTags: ['Notes'],
+        }),
+        createNote: builder.mutation<Note, { content: string }>({
+            query: (body) => ({
+                url: '/notes',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Notes'],
+        }),
+        deleteNote: builder.mutation<{ message: string }, string>({
+            query: (id) => ({
+                url: `/notes/${id}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: ['Notes'],
+        }),
+
+        // ── Audit Logs ─────────────────────────────────────────
+        getAuditLogs: builder.query<{ logs: AuditLog[] }, { limit?: number; page?: number } | void>({
+            query: (params) => ({
+                url: '/audit-logs',
+                method: 'GET',
+                params: params || {},
+            }),
+            providesTags: ['AuditLogs'],
+        }),
+        subscribeToPush: builder.mutation<{ message: string }, any>({
+            query: (body) => ({
+                url: '/notifications/subscribe',
+                method: 'POST',
+                body,
+            }),
+        }),
+        unsubscribeFromPush: builder.mutation<{ message: string }, { endpoint: string }>({
+            query: (body) => ({
+                url: '/notifications/unsubscribe',
+                method: 'POST',
+                body,
+            }),
+        }),
     }),
 });
 
@@ -498,4 +561,10 @@ export const {
     useMarkAttendanceMutation,
     useGetAttendanceHistoryQuery,
     useGetNotificationDeepLinkQuery,
+    useGetNotesQuery,
+    useCreateNoteMutation,
+    useDeleteNoteMutation,
+    useGetAuditLogsQuery,
+    useSubscribeToPushMutation,
+    useUnsubscribeFromPushMutation,
 } = tasksApi;

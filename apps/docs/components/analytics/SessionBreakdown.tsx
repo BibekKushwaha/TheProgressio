@@ -1,11 +1,16 @@
+import { useState, useEffect } from 'react';
 import { useGetDailySummaryQuery, SessionType } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function SessionBreakdown({ pastDays }: { pastDays: string }) {
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const { data: summaryData, isLoading } = useGetDailySummaryQuery(pastDays, {
         pollingInterval: 30000,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
+        skip: !isMounted,
     });
 
     const colors: Record<SessionType, string> = {
@@ -46,7 +51,7 @@ export function SessionBreakdown({ pastDays }: { pastDays: string }) {
 
             <div className="flex flex-col items-center">
                 <div className="relative w-64 h-64 mb-6">
-                    {isLoading ? (
+                    {(!isMounted || isLoading) ? (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <Skeleton className="w-full h-full rounded-full bg-white/5" />
                         </div>

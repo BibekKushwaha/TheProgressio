@@ -1,18 +1,24 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useGetTimeLeakageQuery, useGetPeakWindowQuery, useGetPredictivePerformanceQuery } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Clock, TrendingUp, AlertCircle, Sun } from 'lucide-react';
 
 export function ProductivityInsights() {
+    const [isMounted, setIsMounted] = useState(false);
     const { data: leakageData, isLoading: leakageLoading } = useGetTimeLeakageQuery(7);
     const { data: peakData, isLoading: peakLoading } = useGetPeakWindowQuery();
     const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery('');
 
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const isLoading = leakageLoading || peakLoading || performanceLoading;
 
-    if (isLoading) {
+    if (!isMounted || isLoading) {
         return (
             <div className="space-y-6">
                 <Skeleton className="h-48 w-full bg-white/5" />
@@ -44,30 +50,30 @@ export function ProductivityInsights() {
     const performance = (performanceData?.data || []) as PerformanceItem[];
     const leakageStats = leakage
         ? [
-              {
-                  label: 'Total Leakage',
-                  value: `${leakage.totalLeakageMinutes} min`,
-                  valueClass: 'text-red-400',
-                  note: `${leakage.leakagePercentage.toFixed(1)}% of planned time`,
-              },
-              {
-                  label: 'Planned Time',
-                  value: `${leakage.totalPlannedMinutes} min`,
-                  valueClass: 'text-white',
-              },
-              {
-                  label: 'Actual Time',
-                  value: `${leakage.totalActualMinutes} min`,
-                  valueClass: 'text-green-400',
-              },
-          ]
+            {
+                label: 'Total Leakage',
+                value: `${leakage.totalLeakageMinutes} min`,
+                valueClass: 'text-red-400',
+                note: `${leakage.leakagePercentage.toFixed(1)}% of planned time`,
+            },
+            {
+                label: 'Planned Time',
+                value: `${leakage.totalPlannedMinutes} min`,
+                valueClass: 'text-white',
+            },
+            {
+                label: 'Actual Time',
+                value: `${leakage.totalActualMinutes} min`,
+                valueClass: 'text-green-400',
+            },
+        ]
         : [];
     const getPaceTone = (pace: string) =>
         pace === 'accelerating'
             ? 'bg-green-500/20 text-green-400'
             : pace === 'steady'
-              ? 'bg-blue-500/20 text-blue-400'
-              : 'bg-red-500/20 text-red-400';
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'bg-red-500/20 text-red-400';
 
     return (
         <div className="space-y-6">

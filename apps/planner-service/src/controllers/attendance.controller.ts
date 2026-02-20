@@ -4,6 +4,7 @@ import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import ErrorHandler from "../utils/errorHandler.js";
 import { z } from "zod";
+import { logAuditAction } from "../services/audit.service.js";
 
 const markAttendanceSchema = z.object({
   qrCode: z.string().optional(),
@@ -14,7 +15,7 @@ const markAttendanceSchema = z.object({
 
 export const markAttendance = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
-  
+
   const result = markAttendanceSchema.safeParse(req.body);
   if (!result.success) {
     throw new ErrorHandler(400, "Invalid attendance data");
@@ -32,6 +33,8 @@ export const markAttendance = TryCatch(async (req: AuthenticatedRequest, res: Re
       date: new Date(),
     }
   });
+
+  void logAuditAction(userId, "ATTENDANCE_MARKED", "ATTENDANCE", attendance.id, JSON.stringify({ status, method, location }));
 
   return res.status(201).json({
     message: "Attendance marked successfully",
