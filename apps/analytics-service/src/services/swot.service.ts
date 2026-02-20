@@ -160,44 +160,35 @@ export async function getSubjectPerformance(userId: string, subjectName: string)
         subjectName: { equals: subjectName.trim(), mode: 'insensitive' as const },
     };
 
-    // 1. Aggregate for average score — avoids pulling all rows just to compute mean
-    const agg = await prisma.gradeEntry.aggregate({
-        where,
-        _avg: { obtainedMarks: true, totalMarks: true },
-        _count: { id: true },
-    });
-
-    if (!agg._count.id || agg._count.id === 0) return null;
-
-    // 2. Fetch first 5 + last 5 in parallel for improvement rate — O(10) vs O(N)
-    const [first5, last5Raw] = await Promise.all([
+    // 1 + 2. Both queries run in parallel — eliminates one sequential round-trip.
+    // trendEntries (max 50, asc) serves double duty: first5/last5 are sliced from it,
+    // eliminating the previous 3rd sequential query.
+    const [agg, trendEntries] = await Promise.all([
+        prisma.gradeEntry.aggregate({
+            where,
+            _avg: { obtainedMarks: true, totalMarks: true },
+            _count: { id: true },
+        }),
         prisma.gradeEntry.findMany({
             where,
             orderBy: { createdAt: "asc" },
             select: { obtainedMarks: true, totalMarks: true, timeTakenMins: true, createdAt: true },
-            take: 5,
-        }),
-        prisma.gradeEntry.findMany({
-            where,
-            orderBy: { createdAt: "desc" },
-            select: { obtainedMarks: true, totalMarks: true, timeTakenMins: true, createdAt: true },
-            take: 5,
+            take: 50,
         }),
     ]);
-    // Reverse desc result so timeTrend is chronological
-    const last5 = [...last5Raw].reverse();
 
-    const earlyRate = first5.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks), 0) / first5.length;
-    const recentRate = last5.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks), 0) / last5.length;
+    if (!agg._count.id || agg._count.id === 0) return null;
+
+    const first5 = trendEntries.slice(0, 5);
+    const last5 = trendEntries.slice(-5);
+
+    const earlyRate = first5.length > 0
+        ? first5.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks), 0) / first5.length
+        : 0;
+    const recentRate = last5.length > 0
+        ? last5.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks), 0) / last5.length
+        : 0;
     const improvementRate = Math.round((recentRate - earlyRate) * 100);
-
-    // 3. Fetch up to 50 entries for timeTrend (capped — statistically representative)
-    const trendEntries = await prisma.gradeEntry.findMany({
-        where,
-        orderBy: { createdAt: "asc" },
-        select: { obtainedMarks: true, totalMarks: true, timeTakenMins: true, createdAt: true },
-        take: 50,
-    });
 
     const timeTrend = trendEntries
         .filter(e => e.timeTakenMins !== null)

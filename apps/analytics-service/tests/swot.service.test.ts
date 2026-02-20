@@ -136,6 +136,8 @@ describe('SWOT Service — getSubjectPerformance', () => {
             _count: { id: 0 },
             _avg: { obtainedMarks: null, totalMarks: null },
         });
+        // findMany runs in parallel via Promise.all but result is unused when count=0
+        mockPrisma.gradeEntry.findMany.mockResolvedValue([]);
 
         const result = await getSubjectPerformance('u1', 'Unknown');
 
@@ -143,7 +145,8 @@ describe('SWOT Service — getSubjectPerformance', () => {
     });
 
     it('detects accelerating pace when recent scores improve', async () => {
-        // first5 (low), last5 (high) — improvement > 5pp → accelerating
+        // first5 (low scores, oldest), last5 (high scores, most recent)
+        // all10 is in ascending createdAt order for the single findMany call
         const first5 = [
             makeEntry('Physics', 'Ch1', 40, 100, 50),
             makeEntry('Physics', 'Ch2', 42, 100, 45),
@@ -158,17 +161,15 @@ describe('SWOT Service — getSubjectPerformance', () => {
             makeEntry('Physics', 'Ch7', 75, 100, 15),
             makeEntry('Physics', 'Ch6', 70, 100, 20),
         ];
+        // Single ascending-order fetch (mocks the new Promise.all findMany call)
         const all10 = [...first5, ...[...last5desc].reverse()];
 
         mockPrisma.gradeEntry.aggregate.mockResolvedValue({
             _count: { id: 10 },
             _avg: { obtainedMarks: 62, totalMarks: 100 },
         });
-        // findMany called 3 times: first5 (asc), last5 (desc), trendEntries (asc)
-        mockPrisma.gradeEntry.findMany
-            .mockResolvedValueOnce(first5)
-            .mockResolvedValueOnce(last5desc)
-            .mockResolvedValueOnce(all10);
+        // Now only ONE findMany call (agg + trendEntries run in Promise.all)
+        mockPrisma.gradeEntry.findMany.mockResolvedValueOnce(all10);
 
         const result = await getSubjectPerformance('u1', 'Physics');
 
@@ -177,7 +178,7 @@ describe('SWOT Service — getSubjectPerformance', () => {
     });
 
     it('detects declining pace when recent scores drop', async () => {
-        // first5 (high), last5 (low) — improvement < -5pp → declining
+        // first5 (high scores, oldest), last5 (low scores, most recent)
         const first5 = [
             makeEntry('Chemistry', 'Ch1', 90, 100, 50),
             makeEntry('Chemistry', 'Ch2', 88, 100, 45),
@@ -192,16 +193,14 @@ describe('SWOT Service — getSubjectPerformance', () => {
             makeEntry('Chemistry', 'Ch7', 50, 100, 15),
             makeEntry('Chemistry', 'Ch6', 55, 100, 20),
         ];
+        // Single ascending-order fetch
         const all10 = [...first5, ...[...last5desc].reverse()];
 
         mockPrisma.gradeEntry.aggregate.mockResolvedValue({
             _count: { id: 10 },
             _avg: { obtainedMarks: 65, totalMarks: 100 },
         });
-        mockPrisma.gradeEntry.findMany
-            .mockResolvedValueOnce(first5)
-            .mockResolvedValueOnce(last5desc)
-            .mockResolvedValueOnce(all10);
+        mockPrisma.gradeEntry.findMany.mockResolvedValueOnce(all10);
 
         const result = await getSubjectPerformance('u1', 'Chemistry');
 
