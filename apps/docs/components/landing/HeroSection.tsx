@@ -1,5 +1,8 @@
 'use client';
 
+import React from 'react';
+
+
 import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, Focus, LayoutDashboard } from 'lucide-react';
 import { selectCurrentUser, useAppSelector, useGetActiveLiveSessionQuery } from '@repo/store';
@@ -25,6 +28,7 @@ const FLOAT_CARD = {
 };
 
 export function HeroSection() {
+  const [mounted, setMounted] = React.useState(false);
   const user = useAppSelector(selectCurrentUser);
   const router = useRouter();
   const { data: activeLive } = useGetActiveLiveSessionQuery(undefined, {
@@ -32,7 +36,12 @@ export function HeroSection() {
     pollingInterval: 10000,
   });
 
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const isLive = !!activeLive?.session;
+  const showUserContent = mounted && !!user;
 
   return (
     <section className="relative min-h-screen flex items-center justify-center px-6  pb-20">
@@ -55,10 +64,10 @@ export function HeroSection() {
           transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
         >
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-            {user ? `Welcome back, ${user.username}.` : 'Conquer the'}
+            {showUserContent ? `Welcome back, ${user?.username}.` : 'Conquer the'}
             {' '}
             <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
-              {user ? 'Your Peaks await.' : 'Impossible.'}
+              {showUserContent ? 'Your Peaks await.' : 'Impossible.'}
             </span>
           </h1>
         </motion.div>
@@ -67,7 +76,7 @@ export function HeroSection() {
           {...FADE_UP(0.2)}
           className="text-xl text-slate-300 mb-10"
         >
-          {user 
+          {showUserContent
             ? "Your predictive AI advisor has updated your daily route based on your latest performance."
             : "India's most advanced AI Academic Advisor for high-stakes exams"
           }
@@ -77,7 +86,7 @@ export function HeroSection() {
           {...FADE_UP(0.3)}
           className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
         >
-          {user ? (
+          {showUserContent ? (
             <motion.button
               {...BUTTON_MOTION}
               onClick={() => router.push('/dashboard')}
@@ -99,11 +108,11 @@ export function HeroSection() {
 
           <motion.button
             {...BUTTON_MOTION}
-            onClick={() => router.push(user ? '/reports' : '#')}
+            onClick={() => router.push(showUserContent ? '/reports' : '#')}
             className="px-8 py-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full font-bold flex items-center gap-2 hover:bg-white/10 transition-all"
           >
             <Sparkles className="w-5 h-5 text-purple-400" />
-            {user ? 'View Analytics' : 'Powered by AI'}
+            {showUserContent ? 'View Analytics' : 'Powered by AI'}
           </motion.button>
         </motion.div>
 

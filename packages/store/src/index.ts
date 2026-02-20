@@ -88,6 +88,12 @@ export {
   useMarkAttendanceMutation,
   useGetAttendanceHistoryQuery,
   useGetNotificationDeepLinkQuery,
+  useGetNotesQuery,
+  useCreateNoteMutation,
+  useDeleteNoteMutation,
+  useGetAuditLogsQuery,
+  useSubscribeToPushMutation,
+  useUnsubscribeFromPushMutation,
 } from './services/tasksApi';
 export type {
   Task,
@@ -100,6 +106,8 @@ export type {
   RecoveryPlanItem,
   ComposeNotificationRequest,
   PlannerNotification,
+  Note,
+  AuditLog,
 } from './services/tasksApi';
 export type { Status, Priority } from './services/tasksApi';
 export { TaskStatus, PriorityEnum } from './services/tasksApi';

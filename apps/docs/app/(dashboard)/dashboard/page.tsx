@@ -5,6 +5,9 @@ import { QuickActions } from '@/components/dashboard/QuickActions';
 import { TodaysTasks } from '@/components/dashboard/TodaysTasks';
 import { MorningBriefing } from '@/components/dashboard/MorningBriefing';
 import { LiveActivityWidget } from '@/components/dashboard/LiveActivityWidget';
+import { ActivityLedger } from '@/components/dashboard/ActivityLedger';
+import { NotesWidget } from '@/components/dashboard/NotesWidget';
+import { QRAttendance } from '@/components/settings/QRAttendance';
 
 import { DashboardGrid } from '@/components/layout/DashboardGrid';
 
@@ -17,14 +20,19 @@ export default function DashboardPage() {
 
             <DashboardGrid
                 sidebar={
-                    <>
+                    <div className="space-y-6">
                         <MorningBriefing />
                         <QuickActions />
-                    </>
+                        <NotesWidget />
+                    </div>
                 }
             >
-                <WeeklyActivity />
-                <TodaysTasks />
+                <div className="space-y-6">
+                    <WeeklyActivity />
+                    <QRAttendance />
+                    <TodaysTasks />
+                    <ActivityLedger />
+                </div>
             </DashboardGrid>
         </div>
     );

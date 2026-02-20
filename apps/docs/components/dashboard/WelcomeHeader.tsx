@@ -14,8 +14,8 @@ export function WelcomeHeader() {
     const { data } = useGetNudgesQuery();
     const nudges = data?.nudges || [];
     const unreadCount = nudges.filter((n: Nudge) => !n.isRead).length;
-    const [sawNotifications, setSawNotifications] = useState(false);
-    const displayedCount = sawNotifications ? 0 : unreadCount;
+    const [lastOpenedCount, setLastOpenedCount] = useState(0);
+    const displayedCount = Math.max(0, unreadCount - lastOpenedCount);
     const username = user?.username?.trim() || 'there';
     const { data: xpData } = useGetUserXPQuery();
     const xp = xpData?.xp;
@@ -56,7 +56,7 @@ export function WelcomeHeader() {
                 <Popover>
                     <PopoverTrigger asChild>
                         <Button
-                            onClick={() => setSawNotifications(true)}
+                            onClick={() => setLastOpenedCount(unreadCount)}
                             aria-label="Notifications"
                             className="h-12 w-12 p-0 rounded-xl flex items-center justify-center bg-transparent hover:bg-white/10 text-white overflow-visible transition-all active:scale-95"
                         >
@@ -70,7 +70,7 @@ export function WelcomeHeader() {
                             </span>
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-transparent border-0 shadow-2xl">
+                    <PopoverContent align="end" sideOffset={8} className="w-auto p-0 bg-transparent border-0 shadow-2xl">
                         <NotificationCenter />
                     </PopoverContent>
                 </Popover>

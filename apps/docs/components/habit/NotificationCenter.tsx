@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { MouseEvent } from 'react';
 import {
     useGetNudgesQuery,
@@ -54,8 +54,13 @@ const toProgress = (metadata: Record<string, unknown>) => {
 };
 
 export function NotificationCenter() {
+    const [isMounted, setIsMounted] = useState(false);
     const router = useRouter();
     const { data, isLoading, refetch } = useGetNudgesQuery();
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
     const [markRead] = useMarkNudgeAsReadMutation();
     const [markAllRead, { isLoading: isMarkingAllRead }] = useMarkAllNudgesAsReadMutation();
     const [postDirectReply, { isLoading: isReplying }] = usePostNotificationDirectReplyMutation();
@@ -250,7 +255,7 @@ export function NotificationCenter() {
         }
     };
 
-    if (isLoading) {
+    if (!isMounted || isLoading) {
         return (
             <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6 max-w-[94vw] w-[94vw] sm:w-auto overflow-hidden">
                 <Skeleton className="h-8 w-48 bg-white/5 mb-4" />
@@ -261,8 +266,8 @@ export function NotificationCenter() {
     }
 
     return (
-        <Card className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 backdrop-blur-md border-purple-500/20 p-6 max-w-[94vw] w-[94vw] sm:w-auto overflow-hidden">
-            <div className="flex items-center justify-between mb-6">
+        <Card className="bg-gradient-to-br from-slate-900 to-indigo-950/95 backdrop-blur-xl border-purple-500/30 p-4 sm:p-6 max-w-[94vw] w-[94vw] sm:w-[500px] flex flex-col max-h-[85vh] shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+            <div className="flex items-center justify-between mb-4 sm:mb-6 shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl relative">
                         <Bell className="w-6 h-6 text-white" />
@@ -293,7 +298,7 @@ export function NotificationCenter() {
             </div>
 
             {/* Categories Filter */}
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2 scrollbar-hide shrink-0">
                 {[
                     { id: 'all', label: 'All', icon: Bell },
                     { id: 'streak_reminder', label: 'Streaks', icon: TrendingUp },
@@ -316,7 +321,7 @@ export function NotificationCenter() {
             </div>
 
             {filteredNudges.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-0">
                     {filteredNudges.map((nudge: Nudge) => (
                         (() => {
                             const metadata = parseNudgeMetadata(nudge.metadata);
@@ -355,11 +360,11 @@ export function NotificationCenter() {
                                         }`}
                                 >
                                     <div className="flex items-start justify-between gap-4">
-                                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                                        <div className="flex items-start gap-3 flex-1 min-w-0">
                                             <div className="mt-1">
                                                 {getTypeIcon(nudge.type)}
                                             </div>
-                                        <div className="flex-1 min-w-0">
+                                            <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <h3 className="font-semibold text-white">{nudge.title}</h3>
                                                     {!nudge.isRead && (
@@ -474,13 +479,13 @@ export function NotificationCenter() {
                                                     return (
                                                         <div className="mt-3 flex items-center gap-2">
                                                             <input
-                                                                    type="text"
-                                                                    value={replyDraft[nudge.id] || ''}
-                                                                    onChange={(event) => setReplyDraft((prev) => ({ ...prev, [nudge.id]: event.target.value }))}
-                                                                    placeholder="Quick reply from notification..."
-                                                                    className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                                                                    maxLength={240}
-                                                                />
+                                                                type="text"
+                                                                value={replyDraft[nudge.id] || ''}
+                                                                onChange={(event) => setReplyDraft((prev) => ({ ...prev, [nudge.id]: event.target.value }))}
+                                                                placeholder="Quick reply from notification..."
+                                                                className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                                                maxLength={240}
+                                                            />
                                                             <Button
                                                                 size="sm"
                                                                 onClick={() => handleDirectReply(nudge)}
@@ -512,9 +517,9 @@ export function NotificationCenter() {
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-12">
-                    <Bell className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-                    <p className="text-slate-400">
+                <div className="text-center py-12 flex-1 flex flex-col items-center justify-center min-h-[200px]">
+                    <Bell className="w-12 h-12 text-slate-500 opacity-30 mb-4" />
+                    <p className="text-slate-400 font-medium">
                         {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
                     </p>
                 </div>

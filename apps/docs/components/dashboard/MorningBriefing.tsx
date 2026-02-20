@@ -1,7 +1,7 @@
 'use client';
 
 import { useGetMorningBriefingQuery, useGetTasksQuery } from '@repo/store';
-import { Sun, BookOpen, Flame, AlertTriangle, ChevronRight, Clock, Zap } from 'lucide-react';
+import { Sun, BookOpen, Flame, AlertTriangle, ChevronRight, Clock, Zap, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 export function MorningBriefing() {
@@ -92,6 +92,12 @@ export function MorningBriefing() {
                         <ChevronRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                     </Link>
                 )}
+
+                <div className="flex items-center gap-2 text-slate-300 transition-colors group">
+                    <MapPin className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <span>Don&apos;t forget to <strong>mark attendance</strong> today</span>
+                    <ChevronRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
             </div>
 
             {/* Top 3 Priority Tasks */}

@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ToastProvider } from "@/components/ui/toast-provider";
+import { PushNotificationManager } from "@/components/PushNotificationManager";
 
 export const metadata: Metadata = {
   title: "Student Activity Tracker",
@@ -24,11 +25,12 @@ export default function RootLayout({
             attribute="class"
             defaultTheme="dark"
             enableSystem
-            disableTransitionOnChange 
+            disableTransitionOnChange
           >
             <TooltipProvider>
               <ToastProvider>
                 {children}
+                <PushNotificationManager />
                 <Toaster richColors position="bottom-right" />
               </ToastProvider>
             </TooltipProvider>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     useGetRotationPatternsQuery,
     useCreateRotationPatternMutation,
@@ -18,8 +18,13 @@ import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Plus, Edit, Trash2, RotateCw, CheckCircle, XCircle, CalendarDays } from 'lucide-react';
 
 export function RotationManager() {
+    const [isMounted, setIsMounted] = useState(false);
     const { data: patternsData, isLoading } = useGetRotationPatternsQuery();
     const { data: todayRotation } = useResolveRotationQuery();
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
     const [createPattern] = useCreateRotationPatternMutation();
     const [updatePattern] = useUpdateRotationPatternMutation();
     const [deletePattern] = useDeleteRotationPatternMutation();
@@ -115,7 +120,7 @@ export function RotationManager() {
         setIsEditOpen(true);
     };
 
-    if (isLoading) {
+    if (!isMounted || isLoading) {
         return (
             <Card className="bg-white/5 backdrop-blur-md border-white/10 p-6">
                 <Skeleton className="h-8 w-48 bg-white/5 mb-4" />

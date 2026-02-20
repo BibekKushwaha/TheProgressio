@@ -15,6 +15,13 @@ vi.mock('../src/middleware/auth.middleware.js', () => ({
 // Mock BullMQ producer (non-blocking)
 vi.mock('../src/services/queue.service.js', () => ({
   emitTaskEvent: vi.fn().mockResolvedValue(undefined),
+  emitPushEvent: vi.fn().mockResolvedValue(undefined),
+  QUEUE_NAMES: {
+    TASK_EVENTS: "planner.task.events",
+    TASK_ANALYTICS: "planner.task.analytics",
+    HABIT_TRIGGERS: "planner.habit.triggers",
+    WEB_PUSH: "planner.web.push",
+  },
   TaskEventType: {
     TASK_CREATED: 'task.created',
     TASK_UPDATED: 'task.updated',

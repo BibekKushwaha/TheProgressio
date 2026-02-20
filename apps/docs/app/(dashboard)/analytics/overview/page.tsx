@@ -25,32 +25,60 @@ import {
   useGetTasksQuery,
   useGetWeeklyTrendsQuery,
 } from "@repo/store";
-import { redirect } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { exportTasksToCSV, downloadCSV } from "@/lib/exportUtils";
+import { toast } from "sonner";
 
 export default function AnalyticsOverviewPage() {
+  const [isMounted, setIsMounted] = useState(false);
   const [pastDays, setPastDays] = useState("1");
-  const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery(pastDays, {
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const {
+    data: summaryData,
+    isLoading: isSummaryLoading,
+    isFetching: isSummaryFetching
+  } = useGetDailySummaryQuery(pastDays, {
     pollingInterval: 30000,
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
+    skip: !isMounted,
   });
-  const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery(undefined, {
+
+  const {
+    data: focusScoreData,
+    isLoading: isFocusLoading,
+    isFetching: isFocusFetching
+  } = useGetFocusScoreQuery(undefined, {
     pollingInterval: 30000,
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
+    skip: !isMounted,
   });
+
   useGetWeeklyTrendsQuery(undefined, {
     pollingInterval: 30000,
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
+    skip: !isMounted,
   });
-  const { data: tasks = [], isLoading: isTasksLoading } = useGetTasksQuery({ page: 1, limit: 500 });
-  const { data: habitsResponse, isLoading: isHabitsLoading } = useGetHabitsQuery();
+
+  const {
+    data: tasks = [],
+    isLoading: isTasksLoading
+  } = useGetTasksQuery({ page: 1, limit: 500 }, { skip: !isMounted });
+
+  const {
+    data: habitsResponse,
+    isLoading: isHabitsLoading
+  } = useGetHabitsQuery(undefined, { skip: !isMounted });
 
   const habits = useMemo(() => habitsResponse?.habits || [], [habitsResponse]);
 
   const taskMetrics = useMemo(() => {
+    if (!isMounted) return {
+      total: 0, pending: 0, inProgress: 0, completed: 0,
+      highPriority: 0, mediumPriority: 0, lowPriority: 0,
+      withoutDueDate: 0, overdue: 0, dueToday: 0
+    };
+
     const now = Date.now();
     const today = new Date();
     const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -85,7 +113,7 @@ export default function AnalyticsOverviewPage() {
       overdue,
       dueToday,
     };
-  }, [tasks]);
+  }, [tasks, isMounted]);
 
   const habitMetrics = useMemo(() => {
     const total = habits.length;
@@ -134,47 +162,66 @@ export default function AnalyticsOverviewPage() {
   }, [habits]);
 
   const handleExportReport = () => {
-    redirect("/reports");
+    const csvContent = exportTasksToCSV(sortedTasks);
+    downloadCSV(csvContent, `analytics_tasks_${new Date().toISOString().slice(0, 10)}.csv`);
+    toast.success("Analytics exported to CSV successfully!");
   };
 
   const isWeekly = pastDays === "7";
-  const timeLabel = isWeekly ? 'Weekly Focus' : 'Today\'s Focus';
+  const timeLabel = isWeekly ? 'Weekly' : 'Today\'s';
 
-  const stats = [
-    {
-      label: `${timeLabel} Time`,
-      value: isSummaryLoading ? <Skeleton className="h-8 w-16" /> : `${summaryData?.stats?.totalHours ?? 0}h`,
-      trend: '+12%',
-      icon: Clock,
-      gradient: 'from-cyan-500 to-blue-500',
-      isLoading: isSummaryLoading
-    },
-    {
-      label: `${timeLabel} Minutes`,
-      value: isSummaryLoading ? <Skeleton className="h-8 w-20" /> : `${summaryData?.stats?.totalMinutes ?? 0}m`,
-      trend: '+2',
-      icon: CheckCircle,
-      gradient: 'from-purple-500 to-pink-500',
-      isLoading: isSummaryLoading
-    },
-    {
-      label: 'Overall Focus Score',
-      value: isFocusLoading ? <Skeleton className="h-8 w-24" /> : `${focusScoreData?.stats?.scoreDisplay ?? (focusScoreData?.stats?.scorePercent ?? focusScoreData?.stats?.score ?? 0)} / 100`,
-      trend: '+5pts',
-      icon: Target,
-      gradient: 'from-green-500 to-emerald-500',
-      isLoading: isFocusLoading
-    },
-    {
-      label: `${isWeekly ? 'Weekly' : 'Daily'} Goal Progress`,
-      value: isSummaryLoading ? <Skeleton className="h-8 w-16" /> : `${Math.round(((summaryData?.stats?.totalHours || 0) / (summaryData?.stats?.dailyGoalHours || 1)) * 100)}%`,
-      trend: 'Target',
-      icon: TrendingUp,
-      gradient: 'from-orange-500 to-red-500',
-      isLoading: isSummaryLoading
-    },
+  const stats = useMemo(() => {
+    // Determine loading states
+    // We only show the full-card skeleton on initial load or if data is missing during a fetch
+    const isSummaryMissing = !summaryData && (isSummaryLoading || isSummaryFetching);
+    const isFocusMissing = !focusScoreData && (isFocusLoading || isFocusFetching);
 
-  ];
+    // Format Values
+    const hours = summaryData?.stats?.totalHours ?? 0;
+    const formattedHours = hours >= 10 ? Math.round(hours) : hours.toFixed(1);
+
+    const focusScore = focusScoreData?.stats?.scorePercent ?? focusScoreData?.stats?.score ?? 0;
+    const scoreDisplay = focusScoreData?.stats?.scoreDisplay ?? Math.round(focusScore).toString();
+
+    const progress = summaryData?.stats?.dailyGoalHours
+      ? Math.min(100, Math.round((hours / summaryData.stats.dailyGoalHours) * 100))
+      : 0;
+
+    return [
+      {
+        label: `${timeLabel} Focus Time`,
+        value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : `${formattedHours}h`,
+        trend: isWeekly ? "Total" : "+12%",
+        icon: Clock,
+        gradient: 'from-cyan-500 to-blue-500',
+        isLoading: isSummaryLoading && !summaryData
+      },
+      {
+        label: `${timeLabel} Completion`,
+        value: isSummaryMissing ? <Skeleton className="h-8 w-12 bg-white/10" /> : `${summaryData?.stats?.totalTasksCompleted ?? 0}`,
+        trend: "Tasks",
+        icon: CheckCircle,
+        gradient: 'from-purple-500 to-pink-500',
+        isLoading: isSummaryLoading && !summaryData
+      },
+      {
+        label: 'Overall Focus Score',
+        value: isFocusMissing ? <Skeleton className="h-8 w-24 bg-white/10" /> : `${scoreDisplay}/100`,
+        trend: focusScore >= 80 ? "Excellent" : focusScore >= 60 ? "Good" : "Steady",
+        icon: Target,
+        gradient: 'from-green-500 to-emerald-500',
+        isLoading: isFocusLoading && !focusScoreData
+      },
+      {
+        label: `${isWeekly ? 'Weekly' : 'Daily'} Target`,
+        value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : `${progress}%`,
+        trend: "Progress",
+        icon: TrendingUp,
+        gradient: 'from-orange-500 to-red-500',
+        isLoading: isSummaryLoading && !summaryData
+      },
+    ];
+  }, [summaryData, focusScoreData, isSummaryLoading, isSummaryFetching, isFocusLoading, isFocusFetching, timeLabel, isWeekly]);
 
   return (
     <div className="space-y-8">
@@ -187,175 +234,175 @@ export default function AnalyticsOverviewPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 min-w-0">
           <FocusTrends pastDays={pastDays} />
-                  </div>
-                  <div className="min-w-0">
-                    <SessionBreakdown pastDays={pastDays} />
-                  </div>
-                </div>
-                {/* <ActivityHeatmap pastDays={pastDays} /> */}
+        </div>
+        <div className="min-w-0">
+          <SessionBreakdown pastDays={pastDays} />
+        </div>
+      </div>
+      {/* <ActivityHeatmap pastDays={pastDays} /> */}
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  <Card variant="glass" className="p-6">
-                    <CardHeader>
-                      <CardTitle>Task Analytics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {isTasksLoading ? (
-                        <div className="grid grid-cols-2 gap-3">
-                          {Array.from({ length: 10 }).map((_, index) => (
-                            <Skeleton key={index} className="h-16 bg-white/10" />
-                          ))}
-                        </div>
-                      ) : (
-                        <MetricGrid
-                          metrics={[
-                            { label: "Total Tasks", value: taskMetrics.total, colorClass: "bg-slate-400" },
-                            { label: "Completed", value: taskMetrics.completed, colorClass: "bg-emerald-400" },
-                            { label: "In Progress", value: taskMetrics.inProgress, colorClass: "bg-cyan-400" },
-                            { label: "Pending", value: taskMetrics.pending, colorClass: "bg-amber-400" },
-                            { label: "Overdue", value: taskMetrics.overdue, colorClass: "bg-rose-400" },
-                            { label: "Due Today", value: taskMetrics.dueToday, colorClass: "bg-violet-400" },
-                            { label: "High Priority", value: taskMetrics.highPriority, colorClass: "bg-rose-400" },
-                            { label: "Medium Priority", value: taskMetrics.mediumPriority, colorClass: "bg-amber-400" },
-                            { label: "Low Priority", value: taskMetrics.lowPriority, colorClass: "bg-sky-400" },
-                            { label: "No Due Date", value: taskMetrics.withoutDueDate, colorClass: "bg-slate-300 text-slate-800" },
-                          ]}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Card variant="glass" className="p-6">
+          <CardHeader>
+            <CardTitle>Task Analytics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isTasksLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 10 }).map((_, index) => (
+                  <Skeleton key={index} className="h-16 bg-white/10" />
+                ))}
+              </div>
+            ) : (
+              <MetricGrid
+                metrics={[
+                  { label: "Total Tasks", value: taskMetrics.total, colorClass: "bg-slate-400" },
+                  { label: "Completed", value: taskMetrics.completed, colorClass: "bg-emerald-400" },
+                  { label: "In Progress", value: taskMetrics.inProgress, colorClass: "bg-cyan-400" },
+                  { label: "Pending", value: taskMetrics.pending, colorClass: "bg-amber-400" },
+                  { label: "Overdue", value: taskMetrics.overdue, colorClass: "bg-rose-400" },
+                  { label: "Due Today", value: taskMetrics.dueToday, colorClass: "bg-violet-400" },
+                  { label: "High Priority", value: taskMetrics.highPriority, colorClass: "bg-rose-400" },
+                  { label: "Medium Priority", value: taskMetrics.mediumPriority, colorClass: "bg-amber-400" },
+                  { label: "Low Priority", value: taskMetrics.lowPriority, colorClass: "bg-sky-400" },
+                  { label: "No Due Date", value: taskMetrics.withoutDueDate, colorClass: "bg-slate-300 text-slate-800" },
+                ]}
+              />
+            )}
+          </CardContent>
+        </Card>
 
-                  <Card variant="glass" className="p-6">
-                    <CardHeader>
-                      <CardTitle>Habit Analytics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {isHabitsLoading ? (
-                        <div className="grid grid-cols-2 gap-3">
-                          {Array.from({ length: 9 }).map((_, index) => (
-                            <Skeleton key={index} className="h-16 bg-white/10" />
-                          ))}
-                        </div>
-                      ) : (
-                        <MetricGrid
-                          metrics={[
-                            { label: "Total Habits", value: habitMetrics.total, colorClass: "bg-white text-slate-800" },
-                            { label: "Active Streaks", value: habitMetrics.active, colorClass: "bg-emerald-400" },
-                            { label: "Broken Streaks", value: habitMetrics.broken, colorClass: "bg-rose-400" },
-                            { label: "At Risk", value: habitMetrics.atRisk, colorClass: "bg-amber-400" },
-                            { label: "Daily Habits", value: habitMetrics.daily, colorClass: "bg-cyan-400" },
-                            { label: "Weekly Habits", value: habitMetrics.weekly, colorClass: "bg-violet-400" },
-                            { label: "Avg Current Streak", value: habitMetrics.averageStreak, colorClass: "bg-sky-400" },
-                            { label: "Longest Streak", value: habitMetrics.longestStreak, colorClass: "bg-fuchsia-400" },
-                            { label: "Mercy Active", value: habitMetrics.mercyActive, colorClass: "bg-orange-400", colSpan: 2 },
-                          ]}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+        <Card variant="glass" className="p-6">
+          <CardHeader>
+            <CardTitle>Habit Analytics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isHabitsLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 9 }).map((_, index) => (
+                  <Skeleton key={index} className="h-16 bg-white/10" />
+                ))}
+              </div>
+            ) : (
+              <MetricGrid
+                metrics={[
+                  { label: "Total Habits", value: habitMetrics.total, colorClass: "bg-white text-slate-800" },
+                  { label: "Active Streaks", value: habitMetrics.active, colorClass: "bg-emerald-400" },
+                  { label: "Broken Streaks", value: habitMetrics.broken, colorClass: "bg-rose-400" },
+                  { label: "At Risk", value: habitMetrics.atRisk, colorClass: "bg-amber-400" },
+                  { label: "Daily Habits", value: habitMetrics.daily, colorClass: "bg-cyan-400" },
+                  { label: "Weekly Habits", value: habitMetrics.weekly, colorClass: "bg-violet-400" },
+                  { label: "Avg Current Streak", value: habitMetrics.averageStreak, colorClass: "bg-sky-400" },
+                  { label: "Longest Streak", value: habitMetrics.longestStreak, colorClass: "bg-fuchsia-400" },
+                  { label: "Mercy Active", value: habitMetrics.mercyActive, colorClass: "bg-orange-400", colSpan: 2 },
+                ]}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-                <Card variant="glass" className="p-6">
-                  <CardHeader>
-                    <CardTitle>All Tasks</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isTasksLoading ? (
-                      <div className="space-y-2">
-                        {Array.from({ length: 8 }).map((_, index) => (
-                          <Skeleton key={index} className="h-12 bg-white/10" />
-                        ))}
-                      </div>
-                    ) : sortedTasks.length === 0 ? (
-                      <Empty>
-                        <EmptyTitle>No tasks found.</EmptyTitle>
-                      </Empty>
-                    ) : (
-                      <div className="w-full overflow-x-auto">
-                        <Table className="text-sm min-w-[920px]">
-                        <TableHeader>
-                          <TableRow className="text-left text-slate-400 border-b border-white/10">
-                            <TableHead className="py-2 pr-4 text-white">Title</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Status</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Priority</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Due Date</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Category</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Recurring</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Subtasks</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Attachments</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {sortedTasks.map((task) => (
-                            <TableRow key={task.id} className="border-b border-white/5 text-slate-200">
-                              <TableCell className="py-2 pr-4 font-medium max-w-[260px] truncate">{task.title}</TableCell>
-                              <TableCell className="py-2 pr-4">{task.status}</TableCell>
-                              <TableCell className="py-2 pr-4">{task.priority}</TableCell>
-                              <TableCell className="py-2 pr-4">{task.dueDate ? new Date(task.dueDate).toLocaleString() : "—"}</TableCell>
-                              <TableCell className="py-2 pr-4">{task.category?.name || "—"}</TableCell>
-                              <TableCell className="py-2 pr-4">{task.isRecurring ? "Yes" : "No"}</TableCell>
-                              <TableCell className="py-2 pr-4">{task.subtasks?.length ?? 0}</TableCell>
-                              <TableCell className="py-2 pr-4">{task.attachments?.length ?? 0}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+      <Card variant="glass" className="p-6">
+        <CardHeader>
+          <CardTitle>All Tasks</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isTasksLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <Skeleton key={index} className="h-12 bg-white/10" />
+              ))}
+            </div>
+          ) : sortedTasks.length === 0 ? (
+            <Empty>
+              <EmptyTitle>No tasks found.</EmptyTitle>
+            </Empty>
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <Table className="text-sm min-w-[920px]">
+                <TableHeader>
+                  <TableRow className="text-left text-slate-400 border-b border-white/10">
+                    <TableHead className="py-2 pr-4 text-white">Title</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Status</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Priority</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Due Date</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Category</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Recurring</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Subtasks</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Attachments</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedTasks.map((task) => (
+                    <TableRow key={task.id} className="border-b border-white/5 text-slate-200">
+                      <TableCell className="py-2 pr-4 font-medium max-w-[260px] truncate">{task.title}</TableCell>
+                      <TableCell className="py-2 pr-4">{task.status}</TableCell>
+                      <TableCell className="py-2 pr-4">{task.priority}</TableCell>
+                      <TableCell className="py-2 pr-4">{isMounted && task.dueDate ? new Date(task.dueDate).toLocaleString() : "—"}</TableCell>
+                      <TableCell className="py-2 pr-4">{task.category?.name || "—"}</TableCell>
+                      <TableCell className="py-2 pr-4">{task.isRecurring ? "Yes" : "No"}</TableCell>
+                      <TableCell className="py-2 pr-4">{task.subtasks?.length ?? 0}</TableCell>
+                      <TableCell className="py-2 pr-4">{task.attachments?.length ?? 0}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-                <Card variant="glass" className="p-6">
-                  <CardHeader>
-                    <CardTitle>All Habits</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isHabitsLoading ? (
-                      <div className="space-y-2">
-                        {Array.from({ length: 6 }).map((_, index) => (
-                          <Skeleton key={index} className="h-12 bg-white/10" />
-                        ))}
-                      </div>
-                    ) : sortedHabits.length === 0 ? (
-                      <Empty>
-                        <EmptyTitle>No habits found.</EmptyTitle>
-                      </Empty>
-                    ) : (
-                      <div className="w-full overflow-x-auto">
-                        <Table className="text-sm min-w-[980px]">
-                        <TableHeader>
-                          <TableRow className="text-left text-slate-400 border-b border-white/10">
-                            <TableHead className="py-2 pr-4 text-white">Habit</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Frequency</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Target</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Current Streak</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Longest Streak</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Streak Status</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Streak Health</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Last Log Date</TableHead>
-                            <TableHead className="py-2 pr-4 text-white">Mercy</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {sortedHabits.map((habit) => (
-                            <TableRow key={habit.id} className="border-b border-white/5 text-slate-200">
-                              <TableCell className="py-2 pr-4 font-medium">{habit.icon || "✨"} {habit.name}</TableCell>
-                              <TableCell className="py-2 pr-4">{habit.frequency}</TableCell>
-                              <TableCell className="py-2 pr-4">{habit.targetValue}</TableCell>
-                              <TableCell className="py-2 pr-4">{habit.currentStreak}</TableCell>
-                              <TableCell className="py-2 pr-4">{habit.longestStreak}</TableCell>
-                              <TableCell className="py-2 pr-4">{habit.streakStatus}</TableCell>
-                              <TableCell className="py-2 pr-4">{habit.streakHealth || "—"}</TableCell>
-                              <TableCell className="py-2 pr-4">{habit.lastLogDate ? new Date(habit.lastLogDate).toLocaleString() : "—"}</TableCell>
-                              <TableCell className="py-2 pr-4">{habit.isMercyActive ? `Active (${habit.mercyDaysUsed || 0}/${habit.mercyDaysAllowed || 0})` : "Inactive"}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+      <Card variant="glass" className="p-6">
+        <CardHeader>
+          <CardTitle>All Habits</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isHabitsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-12 bg-white/10" />
+              ))}
+            </div>
+          ) : sortedHabits.length === 0 ? (
+            <Empty>
+              <EmptyTitle>No habits found.</EmptyTitle>
+            </Empty>
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <Table className="text-sm min-w-[980px]">
+                <TableHeader>
+                  <TableRow className="text-left text-slate-400 border-b border-white/10">
+                    <TableHead className="py-2 pr-4 text-white">Habit</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Frequency</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Target</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Current Streak</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Longest Streak</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Streak Status</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Streak Health</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Last Log Date</TableHead>
+                    <TableHead className="py-2 pr-4 text-white">Mercy</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedHabits.map((habit) => (
+                    <TableRow key={habit.id} className="border-b border-white/5 text-slate-200">
+                      <TableCell className="py-2 pr-4 font-medium">{habit.icon || "✨"} {habit.name}</TableCell>
+                      <TableCell className="py-2 pr-4">{habit.frequency}</TableCell>
+                      <TableCell className="py-2 pr-4">{habit.targetValue}</TableCell>
+                      <TableCell className="py-2 pr-4">{habit.currentStreak}</TableCell>
+                      <TableCell className="py-2 pr-4">{habit.longestStreak}</TableCell>
+                      <TableCell className="py-2 pr-4">{habit.streakStatus}</TableCell>
+                      <TableCell className="py-2 pr-4">{habit.streakHealth || "—"}</TableCell>
+                      <TableCell className="py-2 pr-4">{isMounted && habit.lastLogDate ? new Date(habit.lastLogDate).toLocaleString() : "—"}</TableCell>
+                      <TableCell className="py-2 pr-4">{habit.isMercyActive ? `Active (${habit.mercyDaysUsed || 0}/${habit.mercyDaysAllowed || 0})` : "Inactive"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

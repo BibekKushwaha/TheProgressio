@@ -1,14 +1,23 @@
 'use client';
+import React from 'react';
+
 
 import { motion } from 'framer-motion';
 import { Trophy, Flame, Clock, Zap } from 'lucide-react';
 import { useGetUserStreakQuery, useGetFocusScoreQuery, selectCurrentUser, useAppSelector, useGetUserXPQuery } from '@repo/store';
 
 export function ProgressSection() {
+  const [mounted, setMounted] = React.useState(false);
   const user = useAppSelector(selectCurrentUser);
   const { data: streakData } = useGetUserStreakQuery(undefined, { skip: !user });
   const { data: focusScoreData } = useGetFocusScoreQuery(undefined, { skip: !user });
   const { data: xpData } = useGetUserXPQuery(undefined, { skip: !user });
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const showUserContent = mounted && !!user;
 
   // Calculate XP and Stats
   const currentStreak = streakData?.streak || 0;
@@ -23,21 +32,21 @@ export function ProgressSection() {
   const STATS = [
     {
       icon: Flame,
-      value: user ? currentStreak.toString() : '21',
+      value: showUserContent ? currentStreak.toString() : '21',
       label: 'Day Streak',
       cardTone: 'from-purple-900/30 to-purple-950/20 border-purple-500/20',
       iconTone: 'bg-purple-600/20 text-orange-400',
     },
     {
       icon: Clock,
-      value: user ? totalHours.toString() : '156',
+      value: showUserContent ? totalHours.toString() : '156',
       label: 'Hours Studied',
       cardTone: 'from-indigo-900/30 to-indigo-950/20 border-indigo-500/20',
       iconTone: 'bg-indigo-600/20 text-indigo-400',
     },
     {
       icon: Zap,
-      value: user ? totalXP.toLocaleString() : '3,420',
+      value: showUserContent ? totalXP.toLocaleString() : '3,420',
       label: 'XP Earned',
       cardTone: 'from-pink-900/30 to-pink-950/20 border-pink-500/20',
       iconTone: 'bg-pink-600/20 text-yellow-400',
@@ -99,21 +108,21 @@ export function ProgressSection() {
                 </div>
                 <div>
                   <div className="font-bold">
-                    {user ? `Level ${currentLevel} Scholar` : 'Level 12 Scholar'}
+                    {showUserContent ? `Level ${currentLevel} Scholar` : 'Level 12 Scholar'}
                   </div>
                   <div className="text-sm text-slate-400">
-                    {user ? `${xpNeededForNext.toLocaleString()} XP to Level ${currentLevel + 1}` : '2,580 XP to Level 13'}
+                    {showUserContent ? `${xpNeededForNext.toLocaleString()} XP to Level ${currentLevel + 1}` : '2,580 XP to Level 13'}
                   </div>
                 </div>
               </div>
-              <div className="text-2xl font-bold">Lvl {user ? currentLevel : '12'}</div>
+              <div className="text-2xl font-bold">Lvl {showUserContent ? currentLevel : '12'}</div>
             </div>
 
             <div className="relative">
               <div className="h-4 bg-slate-700/50 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
-                  whileInView={{ width: `${user ? progressPercent : 67}%` }}
+                  whileInView={{ width: `${showUserContent ? progressPercent : 67}%` }}
                   viewport={{ once: true }}
                   transition={{ duration: 1.5, ease: 'easeOut', delay: 0.5 }}
                   className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
@@ -121,7 +130,7 @@ export function ProgressSection() {
               </div>
               <motion.div
                 initial={{ left: 0 }}
-                whileInView={{ left: `${user ? progressPercent : 67}%` }}
+                whileInView={{ left: `${showUserContent ? progressPercent : 67}%` }}
                 viewport={{ once: true }}
                 transition={{ duration: 1.5, ease: 'easeOut', delay: 0.5 }}
                 className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 bg-white rounded-full shadow-lg"

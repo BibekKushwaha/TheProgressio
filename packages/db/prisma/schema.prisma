@@ -56,6 +56,23 @@ model User {
   
   mobileRefreshTokens MobileRefreshToken[]
   familyShareLinks    FamilyShareLink[]
+  notes               Note[]
+  auditLogs           AuditLog[]
+  pushSubscriptions   WebPushSubscription[]
+}
+
+model WebPushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model MobileRefreshToken {
@@ -522,4 +539,30 @@ enum AttendanceMethod {
   QR
   MANUAL
   GEOFENCE
+}
+
+// ── Phase 5: Notes & Audit Trails ────────────────────────────────────────
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String   // e.g., "TASK_COMPLETED", "HABIT_LOGGED", "ATTENDANCE_MARKED"
+  entityType String   // e.g., "TASK", "HABIT", "ATTENDANCE"
+  entityId   String
+  details    String?  // JSON string containing extra details
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
