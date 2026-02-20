@@ -2,14 +2,18 @@
 
 import React, { useState } from 'react';
 import { useGetWeeklyTrendsQuery, useGetProfileQuery } from '@repo/store';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function WeeklyActivity() {
     const [viewType, setViewType] = useState<'week' | 'month'>('week');
+    const isVisible = usePageVisibility();
     const { data: profileData } = useGetProfileQuery();
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
-        pollingInterval: 30000,
+        // Weekly trends change at most once per study session — 5-min poll is
+        // far more than sufficient and cuts backend load by 5×.
+        pollingInterval: isVisible ? 300000 : 0,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });

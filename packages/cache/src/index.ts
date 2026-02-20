@@ -17,3 +17,9 @@ export {
   deleteUserCache,
 } from './userCache.js';
 export type { UserCacheValue } from './userCache.js';
+export {
+  getAnalyticsCacheKey,
+  getAnalyticsCache,
+  setAnalyticsCache,
+  deleteAnalyticsCache,
+} from './analyticsCache.js';

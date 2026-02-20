@@ -118,6 +118,10 @@ vi.mock('@repo/db', () => ({
                 id: 'ge1', subjectName: 'Physics', chapter: 'Mechanics',
                 totalMarks: 100, obtainedMarks: 85, examType: 'JEE',
             }),
+            findFirst: vi.fn().mockResolvedValue({
+                id: 'ge1', subjectName: 'Physics', chapter: 'Mechanics',
+                totalMarks: 100, obtainedMarks: 85, examType: 'JEE',
+            }),
             findMany: vi.fn().mockResolvedValue([]),
             delete: vi.fn().mockResolvedValue({ id: 'ge1' }),
             deleteMany: vi.fn().mockResolvedValue({ count: 1 }),

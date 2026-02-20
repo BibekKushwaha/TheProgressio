@@ -4,35 +4,38 @@ import { useMemo } from 'react';
 import { Target, Flame } from 'lucide-react';
 import {
     useGetDailySummaryQuery,
-    useGetFocusScoreQuery,
-    useGetUserStreakQuery,
+    useGetDashboardSummaryQuery,
     useGetActiveLiveSessionQuery
 } from '@repo/store';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toLocalDateKey, normalizeDateInput } from '@/lib/date';
 
 export function TopStats() {
+    const isVisible = usePageVisibility();
+    const pollMs = isVisible ? 60000 : 0;
+
     // Enable polling and refetch-on-focus to keep stats fresh
     const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery("1", {
-        pollingInterval: 30000,
+        pollingInterval: pollMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
 
-    const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery(undefined, {
-        pollingInterval: 60000,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
-
-    const { data: streakData, isLoading: isStreakLoading } = useGetUserStreakQuery(undefined, {
-        pollingInterval: 60000,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
+    // BFF replaces useGetFocusScoreQuery: delivers score+breakdown in one call
+    // that the dashboard-summary cache (2-min TTL) already has warm.
+    // v2 of the BFF also includes activeDates[], eliminating useGetUserStreakQuery.
+    const { data: dashboardData, isLoading: isFocusLoading } = useGetDashboardSummaryQuery(
+        { leakageDays: 1, peakDays: 7 },
+        {
+            pollingInterval: pollMs,
+            refetchOnFocus: true,
+            refetchOnReconnect: true,
+        }
+    );
 
     const { data: activeLive } = useGetActiveLiveSessionQuery(undefined, {
-        pollingInterval: 10000,
+        pollingInterval: 10000, // real-time — keep fast
         refetchOnFocus: true,
     });
 
@@ -48,8 +51,8 @@ export function TopStats() {
     const progress = Math.min(100, Math.round((totalHours / dailyGoalHours) * 100));
 
     // 2. Focus Score Logic
-    const focusScoreStats = focusScoreData?.stats;
-    const rawFocusScore = focusScoreStats?.scorePercent ?? focusScoreStats?.score ?? 0;
+    const focusScoreStats = dashboardData?.focus;
+    const rawFocusScore = focusScoreStats?.score ?? 0;
     const focusScoreNumeric = Math.max(0, Math.min(100, Number(rawFocusScore)));
     const displayFocusScore = isFocusLoading ? '—' : focusScoreNumeric.toFixed(1);
 
@@ -83,11 +86,11 @@ export function TopStats() {
         },
     ];
 
-    // 3. Streak and History Logic
-    const currentStreak = streakData?.streak ?? 0;
+    // 3. Streak and History Logic — sourced from BFF (no separate round-trip)
+    const currentStreak = dashboardData?.streak ?? 0;
 
     const activeDateSet = useMemo(() => {
-        const dates = streakData?.activeDates || [];
+        const dates = dashboardData?.activeDates || [];
         const set = new Set<string>();
         dates.forEach((d) => {
             if (!d) return;
@@ -107,7 +110,7 @@ export function TopStats() {
             }
         });
         return set;
-    }, [streakData?.activeDates]);
+    }, [dashboardData?.activeDates]);
 
     const historyDots = useMemo(() => {
         return Array.from({ length: 14 }).map((_, i) => {
@@ -228,7 +231,7 @@ export function TopStats() {
                     <div>
                         <div className="text-sm text-slate-400 mb-1">Active Streak</div>
                         <div className="text-3xl font-bold">
-                            {isStreakLoading ? <Skeleton className="h-9 w-12" /> : currentStreak}
+                            {isFocusLoading ? <Skeleton className="h-9 w-12" /> : currentStreak}
                         </div>
                     </div>
                     <div className={`p-3 rounded-xl bg-gradient-to-br transition-all duration-500 ${currentStreak > 0 ? "from-orange-500 to-red-500 shadow-lg shadow-orange-500/20" : "from-slate-700 to-slate-800"}`}>

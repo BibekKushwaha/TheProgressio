@@ -281,6 +281,36 @@ export interface SubjectPerformance {
     trend?: string;
 }
 
+export interface DashboardFocusStats {
+    score: number;
+    breakdown: FocusScoreBreakdown;
+    totalSessions: number;
+    totalMinutes: number;
+    activeDays: number;
+    avgHoursPerDay: number;
+}
+
+export interface DashboardSummaryResponse {
+    message: string;
+    leakage: TimeLeakageReport;
+    peak: PeakProductivityResult;
+    focus: DashboardFocusStats;
+    streak: number;
+    // 14 most recent active date strings (ISO YYYY-MM-DD) — used by TopStats
+    // history dots, eliminating a separate useGetUserStreakQuery round-trip.
+    activeDates: string[];
+    generatedAt: string;
+}
+export interface StrategicSummaryResponse {
+    message: string;
+    peak: PeakProductivityResult;
+    leakage: TimeLeakageReport;
+    swot: FullSWOT;
+    cycleTime: CycleTimeData;
+    predictive: LearningPace[];
+    examType: string;
+    generatedAt: string;
+}
 export const analyticsApi = createApi({
     reducerPath: 'analyticsApi',
     baseQuery: fetchBaseQuery({
@@ -610,6 +640,50 @@ export const analyticsApi = createApi({
             }),
             providesTags: ['Stats'],
         }),
+
+        // ── BFF: Dashboard Summary (batches leakage + peak + focus + streak) ──
+        getDashboardSummary: builder.query<
+            DashboardSummaryResponse,
+            { leakageDays?: number; peakDays?: number } | void
+        >({
+            query: (params) => ({
+                url: '/stats/dashboard-summary',
+                params: {
+                    ...(params?.leakageDays ? { leakageDays: String(params.leakageDays) } : {}),
+                    ...(params?.peakDays ? { peakDays: String(params.peakDays) } : {}),
+                },
+            }),
+            providesTags: ['Stats'],
+        }),
+
+        // ── BFF: Strategic Summary (batches peak + leakage + swot + cycleTime + predictive) ──
+        getStrategicSummary: builder.query<
+            StrategicSummaryResponse,
+            { examType?: string } | void
+        >({
+            query: (params) => ({
+                url: '/stats/strategic-summary',
+                params: params?.examType ? { examType: params.examType } : {},
+            }),
+            // The backend returns cycleTime in raw CycleTimePercentiles shape
+            // (minutes, `mean`, `dataPoints`).  Normalise to CycleTimeData so
+            // CycleTimeScatterPlot receives the same shape as getCycleTime does.
+            transformResponse: (response: any): StrategicSummaryResponse => ({
+                ...response,
+                cycleTime: {
+                    p50: (response.cycleTime?.p50 || 0) / 60,
+                    p85: (response.cycleTime?.p85 || 0) / 60,
+                    p95: (response.cycleTime?.p95 || 0) / 60,
+                    avg: (response.cycleTime?.mean || 0) / 60,
+                    recentTasks: (response.cycleTime?.dataPoints || []).map((p: any) => ({
+                        title: p.taskTitle,
+                        cycleTimeHours: p.minutes / 60,
+                        completedAt: p.completedAt,
+                    })),
+                },
+            }),
+            providesTags: ['Stats'],
+        }),
     }),
 });
 
@@ -648,4 +722,6 @@ export const {
     useGetPredictivePerformanceQuery,
     useGetNotificationIntelligenceQuery,
     useGetNotificationContextSignalsQuery,
+    useGetDashboardSummaryQuery,
+    useGetStrategicSummaryQuery,
 } = analyticsApi;

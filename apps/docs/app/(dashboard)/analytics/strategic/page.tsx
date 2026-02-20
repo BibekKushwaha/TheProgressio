@@ -9,13 +9,17 @@ import { TimeLeakageCard } from '@/components/analytics/TimeLeakageCard';
 import { SWOTReport } from '@/components/analytics/SWOTReport';
 import { GlassHero } from '@/components/layout/GlassHero';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TaskStatus, useGetTasksQuery } from "@repo/store";
+import { TaskStatus, useGetTasksQuery, useGetStrategicSummaryQuery } from "@repo/store";
 import { BrainCircuit, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 export default function AnalyticsStrategicPage() {
   const [selectedPredictionTaskId, setSelectedPredictionTaskId] = useState("");
-  const { data: allTasks } = useGetTasksQuery({ limit: 100 });
+  const { data: allTasks } = useGetTasksQuery({ limit: 50 });
+
+  // Single BFF call pre-warms all 5 expensive analytics in parallel.
+  // Each child component receives the result as initialData and skips its own query.
+  const { data: strategicData } = useGetStrategicSummaryQuery({ examType: 'JEE' });
   const predictionTaskOptions = useMemo(() => {
     if (!allTasks) return [];
     return [...allTasks]
@@ -114,19 +118,23 @@ export default function AnalyticsStrategicPage() {
                   <DurationPredictionCard
                     taskId={selectedPredictionTaskId || undefined}
                   />
-                  <PredictiveScoreCard />
+                  <PredictiveScoreCard initialData={strategicData?.predictive} />
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <PeakProductivityCard />
-                  <TimeLeakageCard />
+                  <PeakProductivityCard initialData={strategicData?.peak} />
+                  <TimeLeakageCard initialData={strategicData?.leakage} />
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <CycleTimeScatterPlot />
+                  <CycleTimeScatterPlot initialData={strategicData?.cycleTime} />
                   <WhatIfGPASimulator />
                 </div>
-                <SWOTReport />
+                <SWOTReport initialData={strategicData?.swot} />
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-1">
-                  <ProductivityInsights />
+                  <ProductivityInsights
+                    initialLeakage={strategicData?.leakage}
+                    initialPeak={strategicData?.peak}
+                    initialPredictive={strategicData?.predictive}
+                  />
                 </div>
               </div>
 

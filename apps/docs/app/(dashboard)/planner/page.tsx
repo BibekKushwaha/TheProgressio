@@ -34,7 +34,7 @@ const mergeTaskSources = (remoteTasks: Task[], localTasks: LocalTask[]): Task[] 
 };
 
 const PlannerPage = () => {
-    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 500 });
+    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 50 });
     const { tasks: cachedTasks } = useLocalTasks();
     
     const tasks = useMemo(

@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
 
-const sw = self as unknown as ServiceWorkerGlobalScope;
+/* global self */
+// eslint-disable-next-line no-undef
+const sw = /** @type {ServiceWorkerGlobalScope} */ (self);
 
 sw.addEventListener('push', (event) => {
     if (!event.data) return;

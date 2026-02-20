@@ -1,15 +1,20 @@
 'use client';
 
 import React from 'react';
-import { useGetPeakWindowQuery } from '@repo/store';
+import { useGetPeakWindowQuery, PeakProductivityResult } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Zap, Target } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-export function PeakProductivityCard() {
-    const { data, isLoading } = useGetPeakWindowQuery(14); // Last 14 days
-    const peak = data?.data;
+interface PeakProductivityCardProps {
+    /** Pre-fetched data from a BFF call. When provided the query is skipped. */
+    initialData?: PeakProductivityResult;
+}
+
+export function PeakProductivityCard({ initialData }: PeakProductivityCardProps = {}) {
+    const { data, isLoading } = useGetPeakWindowQuery(14, { skip: !!initialData });
+    const peak = initialData ?? data?.data;
 
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-2xl" />;

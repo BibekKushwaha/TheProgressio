@@ -1,15 +1,20 @@
 'use client';
 
 import React from 'react';
-import { useGetTimeLeakageQuery } from '@repo/store';
+import { useGetTimeLeakageQuery, TimeLeakageReport } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, TrendingDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-export function TimeLeakageCard() {
-    const { data, isLoading } = useGetTimeLeakageQuery(7); // Last 7 days
-    const report = data?.report;
+interface TimeLeakageCardProps {
+    /** Pre-fetched data from a BFF call. When provided the query is skipped. */
+    initialData?: TimeLeakageReport;
+}
+
+export function TimeLeakageCard({ initialData }: TimeLeakageCardProps = {}) {
+    const { data, isLoading } = useGetTimeLeakageQuery(7, { skip: !!initialData });
+    const report = initialData ?? data?.report;
 
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-2xl" />;

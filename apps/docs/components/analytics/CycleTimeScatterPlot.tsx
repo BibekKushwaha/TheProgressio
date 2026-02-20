@@ -1,13 +1,19 @@
 'use client';
 
 import React from 'react';
-import { useGetCycleTimeQuery } from '@repo/store';
+import { useGetCycleTimeQuery, CycleTimeData } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { TrendingUp, AlertTriangle, CheckCircle2, Loader2, Info } from 'lucide-react';
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, Cell, ReferenceLine, CartesianGrid } from 'recharts';
 
-export function CycleTimeScatterPlot() {
-    const { data, isLoading, error } = useGetCycleTimeQuery();
+interface CycleTimeScatterPlotProps {
+    /** Pre-fetched data from a BFF call. When provided the query is skipped. */
+    initialData?: CycleTimeData;
+}
+
+export function CycleTimeScatterPlot({ initialData }: CycleTimeScatterPlotProps = {}) {
+    const { data, isLoading, error } = useGetCycleTimeQuery(undefined, { skip: !!initialData });
+    const resolvedData = initialData ? { message: 'ok', data: initialData } : data;
 
     if (isLoading) {
         return (
@@ -20,7 +26,7 @@ export function CycleTimeScatterPlot() {
         );
     }
 
-    if (error || !data) {
+    if (error || !resolvedData) {
         return (
             <Card variant="glass" className="h-[400px] flex items-center justify-center p-6 text-center">
                 <div className="space-y-2">
@@ -32,7 +38,7 @@ export function CycleTimeScatterPlot() {
         );
     }
 
-    const { p50, p85, p95, avg, recentTasks } = data.data;
+    const { p50, p85, p95, avg, recentTasks } = resolvedData.data;
 
     // Format data for Scatter Chart
     // x: index or date, y: cycleTimeHours

@@ -7,6 +7,7 @@
  * Also provides cycle-time percentile analysis (50th, 85th, 95th).
  */
 import { prisma } from "@repo/db";
+import { getAnalyticsCache, setAnalyticsCache } from "@repo/cache";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -179,33 +180,39 @@ export async function getCycleTimePercentiles(
     options?: { categoryId?: string; subjectId?: string; days?: number }
 ): Promise<CycleTimePercentiles> {
     const daysBack = options?.days ?? 90;
+    const cacheKey = `cycle:${daysBack}:${options?.categoryId ?? ''}:${options?.subjectId ?? ''}`;
+    const cached = await getAnalyticsCache<CycleTimePercentiles>(userId, "cycle-time", cacheKey);
+    if (cached) return cached;
+
     const since = new Date();
     since.setDate(since.getDate() - daysBack);
 
     const where: any = {
         userId,
         completedAt: { gte: since },
+        ...(options?.categoryId ? { task: { categoryId: options.categoryId } } : {}),
+        ...(options?.subjectId ? { task: { subjectId: options.subjectId } } : {}),
     };
 
     const stats = await prisma.taskCompletionStat.findMany({
         where,
-        include: { task: { include: { category: true, subject: true } } },
+        select: {
+            totalMinutes: true,
+            completedAt: true,
+            task: { select: { title: true, categoryId: true, subjectId: true } },
+        },
         orderBy: { completedAt: "desc" },
+        take: 200,
     });
 
-    // Filter by category/subject if specified
-    let filtered = stats;
-    if (options?.categoryId) {
-        filtered = filtered.filter(s => s.task?.categoryId === options.categoryId);
-    }
-    if (options?.subjectId) {
-        filtered = filtered.filter(s => s.task?.subjectId === options.subjectId);
-    }
+    const filtered = stats;
 
     const minutes = filtered.map(s => s.totalMinutes).sort((a, b) => a - b);
 
     if (minutes.length === 0) {
-        return { p50: 0, p85: 0, p95: 0, mean: 0, dataPoints: [] };
+        const empty: CycleTimePercentiles = { p50: 0, p85: 0, p95: 0, mean: 0, dataPoints: [] };
+        await setAnalyticsCache(userId, "cycle-time", empty, cacheKey, 900);
+        return empty;
     }
 
     const percentile = (arr: number[], p: number): number => {
@@ -215,7 +222,7 @@ export async function getCycleTimePercentiles(
 
     const mean = Math.round(minutes.reduce((a, b) => a + b, 0) / minutes.length);
 
-    return {
+    const result: CycleTimePercentiles = {
         p50: percentile(minutes, 50),
         p85: percentile(minutes, 85),
         p95: percentile(minutes, 95),
@@ -226,4 +233,7 @@ export async function getCycleTimePercentiles(
             completedAt: s.completedAt.toISOString(),
         })),
     };
+    // 15-minute TTL — cycle time percentiles are stable within a work session
+    await setAnalyticsCache(userId, "cycle-time", result, cacheKey, 900);
+    return result;
 }

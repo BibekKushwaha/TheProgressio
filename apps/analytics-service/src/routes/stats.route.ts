@@ -9,13 +9,16 @@ import {
     // Phase 3 — GPA
     getGPA, getWhatIfGPA, addCourse, updateCourse, deleteCourse,
     // Phase 3 — Grade Entries
-    addGradeEntry, getGradeEntries, deleteGradeEntry,
+    addGradeEntry, getGradeEntries, updateGradeEntry, deleteGradeEntry,
     // Phase 3 — Focus / Leakage
     getTimeLeakage, getPeakWindow, getPredictivePerformanceEndpoint,
     getRevisionSchedule,
     getInternalConsistency,
     getNotificationIntelligence,
     getActiveContextSignals,
+    // BFF — Dashboard
+    getDashboardSummary,
+    getStrategicSummary,
 } from "../controllers/stats.controller.js";
 import { isAuth } from "../middleware/auth.middleware.js";
 
@@ -49,6 +52,7 @@ router.delete("/gpa/course/:id", isAuth, deleteCourse);
 // ── Grade Entries ──────────────────────────────────────────────────────
 router.post("/grade-entry", isAuth, addGradeEntry);
 router.get("/grade-entries", isAuth, getGradeEntries);
+router.put("/grade-entry/:id", isAuth, updateGradeEntry);
 router.delete("/grade-entry/:id", isAuth, deleteGradeEntry);
 
 // ── Focus & Time Leakage ──────────────────────────────────────────────
@@ -60,7 +64,9 @@ router.get("/notifications/context", isAuth, getActiveContextSignals);
 
 // ── Events ─────────────────────────────────────────────────────────────
 router.post("/events/task-completed", handleTaskCompletedEvent);
-
+// ── BFF ────────────────────────────────────────────────────────────
+router.get("/dashboard-summary", isAuth, getDashboardSummary);
+router.get("/strategic-summary", isAuth, getStrategicSummary);
 // ── Internal service-to-service helpers ────────────────────────────────
 router.get("/internal/consistency", getInternalConsistency);
 
