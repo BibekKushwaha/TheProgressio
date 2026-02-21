@@ -52,7 +52,7 @@ export function QuietHoursPanel() {
         updateNudgeSettings({
             quietHours: effectiveQuietHours,
             positiveTone: newSettings.gentleNudges,
-        }).then(() => {
+        }).unwrap().then(() => {
             if (key === 'enabled') {
                 toast.success(value ? "Quiet hours enabled" : "Quiet hours disabled");
             } else if (key === 'gentleNudges') {

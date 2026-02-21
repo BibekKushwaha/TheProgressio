@@ -176,7 +176,18 @@ export function SWOTReport({ initialData }: SWOTReportProps = {}) {
             <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex gap-4 items-start">
                 <Zap className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
                 <div className="text-xs text-indigo-100/70 leading-relaxed">
-                    <strong>AI Recommendation:</strong> Our analysis suggests focusing on <span className="text-white font-bold">{swot.topPriorityChapters[0]}</span> for at least 4 hours this week. Your performance in {swot.subjects[0]?.subject} subjects shows high stability, providing a clear window for aggressive focus on weak points.
+                    {swot.topPriorityChapters.length > 0 ? (
+                        <>
+                            <strong>AI Recommendation:</strong> Our analysis suggests focusing on{' '}
+                            <span className="text-white font-bold">{swot.topPriorityChapters[0]}</span>{' '}
+                            for at least 4 hours this week. Your performance in{' '}
+                            {swot.subjects[0]?.subject} subjects shows high stability, providing a clear window for aggressive focus on weak points.
+                        </>
+                    ) : (
+                        <>
+                            <strong>AI Recommendation:</strong> Keep logging practice tests to unlock personalised chapter-level recommendations.
+                        </>
+                    )}
                 </div>
             </div>
         </div>

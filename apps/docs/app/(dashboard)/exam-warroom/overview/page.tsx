@@ -44,19 +44,19 @@ export default function ExamWarRoomPage() {
                     </div>
                     <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-5">
                         <div className="flex items-center gap-2 text-sm text-green-400 mb-1">
-                            <Trophy className="w-4 h-4" /> Easy Solved
+                            <Trophy className="w-4 h-4" /> Strong (≥80%)
                         </div>
                         <div className="text-3xl font-bold text-green-400">{difficultyStats.easy}</div>
                     </div>
                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-5">
                         <div className="flex items-center gap-2 text-sm text-yellow-400 mb-1">
-                            <Target className="w-4 h-4" /> Medium Solved
+                            <Target className="w-4 h-4" /> Developing (50–79%)
                         </div>
                         <div className="text-3xl font-bold text-yellow-400">{difficultyStats.medium}</div>
                     </div>
                     <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5">
                         <div className="flex items-center gap-2 text-sm text-red-400 mb-1">
-                            <Swords className="w-4 h-4" /> Hard Solved
+                            <Swords className="w-4 h-4" /> Needs Work (&lt;50%)
                         </div>
                         <div className="text-3xl font-bold text-red-400">{difficultyStats.hard}</div>
                     </div>

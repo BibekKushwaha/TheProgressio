@@ -684,20 +684,68 @@ export const analyticsApi = createApi({
             // The backend returns cycleTime in raw CycleTimePercentiles shape
             // (minutes, `mean`, `dataPoints`).  Normalise to CycleTimeData so
             // CycleTimeScatterPlot receives the same shape as getCycleTime does.
-            transformResponse: (response: any): StrategicSummaryResponse => ({
-                ...response,
-                cycleTime: {
-                    p50: (response.cycleTime?.p50 || 0) / 60,
-                    p85: (response.cycleTime?.p85 || 0) / 60,
-                    p95: (response.cycleTime?.p95 || 0) / 60,
-                    avg: (response.cycleTime?.mean || 0) / 60,
-                    recentTasks: (response.cycleTime?.dataPoints || []).map((p: any) => ({
-                        title: p.taskTitle,
-                        cycleTimeHours: p.minutes / 60,
-                        completedAt: p.completedAt,
-                    })),
-                },
-            }),
+            //
+            // The BFF also returns the raw swot from generateSWOT() which has:
+            //   - topPriorityChapters: ChapterAnalysis[]  (not string[])
+            //   - strengths/weaknesses/etc. with `successRate` (not `score`)
+            // Normalise to match the FullSWOT contract used by SWOTReport.
+            transformResponse: (response: any): StrategicSummaryResponse => {
+                const rawSwot = response.swot;
+                const normalizedSwot: FullSWOT | undefined = rawSwot
+                    ? {
+                          examType: rawSwot.examType,
+                          overallReadiness: rawSwot.overallReadiness ?? 0,
+                          topPriorityChapters: (rawSwot.topPriorityChapters || []).map(
+                              (c: any) => (typeof c === 'string' ? c : c.chapter)
+                          ),
+                          subjects: (rawSwot.subjects || []).map((sub: any) => ({
+                              subject: sub.subject,
+                              strengths: (sub.strengths || []).map((item: any) => ({
+                                  chapter: item.chapter,
+                                  score: item.score ?? item.successRate ?? 0,
+                              })),
+                              weaknesses: (sub.weaknesses || []).map((item: any) => ({
+                                  chapter: item.chapter,
+                                  score: item.score ?? item.successRate ?? 0,
+                              })),
+                              opportunities: (sub.opportunities || []).map((item: any) => ({
+                                  chapter: item.chapter,
+                                  score: item.score ?? item.successRate ?? 0,
+                                  reason:
+                                      item.reason ??
+                                      (item.avgTimePerQuestion > 0
+                                          ? `Avg time/question: ${item.avgTimePerQuestion} mins`
+                                          : 'Moderate score with room for improvement'),
+                              })),
+                              threats: (sub.threats || []).map((item: any) => ({
+                                  chapter: item.chapter,
+                                  score: item.score ?? item.successRate ?? 0,
+                                  reason:
+                                      item.reason ??
+                                      (item.avgTimePerQuestion > 0
+                                          ? `Low score and avg time/question: ${item.avgTimePerQuestion} mins`
+                                          : 'Low score needs immediate attention'),
+                              })),
+                          })),
+                      }
+                    : rawSwot;
+
+                return {
+                    ...response,
+                    swot: normalizedSwot,
+                    cycleTime: {
+                        p50: (response.cycleTime?.p50 || 0) / 60,
+                        p85: (response.cycleTime?.p85 || 0) / 60,
+                        p95: (response.cycleTime?.p95 || 0) / 60,
+                        avg: (response.cycleTime?.mean || 0) / 60,
+                        recentTasks: (response.cycleTime?.dataPoints || []).map((p: any) => ({
+                            title: p.taskTitle,
+                            cycleTimeHours: p.minutes / 60,
+                            completedAt: p.completedAt,
+                        })),
+                    },
+                };
+            },
             providesTags: ['Stats'],
         }),
     }),

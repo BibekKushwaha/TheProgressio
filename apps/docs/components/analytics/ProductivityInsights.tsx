@@ -266,7 +266,7 @@ export function ProductivityInsights({
                 </Card>
             )}
 
-            {!leakage && !peak && !performance && (
+            {!leakage && !peak && performance.length === 0 && (
                 <Card className="bg-white/5 backdrop-blur-md border-white/10 p-12 text-center">
                     <Clock className="w-12 h-12 text-slate-500 mx-auto mb-4" />
                     <p className="text-slate-400">No productivity insights available yet. Keep logging your activities!</p>
