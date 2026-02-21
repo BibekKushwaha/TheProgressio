@@ -1,10 +1,21 @@
-version: '3'
+# ── Usage examples ─────────────────────────────────────────────────────
+# Start everything:    docker compose up -d
+# Infra only:          docker compose up -d redis postgres
+# Single service:      docker compose up -d analytics-service
+# ──────────────────────────────────────────────────────────────────────
+
 services:
+  # ── Infrastructure ────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    restart: always
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: '0.25'
 
   postgres:
     image: postgres:15-alpine
@@ -15,7 +26,95 @@ services:
       POSTGRES_DB: transition
     volumes:
       - pgdata:/var/lib/postgresql/data
-    restart: always
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '0.50'
+
+  # ── Microservices ─────────────────────────────────────────────────────
+  analytics-service:
+    build:
+      context: .
+      dockerfile: apps/analytics-service/Dockerfile
+    ports:
+      - "4003:4003"
+    env_file: ./apps/analytics-service/.env
+    environment:
+      - NODE_ENV=development
+      - PORT=4003
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+      - REDIS_HOST=redis
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # Monte Carlo simulation is CPU-heavy; cap at 1 core to prevent
+          # runaway usage when QUEUE_ENABLED=false (synchronous fallback).
+          memory: 512m
+          cpus: '1.00'
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    ports:
+      - "4000:4000"
+    env_file: ./apps/auth-service/.env
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+      - REDIS_HOST=redis
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.50'
+
+  habit-service:
+    build:
+      context: .
+      dockerfile: apps/habit-service/Dockerfile
+    ports:
+      - "4002:4002"
+    env_file: ./apps/habit-service/.env
+    environment:
+      - NODE_ENV=development
+      - PORT=4002
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+      - REDIS_HOST=redis
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.50'
+
+  planner-service:
+    build:
+      context: .
+      dockerfile: apps/planner-service/Dockerfile
+    ports:
+      - "4001:4001"
+    env_file: ./apps/planner-service/.env
+    environment:
+      - NODE_ENV=development
+      - PORT=4001
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+      - REDIS_HOST=redis
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.50'
 
 volumes:
   pgdata:

@@ -107,15 +107,33 @@ export async function computeFocusScore(
     start.setDate(end.getDate() - 7);
     start.setHours(0, 0, 0, 0);
 
-    const sessions = await prisma.activityLog.findMany({
-        where: {
-            task: { userId },
-            startTime: { gte: start, lt: end },
-        },
-        select: { durationMinutes: true, sessionType: true, startTime: true },
-    });
+    // Single-query aggregation — returns 1 row with all 4 metrics instead of
+    // transferring every individual session row to Node.js for JS summation.
+    type FocusAggRow = {
+        total_sessions: bigint;
+        total_minutes: bigint;
+        active_days: bigint;
+        deep_work_count: bigint;
+    };
 
-    if (sessions.length === 0) {
+    const [agg] = await prisma.$queryRaw<FocusAggRow[]>`
+        SELECT COUNT(*)                                                AS total_sessions,
+               COALESCE(SUM(al."durationMinutes"), 0)                 AS total_minutes,
+               COUNT(DISTINCT DATE(al."startTime"))                   AS active_days,
+               COUNT(*) FILTER (WHERE al."sessionType" = 'DEEP_WORK') AS deep_work_count
+        FROM   "ActivityLog" al
+        INNER JOIN "Task" t ON al."taskId" = t.id
+        WHERE  t."userId"    = ${userId}
+          AND  al."startTime" >= ${start}
+          AND  al."startTime" <  ${end}
+    `;
+
+    const totalSessions   = Number(agg?.total_sessions   ?? 0);
+    const totalMinutes    = Number(agg?.total_minutes     ?? 0);
+    const activeDaysCount = Number(agg?.active_days       ?? 0);
+    const deepWorkCount   = Number(agg?.deep_work_count   ?? 0);
+
+    if (totalSessions === 0) {
         const empty: FocusScoreResult = {
             score: 0,
             breakdown: { consistency: 0, intensity: 0, depth: 0 },
@@ -125,15 +143,11 @@ export async function computeFocusScore(
         return empty;
     }
 
-    const totalMinutes = sessions.reduce((s, sess) => s + (sess.durationMinutes ?? 0), 0);
-    const activeDaysSet = new Set(sessions.map(s => s.startTime.toISOString().split("T")[0]!));
-    const activeDaysCount = activeDaysSet.size;
     const consistencyScore = (activeDaysCount / 7) * 40;
-    const avgHoursPerDay = (totalMinutes / 60) / 7;
-    const intensityScore = Math.min(30, (avgHoursPerDay / dailyGoalHours) * 30);
-    const deepWorkCount = sessions.filter(s => s.sessionType === "DEEP_WORK").length;
-    const depthScore = (deepWorkCount / sessions.length) * 30;
-    const score = Math.min(100, Math.round(consistencyScore + intensityScore + depthScore));
+    const avgHoursPerDay   = (totalMinutes / 60) / 7;
+    const intensityScore   = Math.min(30, (avgHoursPerDay / dailyGoalHours) * 30);
+    const depthScore       = (deepWorkCount / totalSessions) * 30;
+    const score            = Math.min(100, Math.round(consistencyScore + intensityScore + depthScore));
 
     const result: FocusScoreResult = {
         score,
@@ -142,7 +156,7 @@ export async function computeFocusScore(
             intensity: Math.round(intensityScore),
             depth: Math.round(depthScore),
         },
-        totalSessions: sessions.length,
+        totalSessions,
         totalMinutes,
         activeDays: activeDaysCount,
         avgHoursPerDay: Math.round(avgHoursPerDay * 10) / 10,
@@ -168,15 +182,20 @@ export async function getPlannedVsActual(userId: string, days: number = 14): Pro
     since.setDate(since.getDate() - days);
     since.setHours(0, 0, 0, 0);
 
-    const activityLogs = await prisma.activityLog.findMany({
-        where: {
-            task: { userId },
-            startTime: { gte: since },
-        },
-        select: { startTime: true, durationMinutes: true },
-    });
+    // DB-level GROUP BY DATE — returns at most `days` rows instead of every
+    // raw activity-log row, eliminating the previous findMany + JS loop pattern.
+    type DailyRow = { date: Date; actual_minutes: bigint };
+    const dailyRows = await prisma.$queryRaw<DailyRow[]>`
+        SELECT DATE(al."startTime")                       AS date,
+               COALESCE(SUM(al."durationMinutes"), 0)     AS actual_minutes
+        FROM   "ActivityLog" al
+        INNER JOIN "Task" t ON al."taskId" = t.id
+        WHERE  t."userId"    = ${userId}
+          AND  al."startTime" >= ${since}
+        GROUP BY DATE(al."startTime")
+    `;
 
-    // Build daily map
+    // Seed all expected dates to zero, then fill from the query result.
     const dailyMap = new Map<string, number>();
     for (let i = 0; i < days; i++) {
         const d = new Date(since);
@@ -184,9 +203,10 @@ export async function getPlannedVsActual(userId: string, days: number = 14): Pro
         dailyMap.set(d.toISOString().split("T")[0]!, 0);
     }
 
-    for (const log of activityLogs) {
-        const key = log.startTime.toISOString().split("T")[0]!;
-        dailyMap.set(key, (dailyMap.get(key) ?? 0) + (log.durationMinutes ?? 0));
+    for (const row of dailyRows) {
+        // Postgres DATE returns a Date object; extract ISO date key
+        const key = new Date(row.date).toISOString().split("T")[0]!;
+        dailyMap.set(key, Number(row.actual_minutes));
     }
 
     const dailyBreakdown: PlannedVsActual[] = [];
@@ -245,26 +265,43 @@ export async function detectPeakProductivity(userId: string, days: number = 30):
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    const sessions = await prisma.activityLog.findMany({
-        where: {
-            task: { userId },
-            startTime: { gte: since },
-            durationMinutes: { gt: 0 },
-        },
-        select: { startTime: true, durationMinutes: true, sessionType: true },
-    });
+    // DB-level GROUP BY HOUR aggregation — returns at most 24 rows regardless
+    // of history size, eliminating the previous findMany + JS bucketing pattern
+    // that transferred every raw session row to Node.js.
+    type HourRow = {
+        hour: number;
+        session_count: bigint;
+        total_mins: bigint;
+        deep_work_count: bigint;
+    };
 
-    // Group by hour of day
+    const hourRows = await prisma.$queryRaw<HourRow[]>`
+        SELECT EXTRACT(HOUR FROM al."startTime")::int         AS hour,
+               COUNT(*)                                       AS session_count,
+               COALESCE(SUM(al."durationMinutes"), 0)         AS total_mins,
+               COUNT(*) FILTER (WHERE al."sessionType" = 'DEEP_WORK') AS deep_work_count
+        FROM   "ActivityLog" al
+        INNER JOIN "Task" t ON al."taskId" = t.id
+        WHERE  t."userId"    = ${userId}
+          AND  al."startTime" >= ${since}
+          AND  al."durationMinutes" > 0
+        GROUP BY EXTRACT(HOUR FROM al."startTime")
+        ORDER BY hour
+    `;
+
+    // Build the full 24-slot array; hours with no sessions stay at zero.
     const hourBuckets: { totalMins: number; count: number; deepWorkCount: number }[] = Array.from(
         { length: 24 },
         () => ({ totalMins: 0, count: 0, deepWorkCount: 0 })
     );
 
-    for (const s of sessions) {
-        const hour = s.startTime.getHours();
-        hourBuckets[hour]!.totalMins += s.durationMinutes ?? 0;
-        hourBuckets[hour]!.count++;
-        if (s.sessionType === "DEEP_WORK") hourBuckets[hour]!.deepWorkCount++;
+    for (const row of hourRows) {
+        const h = row.hour;
+        if (h >= 0 && h < 24) {
+            hourBuckets[h]!.totalMins    = Number(row.total_mins);
+            hourBuckets[h]!.count        = Number(row.session_count);
+            hourBuckets[h]!.deepWorkCount = Number(row.deep_work_count);
+        }
     }
 
     const efficiencyByHour = hourBuckets.map((b, hour) => ({

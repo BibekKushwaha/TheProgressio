@@ -964,6 +964,98 @@ export const getSWOTAnalysis = async (req: AuthenticatedRequest, res: Response):
     }
 };
 
+// GET /stats/subjects — returns performance stats for ALL subjects belonging to
+// the authenticated user. Results are aggregated in a single DB round-trip via
+// groupBy and cached per-user for 5 minutes.
+export const getAllSubjectStats = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const cacheKey = "all";
+        const cached = await getAnalyticsCache<object[]>(userId, "all-subjects", cacheKey);
+        if (cached) {
+            res.status(200).json({ message: "All subject performance fetched", data: cached });
+            return;
+        }
+
+        // Two parallel DB calls:
+        // 1. groupBy for avg + count — one row per subject.
+        // 2. Window-function query for trend — returns only the first 5 and last
+        //    5 entries PER subject regardless of total history size.
+        //    This replaces the previous findMany(take:200) + JS groupBy that
+        //    transferred up to 200 rows and iterated over them in Node.js.
+        type TrendRow = { subjectName: string; obtainedMarks: number; totalMarks: number };
+
+        const [agg, trendRows] = await Promise.all([
+            prisma.gradeEntry.groupBy({
+                by: ["subjectName"],
+                where: { userId },
+                _avg: { obtainedMarks: true, totalMarks: true },
+                _count: { id: true },
+            }),
+            prisma.$queryRaw<TrendRow[]>`
+                SELECT "subjectName",
+                       "obtainedMarks"::float AS "obtainedMarks",
+                       "totalMarks"::float    AS "totalMarks"
+                FROM (
+                    SELECT "subjectName", "obtainedMarks", "totalMarks",
+                           ROW_NUMBER() OVER (PARTITION BY "subjectName" ORDER BY "createdAt" ASC)  AS rn_asc,
+                           ROW_NUMBER() OVER (PARTITION BY "subjectName" ORDER BY "createdAt" DESC) AS rn_desc
+                    FROM   "GradeEntry"
+                    WHERE  "userId" = ${userId}
+                ) ranked
+                WHERE rn_asc <= 5 OR rn_desc <= 5
+            `,
+        ]);
+
+        if (agg.length === 0) {
+            res.status(200).json({ message: "All subject performance fetched", data: [] });
+            return;
+        }
+
+        // Build per-subject trend map from the already-filtered rows.
+        const firstRows = new Map<string, TrendRow[]>();
+        for (const row of trendRows) {
+            const bucket = firstRows.get(row.subjectName) ?? [];
+            bucket.push(row);
+            firstRows.set(row.subjectName, bucket);
+        }
+        // Split into early / recent halves per subject.
+        const splitTrend = (rows: TrendRow[]) => {
+            const mid = Math.ceil(rows.length / 2);
+            return { first: rows.slice(0, mid), last: rows.slice(-mid) };
+        };
+
+        const data = agg.map((row) => {
+            const avgScore = row._avg.totalMarks && row._avg.totalMarks > 0
+                ? Math.round(((row._avg.obtainedMarks ?? 0) / row._avg.totalMarks) * 100)
+                : 0;
+
+            const rows = firstRows.get(row.subjectName) ?? [];
+            const { first, last } = splitTrend(rows);
+            const earlyRate  = first.length > 0 ? first.reduce((s, e) => s + e.obtainedMarks / e.totalMarks, 0) / first.length : 0;
+            const recentRate = last.length  > 0 ? last.reduce( (s, e) => s + e.obtainedMarks / e.totalMarks, 0) / last.length  : 0;
+            const improvementRate = Math.round((recentRate - earlyRate) * 100);
+            const trend = improvementRate > 5 ? "improving" : improvementRate < -5 ? "declining" : "stable";
+
+            return {
+                subjectName: row.subjectName,
+                avgScore,
+                entryCount: row._count.id,
+                trend,
+                improvementRate,
+            };
+        });
+
+        await setAnalyticsCache(userId, "all-subjects", data, cacheKey, 300);
+        res.status(200).json({ message: "All subject performance fetched", data });
+    } catch (error) {
+        console.error("Error fetching all subject stats:", error);
+        res.status(500).json({ message: "Failed to fetch all subject stats", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
 // GET /stats/subject/:name
 export const getSubjectStats = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
@@ -1136,12 +1228,13 @@ export const addGradeEntry = async (req: AuthenticatedRequest, res: Response): P
             },
         });
 
-        // Invalidate SWOT, predictive, and subject caches for this user+examType
+        // Invalidate SWOT, predictive, subject and all-subjects caches
         const et = (examType || "JEE") as string;
         await Promise.all([
             deleteAnalyticsCache(userId, "swot", et),
             deleteAnalyticsCache(userId, "predictive", et),
             deleteAnalyticsCache(userId, "subject", (subjectName as string).trim().toLowerCase()),
+            deleteAnalyticsCache(userId, "all-subjects", "all"),
         ]);
 
         res.status(201).json({ message: "Grade entry added", entry });
@@ -1191,6 +1284,7 @@ export const deleteGradeEntry = async (req: AuthenticatedRequest, res: Response)
                 deleteAnalyticsCache(userId, "swot", existing.examType),
                 deleteAnalyticsCache(userId, "predictive", existing.examType),
                 deleteAnalyticsCache(userId, "subject", existing.subjectName.trim().toLowerCase()),
+                deleteAnalyticsCache(userId, "all-subjects", "all"),
             ]);
         }
 
@@ -1249,6 +1343,8 @@ export const updateGradeEntry = async (req: AuthenticatedRequest, res: Response)
         };
         addKeys(before.examType, before.subjectName);
         addKeys(updated.examType, updated.subjectName);
+        // Always bust the all-subjects roll-up cache on any grade entry mutation.
+        keysToInvalidate.add("all-subjects:all");
 
         await Promise.all(
             Array.from(keysToInvalidate).map((key) => {

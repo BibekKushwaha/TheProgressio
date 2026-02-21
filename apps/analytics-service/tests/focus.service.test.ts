@@ -13,6 +13,7 @@ const { mockPrisma } = vi.hoisted(() => ({
         user: { findUnique: vi.fn() },
         activityLog: { findMany: vi.fn() },
         gradeEntry: { findMany: vi.fn() },
+        $queryRaw: vi.fn(),
     },
 }));
 
@@ -44,16 +45,6 @@ const daysAgo = (n: number): Date => {
     return d;
 };
 
-const makeSession = (daysBack: number, minutes: number, hour: number = 10, sessionType: string = 'DEEP_WORK') => ({
-    startTime: (() => {
-        const d = daysAgo(daysBack);
-        d.setHours(hour, 0, 0, 0);
-        return d;
-    })(),
-    durationMinutes: minutes,
-    sessionType,
-});
-
 // ─── Tests: Planned vs Actual ───────────────────────────────────────────────────
 
 describe('Focus Service — getPlannedVsActual', () => {
@@ -61,10 +52,8 @@ describe('Focus Service — getPlannedVsActual', () => {
 
     it('returns leakage report with correct structure', async () => {
         mockPrisma.user.findUnique.mockResolvedValue({ dailyGoalHours: 4 });
-        mockPrisma.activityLog.findMany.mockResolvedValue([
-            makeSession(0, 120), // 2 hours today
-            makeSession(1, 180), // 3 hours yesterday
-        ]);
+        // $queryRaw returns aggregated DailyRow[] — empty is fine for structure checks
+        mockPrisma.$queryRaw.mockResolvedValue([]);
 
         const report = await getPlannedVsActual('u1', 7);
 
@@ -82,7 +71,7 @@ describe('Focus Service — getPlannedVsActual', () => {
 
     it('calculates correct total planned minutes based on daily goal', async () => {
         mockPrisma.user.findUnique.mockResolvedValue({ dailyGoalHours: 4 });
-        mockPrisma.activityLog.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
 
         const report = await getPlannedVsActual('u1', 7);
 
@@ -92,9 +81,13 @@ describe('Focus Service — getPlannedVsActual', () => {
 
     it('leakage = 0 when actual exceeds planned', async () => {
         mockPrisma.user.findUnique.mockResolvedValue({ dailyGoalHours: 1 });
-        // 5 hours of actual study for 1 day
-        mockPrisma.activityLog.findMany.mockResolvedValue([
-            makeSession(0, 300),
+        // Build the same date key the service will seed into dailyMap
+        const since = new Date();
+        since.setDate(since.getDate() - 1);
+        since.setHours(0, 0, 0, 0);
+        // $queryRaw returns DailyRow[] — 5 hours of actual for 1 day
+        mockPrisma.$queryRaw.mockResolvedValue([
+            { date: since, actual_minutes: BigInt(300) },
         ]);
 
         const report = await getPlannedVsActual('u1', 1);
@@ -105,7 +98,7 @@ describe('Focus Service — getPlannedVsActual', () => {
 
     it('returns appropriate suggestion based on leakage percentage', async () => {
         mockPrisma.user.findUnique.mockResolvedValue({ dailyGoalHours: 4 });
-        mockPrisma.activityLog.findMany.mockResolvedValue([]); // 0 actual → 100% leakage
+        mockPrisma.$queryRaw.mockResolvedValue([]); // 0 actual → 100% leakage
 
         const report = await getPlannedVsActual('u1', 7);
 
@@ -115,7 +108,7 @@ describe('Focus Service — getPlannedVsActual', () => {
 
     it('uses default 4h daily goal when user has none', async () => {
         mockPrisma.user.findUnique.mockResolvedValue(null);
-        mockPrisma.activityLog.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
 
         const report = await getPlannedVsActual('u1', 7);
 
@@ -130,13 +123,12 @@ describe('Focus Service — detectPeakProductivity', () => {
     beforeEach(() => vi.clearAllMocks());
 
     it('returns peak window structure', async () => {
-        const sessions = [
-            makeSession(1, 45, 9),
-            makeSession(2, 60, 9),
-            makeSession(3, 50, 10),
-            makeSession(4, 30, 14),
-        ];
-        mockPrisma.activityLog.findMany.mockResolvedValue(sessions);
+        // $queryRaw returns HourRow[] aggregated per hour
+        mockPrisma.$queryRaw.mockResolvedValue([
+            { hour: 9,  session_count: BigInt(2), total_mins: BigInt(105), deep_work_count: BigInt(2) },
+            { hour: 10, session_count: BigInt(1), total_mins: BigInt(50),  deep_work_count: BigInt(1) },
+            { hour: 14, session_count: BigInt(1), total_mins: BigInt(30),  deep_work_count: BigInt(1) },
+        ]);
 
         const result = await detectPeakProductivity('u1', 7);
 
@@ -151,12 +143,11 @@ describe('Focus Service — detectPeakProductivity', () => {
     });
 
     it('identifies correct peak window from session data', async () => {
-        // Heavy 9-10 AM sessions to make 9-10 window clearly the best
-        const sessions = [
-            ...Array.from({ length: 10 }, (_, i) => makeSession(i, 90, 9, 'DEEP_WORK')),
-            ...Array.from({ length: 5 }, (_, i) => makeSession(i + 10, 60, 10, 'DEEP_WORK')),
-        ];
-        mockPrisma.activityLog.findMany.mockResolvedValue(sessions);
+        // Heavy 9 AM sessions make 9–11 window clearly the best
+        mockPrisma.$queryRaw.mockResolvedValue([
+            { hour: 9,  session_count: BigInt(10), total_mins: BigInt(900), deep_work_count: BigInt(10) },
+            { hour: 10, session_count: BigInt(5),  total_mins: BigInt(300), deep_work_count: BigInt(5)  },
+        ]);
 
         const result = await detectPeakProductivity('u1', 14);
 
@@ -164,7 +155,7 @@ describe('Focus Service — detectPeakProductivity', () => {
     });
 
     it('handles empty session data', async () => {
-        mockPrisma.activityLog.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
 
         const result = await detectPeakProductivity('u1', 7);
 
@@ -173,12 +164,10 @@ describe('Focus Service — detectPeakProductivity', () => {
     });
 
     it('calculates focus ratio from DEEP_WORK sessions', async () => {
-        const sessions = [
-            makeSession(1, 60, 9, 'DEEP_WORK'),
-            makeSession(2, 30, 9, 'POMODORO'),
-            makeSession(3, 45, 9, 'DEEP_WORK'),
-        ];
-        mockPrisma.activityLog.findMany.mockResolvedValue(sessions);
+        // 3 sessions at hour 9; 2 are DEEP_WORK, 1 is POMODORO
+        mockPrisma.$queryRaw.mockResolvedValue([
+            { hour: 9, session_count: BigInt(3), total_mins: BigInt(135), deep_work_count: BigInt(2) },
+        ]);
 
         const result = await detectPeakProductivity('u1', 7);
 

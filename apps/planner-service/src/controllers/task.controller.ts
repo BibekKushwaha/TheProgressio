@@ -226,6 +226,65 @@ export const createTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
     return res.status(201).json(task);
 });
 
+export const getTaskMetrics = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd   = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    // All five counts run in one round-trip via Promise.all over groupBy queries
+    const [statusGroups, priorityGroups, overdueCount, dueTodayCount, noDueDateCount] = await Promise.all([
+        prisma.task.groupBy({
+            by: ["status"],
+            where: { userId },
+            _count: { _all: true },
+        }),
+        prisma.task.groupBy({
+            by: ["priority"],
+            where: { userId },
+            _count: { _all: true },
+        }),
+        prisma.task.count({
+            where: {
+                userId,
+                status: { not: "COMPLETED" },
+                dueDate: { lt: now },
+            },
+        }),
+        prisma.task.count({
+            where: {
+                userId,
+                status: { not: "COMPLETED" },
+                dueDate: { gte: todayStart, lt: todayEnd },
+            },
+        }),
+        prisma.task.count({ where: { userId, dueDate: null } }),
+    ]);
+
+    const byStatus = Object.fromEntries(
+        statusGroups.map((g) => [g.status.toLowerCase(), g._count._all])
+    ) as Record<string, number>;
+
+    const byPriority = Object.fromEntries(
+        priorityGroups.map((g) => [g.priority.toLowerCase(), g._count._all])
+    ) as Record<string, number>;
+
+    const total = statusGroups.reduce((acc, g) => acc + g._count._all, 0);
+
+    return res.status(200).json({
+        total,
+        pending:        byStatus["pending"]     ?? 0,
+        inProgress:     byStatus["in_progress"]  ?? 0,
+        completed:      byStatus["completed"]    ?? 0,
+        highPriority:   byPriority["high"]        ?? 0,
+        mediumPriority: byPriority["medium"]      ?? 0,
+        lowPriority:    byPriority["low"]         ?? 0,
+        overdue:        overdueCount,
+        dueToday:       dueTodayCount,
+        withoutDueDate: noDueDateCount,
+    });
+});
+
 export const getAllTasks = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.id;
 

@@ -3,13 +3,13 @@
 import { SWOTAnalysis } from '@/components/analytics/SWOTAnalysis';
 import { PredictiveScoreCard } from '@/components/analytics/PredictiveScoreCard';
 import { Swords, Target, BookOpen, Trophy } from 'lucide-react';
-import { useGetSubjectPerformanceQuery } from '@repo/store';
+import { useGetAllSubjectPerformanceQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useMemo } from 'react';
 
 export default function ExamWarRoomPage() {
-    const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('');
+    const { data: performanceData, isLoading: perfLoading } = useGetAllSubjectPerformanceQuery();
 
     // Stable reference — prevents difficultyStats from recomputing on every render
     // when performanceData is undefined (new [] reference each time).

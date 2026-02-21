@@ -1,0 +1,8 @@
+**/node_modules
+**/.next
+**/.git
+**/*.log
+**/test-results
+**/dist
+apps/docs
+apps/mobile

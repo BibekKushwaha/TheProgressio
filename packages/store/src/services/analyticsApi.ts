@@ -313,6 +313,9 @@ export interface StrategicSummaryResponse {
 }
 export const analyticsApi = createApi({
     reducerPath: 'analyticsApi',
+    // Keep data fresh for 5 minutes after all subscribers unmount. Prevents
+    // re-fetching on rapid navigation between exam-warroom sub-pages.
+    keepUnusedDataFor: 300,
     baseQuery: fetchBaseQuery({
         baseUrl: `${ANALYTICS_SERVICE_URL}/api`,
         credentials: 'include',
@@ -458,6 +461,8 @@ export const analyticsApi = createApi({
         getSWOTReport: builder.query<{ message: string; data: FullSWOT }, string>({
             query: (examType) => `/stats/swot/${examType}`,
             providesTags: ['Stats'],
+            // SWOT depends on grade-entry groupBy — expensive. Keep data for 10 min.
+            keepUnusedDataFor: 600,
             transformResponse: (response: any) => ({
                 message: response.message,
                 data: response.swot || response.data
@@ -469,6 +474,13 @@ export const analyticsApi = createApi({
                 return `/stats/subject/${encodeURIComponent(safeName)}`;
             },
             providesTags: ['Stats'],
+        }),
+        // Bulk endpoint — single aggregation query, 5-min backend cache.
+        // Use this instead of getSubjectPerformance('') to get all subjects.
+        getAllSubjectPerformance: builder.query<{ message: string; data: SubjectPerformance[] }, void>({
+            query: () => '/stats/subjects',
+            providesTags: ['Stats'],
+            keepUnusedDataFor: 300,
         }),
         getRevisionSchedule: builder.query<RevisionScheduleResponse, string>({
             query: (examType) => `/stats/revision-schedule?examType=${examType}`,
@@ -611,7 +623,9 @@ export const analyticsApi = createApi({
         >({
             query: (arg) => {
                 const examType = typeof arg === 'string' ? arg : arg.examType;
-                const safeExamType = examType?.trim() || 'midterm';
+                // Default to 'JEE' so that callers passing '' or omitting examType
+                // share the same Redis cache key as PredictiveScoreCard('JEE').
+                const safeExamType = examType?.trim() || 'JEE';
                 const queryArg = typeof arg === 'string' ? undefined : arg;
 
                 return {
@@ -625,6 +639,8 @@ export const analyticsApi = createApi({
                 };
             },
             providesTags: ['Stats'],
+            // Monte Carlo simulation: 2000 runs is expensive. Keep data for 10 min.
+            keepUnusedDataFor: 600,
         }),
         getNotificationIntelligence: builder.query<{ message: string; intelligence: NotificationIntelligence }, void>({
             query: () => '/stats/notifications/intelligence',
@@ -707,6 +723,7 @@ export const {
     useGetCycleTimeQuery,
     useGetSWOTReportQuery,
     useGetSubjectPerformanceQuery,
+    useGetAllSubjectPerformanceQuery,
     useGetRevisionScheduleQuery,
     useGetGPAQuery,
     useWhatIfGPAMutation,

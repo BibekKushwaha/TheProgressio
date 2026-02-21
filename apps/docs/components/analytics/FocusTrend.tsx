@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 const DEFAULT_TRENDS = [
     { date: 'Mon', hours: 0 },
@@ -18,8 +19,11 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
         setIsMounted(true);
     }, []);
 
+    const isVisible = usePageVisibility();
+    // Weekly trend data changes at most once per session-log; 5-minute polling
+    // when the tab is visible, paused entirely when hidden.
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
-        pollingInterval: 30000,
+        pollingInterval: isVisible ? 300000 : 0,
         skip: !isMounted,
     });
     const chartWidth = 600;

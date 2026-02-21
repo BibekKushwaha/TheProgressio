@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useGetDailySummaryQuery, SessionType } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 export function SessionBreakdown({ pastDays }: { pastDays: string }) {
     const [isMounted, setIsMounted] = useState(false);
@@ -8,8 +9,11 @@ export function SessionBreakdown({ pastDays }: { pastDays: string }) {
         setIsMounted(true);
     }, []);
 
+    const isVisible = usePageVisibility();
+    // Daily summary updates via tag invalidation on session log. Poll every
+    // 2 minutes when the tab is visible; pause when it is hidden.
     const { data: summaryData, isLoading } = useGetDailySummaryQuery(pastDays, {
-        pollingInterval: 30000,
+        pollingInterval: isVisible ? 120000 : 0,
         skip: !isMounted,
     });
 

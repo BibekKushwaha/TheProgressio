@@ -5,10 +5,14 @@ import { Plus, Flame, Loader2, Sparkles } from 'lucide-react';
 import { useGetHabitsQuery } from '@repo/store';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 export function HabitStreaks() {
+    const isVisible = usePageVisibility();
+    // Habit streaks update only when the user logs a habit — tag invalidation
+    // handles that. 2-minute visibility-gated poll catches cross-tab updates.
     const { data, isLoading } = useGetHabitsQuery(undefined, {
-        pollingInterval: 60000,
+        pollingInterval: isVisible ? 120000 : 0,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });

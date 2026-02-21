@@ -4,11 +4,16 @@ import { ChevronRight, Clock, CheckCircle2, Circle } from 'lucide-react';
 import { useGetTasksQuery, useToggleTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 export function TodaysTasks() {
     const today = new Date().toISOString().split('T')[0];
+    const isVisible = usePageVisibility();
+    // Task list is kept fresh by tag invalidation on toggle/add mutations.
+    // Background polling every 60s when visible covers cross-device updates;
+    // pause entirely when the tab is hidden.
     const { data: tasks, isLoading } = useGetTasksQuery({ date: today }, {
-        pollingInterval: 15000,
+        pollingInterval: isVisible ? 60000 : 0,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });

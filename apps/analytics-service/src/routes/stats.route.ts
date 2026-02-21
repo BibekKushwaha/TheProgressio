@@ -5,7 +5,7 @@ import {
     // Phase 3 — Prediction
     getPrediction, predictGradeEndpoint, getCycleTime,
     // Phase 3 — SWOT
-    getSWOTAnalysis, getSubjectStats,
+    getSWOTAnalysis, getSubjectStats, getAllSubjectStats,
     // Phase 3 — GPA
     getGPA, getWhatIfGPA, addCourse, updateCourse, deleteCourse,
     // Phase 3 — Grade Entries
@@ -39,6 +39,9 @@ router.get("/cycle-time", isAuth, getCycleTime);
 
 // ── SWOT Analysis ──────────────────────────────────────────────────────
 router.get("/swot/:examType", isAuth, getSWOTAnalysis);
+// Bulk all-subjects endpoint — single DB round-trip, 5-min cache.
+// Must be registered BEFORE /subject/:name to avoid route shadowing.
+router.get("/subjects", isAuth, getAllSubjectStats);
 router.get("/subject/:name", isAuth, getSubjectStats);
 router.get("/revision-schedule", isAuth, getRevisionSchedule);
 

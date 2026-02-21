@@ -9,6 +9,7 @@ import Input from "@/components/auth/input";
 import { setCredentials, useAppDispatch, useRegisterMutation } from "@repo/store";
 import { registerSchema } from "@repo/schemas/auth";
 import { Card } from "@/components/ui/card";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 const SignupPage = () => {
   const [registerApi, { isLoading }] = useRegisterMutation();
@@ -83,33 +84,8 @@ const SignupPage = () => {
       }
       router.push('/');
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorAny = err as any;
-      console.error('Signup failed:', errorAny);
-
-      let errorMessage = 'Signup failed. Please try again.';
-
-      if (errorAny?.data) {
-        if (typeof errorAny.data === 'string') {
-          errorMessage = errorAny.data;
-        } else if (errorAny.data.message) {
-          errorMessage = errorAny.data.message;
-        } else if (errorAny.data.errors) {
-          // Handle Zod errors from server
-          const fieldErrors = errorAny.data.errors.fieldErrors;
-          if (fieldErrors) {
-            const firstKey = Object.keys(fieldErrors)[0];
-            if (firstKey) {
-              errorMessage = fieldErrors[firstKey][0];
-            }
-          }
-        }
-      } else if (errorAny?.error) {
-        errorMessage = errorAny.error;
-      } else if (errorAny?.message) {
-        errorMessage = errorAny.message;
-      }
-
+      const errorMessage = getApiErrorMessage(err, 'Signup failed. Please try again.');
+      console.error('Signup failed:', errorMessage, err);
       setErrors({ email: errorMessage });
     }
   };

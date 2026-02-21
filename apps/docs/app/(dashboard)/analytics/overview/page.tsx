@@ -17,12 +17,12 @@ import {
 } from "@/components/ui/table";
 import { Empty, EmptyTitle } from "@/components/ui/empty";
 import {
-  PriorityEnum,
   TaskStatus,
   useGetDailySummaryQuery,
   useGetDashboardSummaryQuery,
   useGetHabitsQuery,
   useGetTasksQuery,
+  useGetTaskMetricsQuery,
 } from "@repo/store";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useMemo, useState, useEffect } from "react";
@@ -59,6 +59,13 @@ export default function AnalyticsOverviewPage() {
     { pollingInterval: pollMs, skip: !isMounted }
   );
 
+  // Lightweight count-only endpoint — no full task rows transferred.
+  const {
+    data: taskMetricsData,
+    isLoading: isTaskMetricsLoading,
+  } = useGetTaskMetricsQuery(undefined, { skip: !isMounted });
+
+  // Full task list only for the table render and CSV export.
   const {
     data: tasks = [],
     isLoading: isTasksLoading
@@ -71,48 +78,19 @@ export default function AnalyticsOverviewPage() {
 
   const habits = useMemo(() => habitsResponse?.habits || [], [habitsResponse]);
 
-  const taskMetrics = useMemo(() => {
-    if (!isMounted) return {
-      total: 0, pending: 0, inProgress: 0, completed: 0,
-      highPriority: 0, mediumPriority: 0, lowPriority: 0,
-      withoutDueDate: 0, overdue: 0, dueToday: 0
-    };
-
-    const now = Date.now();
-    const today = new Date();
-    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
-    const pending = tasks.filter((task) => task.status === TaskStatus.PENDING).length;
-    const inProgress = tasks.filter((task) => task.status === TaskStatus.IN_PROGRESS).length;
-    const completed = tasks.filter((task) => task.status === TaskStatus.COMPLETED).length;
-    const highPriority = tasks.filter((task) => task.priority === PriorityEnum.HIGH).length;
-    const mediumPriority = tasks.filter((task) => task.priority === PriorityEnum.MEDIUM).length;
-    const lowPriority = tasks.filter((task) => task.priority === PriorityEnum.LOW).length;
-    const withoutDueDate = tasks.filter((task) => !task.dueDate).length;
-    const overdue = tasks.filter((task) => {
-      if (!task.dueDate || task.status === TaskStatus.COMPLETED) return false;
-      return new Date(task.dueDate).getTime() < now;
-    }).length;
-    const dueToday = tasks.filter((task) => {
-      if (!task.dueDate || task.status === TaskStatus.COMPLETED) return false;
-      const due = new Date(task.dueDate);
-      const dueKey = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(due.getDate()).padStart(2, "0")}`;
-      return dueKey === todayKey;
-    }).length;
-
-    return {
-      total: tasks.length,
-      pending,
-      inProgress,
-      completed,
-      highPriority,
-      mediumPriority,
-      lowPriority,
-      withoutDueDate,
-      overdue,
-      dueToday,
-    };
-  }, [tasks, isMounted]);
+  // Use server-computed counts from the lightweight /tasks/metrics endpoint.
+  const taskMetrics = useMemo(() => ({
+    total:          taskMetricsData?.total          ?? 0,
+    pending:        taskMetricsData?.pending        ?? 0,
+    inProgress:     taskMetricsData?.inProgress     ?? 0,
+    completed:      taskMetricsData?.completed      ?? 0,
+    highPriority:   taskMetricsData?.highPriority   ?? 0,
+    mediumPriority: taskMetricsData?.mediumPriority ?? 0,
+    lowPriority:    taskMetricsData?.lowPriority    ?? 0,
+    withoutDueDate: taskMetricsData?.withoutDueDate ?? 0,
+    overdue:        taskMetricsData?.overdue        ?? 0,
+    dueToday:       taskMetricsData?.dueToday       ?? 0,
+  }), [taskMetricsData]);
 
   const habitMetrics = useMemo(() => {
     const total = habits.length;
@@ -243,7 +221,7 @@ export default function AnalyticsOverviewPage() {
             <CardTitle>Task Analytics</CardTitle>
           </CardHeader>
           <CardContent>
-            {isTasksLoading ? (
+            {isTaskMetricsLoading ? (
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 10 }).map((_, index) => (
                   <Skeleton key={index} className="h-16 bg-white/10" />
