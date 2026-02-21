@@ -1,13 +1,12 @@
 'use client';
 
 import { BookOpen, FileSpreadsheet } from 'lucide-react';
-import { useGetSubjectPerformanceQuery, useGetGradeEntriesQuery } from '@repo/store';
+import { useGetSubjectPerformanceQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RevisionScheduler } from '@/components/analytics/RevisionScheduler';
 
 export default function ExamWarRoomPage() {
     const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('');
-    useGetGradeEntriesQuery();
 
     const subjects = performanceData?.data ?? [];
 

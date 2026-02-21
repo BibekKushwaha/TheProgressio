@@ -3,30 +3,30 @@
 import { SWOTAnalysis } from '@/components/analytics/SWOTAnalysis';
 import { PredictiveScoreCard } from '@/components/analytics/PredictiveScoreCard';
 import { Swords, Target, BookOpen, Trophy } from 'lucide-react';
-import { useGetSubjectPerformanceQuery, useGetGradeEntriesQuery } from '@repo/store';
+import { useGetSubjectPerformanceQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useMemo } from 'react';
 
 export default function ExamWarRoomPage() {
     const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('');
-    const { data: gradeData } = useGetGradeEntriesQuery();
 
-    const grades = gradeData?.entries || [];
+    // Stable reference — prevents difficultyStats from recomputing on every render
+    // when performanceData is undefined (new [] reference each time).
+    const subjects = useMemo(() => performanceData?.data ?? [], [performanceData]);
 
-    const subjects = performanceData?.data ?? [];
-
-    // Difficulty breakdown from grade entries
-    const difficultyStats = grades.reduce(
-        (acc, entry) => {
-            const pct = (entry.obtainedMarks / entry.totalMarks) * 100;
-            const type = entry.examType?.toLowerCase() || 'practice';
-            if (type.includes('easy') || pct >= 80) acc.easy++;
-            else if (type.includes('hard') || pct < 50) acc.hard++;
-            else acc.medium++;
-            return acc;
-        },
-        { easy: 0, medium: 0, hard: 0 }
-    );
+    // Derive difficulty breakdown from already-fetched subject performance —
+    // eliminates the useGetGradeEntriesQuery full table scan (no take/where).
+    const difficultyStats = useMemo(() => {
+        const stats = { easy: 0, medium: 0, hard: 0 };
+        for (const subject of subjects) {
+            const score = subject.avgScore ?? 0;
+            if (score >= 80) stats.easy++;
+            else if (score >= 50) stats.medium++;
+            else stats.hard++;
+        }
+        return stats;
+    }, [subjects]);
     const totalAttempts = difficultyStats.easy + difficultyStats.medium + difficultyStats.hard;
 
     return (

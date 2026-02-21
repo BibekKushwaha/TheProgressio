@@ -4,42 +4,37 @@ import React from "react";
 import { TrendingUp, Clock, Target, Award } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 
-import { useGetDailySummaryQuery, useGetWeeklyTrendsQuery, useGetFocusScoreQuery, useGetUserStreakQuery } from "@repo/store";
+import { useGetWeeklyTrendsQuery, useGetDashboardSummaryQuery } from "@repo/store";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ReportsPage() {
-    const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery('7', {
-        pollingInterval: 30000,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
+    const isVisible = usePageVisibility();
+    const pollingMs = isVisible ? 60000 : 0;
+
+    // Single BFF call — replaces useGetDailySummaryQuery + useGetFocusScoreQuery
+    // + useGetUserStreakQuery. All three data sets are inside dashboardData.
+    const { data: dashboardData, isLoading: isDashLoading } = useGetDashboardSummaryQuery(
+        { leakageDays: 7, peakDays: 30 },
+        { pollingInterval: pollingMs, refetchOnFocus: true, refetchOnReconnect: true }
+    );
     const { data: trendsData, isLoading: isTrendsLoading } = useGetWeeklyTrendsQuery(undefined, {
-        pollingInterval: 30000,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
-    const { data: focusScoreData, isLoading: isFocusLoading } = useGetFocusScoreQuery(undefined, {
-        pollingInterval: 30000,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
-    const { data: streakData, isLoading: isStreakLoading } = useGetUserStreakQuery(undefined, {
-        pollingInterval: 30000,
+        pollingInterval: pollingMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
 
     const weeklyData = trendsData?.data || [];
 
-    const categoryData = focusScoreData?.stats?.breakdown ? [
-        { category: "Consistency", value: focusScoreData.stats.breakdown.consistency * 2.5 }, 
-        { category: "Intensity", value: focusScoreData.stats.breakdown.intensity * 3.3 },
-        { category: "Depth", value: focusScoreData.stats.breakdown.depth * 3.3 },
-        { category: "Efficiency", value: focusScoreData?.stats?.scorePercent ?? focusScoreData.stats.score },
-        { category: "Balance", value: focusScoreData?.stats?.balanceScore ?? 75 }, 
+    const categoryData = dashboardData?.focus?.breakdown ? [
+        { category: "Consistency", value: dashboardData.focus.breakdown.consistency * 2.5 },
+        { category: "Intensity", value: dashboardData.focus.breakdown.intensity * 3.3 },
+        { category: "Depth", value: dashboardData.focus.breakdown.depth * 3.3 },
+        { category: "Efficiency", value: dashboardData.focus.score },
+        { category: "Balance", value: 75 },
     ] : [];
 
-    if (isSummaryLoading || isTrendsLoading || isFocusLoading || isStreakLoading) {
+    if (isDashLoading || isTrendsLoading) {
         return (
             <div className="space-y-6 p-6">
                 <Skeleton className="h-10 w-1/3 bg-white/5" />
@@ -55,10 +50,10 @@ export default function ReportsPage() {
     }
 
     const stats = {
-        totalHours: summaryData?.stats?.totalHours || 0,
-        tasksCompleted: summaryData?.stats?.totalTasksCompleted || 0,
-        avgFocus: focusScoreData?.stats?.avgHoursPerDay || 0,
-        streak: streakData?.streak || 0
+        totalHours: Math.round((dashboardData?.focus?.totalMinutes ?? 0) / 60 * 10) / 10,
+        tasksCompleted: 0,
+        avgFocus: dashboardData?.focus?.avgHoursPerDay ?? 0,
+        streak: dashboardData?.streak ?? 0,
     };
 
     return (

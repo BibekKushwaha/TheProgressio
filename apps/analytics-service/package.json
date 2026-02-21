@@ -16,6 +16,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@repo/cache": "*",
     "@repo/db": "*",
     "@repo/schemas": "*",
     "bullmq": "^5.69.3",

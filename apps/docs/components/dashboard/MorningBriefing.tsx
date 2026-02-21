@@ -1,17 +1,19 @@
 'use client';
 
-import { useGetMorningBriefingQuery, useGetTasksQuery } from '@repo/store';
+import { useGetMorningBriefingQuery, useGetTasksQuery, TaskStatus } from '@repo/store';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { Sun, BookOpen, Flame, AlertTriangle, ChevronRight, Clock, Zap, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 export function MorningBriefing() {
+    const isVisible = usePageVisibility();
     const { data, isLoading } = useGetMorningBriefingQuery(undefined, {
-        pollingInterval: 60000,
+        pollingInterval: isVisible ? 300000 : 0,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
-    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 500 }, {
-        pollingInterval: 30000,
+    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 10, status: TaskStatus.PENDING }, {
+        pollingInterval: isVisible ? 120000 : 0,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });

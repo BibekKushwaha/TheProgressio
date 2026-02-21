@@ -8,6 +8,9 @@
  * 4. Session quality analysis by hour of day
  */
 import { prisma } from "@repo/db";
+import { getAnalyticsCache, setAnalyticsCache } from "@repo/cache";
+import { simulationService } from "./simulation.service.js";
+import { clampInteger } from "./simulation.utils.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -77,9 +80,84 @@ export interface PredictivePerformanceOptions {
     seed?: number;
 }
 
+// ── Shared Focus Score (used by standalone endpoint AND the BFF) ───────
+//
+// Centralising the computation here means both callers share the same
+// 60-second Redis cache — if /stats/focus was called recently the BFF
+// re-uses the cached result instead of re-querying the DB.
+
+export interface FocusScoreResult {
+    score: number;
+    breakdown: { consistency: number; intensity: number; depth: number };
+    totalSessions: number;
+    totalMinutes: number;
+    activeDays: number;
+    avgHoursPerDay: number;
+}
+
+export async function computeFocusScore(
+    userId: string,
+    dailyGoalHours: number = 4,
+): Promise<FocusScoreResult> {
+    const cached = await getAnalyticsCache<FocusScoreResult>(userId, "focus-score", "v1");
+    if (cached) return cached;
+
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 7);
+    start.setHours(0, 0, 0, 0);
+
+    const sessions = await prisma.activityLog.findMany({
+        where: {
+            task: { userId },
+            startTime: { gte: start, lt: end },
+        },
+        select: { durationMinutes: true, sessionType: true, startTime: true },
+    });
+
+    if (sessions.length === 0) {
+        const empty: FocusScoreResult = {
+            score: 0,
+            breakdown: { consistency: 0, intensity: 0, depth: 0 },
+            totalSessions: 0, totalMinutes: 0, activeDays: 0, avgHoursPerDay: 0,
+        };
+        await setAnalyticsCache(userId, "focus-score", empty, "v1", 60);
+        return empty;
+    }
+
+    const totalMinutes = sessions.reduce((s, sess) => s + (sess.durationMinutes ?? 0), 0);
+    const activeDaysSet = new Set(sessions.map(s => s.startTime.toISOString().split("T")[0]!));
+    const activeDaysCount = activeDaysSet.size;
+    const consistencyScore = (activeDaysCount / 7) * 40;
+    const avgHoursPerDay = (totalMinutes / 60) / 7;
+    const intensityScore = Math.min(30, (avgHoursPerDay / dailyGoalHours) * 30);
+    const deepWorkCount = sessions.filter(s => s.sessionType === "DEEP_WORK").length;
+    const depthScore = (deepWorkCount / sessions.length) * 30;
+    const score = Math.min(100, Math.round(consistencyScore + intensityScore + depthScore));
+
+    const result: FocusScoreResult = {
+        score,
+        breakdown: {
+            consistency: Math.round(consistencyScore),
+            intensity: Math.round(intensityScore),
+            depth: Math.round(depthScore),
+        },
+        totalSessions: sessions.length,
+        totalMinutes,
+        activeDays: activeDaysCount,
+        avgHoursPerDay: Math.round(avgHoursPerDay * 10) / 10,
+    };
+
+    await setAnalyticsCache(userId, "focus-score", result, "v1", 60);
+    return result;
+}
+
 // ── Planned vs Actual ──────────────────────────────────────────────────
 
 export async function getPlannedVsActual(userId: string, days: number = 14): Promise<TimeLeakageReport> {
+    const cached = await getAnalyticsCache<TimeLeakageReport>(userId, "leakage", String(days));
+    if (cached) return cached;
+
     const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { dailyGoalHours: true },
@@ -144,7 +222,7 @@ export async function getPlannedVsActual(userId: string, days: number = 14): Pro
         suggestion = "Great focus discipline! You're hitting close to your daily goals.";
     }
 
-    return {
+    const report: TimeLeakageReport = {
         periodDays: days,
         totalPlannedMinutes: totalPlanned,
         totalActualMinutes: totalActual,
@@ -154,11 +232,16 @@ export async function getPlannedVsActual(userId: string, days: number = 14): Pro
         worstDays,
         suggestion,
     };
+    await setAnalyticsCache(userId, "leakage", report, String(days), 300);
+    return report;
 }
 
 // ── Peak Productivity Window ───────────────────────────────────────────
 
 export async function detectPeakProductivity(userId: string, days: number = 30): Promise<PeakProductivityResult> {
+    const cached = await getAnalyticsCache<PeakProductivityResult>(userId, "peak", String(days));
+    if (cached) return cached;
+
     const since = new Date();
     since.setDate(since.getDate() - days);
 
@@ -215,12 +298,14 @@ export async function detectPeakProductivity(userId: string, days: number = 30):
         ? Math.round(((peakAvg - overallAvg) / overallAvg) * 100)
         : 0;
 
-    return {
+    const peakResult: PeakProductivityResult = {
         peakWindow: { startHour: bestStart, endHour: bestEnd, label },
         efficiencyByHour,
         recommendation: `You are ${efficiencyBoostPercent}% more efficient between ${label}. Schedule your hardest tasks during this window.`,
         efficiencyBoostPercent,
     };
+    await setAnalyticsCache(userId, "peak", peakResult, String(days), 1800);
+    return peakResult;
 }
 
 // ── Learning Pace & Predictive Performance ─────────────────────────────
@@ -230,9 +315,18 @@ export async function getPredictivePerformance(
     examType: string,
     options: PredictivePerformanceOptions = {}
 ): Promise<LearningPace[]> {
+    // Cache key is based on userId+examType only — runs/seed are tuning params
+    const cached = await getAnalyticsCache<LearningPace[]>(userId, "predictive", examType);
+    if (cached) return cached;
+
     const entries = await prisma.gradeEntry.findMany({
         where: { userId, examType },
         orderBy: { createdAt: "asc" },
+        // Only the fields the simulation loop uses — avoids pulling wide rows
+        select: { subjectName: true, obtainedMarks: true, totalMarks: true, createdAt: true },
+        // 50 entries per user+examType is statistically sufficient for convergence;
+        // taking from the tail (most recent) preserves recency bias intentionally.
+        take: 50,
     });
 
     if (entries.length === 0) return [];
@@ -254,239 +348,31 @@ export async function getPredictivePerformance(
         subjectMap.get(entry.subjectName)!.push(entry);
     }
 
-    const results: LearningPace[] = [];
+    // Build the per-subject input arrays and hand off to the simulation service.
+    // When QUEUE_ENABLED=true the work runs in a concurrency-2 BullMQ worker,
+    // preventing >2 simultaneous CPU-heavy loops even under burst load.
+    // When QUEUE_ENABLED=false the service falls back to synchronous inline execution.
+    const subjects = Array.from(subjectMap.entries()).map(([subjectName, subjectEntries]) => ({
+        subjectName,
+        scores: subjectEntries.map(e => (e.obtainedMarks / e.totalMarks) * 100),
+    }));
 
-    for (const [subjectName, subjectEntries] of subjectMap.entries()) {
-        const scores = subjectEntries.map(e => (e.obtainedMarks / e.totalMarks) * 100);
+    const results = await simulationService.run(userId, subjects, {
+        examType,
+        simulationRuns,
+        seed,
+        assumptions,
+    });
 
-        // Split into first half and second half
-        const mid = Math.floor(scores.length / 2);
-        const firstHalf = scores.slice(0, Math.max(1, mid));
-        const secondHalf = scores.slice(Math.max(1, mid));
-
-        const historicalAvg = Math.round(firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length);
-        const recentAvg = Math.round(secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length);
-        const improvementRate = recentAvg - historicalAvg;
-
-        let pace: "accelerating" | "steady" | "declining";
-        if (improvementRate > 5) pace = "accelerating";
-        else if (improvementRate >= -2) pace = "steady";
-        else pace = "declining";
-
-        const trendPerEntry = getLinearTrend(scores);
-        const expectedScore = clampNumber(recentAvg + trendPerEntry * 3, 0, 100);
-        const scoreStdDev = getAdaptiveStdDev(scores);
-        const seededRandom = mulberry32(hashStringToSeed(`${subjectName}:${examType}:${seed}:${scores.length}`));
-
-        const simulatedScores: number[] = [];
-        const simulatedPercentiles: number[] = [];
-        for (let i = 0; i < simulationRuns; i++) {
-            const sampleScore = clampNumber(normalRandom(expectedScore, scoreStdDev, seededRandom), 0, 100);
-            simulatedScores.push(sampleScore);
-            simulatedPercentiles.push(scoreToPercentile(sampleScore));
-        }
-
-        const estimatedExamScore = roundToInt(mean(simulatedScores));
-        const estimatedPercentile = roundToInt(mean(simulatedPercentiles));
-        const confidenceInterval = buildConfidenceInterval(simulatedScores, 90);
-        const rankBands = buildRankBands(simulatedPercentiles);
-        const scoreDistribution = buildDistribution(simulatedScores, 10);
-
-        const dataQuality = getDataQuality(subjectEntries.length);
-        const confidence = getConfidenceLabel(subjectEntries.length, scoreStdDev);
-
-        const modelAssumptions = [...assumptions];
-        if (subjectEntries.length < 5) {
-            modelAssumptions.push("Sparse subject history detected; confidence is reduced.");
-        }
-
-        results.push({
-            subjectName,
-            recentScoreAvg: recentAvg,
-            historicalScoreAvg: historicalAvg,
-            improvementRate,
-            pace,
-            estimatedExamScore,
-            estimatedPercentile,
-            simulationRuns,
-            scoreDistribution,
-            rankBands,
-            confidenceInterval,
-            assumptions: modelAssumptions,
-            confidence,
-            modelVersion: "monte-carlo-v1",
-            dataQuality,
-        });
+    // simulationService caches internally when QUEUE_ENABLED (worker writes after computing).
+    // Cache here as well to cover the inline (non-queue) path.
+    if (results.length > 0) {
+        await setAnalyticsCache(userId, "predictive", results, examType, 600);
     }
-
     return results;
 }
 
-const clampInteger = (value: number, min: number, max: number): number => {
-    if (!Number.isFinite(value)) return min;
-    return Math.min(max, Math.max(min, Math.round(value)));
-};
+// Note: all pure Monte Carlo math functions (normalRandom, buildDistribution,
+// buildConfidenceInterval, etc.) have been extracted to simulation.utils.ts
+// to allow import from both this module and the BullMQ worker handler.
 
-const clampNumber = (value: number, min: number, max: number): number =>
-    Math.min(max, Math.max(min, value));
-
-const roundToInt = (value: number): number => Math.round(value);
-
-const mean = (values: number[]): number =>
-    values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-
-const stdDev = (values: number[]): number => {
-    if (values.length <= 1) return 0;
-    const avg = mean(values);
-    const variance = values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / (values.length - 1);
-    return Math.sqrt(variance);
-};
-
-const getLinearTrend = (values: number[]): number => {
-    if (values.length <= 1) return 0;
-
-    const xAvg = (values.length - 1) / 2;
-    const yAvg = mean(values);
-
-    let numerator = 0;
-    let denominator = 0;
-    for (let i = 0; i < values.length; i++) {
-        const x = i - xAvg;
-        const y = values[i]! - yAvg;
-        numerator += x * y;
-        denominator += x ** 2;
-    }
-
-    return denominator === 0 ? 0 : numerator / denominator;
-};
-
-const getAdaptiveStdDev = (scores: number[]): number => {
-    const observedStd = stdDev(scores);
-    const floor = scores.length < 4 ? 12 : scores.length < 8 ? 9 : 6;
-    const ceiling = 22;
-    return clampNumber(Math.max(observedStd, floor), 4, ceiling);
-};
-
-const hashStringToSeed = (value: string): number => {
-    let hash = 0;
-    for (let i = 0; i < value.length; i++) {
-        hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
-    }
-    return hash || 1;
-};
-
-const mulberry32 = (seed: number): (() => number) => {
-    let state = seed >>> 0;
-    return () => {
-        state += 0x6D2B79F5;
-        let t = state;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-};
-
-const normalRandom = (meanValue: number, deviation: number, random: () => number): number => {
-    const u1 = Math.max(random(), 1e-12);
-    const u2 = Math.max(random(), 1e-12);
-    const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-    return meanValue + z0 * deviation;
-};
-
-const scoreToPercentile = (score: number): number => {
-    if (score >= 98) return 99.7;
-    if (score >= 95) return 99;
-    if (score >= 90) return 96;
-    if (score >= 85) return 90;
-    if (score >= 80) return 84;
-    if (score >= 75) return 76;
-    if (score >= 70) return 67;
-    if (score >= 60) return 52;
-    if (score >= 50) return 38;
-    return 20;
-};
-
-const buildDistribution = (scores: number[], bucketSize: number): ScoreDistributionBucket[] => {
-    const bucketCount = Math.ceil(100 / bucketSize) + 1;
-    const counts = Array.from({ length: bucketCount }, () => 0);
-
-    for (const score of scores) {
-        const bounded = clampNumber(score, 0, 100);
-        const bucket = bounded === 100
-            ? 100 / bucketSize
-            : Math.floor(bounded / bucketSize);
-        counts[bucket]! += 1;
-    }
-
-    return counts
-        .map((count, index) => ({
-            score: index * bucketSize,
-            count,
-            probability: scores.length > 0 ? Number((count / scores.length).toFixed(4)) : 0,
-        }))
-        .filter((item) => item.count > 0);
-};
-
-const buildRankBands = (percentiles: number[]): RankBandProbability[] => {
-    const bands = [
-        { label: "Top 1%", minPercentile: 99, maxPercentile: 100 },
-        { label: "Top 5%", minPercentile: 95, maxPercentile: 99 },
-        { label: "Top 15%", minPercentile: 85, maxPercentile: 95 },
-        { label: "Top 30%", minPercentile: 70, maxPercentile: 85 },
-        { label: "Below Top 30%", minPercentile: 0, maxPercentile: 70 },
-    ];
-
-    return bands.map((band, index) => {
-        const isLastBand = index === bands.length - 1;
-        const count = percentiles.filter((value) =>
-            isLastBand
-                ? value >= band.minPercentile && value <= band.maxPercentile
-                : value >= band.minPercentile && value < band.maxPercentile
-        ).length;
-
-        return {
-            ...band,
-            probability: percentiles.length > 0 ? Number((count / percentiles.length).toFixed(4)) : 0,
-        };
-    });
-};
-
-const quantile = (sortedValues: number[], q: number): number => {
-    if (sortedValues.length === 0) return 0;
-    const boundedQ = clampNumber(q, 0, 1);
-    const position = (sortedValues.length - 1) * boundedQ;
-    const lower = Math.floor(position);
-    const upper = Math.ceil(position);
-    const lowerValue = sortedValues[lower] ?? sortedValues[0]!;
-    const upperValue = sortedValues[upper] ?? sortedValues[sortedValues.length - 1]!;
-    const weight = position - lower;
-    return lowerValue + (upperValue - lowerValue) * weight;
-};
-
-const buildConfidenceInterval = (
-    samples: number[],
-    level: number
-): { lower: number; upper: number; level: number } => {
-    const sorted = [...samples].sort((a, b) => a - b);
-    const alpha = (100 - level) / 100;
-    const lower = quantile(sorted, alpha / 2);
-    const upper = quantile(sorted, 1 - alpha / 2);
-
-    return {
-        lower: roundToInt(lower),
-        upper: roundToInt(upper),
-        level,
-    };
-};
-
-const getDataQuality = (sampleSize: number): "low" | "medium" | "high" => {
-    if (sampleSize >= 10) return "high";
-    if (sampleSize >= 5) return "medium";
-    return "low";
-};
-
-const getConfidenceLabel = (sampleSize: number, deviation: number): "low" | "medium" | "high" => {
-    if (sampleSize >= 10 && deviation <= 10) return "high";
-    if (sampleSize >= 5 && deviation <= 16) return "medium";
-    return "low";
-};

@@ -6,6 +6,7 @@
  * specific weak areas requiring targeted revision.
  */
 import { prisma } from "@repo/db";
+import { getAnalyticsCache, setAnalyticsCache } from "@repo/cache";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -40,12 +41,19 @@ export interface FullSWOT {
 // ── SWOT Engine ────────────────────────────────────────────────────────
 
 export async function generateSWOT(userId: string, examType: string): Promise<FullSWOT> {
-    const entries = await prisma.gradeEntry.findMany({
+    // ── Cache check ────────────────────────────────────────────────────
+    const cached = await getAnalyticsCache<FullSWOT>(userId, "swot", examType);
+    if (cached) return cached;
+
+    // ── DB-level aggregation (single round-trip instead of N rows) ─────
+    const grouped = await prisma.gradeEntry.groupBy({
+        by: ["subjectName", "chapter"],
         where: { userId, examType },
-        orderBy: { createdAt: "desc" },
+        _sum: { totalMarks: true, obtainedMarks: true, timeTakenMins: true },
+        _count: { id: true },
     });
 
-    if (entries.length === 0) {
+    if (grouped.length === 0) {
         return {
             examType,
             subjects: [],
@@ -54,38 +62,29 @@ export async function generateSWOT(userId: string, examType: string): Promise<Fu
         };
     }
 
-    // Group by subject (normalized) → chapter
-    // Map<normalizedSubject, Map<chapter, ChapterAnalysis>>
+    // Re-build the subject→chapter map from the aggregated rows
+    // Map<normalizedSubject, Map<chapterKey, ChapterAnalysis>>
     const subjectMap = new Map<string, Map<string, ChapterAnalysis>>();
 
-    for (const entry of entries) {
-        const normalizedSubject = entry.subjectName.trim().toLowerCase();
-
+    for (const row of grouped) {
+        const normalizedSubject = row.subjectName.trim().toLowerCase();
         if (!subjectMap.has(normalizedSubject)) {
             subjectMap.set(normalizedSubject, new Map());
         }
         const chapterMap = subjectMap.get(normalizedSubject)!;
-        const chapterKey = entry.chapter ?? "General";
+        const chapterKey = row.chapter ?? "General";
 
-        if (!chapterMap.has(chapterKey)) {
-            chapterMap.set(chapterKey, {
-                subjectName: entry.subjectName.trim(), // Keep the first display name encountered (or user provided)
-                chapter: chapterKey,
-                totalAttempts: 0,
-                totalMarks: 0,
-                obtainedMarks: 0,
-                successRate: 0,
-                avgTimePerQuestion: 0,
-                totalTimeMins: 0,
-                rating: "average",
-            });
-        }
-
-        const analysis = chapterMap.get(chapterKey)!;
-        analysis.totalAttempts++;
-        analysis.totalMarks += entry.totalMarks;
-        analysis.obtainedMarks += entry.obtainedMarks;
-        analysis.totalTimeMins += entry.timeTakenMins ?? 0;
+        chapterMap.set(chapterKey, {
+            subjectName: row.subjectName.trim(),
+            chapter: chapterKey,
+            totalAttempts: row._count.id,
+            totalMarks: row._sum.totalMarks ?? 0,
+            obtainedMarks: row._sum.obtainedMarks ?? 0,
+            successRate: 0,
+            avgTimePerQuestion: 0,
+            totalTimeMins: row._sum.timeTakenMins ?? 0,
+            rating: "average",
+        });
     }
 
     // Calculate rates and ratings
@@ -144,43 +143,86 @@ export async function generateSWOT(userId: string, examType: string): Promise<Fu
         .sort((a, b) => a.successRate - b.successRate)
         .slice(0, 10);
 
-    return { examType, subjects, overallReadiness, topPriorityChapters };
+    const result: FullSWOT = { examType, subjects, overallReadiness, topPriorityChapters };
+    await setAnalyticsCache(userId, "swot", result, examType);
+    return result;
 }
 
 // ── Subject-level Analytics ────────────────────────────────────────────
 
 export async function getSubjectPerformance(userId: string, subjectName: string) {
-    const entries = await prisma.gradeEntry.findMany({
-        where: {
-            userId,
-            subjectName: {
-                equals: subjectName.trim(),
-                mode: 'insensitive'
-            }
-        },
-        orderBy: { createdAt: "asc" },
-    });
+    const normalizedName = subjectName.trim().toLowerCase();
+    const cached = await getAnalyticsCache<ReturnType<typeof _buildSubjectResult>>(userId, "subject", normalizedName);
+    if (cached) return cached;
 
-    if (entries.length === 0) return null;
+    const where = {
+        userId,
+        subjectName: { equals: subjectName.trim(), mode: 'insensitive' as const },
+    };
 
-    // Calculate learning pace (improvement between first and last attempts)
-    const first5 = entries.slice(0, Math.min(5, entries.length));
-    const last5 = entries.slice(-Math.min(5, entries.length));
+    // 1 + 2. Both queries run in parallel — eliminates one sequential round-trip.
+    // trendEntries (max 50, asc) serves double duty: first5/last5 are sliced from it,
+    // eliminating the previous 3rd sequential query.
+    const [agg, trendEntries] = await Promise.all([
+        prisma.gradeEntry.aggregate({
+            where,
+            _avg: { obtainedMarks: true, totalMarks: true },
+            _count: { id: true },
+        }),
+        prisma.gradeEntry.findMany({
+            where,
+            orderBy: { createdAt: "asc" },
+            select: { obtainedMarks: true, totalMarks: true, timeTakenMins: true, createdAt: true },
+            take: 50,
+        }),
+    ]);
 
-    const earlyRate = first5.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks), 0) / first5.length;
-    const recentRate = last5.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks), 0) / last5.length;
+    if (!agg._count.id || agg._count.id === 0) return null;
 
+    const first5 = trendEntries.slice(0, 5);
+    const last5 = trendEntries.slice(-5);
+
+    const earlyRate = first5.length > 0
+        ? first5.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks), 0) / first5.length
+        : 0;
+    const recentRate = last5.length > 0
+        ? last5.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks), 0) / last5.length
+        : 0;
     const improvementRate = Math.round((recentRate - earlyRate) * 100);
 
-    // Time trend per question
-    const timeTrend = entries
+    const timeTrend = trendEntries
         .filter(e => e.timeTakenMins !== null)
-        .map(e => ({
-            date: e.createdAt.toISOString().split("T")[0],
-            timePerQuestion: e.timeTakenMins!,
-            score: Math.round((e.obtainedMarks / e.totalMarks) * 100),
-        }));
+        .flatMap(e => {
+            const date = e.createdAt.toISOString().split("T")[0];
+            if (!date) return [];
+            return [{ date, timePerQuestion: e.timeTakenMins!, score: Math.round((e.obtainedMarks / e.totalMarks) * 100) }];
+        });
 
+    const avgScore = agg._avg.totalMarks && agg._avg.totalMarks > 0
+        ? Math.round(((agg._avg.obtainedMarks ?? 0) / agg._avg.totalMarks) * 100)
+        : 0;
+
+    const result = {
+        subjectName,
+        totalEntries: agg._count.id,
+        averageScore: avgScore,
+        avgScore,
+        entryCount: agg._count.id,
+        trend: improvementRate > 5 ? "improving" : improvementRate < -5 ? "declining" : "stable",
+        improvementRate,
+        learningPace: improvementRate > 5 ? "accelerating" : improvementRate > 0 ? "steady" : "declining" as const,
+        timeTrend,
+    };
+    await setAnalyticsCache(userId, "subject", result, normalizedName, 300);
+    return result;
+}
+
+function _buildSubjectResult(
+    subjectName: string,
+    entries: { obtainedMarks: number; totalMarks: number; timeTakenMins: number | null; createdAt: Date }[],
+    improvementRate: number,
+    timeTrend: { date: string; timePerQuestion: number; score: number }[],
+) {
     return {
         subjectName,
         totalEntries: entries.length,
@@ -188,7 +230,7 @@ export async function getSubjectPerformance(userId: string, subjectName: string)
             entries.reduce((sum, e) => sum + (e.obtainedMarks / e.totalMarks) * 100, 0) / entries.length
         ),
         improvementRate,
-        learningPace: improvementRate > 5 ? "accelerating" : improvementRate > 0 ? "steady" : "declining",
+        learningPace: improvementRate > 5 ? "accelerating" : improvementRate > 0 ? "steady" : "declining" as const,
         timeTrend,
     };
 }

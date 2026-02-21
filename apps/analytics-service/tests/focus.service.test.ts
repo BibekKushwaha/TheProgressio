@@ -20,6 +20,15 @@ vi.mock('@repo/db', () => ({
     prisma: mockPrisma,
 }));
 
+// Prevent cache cross-contamination between tests — without this mock,
+// a test writing 1-subject results to cache would cause the next test
+// (multiple subjects) to read the stale 1-subject entry and fail.
+vi.mock('@repo/cache', () => ({
+    getAnalyticsCache: vi.fn().mockResolvedValue(null),
+    setAnalyticsCache: vi.fn().mockResolvedValue(undefined),
+    deleteAnalyticsCache: vi.fn().mockResolvedValue(undefined),
+}));
+
 import {
     getPlannedVsActual,
     detectPeakProductivity,

@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import activityRouter from "./routes/activity.route.js";
 import statsRouter from "./routes/stats.route.js";
 import { shutdownWorker } from "./services/worker.service.js";
+import { shutdownSimulationService } from "./services/simulation.service.js";
 
 export const app = express();
 
@@ -39,6 +40,7 @@ if (process.env.NODE_ENV !== 'test') {
     const shutdown = async () => {
         console.log("Shutting down Analytics Service...");
         await shutdownWorker();
+        await shutdownSimulationService();
         process.exit(0);
     };
     process.on("SIGTERM", shutdown);

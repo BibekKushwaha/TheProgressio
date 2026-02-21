@@ -37,7 +37,7 @@ type SubjectTaskStatusFilter = 'all' | TaskStatus.PENDING | TaskStatus.IN_PROGRE
 
 export default function SubjectLibraryPage() {
     const { data: categories, isLoading: catLoading } = useGetCategoriesQuery();
-    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery({ page: 1, limit: 500 });
+    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery({ page: 1, limit: 100 });
     const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
     const [showGPA, setShowGPA] = useState(false);
     const [subjectSearch, setSubjectSearch] = useState('');

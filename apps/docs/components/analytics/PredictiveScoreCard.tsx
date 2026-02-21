@@ -1,12 +1,17 @@
 'use client';
 
-import { useGetPredictivePerformanceQuery } from '@repo/store';
+import { useGetPredictivePerformanceQuery, LearningPace } from '@repo/store';
 import { TrendingUp, TrendingDown, Minus, Trophy, Target } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
 
-export function PredictiveScoreCard() {
-    const { data, isLoading } = useGetPredictivePerformanceQuery('JEE');
-    const subjects = data?.data || [];
+interface PredictiveScoreCardProps {
+    /** Pre-fetched data from a BFF call. When provided the query is skipped. */
+    initialData?: LearningPace[];
+}
+
+export function PredictiveScoreCard({ initialData }: PredictiveScoreCardProps = {}) {
+    const { data, isLoading } = useGetPredictivePerformanceQuery('JEE', { skip: !!initialData });
+    const subjects = initialData ?? data?.data ?? [];
 
     if (isLoading) {
         return (

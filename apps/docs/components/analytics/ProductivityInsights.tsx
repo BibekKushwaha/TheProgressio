@@ -1,22 +1,51 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useGetTimeLeakageQuery, useGetPeakWindowQuery, useGetPredictivePerformanceQuery } from '@repo/store';
+import {
+    useGetDashboardSummaryQuery,
+    useGetPredictivePerformanceQuery,
+    type TimeLeakageReport,
+    type PeakProductivityResult,
+    type LearningPace,
+} from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Clock, TrendingUp, AlertCircle, Sun } from 'lucide-react';
 
-export function ProductivityInsights() {
+interface ProductivityInsightsProps {
+    /** Leakage data from strategic BFF — skips useGetDashboardSummaryQuery when supplied */
+    initialLeakage?: TimeLeakageReport;
+    /** Peak data from strategic BFF — skips useGetDashboardSummaryQuery when supplied */
+    initialPeak?: PeakProductivityResult;
+    /** Predictive performance from strategic BFF — skips useGetPredictivePerformanceQuery when supplied */
+    initialPredictive?: LearningPace[];
+}
+
+export function ProductivityInsights({
+    initialLeakage,
+    initialPeak,
+    initialPredictive,
+}: ProductivityInsightsProps = {}) {
     const [isMounted, setIsMounted] = useState(false);
-    const { data: leakageData, isLoading: leakageLoading } = useGetTimeLeakageQuery(7);
-    const { data: peakData, isLoading: peakLoading } = useGetPeakWindowQuery();
-    const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery('');
+
+    // Skip BFF if parent already provided both leakage + peak
+    const hasDashboard = !!(initialLeakage && initialPeak);
+    const { data: dashboardData, isLoading: dashLoading } = useGetDashboardSummaryQuery(
+        { leakageDays: 7, peakDays: 14 },
+        { skip: hasDashboard }
+    );
+
+    // Skip predictive query if parent already provided it
+    const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery(
+        '',
+        { skip: !!initialPredictive }
+    );
 
     useEffect(() => {
         setIsMounted(true);
     }, []);
 
-    const isLoading = leakageLoading || peakLoading || performanceLoading;
+    const isLoading = (!hasDashboard && dashLoading) || (!initialPredictive && performanceLoading);
 
     if (!isMounted || isLoading) {
         return (
@@ -45,9 +74,9 @@ export function ProductivityInsights() {
         estimatedPercentile: number;
     };
 
-    const leakage = leakageData?.report;
-    const peak = peakData?.data as PeakData | undefined;
-    const performance = (performanceData?.data || []) as PerformanceItem[];
+    const leakage = initialLeakage ?? dashboardData?.leakage;
+    const peak = (initialPeak ?? dashboardData?.peak) as PeakData | undefined;
+    const performance = (initialPredictive ?? performanceData?.data ?? []) as PerformanceItem[];
     const leakageStats = leakage
         ? [
             {
@@ -110,7 +139,7 @@ export function ProductivityInsights() {
                         <div className="mt-4">
                             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Worst Days</h3>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                {leakage.worstDays.map((day, idx) => (
+                                {leakage.worstDays.map((day: { date: string; leakagePercent: number }, idx: number) => (
                                     <div key={idx} className="bg-white/5 border border-white/10 rounded-lg p-3">
                                         <div className="text-xs text-slate-400">{new Date(day.date).toLocaleDateString()}</div>
                                         <div className="text-lg font-bold text-red-400">{day.leakagePercent.toFixed(1)}%</div>

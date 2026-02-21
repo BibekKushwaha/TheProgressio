@@ -1,10 +1,11 @@
 import type { Request, Response } from "express";
 import { prisma } from "@repo/db";
+import { deleteAnalyticsCache, getAnalyticsCache, setAnalyticsCache } from "@repo/cache";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { predictTaskDuration, getCycleTimePercentiles, predictGrade } from "../services/prediction.service.js";
 import { generateSWOT, getSubjectPerformance } from "../services/swot.service.js";
 import { calculateCGPA, whatIfGPA, addCourseGrade, updateCourseGrade, deleteCourseGrade } from "../services/gpa.service.js";
-import { getPlannedVsActual, detectPeakProductivity, getPredictivePerformance } from "../services/focus.service.js";
+import { getPlannedVsActual, detectPeakProductivity, getPredictivePerformance, computeFocusScore } from "../services/focus.service.js";
 
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
@@ -49,10 +50,18 @@ const getHabitActiveDates = async (userId: string): Promise<string[]> => {
             headers["x-internal-secret"] = HABIT_INTERNAL_SECRET;
         }
 
-        const response = await fetch(
-            `${HABIT_SERVICE_URL}/api/habits/internal/active-dates?userId=${encodeURIComponent(userId)}`,
-            { headers }
-        );
+        // 3-second hard timeout — habit service latency must not stall the BFF
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        let response: globalThis.Response;
+        try {
+            response = await fetch(
+                `${HABIT_SERVICE_URL}/api/habits/internal/active-dates?userId=${encodeURIComponent(userId)}`,
+                { headers, signal: controller.signal }
+            );
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         if (!response.ok) return [];
 
@@ -69,6 +78,11 @@ const getHabitActiveDates = async (userId: string): Promise<string[]> => {
 };
 
 const getMergedActiveDates = async (userId: string): Promise<string[]> => {
+    // Cache merged active dates for 5 minutes — involves an inter-service HTTP
+    // call to the habit service, so caching is critical for BFF latency.
+    const cached = await getAnalyticsCache<string[]>(userId, "merged-dates", "all");
+    if (cached) return cached;
+
     const [activityLogs, completionStats, habitActiveDates] = await Promise.all([
         prisma.activityLog.findMany({
             where: { task: { userId } },
@@ -89,7 +103,9 @@ const getMergedActiveDates = async (userId: string): Promise<string[]> => {
         ...habitActiveDates,
     ]);
 
-    return Array.from(mergedSet).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    const result = Array.from(mergedSet).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    await setAnalyticsCache(userId, "merged-dates", result, "all", 300);
+    return result;
 };
 
 const inferScreenActive = (brightness: number | null, motionState: string | null): boolean => {
@@ -162,6 +178,14 @@ export const getNotificationIntelligence = async (
             return;
         }
 
+        // Cache for 1 hour — notification timing preferences shift slowly;
+        // a 1-hour TTL eliminates the full session scan on repeat nudge evaluations.
+        const notifCached = await getAnalyticsCache<object>(userId, "notification-intel", "v1");
+        if (notifCached) {
+            res.status(200).json(notifCached);
+            return;
+        }
+
         const now = new Date();
         const lookback = new Date(now);
         lookback.setDate(now.getDate() - 21);
@@ -200,7 +224,7 @@ export const getNotificationIntelligence = async (
 
         const expectedOpenRateLiftPct = sessions.length >= 7 ? 50 : 18;
 
-        res.status(200).json({
+        const intelligenceResult = {
             message: "Notification intelligence computed",
             intelligence: {
                 bestSendHourLocal: bestHour,
@@ -210,7 +234,10 @@ export const getNotificationIntelligence = async (
                 confidence: sessions.length >= 14 ? "high" : sessions.length >= 7 ? "medium" : "low",
                 sampleSize: sessions.length,
             },
-        });
+        };
+
+        await setAnalyticsCache(userId, "notification-intel", intelligenceResult, "v1", 3600);
+        res.status(200).json(intelligenceResult);
     } catch (error) {
         console.error("Error computing notification intelligence:", error);
         res.status(500).json({ message: "Failed to compute notification intelligence" });
@@ -452,27 +479,22 @@ export const getTaskEfficiency = async (
             0
         );
 
-        const similarTasks = await prisma.task.findMany({
-            where: {
-                userId,
-                title: task.title,
-                status: "COMPLETED",
-            },
-            include: { activityLogs: true },
-        });
+        // Replace N+1 (findMany + include activityLogs) with two aggregate queries.
+        const [similarCount, logsAgg] = await Promise.all([
+            prisma.task.count({
+                where: { userId, title: task.title, status: "COMPLETED" },
+            }),
+            prisma.activityLog.aggregate({
+                where: {
+                    task: { userId, title: task.title, status: "COMPLETED" },
+                },
+                _sum: { durationMinutes: true },
+            }),
+        ]);
 
         const averageMinutes =
-            similarTasks.length > 0
-                ? Math.round(
-                    similarTasks.reduce((sum, t) => {
-                        const minutes = t.activityLogs.reduce(
-                            (innerSum, log) =>
-                                innerSum + (log.durationMinutes ?? 0),
-                            0
-                        );
-                        return sum + minutes;
-                    }, 0) / similarTasks.length
-                )
+            similarCount > 0 && (logsAgg._sum.durationMinutes ?? 0) > 0
+                ? Math.round((logsAgg._sum.durationMinutes ?? 0) / similarCount)
                 : null;
 
         res.status(200).json({
@@ -509,63 +531,16 @@ export const getFocusScore = async (
             return;
         }
 
-        const end = new Date();
-        const start = new Date();
-        start.setDate(end.getDate() - 7);
-        start.setHours(0, 0, 0, 0);
-
-        const sessions = await prisma.activityLog.findMany({
-            where: {
-                task: { userId },
-                startTime: { gte: start, lt: end },
-            },
-            select: {
-                durationMinutes: true,
-                sessionType: true,
-                startTime: true
-            },
-        });
-
-        const totalSessions = sessions.length;
-        if (totalSessions === 0) {
-            res.status(200).json({
-                message: "No data found for focus score",
-                stats: { score: 0, totalSessions: 0, totalMinutes: 0, activeDays: 0 }
-            });
-            return;
-        }
-
-        const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0);
-
-        // 1. Consistency (40 points) - Days active in last 7 days
-        const activeDaysSet = new Set(sessions.map(s => formatDateKey(s.startTime)));
-        const activeDaysCount = activeDaysSet.size;
-        const consistencyScore = (activeDaysCount / 7) * 40;
-
-        // 2. Intensity (30 points) - Avg hours vs Daily Goal
-        const avgHoursPerDay = (totalMinutes / 60) / 7;
-        const intensityScore = Math.min(30, (avgHoursPerDay / dailyGoalHours) * 30);
-
-        // 3. Depth (30 points) - Percentage of sessions that are DEEP_WORK
-        const deepWorkSessionsCount = sessions.filter(s => s.sessionType === 'DEEP_WORK').length;
-        const depthScore = (deepWorkSessionsCount / totalSessions) * 30;
-
-        const finalScore = Math.min(100, Math.round(consistencyScore + intensityScore + depthScore));
+        // Delegates to computeFocusScore (focus.service.ts) which owns the
+        // 60-second Redis cache.  Both this endpoint and the BFF share the
+        // same cache key so at most one DB round-trip happens per minute.
+        const focusResult = await computeFocusScore(userId, dailyGoalHours);
 
         res.status(200).json({
-            message: "Focus score calculated successfully",
-            stats: {
-                score: finalScore,
-                breakdown: {
-                    consistency: Math.round(consistencyScore),
-                    intensity: Math.round(intensityScore),
-                    depth: Math.round(depthScore)
-                },
-                totalSessions,
-                totalMinutes,
-                activeDays: activeDaysCount,
-                avgHoursPerDay: Math.round(avgHoursPerDay * 10) / 10
-            },
+            message: focusResult.totalSessions === 0
+                ? "No data found for focus score"
+                : "Focus score calculated successfully",
+            stats: focusResult,
         });
     } catch (error) {
         console.error("Error calculating focus score:", error);
@@ -618,6 +593,15 @@ export const getAchievements = async (
         const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        // Cache check — achievements change rarely; 5-min TTL is safe.
+        // Cache is bypassed (and invalidated) only when new unlocks are detected.
+        const achievementCacheKey = "list";
+        const cachedAchievements = await getAnalyticsCache<object>(userId, "achievements", achievementCacheKey);
+        if (cachedAchievements) {
+            res.status(200).json(cachedAchievements);
             return;
         }
 
@@ -686,10 +670,21 @@ export const getAchievements = async (
             });
         }
 
-        res.status(200).json({
+        const achievementResponse = {
             message: "Achievements retrieved successfully",
             achievements: results
-        });
+        };
+
+        // Only cache when no new unlocks occurred — if there were new unlocks the
+        // next request should re-evaluate (next hit in 5min will be fresh).
+        if (newlyUnlocked.length === 0) {
+            await setAnalyticsCache(userId, "achievements", achievementResponse, achievementCacheKey, 300);
+        } else {
+            // Invalidate stale cache so the next request re-evaluates
+            await deleteAnalyticsCache(userId, "achievements", achievementCacheKey);
+        }
+
+        res.status(200).json(achievementResponse);
     } catch (error) {
         console.error("Error fetching achievements:", error);
         res.status(500).json({
@@ -1140,6 +1135,15 @@ export const addGradeEntry = async (req: AuthenticatedRequest, res: Response): P
                 examType: examType || "JEE", timeTakenMins: timeTakenMins ? parseInt(timeTakenMins) : null,
             },
         });
+
+        // Invalidate SWOT, predictive, and subject caches for this user+examType
+        const et = (examType || "JEE") as string;
+        await Promise.all([
+            deleteAnalyticsCache(userId, "swot", et),
+            deleteAnalyticsCache(userId, "predictive", et),
+            deleteAnalyticsCache(userId, "subject", (subjectName as string).trim().toLowerCase()),
+        ]);
+
         res.status(201).json({ message: "Grade entry added", entry });
     } catch (error) {
         console.error("Error adding grade entry:", error);
@@ -1176,11 +1180,87 @@ export const deleteGradeEntry = async (req: AuthenticatedRequest, res: Response)
         if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
 
         const { id } = req.params;
+
+        // Fetch the entry before deleting so we can invalidate the right caches
+        const existing = await prisma.gradeEntry.findFirst({ where: { id: (id as string)!, userId }, select: { examType: true, subjectName: true } });
+
         await prisma.gradeEntry.deleteMany({ where: { id: (id as string)!, userId } });
+
+        if (existing) {
+            await Promise.all([
+                deleteAnalyticsCache(userId, "swot", existing.examType),
+                deleteAnalyticsCache(userId, "predictive", existing.examType),
+                deleteAnalyticsCache(userId, "subject", existing.subjectName.trim().toLowerCase()),
+            ]);
+        }
+
         res.status(200).json({ message: "Grade entry deleted" });
     } catch (error) {
         console.error("Error deleting grade entry:", error);
         res.status(500).json({ message: "Failed to delete grade entry", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+};
+
+// PUT /stats/grade-entry/:id
+export const updateGradeEntry = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+
+        const { id } = req.params;
+        if (!id || typeof id !== "string") {
+            res.status(400).json({ message: "Entry id is required" });
+            return;
+        }
+
+        // Snapshot old values BEFORE the update so we can selectively bust caches
+        // for both the old examType/subject AND the new ones (they may differ).
+        const before = await prisma.gradeEntry.findFirst({
+            where: { id, userId },
+            select: { examType: true, subjectName: true },
+        });
+
+        if (!before) {
+            res.status(404).json({ message: "Grade entry not found" });
+            return;
+        }
+
+        const { subjectName, chapter, totalMarks, obtainedMarks, examType, timeTakenMins } = req.body ?? {};
+
+        const updated = await prisma.gradeEntry.update({
+            where: { id },
+            data: {
+                ...(subjectName != null && { subjectName }),
+                ...(chapter !== undefined && { chapter }),
+                ...(totalMarks != null && { totalMarks: parseFloat(totalMarks) }),
+                ...(obtainedMarks != null && { obtainedMarks: parseFloat(obtainedMarks) }),
+                ...(examType != null && { examType }),
+                ...(timeTakenMins !== undefined && { timeTakenMins: timeTakenMins !== null ? parseInt(timeTakenMins) : null }),
+            },
+        });
+
+        // Invalidate for OLD keys first, then NEW keys.
+        // Using a Set deduplications the calls when fields haven't changed.
+        const keysToInvalidate = new Set<string>();
+        const addKeys = (et: string, sn: string) => {
+            keysToInvalidate.add(`swot:${et}`);
+            keysToInvalidate.add(`predictive:${et}`);
+            keysToInvalidate.add(`subject:${sn.trim().toLowerCase()}`);
+        };
+        addKeys(before.examType, before.subjectName);
+        addKeys(updated.examType, updated.subjectName);
+
+        await Promise.all(
+            Array.from(keysToInvalidate).map((key) => {
+                const [reportType, param] = key.split(":") as [string, string];
+                return deleteAnalyticsCache(userId, reportType, param);
+            }),
+        );
+
+        res.status(200).json({ message: "Grade entry updated", entry: updated });
+    } catch (error) {
+        console.error("Error updating grade entry:", error);
+        res.status(500).json({ message: "Failed to update grade entry", error: error instanceof Error ? error.message : "Unknown error" });
     }
 };
 
@@ -1289,6 +1369,16 @@ export const getRevisionSchedule = async (
         }
 
         const examType = typeof req.query.examType === "string" ? req.query.examType : "JEE";
+
+        // Cache for 10 minutes — schedule depends only on SWOT (which has its
+        // own TTL), so re-generating every request is pure wasted CPU + DB.
+        const scheduleCacheKey = `schedule:${examType}`;
+        const scheduleCached = await getAnalyticsCache<object>(userId, "revision", scheduleCacheKey);
+        if (scheduleCached) {
+            res.status(200).json(scheduleCached);
+            return;
+        }
+
         const swot = await generateSWOT(userId, examType);
         const routine = INTERNAL_EXAM_ROUTINES[examType] || INTERNAL_EXAM_ROUTINES.JEE;
 
@@ -1328,12 +1418,14 @@ export const getRevisionSchedule = async (
             return item;
         });
 
-        res.status(200).json({
+        const scheduleResult = {
             message: `Revision schedule for ${examType} generated`,
             examType,
             schedule,
-            overallReadiness: swot.overallReadiness
-        });
+            overallReadiness: swot.overallReadiness,
+        };
+        await setAnalyticsCache(userId, "revision", scheduleResult, scheduleCacheKey, 600);
+        res.status(200).json(scheduleResult);
     } catch (error) {
         console.error("Error generating revision schedule:", error);
         res.status(500).json({
@@ -1342,3 +1434,140 @@ export const getRevisionSchedule = async (
         });
     }
 };
+
+// ═══════════════════════════════════════════════════════════════════════
+// BFF — Dashboard Summary (batches leakage + peak + focus + streak)
+// GET /stats/dashboard-summary
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Single endpoint that returns all data needed for the productivity
+ * insights dashboard in one round-trip, eliminating the frontend
+ * waterfall of 3+ parallel RTK-Query hooks.
+ *
+ * All constituent computations are independently cached so repeat
+ * calls within their TTL are essentially free.
+ */
+export const getDashboardSummary = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        const dailyGoalHours = req.user?.dailyGoalHours ?? 4;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const leakageDays = parseInt(req.query.leakageDays as string) || 7;
+        const peakDays = parseInt(req.query.peakDays as string) || 30;
+
+        // Top-level BFF cache — 2 min TTL covers the full aggregated response.
+        // Sub-functions (leakage/peak/predictive) have their own longer TTLs;
+        // this outer cache eliminates the Promise.all overhead on repeat hits.
+        // v2 adds activeDates[] to the response (for TopStats history dots).
+        const bffCacheKey = `bffv2:${leakageDays}:${peakDays}`;
+        const bffCached = await getAnalyticsCache<object>(userId, "dashboard", bffCacheKey);
+        if (bffCached) {
+            res.status(200).json(bffCached);
+            return;
+        }
+
+        // Fetch everything in parallel — each call hits its own cache first.
+        // computeFocusScore shares the same 60 s Redis cache as GET /stats/focus,
+        // so when both endpoints are called within 60 s only one DB scan happens.
+        const [leakage, peak, distinctDates, focusStats] = await Promise.all([
+            getPlannedVsActual(userId, leakageDays),
+            detectPeakProductivity(userId, peakDays),
+            getMergedActiveDates(userId),
+            computeFocusScore(userId, dailyGoalHours),
+        ]);
+
+        // ── Streak ──────────────────────────────────────────────────────
+        const streak = buildConsecutiveStreak(distinctDates);
+
+        const dashboardResult = {
+            message: "Dashboard summary",
+            leakage,
+            peak,
+            focus: focusStats,
+            streak,
+            // Included here so TopStats can render 14-day history without a
+            // separate useGetUserStreakQuery round-trip.
+            activeDates: distinctDates.slice(0, 14),
+            generatedAt: new Date().toISOString(),
+        };
+
+        // Store in cache then respond
+        await setAnalyticsCache(userId, "dashboard", dashboardResult, bffCacheKey, 120);
+        res.status(200).json(dashboardResult);
+    } catch (error) {
+        console.error("Error generating dashboard summary:", error);
+        res.status(500).json({
+            message: "Failed to generate dashboard summary",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+
+// BFF — Strategic Analytics Summary
+// GET /stats/strategic-summary
+// ═══════════════════════════════════════════════════════════
+/**
+ * Batches the 5 expensive analytical computations on the strategic page into a
+ * single cache-aware round-trip, eliminating 5 independent HTTP requests on
+ * mount. Each sub-computation is independently cached so repeat calls within
+ * their respective TTLs are free. The outer 5-min TTL means repeated navigation
+ * to the strategic page does zero backend computation.
+ */
+export const getStrategicSummary = async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const examType = (req.query.examType as string) || "JEE";
+        const strategicCacheKey = `strategic:${examType}`;
+        const cached = await getAnalyticsCache<object>(userId, "strategic", strategicCacheKey);
+        if (cached) {
+            res.status(200).json(cached);
+            return;
+        }
+
+        // Run all 5 sub-computations in parallel — each has its own cache
+        const [peak, leakage, swot, cycleTime, predictive] = await Promise.all([
+            detectPeakProductivity(userId, 14),
+            getPlannedVsActual(userId, 7),
+            generateSWOT(userId, examType),
+            getCycleTimePercentiles(userId, {}),
+            getPredictivePerformance(userId, examType),
+        ]);
+
+        const result = {
+            message: "Strategic analytics summary",
+            peak,
+            leakage,
+            swot,
+            cycleTime,
+            predictive,
+            examType,
+            generatedAt: new Date().toISOString(),
+        };
+
+        await setAnalyticsCache(userId, "strategic", result, strategicCacheKey, 300);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("Error generating strategic summary:", error);
+        res.status(500).json({
+            message: "Failed to generate strategic summary",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+

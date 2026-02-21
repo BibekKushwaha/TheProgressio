@@ -457,9 +457,11 @@ model GradeEntry {
   timeTakenMins Int?     // time taken per question/section
   
   createdAt     DateTime @default(now())
-  
-  @@index([userId, subjectName])
-  @@index([userId, examType])
+
+  // Covering index for groupBy(userId, examType, subjectName, chapter) used by SWOT aggregation.
+  // Replaces the two narrow indexes — the query planner will use this for both the
+  // userId+examType filter and the userId+subjectName filter (left-prefix rule).
+  @@index([userId, examType, subjectName, chapter])
 }
 
 // ── Phase 4: Payments ──────────────────────────────────────────────────

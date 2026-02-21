@@ -32,6 +32,7 @@ const BADGES = [
 export default function HomePage() {
     return (
         <div className="min-h-screen text-white overflow-hidden relative bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.12),_transparent_36%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.18),_transparent_36%),linear-gradient(145deg,_#020617_0%,_#0f172a_45%,_#1e1b4b_100%)]">
+            {/* Background Effects */}
             <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute -top-24 -left-12 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl" />
                 <div className="absolute top-1/3 -right-16 w-72 h-72 bg-fuchsia-500/20 rounded-full blur-3xl" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useGetSWOTReportQuery } from '@repo/store';
+import { useGetSWOTReportQuery, type FullSWOT } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,11 +10,13 @@ import { Target, TrendingUp, AlertTriangle, Lightbulb, Search } from 'lucide-rea
 interface SWOTAnalysisProps {
     examType?: string;
     allowExamTypeChange?: boolean;
+    /** Pre-fetched SWOT data — skips the network round-trip when provided */
+    initialData?: FullSWOT;
 }
 
 const EXAM_TYPE_OPTIONS = ['JEE', 'NEET', 'UPSC', 'Midterm', 'Final', 'Quiz'] as const;
 
-export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange = true }: SWOTAnalysisProps) {
+export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange = true, initialData }: SWOTAnalysisProps) {
     const [isMounted, setIsMounted] = useState(false);
     const [examType, setExamType] = useState(controlledExamType || 'Midterm');
     const [searchQuery, setSearchQuery] = useState('');
@@ -30,9 +32,10 @@ export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange
     }, [controlledExamType]);
 
     const activeExamType = controlledExamType || examType;
-    const { data, isLoading } = useGetSWOTReportQuery(activeExamType);
+    // Skip the network fetch when a parent has already retrieved SWOT data.
+    const { data, isLoading } = useGetSWOTReportQuery(activeExamType, { skip: !!initialData });
 
-    const swotData = data?.data;
+    const swotData = initialData ?? data?.data;
     const filteredSubjects =
         swotData?.subjects.filter(subject =>
             subject.subject.toLowerCase().includes(searchQuery.toLowerCase())

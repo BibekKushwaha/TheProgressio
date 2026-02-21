@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
-const sw = self as unknown as ServiceWorkerGlobalScope;
+// self is a built-in ServiceWorker global — no declaration needed
+const sw = /** @type {ServiceWorkerGlobalScope} */ (self);
 
 sw.addEventListener('push', (event) => {
     if (!event.data) return;

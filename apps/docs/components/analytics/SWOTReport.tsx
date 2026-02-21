@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useGetSWOTReportQuery } from '@repo/store';
+import { useGetSWOTReportQuery, FullSWOT } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -16,9 +16,14 @@ import {
     ArrowRight
 } from 'lucide-react';
 
-export function SWOTReport() {
-    const { data, isLoading } = useGetSWOTReportQuery('JEE'); // Defaulting to JEE for now
-    const swot = data?.data;
+interface SWOTReportProps {
+    /** Pre-fetched data from a BFF call. When provided the query is skipped. */
+    initialData?: FullSWOT;
+}
+
+export function SWOTReport({ initialData }: SWOTReportProps = {}) {
+    const { data, isLoading } = useGetSWOTReportQuery('JEE', { skip: !!initialData });
+    const swot = initialData ?? data?.data;
 
     if (isLoading) {
         return (

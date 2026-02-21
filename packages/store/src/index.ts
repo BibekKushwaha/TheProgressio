@@ -213,6 +213,8 @@ export {
   useGetNotificationIntelligenceQuery,
   useGetNotificationContextSignalsQuery,
   useGetRevisionScheduleQuery,
+  useGetDashboardSummaryQuery,
+  useGetStrategicSummaryQuery,
 } from './services/analyticsApi';
 export type {
   ActivityLog,
@@ -235,6 +237,7 @@ export type {
   TimeLeakageReport,
   PeakProductivityResult,
   LearningPace,
+  CycleTimeData,
   CourseGrade,
   GradeEntry,
   GPAComponentInput,
@@ -242,6 +245,9 @@ export type {
   NotificationIntelligence,
   NotificationContextSignals,
   RevisionScheduleResponse,
+  DashboardSummaryResponse,
+  DashboardFocusStats,
+  StrategicSummaryResponse,
 } from './services/analyticsApi';
 export { SessionType } from './services/analyticsApi';
 

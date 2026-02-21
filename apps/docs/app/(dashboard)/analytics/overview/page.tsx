@@ -20,11 +20,11 @@ import {
   PriorityEnum,
   TaskStatus,
   useGetDailySummaryQuery,
-  useGetFocusScoreQuery,
+  useGetDashboardSummaryQuery,
   useGetHabitsQuery,
   useGetTasksQuery,
-  useGetWeeklyTrendsQuery,
 } from "@repo/store";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useMemo, useState, useEffect } from "react";
 import { exportTasksToCSV, downloadCSV } from "@/lib/exportUtils";
 import { toast } from "sonner";
@@ -32,6 +32,8 @@ import { toast } from "sonner";
 export default function AnalyticsOverviewPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [pastDays, setPastDays] = useState("1");
+  const isVisible = usePageVisibility();
+  const pollMs = isVisible ? 60000 : 0;
 
   useEffect(() => {
     setIsMounted(true);
@@ -42,28 +44,25 @@ export default function AnalyticsOverviewPage() {
     isLoading: isSummaryLoading,
     isFetching: isSummaryFetching
   } = useGetDailySummaryQuery(pastDays, {
-    pollingInterval: 30000,
+    pollingInterval: pollMs,
     skip: !isMounted,
   });
 
+  // BFF replaces useGetFocusScoreQuery — gets score+breakdown in the same
+  // request as leakage/peak, so no extra round-trip on page load.
   const {
-    data: focusScoreData,
-    isLoading: isFocusLoading,
-    isFetching: isFocusFetching
-  } = useGetFocusScoreQuery(undefined, {
-    pollingInterval: 30000,
-    skip: !isMounted,
-  });
-
-  useGetWeeklyTrendsQuery(undefined, {
-    pollingInterval: 30000,
-    skip: !isMounted,
-  });
+    data: dashboardData,
+    isLoading: isDashLoading,
+    isFetching: isDashFetching
+  } = useGetDashboardSummaryQuery(
+    { leakageDays: parseInt(pastDays) || 7, peakDays: 30 },
+    { pollingInterval: pollMs, skip: !isMounted }
+  );
 
   const {
     data: tasks = [],
     isLoading: isTasksLoading
-  } = useGetTasksQuery({ page: 1, limit: 500 }, { skip: !isMounted });
+  } = useGetTasksQuery({ page: 1, limit: 50 }, { skip: !isMounted });
 
   const {
     data: habitsResponse,
@@ -171,17 +170,14 @@ export default function AnalyticsOverviewPage() {
   const timeLabel = isWeekly ? 'Weekly' : 'Today\'s';
 
   const stats = useMemo(() => {
-    // Determine loading states
-    // We only show the full-card skeleton on initial load or if data is missing during a fetch
     const isSummaryMissing = !summaryData && (isSummaryLoading || isSummaryFetching);
-    const isFocusMissing = !focusScoreData && (isFocusLoading || isFocusFetching);
+    const isDashMissing = !dashboardData && (isDashLoading || isDashFetching);
 
-    // Format Values
     const hours = summaryData?.stats?.totalHours ?? 0;
     const formattedHours = hours >= 10 ? Math.round(hours) : hours.toFixed(1);
 
-    const focusScore = focusScoreData?.stats?.scorePercent ?? focusScoreData?.stats?.score ?? 0;
-    const scoreDisplay = focusScoreData?.stats?.scoreDisplay ?? Math.round(focusScore).toString();
+    const focusScore = dashboardData?.focus?.score ?? 0;
+    const scoreDisplay = Math.round(focusScore).toString();
 
     const progress = summaryData?.stats?.dailyGoalHours
       ? Math.min(100, Math.round((hours / summaryData.stats.dailyGoalHours) * 100))
@@ -206,11 +202,11 @@ export default function AnalyticsOverviewPage() {
       },
       {
         label: 'Overall Focus Score',
-        value: isFocusMissing ? <Skeleton className="h-8 w-24 bg-white/10" /> : `${scoreDisplay}/100`,
+        value: isDashMissing ? <Skeleton className="h-8 w-24 bg-white/10" /> : `${scoreDisplay}/100`,
         trend: focusScore >= 80 ? "Excellent" : focusScore >= 60 ? "Good" : "Steady",
         icon: Target,
         gradient: 'from-green-500 to-emerald-500',
-        isLoading: isFocusLoading && !focusScoreData
+        isLoading: isDashLoading && !dashboardData
       },
       {
         label: `${isWeekly ? 'Weekly' : 'Daily'} Target`,
@@ -221,7 +217,7 @@ export default function AnalyticsOverviewPage() {
         isLoading: isSummaryLoading && !summaryData
       },
     ];
-  }, [summaryData, focusScoreData, isSummaryLoading, isSummaryFetching, isFocusLoading, isFocusFetching, timeLabel, isWeekly]);
+  }, [summaryData, dashboardData, isSummaryLoading, isSummaryFetching, isDashLoading, isDashFetching, timeLabel, isWeekly]);
 
   return (
     <div className="space-y-8">
