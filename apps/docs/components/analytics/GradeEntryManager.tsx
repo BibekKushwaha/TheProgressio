@@ -9,6 +9,7 @@ import type { GradeEntry } from '@repo/store';
 import { Plus, GraduationCap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast-provider';
 
 interface GradeEntryManagerProps {
     examType?: string;
@@ -22,6 +23,7 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
     const [obtainedMarks, setObtainedMarks] = useState('');
     const [totalMarks, setTotalMarks] = useState('100');
     const [addGradeEntry, { isLoading: isAdding }] = useAddGradeEntryMutation();
+    const { toast } = useToast();
 
     useEffect(() => {
         if (controlledExamType) {
@@ -42,16 +44,20 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!subjectName || !obtainedMarks || !activeExamType || invalidInput) return;
-        await addGradeEntry({
-            examType: activeExamType,
-            subjectName,
-            chapter: chapter || undefined,
-            obtainedMarks: parseFloat(obtainedMarks),
-            totalMarks: parseFloat(totalMarks),
-        });
-        setSubjectName('');
-        setChapter('');
-        setObtainedMarks('');
+        try {
+            await addGradeEntry({
+                examType: activeExamType,
+                subjectName,
+                chapter: chapter || undefined,
+                obtainedMarks: parseFloat(obtainedMarks),
+                totalMarks: parseFloat(totalMarks),
+            }).unwrap();
+            setSubjectName('');
+            setChapter('');
+            setObtainedMarks('');
+        } catch {
+            toast('Failed to add grade entry. Please try again.', 'error');
+        }
     };
 
     return (

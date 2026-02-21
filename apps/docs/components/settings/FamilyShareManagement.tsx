@@ -154,7 +154,7 @@ export function FamilyShareManagement() {
                                             </div>
                                             <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                                                 <Clock className="w-3 h-3" />
-                                                Expires {new Date(link.expiresAt!).toLocaleDateString()}
+                                                {link.expiresAt ? `Expires ${new Date(link.expiresAt).toLocaleDateString()}` : 'No expiry'}
                                                 {link.lastUsedAt && (
                                                     <span className="flex items-center gap-1 ml-2">
                                                         <Shield className="w-3 h-3" />

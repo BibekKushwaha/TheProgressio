@@ -91,7 +91,7 @@ export function SWOTAnalysis({ examType: controlledExamType, allowExamTypeChange
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                             <div className="text-sm text-slate-400 mb-1">Overall Readiness</div>
-                            <div className="text-3xl font-bold text-blue-400">{swotData.overallReadiness}%</div>
+                            <div className="text-3xl font-bold text-blue-400">{swotData.overallReadiness.toFixed(1)}%</div>
                         </div>
                         <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                             <div className="text-sm text-slate-400 mb-1">Priority Chapters</div>

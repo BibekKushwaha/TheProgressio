@@ -466,7 +466,7 @@ export default function SettingsPage() {
                                     <div className="text-xs text-slate-400">Days before due date</div>
                                 </div>
                                 <div className="w-[100px]">
-                                    <Select defaultValue="2 days">
+                                    <Select defaultValue="2 days" onValueChange={() => toast.info('Nudge schedule customisation coming soon')}>
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
@@ -484,7 +484,7 @@ export default function SettingsPage() {
                                     <div className="text-xs text-slate-400">Daily reminder time</div>
                                 </div>
                                 <div className="w-[110px]">
-                                    <Select defaultValue="9:00 AM">
+                                    <Select defaultValue="9:00 AM" onValueChange={() => toast.info('Nudge schedule customisation coming soon')}>
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>

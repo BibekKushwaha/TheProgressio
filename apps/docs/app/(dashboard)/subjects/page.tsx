@@ -136,10 +136,6 @@ export default function SubjectLibraryPage() {
             .slice(0, 6);
     }, [subjects, statsBySubject]);
 
-    const pulseMaxTotal = useMemo(
-        () => Math.max(1, ...subjectPulse.map((entry) => entry.total)),
-        [subjectPulse]
-    );
 
     const riskHighlights = useMemo(() => {
         const highlights: string[] = [];
@@ -294,7 +290,7 @@ export default function SubjectLibraryPage() {
                                         <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                                             <div
                                                 className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
-                                                style={{ width: `${Math.max(8, Math.round((entry.total / pulseMaxTotal) * 100))}%` }}
+                                                style={{ width: `${Math.max(8, entry.completion)}%` }}
                                             />
                                         </div>
                                     </div>
@@ -391,7 +387,7 @@ export default function SubjectLibraryPage() {
             <Dialog open={!!selectedSubject} onOpenChange={(open) => !open && setSelectedSubject(null)} >
                 <DialogContent className="sm:max-w-[1000px] w-[95vw] max-h-[95vh] overflow-hidden flex flex-col bg-slate-950/95 border-slate-800 backdrop-blur-xl p-0 gap-0">
                     {selectedCat && (
-                        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 animate-in slide-in-from-bottom-4 duration-300 overflow-y-auto flex-1">
                             <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
                                 <DialogHeader className="flex-shrink-0">
                                     <DialogTitle className="text-2xl font-bold text-white flex items-center gap-3 whitespace-nowrap">
@@ -410,7 +406,7 @@ export default function SubjectLibraryPage() {
                                     </Link>
                                     <Link
                                         href={`/exam-warroom?categoryId=${selectedSubject}`}
-                                        className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center tex-gray-400 whitespace-nowrap gap-2"
+                                        className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center text-gray-400 whitespace-nowrap gap-2"
                                     >
                                         <Target className="w-4 h-4" /> SWOT
                                     </Link>

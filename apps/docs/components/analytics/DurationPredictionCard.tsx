@@ -26,6 +26,20 @@ export function DurationPredictionCard({ taskId }: { taskId?: string }) {
         );
     }
 
+    if (isLoading) {
+        return (
+            <StatCard
+                title="ML Duration Prediction"
+                icon={Clock}
+                iconColor="text-blue-400"
+                iconBgColor="bg-blue-500/10"
+                isLoading={true}
+                loadingHeight="h-32"
+                variant="default"
+            />
+        );
+    }
+
     if (error || !data?.prediction) {
         return (
             <StatCard
@@ -49,7 +63,6 @@ export function DurationPredictionCard({ taskId }: { taskId?: string }) {
             icon={TrendingUp}
             iconColor="text-white"
             iconBgColor="bg-gradient-to-br from-blue-500 to-cyan-500"
-            isLoading={isLoading}
             variant="default"
         >
             <div className="grid grid-cols-3 gap-3 mb-4">

@@ -24,10 +24,10 @@ export function QRAttendance() {
     });
 
     useEffect(() => {
-        if (user?.id && qrCode.startsWith('STU-ANON')) {
+        if (user?.id) {
             setQrCode(`STU-${user.id.slice(-6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`);
         }
-    }, [user, qrCode]);
+    }, [user?.id]);
 
     const { data: historyData, isLoading: isHistoryLoading } = useGetAttendanceHistoryQuery();
     const [markAttendance, { isLoading: isMarking }] = useMarkAttendanceMutation();
