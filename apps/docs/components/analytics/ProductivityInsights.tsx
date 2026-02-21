@@ -35,9 +35,11 @@ export function ProductivityInsights({
         { skip: hasDashboard }
     );
 
-    // Skip predictive query if parent already provided it
+    // Skip predictive query if parent already provided it.
+    // Use 'JEE' explicitly so this shares the same RTK cache entry as
+    // PredictiveScoreCard — eliminates the duplicate Monte Carlo request.
     const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery(
-        '',
+        'JEE',
         { skip: !!initialPredictive }
     );
 

@@ -1,13 +1,12 @@
 'use client';
 
 import { BookOpen, FileSpreadsheet } from 'lucide-react';
-import { useGetSubjectPerformanceQuery } from '@repo/store';
+import { useGetAllSubjectPerformanceQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RevisionScheduler } from '@/components/analytics/RevisionScheduler';
 
 export default function ExamWarRoomPage() {
-    const { data: performanceData, isLoading: perfLoading } = useGetSubjectPerformanceQuery('');
-
+    const { data: performanceData, isLoading: perfLoading } = useGetAllSubjectPerformanceQuery();
     const subjects = performanceData?.data ?? [];
 
     // Difficulty breakdown calculation removed as it is currently unused and causing lint warnings.

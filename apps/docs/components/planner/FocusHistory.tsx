@@ -1,11 +1,15 @@
 "use client";
 import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { useParams } from 'next/navigation';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 export function FocusHistory() {
     const { id: taskId } = useParams();
+    const isVisible = usePageVisibility();
+    // A task's weekly history changes only when a new session is logged;
+    // tag invalidation covers that. 5-minute visibility-gated poll is sufficient.
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(taskId as string, {
-        pollingInterval: 30000,
+        pollingInterval: isVisible ? 300000 : 0,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });

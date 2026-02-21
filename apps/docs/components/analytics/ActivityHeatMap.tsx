@@ -1,10 +1,14 @@
 import { useGetContributionHeatmapQuery } from '@repo/store';
 import { useMemo } from 'react';
 import { GenericHeatmap } from './GenericHeatmap';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 export function ActivityHeatmap({ _pastDays }: { _pastDays: string }) {
+    const isVisible = usePageVisibility();
+    // Heatmap spans 90 days — it changes only when new sessions are logged.
+    // 5-minute polling when visible; paused when the tab is in the background.
     const { data: heatmapResponse, isLoading } = useGetContributionHeatmapQuery(undefined, {
-        pollingInterval: 60000,
+        pollingInterval: isVisible ? 300000 : 0,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });

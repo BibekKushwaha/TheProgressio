@@ -11,7 +11,14 @@ export function getApiErrorStatus(error: unknown): number | null {
 export function getApiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
     if (!isRecord(error)) return fallback;
 
+    if (typeof error.status === 'string' && error.status === 'FETCH_ERROR') {
+        return 'Unable to reach the server. Please check that backend services are running.';
+    }
+
     if (typeof error.error === 'string' && error.error.trim()) {
+        if (error.error.includes('FETCH_ERROR') || error.error.includes('Failed to fetch')) {
+            return 'Unable to reach the server. Please check that backend services are running.';
+        }
         return error.error;
     }
 

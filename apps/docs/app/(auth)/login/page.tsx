@@ -10,6 +10,45 @@ import Input from "@/components/auth/input";
 import { hydrateAuth, useAppDispatch, useLoginMutation } from "@repo/store";
 import { loginSchema } from "@repo/schemas/auth";
 
+interface ApiError {
+    data?: string | { message?: string; errors?: { fieldErrors?: Record<string, string[]> } };
+    error?: string;
+    message?: string;
+}
+
+const extractLoginErrorMessage = (error: unknown): string => {
+    const errorAny = error as ApiError;
+
+    if (errorAny?.data) {
+        if (typeof errorAny.data === 'string') {
+            return errorAny.data;
+        }
+        if (errorAny.data.message) {
+            return errorAny.data.message;
+        }
+        if (errorAny.data.errors?.fieldErrors) {
+            const firstKey = Object.keys(errorAny.data.errors.fieldErrors)[0];
+            if (firstKey) {
+                const firstFieldError = errorAny.data.errors.fieldErrors[firstKey]?.[0];
+                if (firstFieldError) return firstFieldError;
+            }
+        }
+    }
+
+    if (typeof errorAny?.error === 'string') {
+        if (errorAny.error.includes('FETCH_ERROR')) {
+            return 'Unable to reach auth service. Ensure docker services are running and auth-service is accessible on port 4000.';
+        }
+        return errorAny.error;
+    }
+
+    if (typeof errorAny?.message === 'string' && errorAny.message.trim().length > 0) {
+        return errorAny.message;
+    }
+
+    return 'Login failed. If you recently reset the database, sign up again to create a new account.';
+};
+
 const LoginPage = () => {
     const router = useRouter();
     const [email, setEmail] = useState("");
@@ -45,32 +84,8 @@ const LoginPage = () => {
                 router.push("/dashboard");
             }
         } catch (err) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const errorAny = err as any;
-            console.error('Login failed:', errorAny);
-
-            let errorMessage = 'Something went wrong';
-
-            if (errorAny?.data) {
-                if (typeof errorAny.data === 'string') {
-                    errorMessage = errorAny.data;
-                } else if (errorAny.data.message) {
-                    errorMessage = errorAny.data.message;
-                } else if (errorAny.data.errors) {
-                    const fieldErrors = errorAny.data.errors.fieldErrors;
-                    if (fieldErrors) {
-                        const firstKey = Object.keys(fieldErrors)[0];
-                        if (firstKey) {
-                            errorMessage = fieldErrors[firstKey][0];
-                        }
-                    }
-                }
-            } else if (errorAny?.error) {
-                errorMessage = errorAny.error;
-            } else if (errorAny?.message) {
-                errorMessage = errorAny.message;
-            }
-
+            const errorMessage = extractLoginErrorMessage(err);
+            console.error('Login failed:', errorMessage, err);
             setError(errorMessage);
         } finally {
             setIsLoading(false);

@@ -1,24 +1,29 @@
 // components/focus-session/StatsGrid.tsx
 import { Star, CheckCircle2, Target, Flame } from 'lucide-react';
 import { useGetDailySummaryQuery, useGetFocusScoreQuery, useGetUserStreakQuery } from '@repo/store';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 interface StatsGridProps {
     taskTitle?: string;
 }
 
 export function StatsGrid({ taskTitle }: StatsGridProps = {}) {
+    const isVisible = usePageVisibility();
+    // StatsGrid is shown during an active focus session; 30s when visible,
+    // paused when the tab is backgrounded to avoid waking a sleeping device.
+    const pollMs = isVisible ? 30000 : 0;
     const { data: summaryData } = useGetDailySummaryQuery('1', {
-        pollingInterval: 30000,
+        pollingInterval: pollMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
     const { data: focusData } = useGetFocusScoreQuery(undefined, {
-        pollingInterval: 30000,
+        pollingInterval: pollMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
     const { data: streakData } = useGetUserStreakQuery(undefined, {
-        pollingInterval: 30000,
+        pollingInterval: pollMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });

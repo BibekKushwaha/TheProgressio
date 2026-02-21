@@ -64,6 +64,7 @@ export type {
 export {
   tasksApi,
   useGetTasksQuery,
+  useGetTaskMetricsQuery,
   useGetTaskByIdQuery,
   useCreateTaskMutation,
   useUpdateTaskMutation,
@@ -97,6 +98,7 @@ export {
 } from './services/tasksApi';
 export type {
   Task,
+  TaskMetrics,
   SubTask,
   Attachment,
   CreateTaskRequest,
@@ -198,6 +200,7 @@ export {
   useGetCycleTimeQuery,
   useGetSWOTReportQuery,
   useGetSubjectPerformanceQuery,
+  useGetAllSubjectPerformanceQuery,
   useGetGPAQuery,
   useAddCourseGradeMutation,
   useUpdateCourseGradeMutation,

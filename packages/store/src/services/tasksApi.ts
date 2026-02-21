@@ -77,6 +77,19 @@ export interface Attachment {
     createdAt: string;
 }
 
+export interface TaskMetrics {
+    total: number;
+    pending: number;
+    inProgress: number;
+    completed: number;
+    highPriority: number;
+    mediumPriority: number;
+    lowPriority: number;
+    overdue: number;
+    dueToday: number;
+    withoutDueDate: number;
+}
+
 export interface Task {
     id: string;
     title: string;
@@ -184,6 +197,11 @@ export const tasksApi = createApi({
                         { type: 'Tasks', id: 'LIST' },
                     ]
                     : [{ type: 'Tasks', id: 'LIST' }],
+        }),
+        getTaskMetrics: builder.query<TaskMetrics, void>({
+            query: () => '/tasks/metrics',
+            providesTags: [{ type: 'Tasks', id: 'LIST' }],
+            keepUnusedDataFor: 60,
         }),
         getTaskById: builder.query<Task, string>({
             query: (id) => `/tasks/${id}`,
@@ -537,6 +555,7 @@ export const tasksApi = createApi({
 
 export const {
     useGetTasksQuery,
+    useGetTaskMetricsQuery,
     useGetTaskByIdQuery,
     useCreateTaskMutation,
     useUpdateTaskMutation,

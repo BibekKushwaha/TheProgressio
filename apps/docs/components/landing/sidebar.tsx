@@ -220,7 +220,7 @@ const Sidebar = () => {
                             T
                         </div>
                         <Link href="/" className="text-xl font-bold text-white tracking-tight">
-                            StudyProgressio
+                            TheProgressio
                         </Link>
                     </div>
 
@@ -256,7 +256,7 @@ const Sidebar = () => {
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-white text-xl">
                         T
                     </div>
-                    <span className="text-lg font-bold text-white">Transition</span>
+                    <span className="text-lg font-bold text-white">TheProgressio</span>
                 </div>
                 <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-white p-2">
                     {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

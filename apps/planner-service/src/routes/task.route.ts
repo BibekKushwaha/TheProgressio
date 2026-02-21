@@ -5,6 +5,7 @@ import {
     generateSubtasks,
     getAllTasks,
     getTaskById,
+    getTaskMetrics,
     parseTaskIntent,
     previewRecoveryPlan,
     previewSubtasks,
@@ -17,6 +18,9 @@ import {
 } from "../controllers/task.controller.js";
 
 const router = express.Router();
+
+// GET /tasks/metrics - Count-only aggregation (no full task rows transferred)
+router.get("/metrics", getTaskMetrics);
 
 // GET /tasks - Get all tasks with pagination, filtering, searching
 router.get("/", getAllTasks);
