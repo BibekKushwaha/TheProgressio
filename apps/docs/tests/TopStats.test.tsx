@@ -2,11 +2,35 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, vi, expect } from 'vitest';
 
-// Mock the store hooks used by TopStats before importing the component
+// Mock hooks used by TopStats
+vi.mock('@/hooks/usePageVisibility', () => ({
+  usePageVisibility: () => true,
+}));
+
 vi.mock('@repo/store', () => ({
-  useGetDailySummaryQuery: () => ({ data: { stats: { totalMinutes: 60, totalHours: 1, dailyGoalHours: 4 } }, isLoading: false }),
-  useGetFocusScoreQuery: () => ({ data: { stats: { score: 123, breakdown: { consistency: 50, intensity: 30, depth: 40 } } }, isLoading: false }),
-  useGetUserStreakQuery: () => ({ data: { streak: 2, activeDates: [] }, isLoading: false }),
+  useGetDailySummaryQuery: () => ({
+    data: { stats: { totalMinutes: 60, totalHours: 1, dailyGoalHours: 4 } },
+    isLoading: false,
+  }),
+  // BFF now delivers focus score + breakdown (replaces useGetFocusScoreQuery)
+  useGetDashboardSummaryQuery: () => ({
+    data: {
+      focus: {
+        score: 123,
+        breakdown: { consistency: 50, intensity: 30, depth: 40 },
+        totalSessions: 5,
+        totalMinutes: 60,
+        activeDays: 3,
+        avgHoursPerDay: 1,
+      },
+      streak: 2,
+      activeDates: [],
+      leakage: {},
+      peak: {},
+      generatedAt: new Date().toISOString(),
+    },
+    isLoading: false,
+  }),
   useGetActiveLiveSessionQuery: () => ({ data: null }),
 }));
 
