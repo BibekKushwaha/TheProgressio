@@ -75,7 +75,7 @@ export const authApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['User'],
+  tagTypes: ['User', 'WhatsAppPairing'],
   endpoints: (builder) => ({
     register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (credentials) => ({
@@ -125,13 +125,14 @@ export const authApi = createApi({
         url: '/whatsapp/pairing',
         method: 'GET',
       }),
+      providesTags: ['WhatsAppPairing'],
     }),
     unpairWhatsApp: builder.mutation<{ success: boolean; message: string }, void>({
       query: () => ({
         url: '/whatsapp/unpair',
         method: 'POST',
       }),
-      invalidatesTags: ['User']
+      invalidatesTags: ['User', 'WhatsAppPairing']
     }),
     logout: builder.mutation<void, void>({
       query: () => ({

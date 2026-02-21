@@ -13,7 +13,7 @@ import { DashboardGrid } from '@/components/layout/DashboardGrid';
 
 export default function DashboardPage() {
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pt-0 md:pt-12 lg:pt-0">
             <WelcomeHeader />
             <LiveActivityWidget />
             <TopStats />

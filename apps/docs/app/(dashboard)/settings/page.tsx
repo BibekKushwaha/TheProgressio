@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { User, Bell, Lock, Palette, Loader2, Moon, Wifi, MessageSquare, Smartphone, CreditCard, Clock, QrCode, Languages } from "lucide-react";
 import {
     useGetProfileQuery,
@@ -51,8 +51,17 @@ export default function SettingsPage() {
     const [updateNudgeSettings, { isLoading: isUpdatingNudgeSettings }] = useUpdateNudgeSettingsMutation();
     const { data: intelligenceData } = useGetNotificationIntelligenceQuery();
     const { data: contextSignals } = useGetNotificationContextSignalsQuery({ locationTag: "CAMPUS", motionState: "WALKING", brightness: 0.7 });
-    const { data: pairingData, isLoading: isPairingLoading } = useGetWhatsAppPairingCodeQuery();
+    const [isPairingPolling, setIsPairingPolling] = useState(true);
+    const { data: pairingData, isLoading: isPairingLoading, refetch: refetchPairing } = useGetWhatsAppPairingCodeQuery(undefined, {
+        pollingInterval: isPairingPolling ? 5000 : 0,
+        refetchOnMountOrArgChange: true,
+    });
     const [unpairWhatsApp, { isLoading: isUnpairing }] = useUnpairWhatsAppMutation();
+
+    // Stop polling once the WhatsApp number is verified
+    useEffect(() => {
+        if (pairingData?.verified) setIsPairingPolling(false);
+    }, [pairingData?.verified]);
 
     const user = profileData?.user;
     const nudgeSettings = nudgeSettingsData?.settings;
@@ -426,6 +435,15 @@ export default function SettingsPage() {
                                     Copy Code
                                 </Button>
                             </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full text-xs border-white/10 text-slate-400 hover:text-slate-200"
+                                onClick={() => refetchPairing()}
+                                disabled={isPairingLoading}
+                            >
+                                {isPairingLoading ? "Checking..." : "Check Pairing Status"}
+                            </Button>
                         </div>
                     )}
 
@@ -440,6 +458,7 @@ export default function SettingsPage() {
                                 onClick={async () => {
                                     try {
                                         await unpairWhatsApp().unwrap();
+                                        setIsPairingPolling(true);  // resume polling so new pairing code is detected
                                         toast.success("WhatsApp account unpaired");
                                     } catch (_err) {
                                         toast.error("Failed to unpair WhatsApp");

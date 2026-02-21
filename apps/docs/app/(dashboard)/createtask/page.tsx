@@ -324,7 +324,7 @@ function CreateTaskPageContent() {
     const isSubmitting = isCreating || isSmartCreating || isUpdating || isAddingGrade || isCreatingExam;
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white relative overflow-x-hidden selection:bg-purple-500/30">
+        <div className="min-h-screen bg-slate-950 text-white relative overflow-x-hidden selection:bg-purple-500/30 md:pt-3">
             <div className="fixed inset-0 z-0 pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-600/12 rounded-full blur-[140px] animate-pulse-slow" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/12 rounded-full blur-[140px] animate-pulse-slow" style={{ animationDelay: '2s' }} />

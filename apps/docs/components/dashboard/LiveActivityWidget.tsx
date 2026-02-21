@@ -75,15 +75,18 @@ export function LiveActivityWidget() {
             }
         };
 
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') onSync();
+        };
+
         window.addEventListener('storage', onSync);
         window.addEventListener('focus', onSync);
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') onSync();
-        });
+        document.addEventListener('visibilitychange', onVisibility);
 
         return () => {
             window.removeEventListener('storage', onSync);
             window.removeEventListener('focus', onSync);
+            document.removeEventListener('visibilitychange', onVisibility);
         };
     }, [refetch, checkLocalSession, remoteData, isUninitialized]);
 

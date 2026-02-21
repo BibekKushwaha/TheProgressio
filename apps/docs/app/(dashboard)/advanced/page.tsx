@@ -84,7 +84,7 @@ export default function AdvancedFeaturesPage() {
                 </div>
 
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabId)} className="w-full space-y-6">
-                    <TabsList className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 h-auto w-full bg-white/5 border border-white/10 p-1.5 rounded-2xl">
+                    <TabsList className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 h-auto w-full bg-white/5 border border-white/10 p-1.5 rounded-2xl">
                         {TAB_ITEMS.map((item) => (
                             <TabsTrigger
                                 key={item.id}
