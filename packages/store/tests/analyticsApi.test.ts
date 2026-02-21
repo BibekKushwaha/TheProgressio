@@ -171,8 +171,8 @@ describe('analyticsApi — Reducer & Middleware', () => {
 });
 
 describe('analyticsApi — Total endpoint count', () => {
-    it('has exactly 35 endpoints', () => {
+    it('has exactly 36 endpoints', () => {
         const endpointCount = Object.keys(analyticsApi.endpoints).length;
-        expect(endpointCount).toBe(35);
+        expect(endpointCount).toBe(36);
     });
 });
