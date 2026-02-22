@@ -11,7 +11,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export const RootNavigator: React.FC = () => {
     // Auth guard – reads from the shared Redux slice
     const isAuthenticated = useAppSelector(
-        (state: any) => !!state.auth?.accessToken
+        (state: any) => Boolean(state.auth?.isAuthenticated || state.auth?.user)
     );
 
     return (

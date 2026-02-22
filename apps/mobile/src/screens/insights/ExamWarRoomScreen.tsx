@@ -9,8 +9,24 @@ type Tab = 'overview' | 'academic' | 'revision';
 
 export const ExamWarRoomScreen: React.FC<InsightsScreenProps<'ExamWarRoom'>> = ({ route }) => {
     const [activeTab, setActiveTab] = useState<Tab>(route?.params?.tab ?? 'overview');
-    const { data: revision } = useGetRevisionScheduleQuery(undefined as any);
+    const { data: revision } = useGetRevisionScheduleQuery('JEE');
     const { data: grades } = useGetGradeEntriesQuery(undefined as any);
+
+    const gradeEntries: any[] = Array.isArray((grades as any)?.entries)
+        ? (grades as any).entries
+        : Array.isArray((grades as any)?.data)
+            ? (grades as any).data
+            : Array.isArray(grades)
+                ? (grades as any[])
+                : [];
+
+    const revisionItems: any[] = Array.isArray((revision as any)?.schedule)
+        ? (revision as any).schedule
+        : Array.isArray((revision as any)?.topics)
+            ? (revision as any).topics
+            : Array.isArray(revision)
+                ? (revision as any[])
+                : [];
 
     const TABS: { key: Tab; label: string }[] = [
         { key: 'overview', label: '📋 Overview' },
@@ -56,26 +72,33 @@ export const ExamWarRoomScreen: React.FC<InsightsScreenProps<'ExamWarRoom'>> = (
             {activeTab === 'academic' && (
                 <View>
                     <Text style={styles.sectionTitle}>Grade Overview</Text>
-                    {((grades as any)?.data ?? grades ?? []).length === 0 && (
+                    {gradeEntries.length === 0 && (
                         <GlassCard>
                             <Text style={styles.emptyText}>No grade entries yet. Add your results to track performance.</Text>
                         </GlassCard>
                     )}
-                    {((grades as any)?.data ?? grades ?? []).map((g: any, i: number) => (
-                        <GlassCard key={i} style={styles.gradeCard}>
+                    {gradeEntries.map((g: any, i: number) => {
+                        const totalMarks = Number(g.totalMarks ?? 0);
+                        const obtainedMarks = Number(g.obtainedMarks ?? 0);
+                        const computedScore = totalMarks > 0 ? Math.round((obtainedMarks / totalMarks) * 100) : undefined;
+                        const score = Number.isFinite(Number(g.score)) ? Number(g.score) : computedScore;
+                        const isGoodScore = typeof score === 'number' ? score >= 70 : false;
+
+                        return (
+                        <GlassCard key={g.id ?? i} style={styles.gradeCard}>
                             <View style={styles.gradeRow}>
                                 <View style={styles.gradeInfo}>
                                     <Text style={styles.gradeSubject}>{g.subject?.name ?? g.subjectName ?? 'Subject'}</Text>
                                     <Text style={styles.gradeExam}>{g.examType ?? 'Exam'}</Text>
                                 </View>
-                                <View style={[styles.gradeBadge, { backgroundColor: g.score >= 70 ? Colors.success + '20' : Colors.error + '20' }]}>
-                                    <Text style={[styles.gradeScore, { color: g.score >= 70 ? Colors.success : Colors.error }]}>
-                                        {g.score ?? '—'}%
+                                <View style={[styles.gradeBadge, { backgroundColor: isGoodScore ? Colors.success + '20' : Colors.error + '20' }]}>
+                                    <Text style={[styles.gradeScore, { color: isGoodScore ? Colors.success : Colors.error }]}>
+                                        {typeof score === 'number' ? `${score}%` : '—'}
                                     </Text>
                                 </View>
                             </View>
                         </GlassCard>
-                    ))}
+                    )})}
                 </View>
             )}
 
@@ -83,26 +106,35 @@ export const ExamWarRoomScreen: React.FC<InsightsScreenProps<'ExamWarRoom'>> = (
             {activeTab === 'revision' && (
                 <View>
                     <Text style={styles.sectionTitle}>Spaced Repetition Schedule</Text>
-                    {((revision as any)?.topics ?? []).length === 0 && (
+                    {revisionItems.length === 0 && (
                         <GlassCard>
                             <Text style={styles.emptyText}>Add exam results to generate a personalized revision schedule.</Text>
                         </GlassCard>
                     )}
-                    {((revision as any)?.topics ?? []).map((topic: any, i: number) => (
-                        <GlassCard key={i} style={styles.revCard}>
+                    {revisionItems.map((topic: any, i: number) => {
+                        const topicName =
+                            topic.name ??
+                            [topic.subject, topic.chapter].filter(Boolean).join(' • ') ??
+                            'Revision item';
+                        const dueLabel = topic.nextRevision ?? topic.time ?? 'Today';
+                        const priority = topic.priority ?? topic.type ?? 'medium';
+                        const isHigh = String(priority).toLowerCase() === 'high';
+
+                        return (
+                        <GlassCard key={topic.id ?? i} style={styles.revCard}>
                             <View style={styles.revRow}>
                                 <View style={styles.revInfo}>
-                                    <Text style={styles.revTopic}>{topic.name}</Text>
-                                    <Text style={styles.revDue}>Due: {topic.nextRevision ?? 'Today'}</Text>
+                                    <Text style={styles.revTopic}>{topicName}</Text>
+                                    <Text style={styles.revDue}>Due: {dueLabel}</Text>
                                 </View>
-                                <View style={[styles.urgencyBadge, { backgroundColor: topic.priority === 'high' ? Colors.error + '20' : Colors.warning + '20' }]}>
-                                    <Text style={[styles.urgencyText, { color: topic.priority === 'high' ? Colors.error : Colors.warning }]}>
-                                        {topic.priority ?? 'medium'}
+                                <View style={[styles.urgencyBadge, { backgroundColor: isHigh ? Colors.error + '20' : Colors.warning + '20' }]}>
+                                    <Text style={[styles.urgencyText, { color: isHigh ? Colors.error : Colors.warning }]}>
+                                        {String(priority)}
                                     </Text>
                                 </View>
                             </View>
                         </GlassCard>
-                    ))}
+                    )})}
                 </View>
             )}
         </ScreenWrapper>

@@ -17,7 +17,9 @@ export const StrategicAnalyticsScreen: React.FC<InsightsScreenProps<'StrategicAn
     const [openSection, setOpenSection] = useState<string | null>('strengths');
 
     const swot = (strategic as any)?.swot ?? {};
-    const insights = (strategic as any)?.insights ?? [];
+    const insights = Array.isArray((strategic as any)?.insights)
+        ? (strategic as any).insights
+        : [];
 
     return (
         <ScreenWrapper scrollable>
@@ -25,31 +27,37 @@ export const StrategicAnalyticsScreen: React.FC<InsightsScreenProps<'StrategicAn
 
             {/* SWOT Accordion */}
             <Text style={styles.sectionTitle}>SWOT Analysis</Text>
-            {SWOT_LABELS.map(({ key, label, color }) => (
-                <GlassCard key={key} style={[styles.swotCard, openSection === key && { borderColor: color + '50' }]}>
-                    <TouchableOpacity
-                        style={styles.swotHeader}
-                        onPress={() => setOpenSection(openSection === key ? null : key)}
-                    >
-                        <Text style={[styles.swotLabel, { color }]}>{label}</Text>
-                        <Text style={styles.swotChevron}>{openSection === key ? '▲' : '▼'}</Text>
-                    </TouchableOpacity>
-                    {openSection === key && (
-                        <View style={styles.swotBody}>
-                            {isLoading && <Text style={styles.loadingText}>Analyzing…</Text>}
-                            {!isLoading && (swot[key] ?? []).length === 0 && (
-                                <Text style={styles.emptyText}>Not enough data yet. Keep tracking!</Text>
-                            )}
-                            {(swot[key] ?? []).map((item: string, i: number) => (
-                                <View key={i} style={styles.swotItem}>
-                                    <View style={[styles.swotDot, { backgroundColor: color }]} />
-                                    <Text style={styles.swotItemText}>{item}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    )}
-                </GlassCard>
-            ))}
+            {SWOT_LABELS.map(({ key, label, color }) => {
+                const sectionItems = Array.isArray((swot as any)?.[key])
+                    ? (swot as any)[key]
+                    : [];
+
+                return (
+                    <GlassCard key={key} style={[styles.swotCard, openSection === key && { borderColor: color + '50' }]}>
+                        <TouchableOpacity
+                            style={styles.swotHeader}
+                            onPress={() => setOpenSection(openSection === key ? null : key)}
+                        >
+                            <Text style={[styles.swotLabel, { color }]}>{label}</Text>
+                            <Text style={styles.swotChevron}>{openSection === key ? '▲' : '▼'}</Text>
+                        </TouchableOpacity>
+                        {openSection === key && (
+                            <View style={styles.swotBody}>
+                                {isLoading && <Text style={styles.loadingText}>Analyzing…</Text>}
+                                {!isLoading && sectionItems.length === 0 && (
+                                    <Text style={styles.emptyText}>Not enough data yet. Keep tracking!</Text>
+                                )}
+                                {sectionItems.map((item: string, i: number) => (
+                                    <View key={i} style={styles.swotItem}>
+                                        <View style={[styles.swotDot, { backgroundColor: color }]} />
+                                        <Text style={styles.swotItemText}>{item}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </GlassCard>
+                );
+            })}
 
             {/* Productivity Insights */}
             <Text style={styles.sectionTitle}>📈 Productivity Insights</Text>

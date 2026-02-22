@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-    View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView,
+    View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, ActivityIndicator,
 } from 'react-native';
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
@@ -8,6 +8,8 @@ import {
     useGetHabitsQuery,
     useLogHabitMutation,
     useGetUserXPQuery,
+    useCreateHabitMutation,
+    Frequency,
 } from '@repo/store';
 import type { InsightsScreenProps } from '../../navigation/types';
 
@@ -33,7 +35,28 @@ export const HabitGalleryScreen: React.FC<InsightsScreenProps<'HabitGallery'>> =
     const { data: habits, isLoading, refetch } = useGetHabitsQuery(undefined);
     const { data: xpData } = useGetUserXPQuery(undefined);
     const [logHabit] = useLogHabitMutation();
+    const [createHabit, { isLoading: isCreating }] = useCreateHabitMutation();
     const [actionModal, setActionModal] = useState<any>(null);
+    const [createModal, setCreateModal] = useState(false);
+    const [newName, setNewName] = useState('');
+    const [newEmoji, setNewEmoji] = useState('✅');
+    const [newFreq, setNewFreq] = useState<'DAILY' | 'WEEKLY'>('DAILY');
+    const [newTarget, setNewTarget] = useState('1');
+
+    const handleCreate = async () => {
+        if (!newName.trim()) return;
+        try {
+            await createHabit({
+                name: newName.trim(),
+                icon: newEmoji,
+                frequency: newFreq as any,
+                targetValue: parseInt(newTarget) || 1,
+            } as any).unwrap();
+            setCreateModal(false);
+            setNewName(''); setNewEmoji('✅'); setNewFreq('DAILY'); setNewTarget('1');
+            refetch();
+        } catch (e) { console.error('Create habit failed', e); }
+    };
 
     const xp = (xpData as any)?.totalXP ?? 0;
     const level = getLevel(xp);
@@ -53,7 +76,7 @@ export const HabitGalleryScreen: React.FC<InsightsScreenProps<'HabitGallery'>> =
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.title}>🔥 Habit Gallery</Text>
-                <TouchableOpacity style={styles.addBtn}>
+                <TouchableOpacity style={styles.addBtn} onPress={() => setCreateModal(true)}>
                     <Text style={styles.addBtnText}>＋</Text>
                 </TouchableOpacity>
             </View>
@@ -149,6 +172,62 @@ export const HabitGalleryScreen: React.FC<InsightsScreenProps<'HabitGallery'>> =
                 }}
             />
 
+            {/* Create Habit Modal */}
+            <Modal visible={createModal} transparent animationType="slide" onRequestClose={() => setCreateModal(false)}>
+                <TouchableOpacity style={styles.modalOverlay} onPress={() => setCreateModal(false)}>
+                    <View style={styles.modalSheet}>
+                        <Text style={styles.modalTitle}>New Habit</Text>
+                        <Text style={styles.inputLabel}>Emoji</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={newEmoji}
+                            onChangeText={setNewEmoji}
+                            placeholder="✅"
+                            placeholderTextColor={Colors.textMuted}
+                        />
+                        <Text style={styles.inputLabel}>Name *</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={newName}
+                            onChangeText={setNewName}
+                            placeholder="e.g. Morning Exercise"
+                            placeholderTextColor={Colors.textMuted}
+                        />
+                        <Text style={styles.inputLabel}>Frequency</Text>
+                        <View style={styles.freqRow}>
+                            {(['DAILY', 'WEEKLY'] as const).map(f => (
+                                <TouchableOpacity
+                                    key={f}
+                                    style={[styles.freqChip, newFreq === f && styles.freqChipActive]}
+                                    onPress={() => setNewFreq(f)}
+                                >
+                                    <Text style={[styles.freqText, newFreq === f && styles.freqTextActive]}>{f}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <Text style={styles.inputLabel}>Target (times per period)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={newTarget}
+                            onChangeText={setNewTarget}
+                            keyboardType="number-pad"
+                            placeholder="1"
+                            placeholderTextColor={Colors.textMuted}
+                        />
+                        <TouchableOpacity
+                            style={[styles.createBtn, (!newName.trim() || isCreating) && { opacity: 0.5 }]}
+                            onPress={handleCreate}
+                            disabled={!newName.trim() || isCreating}
+                        >
+                            {isCreating
+                                ? <ActivityIndicator color="#fff" size="small" />
+                                : <Text style={styles.createBtnText}>Create Habit</Text>
+                            }
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
             {/* Action Modal */}
             <Modal visible={!!actionModal} transparent animationType="slide" onRequestClose={() => setActionModal(null)}>
                 <TouchableOpacity style={styles.modalOverlay} onPress={() => setActionModal(null)}>
@@ -208,4 +287,15 @@ const styles = StyleSheet.create({
     modalTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '700', marginBottom: Spacing['4'] },
     modalAction: { paddingVertical: Spacing['4'], borderBottomWidth: 1, borderBottomColor: Colors.border },
     modalActionText: { color: Colors.textPrimary, fontSize: Typography.fontSize.base },
+    // Create Habit modal styles
+    inputLabel: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing['1'], marginTop: Spacing['3'] },
+    input: { color: Colors.textPrimary, fontSize: Typography.fontSize.base, backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing['3'], paddingVertical: Spacing['2'] },
+    freqRow: { flexDirection: 'row', gap: Spacing['2'], marginBottom: Spacing['2'] },
+    freqChip: { flex: 1, paddingVertical: Spacing['2'], borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', backgroundColor: Colors.surface },
+    freqChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    freqText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, fontWeight: '600' },
+    freqTextActive: { color: '#fff' },
+    createBtn: { backgroundColor: Colors.primary, borderRadius: Radius.xl, paddingVertical: Spacing['3'], alignItems: 'center', marginTop: Spacing['4'] },
+    createBtnText: { color: '#fff', fontSize: Typography.fontSize.base, fontWeight: '700' },
 });
+
