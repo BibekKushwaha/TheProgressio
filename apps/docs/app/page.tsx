@@ -9,11 +9,11 @@ import { LanguageSection } from "@/components/landing/LanguageSection";
 import { BreakdownSection } from "@/components/landing/BreakdownSection";
 import { ProgressSection } from "@/components/landing/ProgressSection";
 import { Footer } from "@/components/landing/footer";
-import { Sparkles, Workflow, Zap } from "lucide-react";
+import { ArrowRight, Workflow, Zap } from "lucide-react";
 
 const BADGES = [
     {
-        icon: Sparkles,
+        icon: ArrowRight,
         text: "AI-first planning",
         textClass: "text-cyan-100",
     },
@@ -42,7 +42,7 @@ export default function HomePage() {
             <Navbar />
 
             <main className="relative z-10">
-                <section className="max-w-7xl mx-auto px-4 pt-24">
+                <section className="max-w-7xl mx-auto px-4 pt-19">
                     <div className="flex flex-wrap gap-2">
                         {BADGES.map(({ icon: Icon, text, textClass }) => (
                             <span

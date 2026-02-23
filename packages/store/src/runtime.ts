@@ -4,7 +4,7 @@ type StorageLike = {
   removeItem(key: string): void;
 };
 
-declare const require: ((id: string) => unknown) | undefined;
+
 
 type PlatformLike = {
   OS?: string;
@@ -80,8 +80,8 @@ export function supportsWindowNetworkEvents(): boolean {
 
   return Boolean(
     maybeWindow &&
-      typeof maybeWindow.addEventListener === 'function' &&
-      typeof maybeWindow.removeEventListener === 'function'
+    typeof maybeWindow.addEventListener === 'function' &&
+    typeof maybeWindow.removeEventListener === 'function'
   );
 }
 
@@ -106,11 +106,25 @@ function getGlobalRequire(): RequireLike | null {
   return typeof maybeRequire === 'function' ? (maybeRequire as RequireLike) : null;
 }
 
+/**
+ * Returns a reference to `require` that is intentionally opaque to static
+ * bundler analysis (webpack / Turbopack). Both bundlers trace `require()`
+ * calls at compile time and emit "Module not found" warnings for any string
+ * that cannot be resolved — even when the call is inside a try/catch.
+ *
+ * Using `new Function(...)` to obtain `require` at runtime means the
+ * bundler never sees a traceable `require(...)` call and skips the warning.
+ * At runtime in a real CommonJS/Node context the function works normally;
+ * in a browser bundle `require` is either undefined or the bundler shim,
+ * and we catch / ignore errors just as before.
+ */
 function getModuleRequire(): RequireLike | null {
-  if (typeof require === 'function') {
-    return require as RequireLike;
+  try {
+    const r = new Function('return typeof require==="function"?require:null')() as RequireLike | null;
+    return r;
+  } catch {
+    return getGlobalRequire();
   }
-  return getGlobalRequire();
 }
 
 function getExpoOs(): string | null {

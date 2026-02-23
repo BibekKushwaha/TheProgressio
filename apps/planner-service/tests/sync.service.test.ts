@@ -184,6 +184,9 @@ const { mockState, mockPrisma } = vi.hoisted(() => {
         return { count: before - state.categories.length };
       }),
     },
+    auditLog: {
+      create: vi.fn(),
+    },
   };
 
   return { mockState: state, mockPrisma: prisma };

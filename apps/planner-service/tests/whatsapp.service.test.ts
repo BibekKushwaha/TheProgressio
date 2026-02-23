@@ -28,6 +28,7 @@ vi.mock('../src/services/producer.service.js', () => ({
 vi.mock('@repo/db', () => ({
   prisma: {
     user: { findUnique: vi.fn() },
+    auditLog: { create: vi.fn() },
   },
   Status: { PENDING: 'PENDING', IN_PROGRESS: 'IN_PROGRESS', COMPLETED: 'COMPLETED' },
   Priority: { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH' },

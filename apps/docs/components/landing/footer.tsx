@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+
 import Link from 'next/link';
 
 export function Footer() {
@@ -56,11 +56,10 @@ export function Footer() {
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-6 h-6 text-purple-400" />
-              <span className="text-xl font-bold">Aura</span>
+              <span className="text-xl font-bold">TheProgressio</span>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
-              India&apos;s most advanced AI Academic Advisor for high-stakes exams. 
+              India&apos;s most advanced AI Academic Advisor for high-stakes exams.
               Helping 1 Lakh+ students conquer the impossible.
             </p>
           </div>
@@ -86,7 +85,7 @@ export function Footer() {
 
         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-slate-500 text-sm">
-            © 2026 Aura. All rights reserved.
+            © 2026 TheProgressio. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             {socialLinks.map((link) => (

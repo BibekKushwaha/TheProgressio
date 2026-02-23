@@ -33,6 +33,9 @@ const { mockPrisma } = vi.hoisted(() => ({
       findUnique: vi.fn(),
     },
     $transaction: vi.fn(),
+    auditLog: {
+      create: vi.fn(),
+    },
   },
 }));
 

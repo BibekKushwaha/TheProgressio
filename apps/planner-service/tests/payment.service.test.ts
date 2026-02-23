@@ -82,6 +82,7 @@ vi.mock('@repo/db', () => {
         update: vi.fn(),
       },
       $transaction: vi.fn(),
+      auditLog: { create: vi.fn() },
     },
     Status,
     Priority,
@@ -104,12 +105,12 @@ describe('Payment endpoints', () => {
 
   describe('POST /api/payments/create-order', () => {
     it('creates a mock order for PRO plan', async () => {
-      (prisma.user.findUnique as any).mockResolvedValue({
+      (prisma as any).user.findUnique.mockResolvedValue({
         id: 'user-1',
         username: 'Tester',
         email: 'test@example.com',
       });
-      (prisma.payment.create as any).mockResolvedValue({
+      (prisma as any).payment.create.mockResolvedValue({
         id: 'pay-1',
         userId: 'user-1',
         razorpayOrderId: 'order_mock_123',
@@ -129,12 +130,12 @@ describe('Payment endpoints', () => {
     });
 
     it('creates a mock order for INSTITUTION plan', async () => {
-      (prisma.user.findUnique as any).mockResolvedValue({
+      (prisma as any).user.findUnique.mockResolvedValue({
         id: 'user-1',
         username: 'Tester',
         email: 'test@example.com',
       });
-      (prisma.payment.create as any).mockResolvedValue({
+      (prisma as any).payment.create.mockResolvedValue({
         id: 'pay-2',
         userId: 'user-1',
         razorpayOrderId: 'order_mock_456',
@@ -179,9 +180,9 @@ describe('Payment endpoints', () => {
         currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       };
 
-      (prisma.payment.findUnique as any).mockResolvedValue(mockPayment);
-      (prisma.$transaction as any).mockResolvedValue([mockSubscription, mockPayment]);
-      (prisma.payment.update as any).mockResolvedValue(mockPayment);
+      (prisma as any).payment.findUnique.mockResolvedValue(mockPayment);
+      (prisma as any).$transaction.mockResolvedValue([mockSubscription, mockPayment]);
+      (prisma as any).payment.update.mockResolvedValue(mockPayment);
 
       const res = await request(app)
         .post('/api/payments/verify')
@@ -200,7 +201,7 @@ describe('Payment endpoints', () => {
     });
 
     it('rejects when payment not found', async () => {
-      (prisma.payment.findUnique as any).mockResolvedValue(null);
+      (prisma as any).payment.findUnique.mockResolvedValue(null);
 
       const res = await request(app)
         .post('/api/payments/verify')
@@ -227,7 +228,7 @@ describe('Payment endpoints', () => {
         currentPeriodEnd: new Date('2025-09-01'),
         createdAt: new Date(),
       };
-      (prisma.subscription.findFirst as any).mockResolvedValue(mockSub);
+      (prisma as any).subscription.findFirst.mockResolvedValue(mockSub);
 
       const res = await request(app).get('/api/payments/status');
 
@@ -238,7 +239,7 @@ describe('Payment endpoints', () => {
     });
 
     it('returns free plan when no subscription', async () => {
-      (prisma.subscription.findFirst as any).mockResolvedValue(null);
+      (prisma as any).subscription.findFirst.mockResolvedValue(null);
 
       const res = await request(app).get('/api/payments/status');
 
@@ -258,8 +259,8 @@ describe('Payment endpoints', () => {
         plan: 'PRO',
         status: 'ACTIVE',
       };
-      (prisma.subscription.findFirst as any).mockResolvedValue(activeSub);
-      (prisma.subscription.update as any).mockResolvedValue({
+      (prisma as any).subscription.findFirst.mockResolvedValue(activeSub);
+      (prisma as any).subscription.update.mockResolvedValue({
         ...activeSub,
         status: 'CANCELLED',
         cancelledAt: new Date(),
@@ -272,7 +273,7 @@ describe('Payment endpoints', () => {
     });
 
     it('returns error when no active subscription', async () => {
-      (prisma.subscription.findFirst as any).mockResolvedValue(null);
+      (prisma as any).subscription.findFirst.mockResolvedValue(null);
 
       const res = await request(app).post('/api/payments/cancel');
 
@@ -302,7 +303,7 @@ describe('Payment endpoints', () => {
           createdAt: new Date('2025-06-01'),
         },
       ];
-      (prisma.payment.findMany as any).mockResolvedValue(mockPayments);
+      (prisma as any).payment.findMany.mockResolvedValue(mockPayments);
 
       const res = await request(app).get('/api/payments/history');
 
@@ -313,7 +314,7 @@ describe('Payment endpoints', () => {
     });
 
     it('returns empty array when no payments', async () => {
-      (prisma.payment.findMany as any).mockResolvedValue([]);
+      (prisma as any).payment.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/payments/history');
 
@@ -326,7 +327,7 @@ describe('Payment endpoints', () => {
 
   describe('POST /api/payments/webhook', () => {
     it('handles payment.captured webhook', async () => {
-      (prisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma as any).payment.updateMany.mockResolvedValue({ count: 1 });
 
       const body = {
         event: 'payment.captured',
@@ -352,7 +353,7 @@ describe('Payment endpoints', () => {
     });
 
     it('handles payment.failed webhook', async () => {
-      (prisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma as any).payment.updateMany.mockResolvedValue({ count: 1 });
 
       const body = {
         event: 'payment.failed',

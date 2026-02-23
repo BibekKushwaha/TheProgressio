@@ -97,6 +97,9 @@ vi.mock('@repo/db', () => {
         update: vi.fn(),
         delete: vi.fn(),
       },
+      auditLog: {
+        create: vi.fn(),
+      },
     },
     Status,
     Priority,

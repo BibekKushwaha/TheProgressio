@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { selectCurrentUser, useAppSelector, useLogoutMutation } from '@repo/store';
 import { motion } from 'framer-motion';
-import { Sparkles, LogOut, Settings, User } from 'lucide-react';
+import { LogOut, Settings, User } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 
 const NAV_LINKS = [
   { label: 'Features', href: '/dashboard' },
-  { label: 'How it Works', href: '/signup' },
+  { label: 'How it Works', href: '/how-it-work' },
   { label: 'Pricing', href: '#' },
 ];
 
@@ -47,8 +47,8 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-purple-400" />
-            <span className="text-xl font-bold">Aura</span>
+
+            <span className="text-xl font-bold">TheProgressio</span>
           </div>
 
           <div className="hidden md:flex items-center gap-8">
