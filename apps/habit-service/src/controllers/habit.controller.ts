@@ -26,8 +26,11 @@ import {
     markNudgeRead,
     markAllNudgesRead,
     upsertNotificationSettings,
+    reschedulePendingStreakNudges,
 } from "../services/nudge.service.js";
 import { dispatchWhatsAppNudges } from "../services/whatsapp-outbound.service.js";
+import { enqueueDueNudgeDispatchJobs } from "../services/nudge-dispatch.queue.js";
+import { incrementMetric, logMetricEvent } from "../services/metrics.service.js";
 
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
@@ -790,6 +793,14 @@ export const updateNudgeSettings = TryCatch(async (
     }
 
     const settings = await upsertNotificationSettings(userId, parsed.data as any);
+    if (parsed.data.streakReminderTime !== undefined || parsed.data.timezone !== undefined || parsed.data.timezoneOffsetMinutes !== undefined) {
+        await reschedulePendingStreakNudges(
+            userId,
+            settings.streakReminderTime,
+            settings.timezone,
+            settings.timezoneOffsetMinutes,
+        );
+    }
     res.status(200).json({ message: "Notification settings updated", settings });
 });
 
@@ -817,10 +828,20 @@ export const getMorningBriefing = TryCatch(async (
 export const dispatchNudges = TryCatch(async (req: Request, res: Response): Promise<void> => {
     const limit = Number.parseInt(String(req.body?.limit ?? "50"), 10);
     const finalLimit = Number.isNaN(limit) ? 50 : limit;
+    if (process.env.QUEUE_ENABLED === "true") {
+        const queued = await enqueueDueNudgeDispatchJobs(finalLimit);
+        if (queued.deduped > 0) incrementMetric("deduplicated_count", queued.deduped);
+        logMetricEvent("nudge_dispatch_enqueued", queued);
+        res.status(200).json({
+            message: "Nudge dispatch jobs queued",
+            ...queued,
+        });
+        return;
+    }
 
     const result = await dispatchWhatsAppNudges({ limit: finalLimit });
     res.status(200).json({
-        message: "Nudge dispatch completed",
+        message: "Nudge dispatch completed (direct mode)",
         ...result,
     });
 });

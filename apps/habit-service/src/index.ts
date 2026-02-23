@@ -7,14 +7,17 @@ import habitRouter from "./routes/habit.route.js";
 import { dispatchNudges, getInternalActiveDates, handleHabitEvent } from "./controllers/habit.controller.js";
 import { requireInternalDispatchAuth, requireInternalReadAuth, requireInternalSignature } from "./middleware/internal.middleware.js";
 import { shutdownWorker } from "./services/worker.service.js";
+import { initNudgeDispatchWorker, closeNudgeDispatchWorker } from "./services/nudge-dispatch.worker.js";
+import { closeNudgeDispatchQueue } from "./services/nudge-dispatch.queue.js";
 
 
 export const app = express();
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const isProduction = process.env.NODE_ENV === "production";
 
 app.use(cors({
-    origin: FRONTEND_URL,
+    origin: isProduction ? FRONTEND_URL : true,
     credentials: true
 }));
 
@@ -35,6 +38,8 @@ app.use("/api/habits", isAuth, enforceReadOnlyWrites, habitRouter);
 const PORT = process.env.PORT || 4002;
 
 if (process.env.NODE_ENV !== 'test') {
+    initNudgeDispatchWorker();
+
     app.listen(PORT, async () => {
         console.log(`🚀 Habit service running on port ${PORT}`);
         console.log(`🔗 Accepting requests from: ${FRONTEND_URL}`);
@@ -44,6 +49,8 @@ if (process.env.NODE_ENV !== 'test') {
     const gracefulShutdown = async () => {
         console.log("🔄 Shutting down habit-service...");
         await shutdownWorker();
+        await closeNudgeDispatchWorker();
+        await closeNudgeDispatchQueue();
         process.exit(0);
     };
 

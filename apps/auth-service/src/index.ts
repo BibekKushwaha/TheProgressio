@@ -10,9 +10,10 @@ import { closeEmailQueue } from "./services/email.queue.js";
 
 const app = express();
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(cors({
-  origin: FRONTEND_ORIGIN,
+  origin: isProduction ? FRONTEND_ORIGIN : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

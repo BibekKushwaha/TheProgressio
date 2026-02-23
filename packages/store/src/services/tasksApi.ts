@@ -1,8 +1,12 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { calendarApi } from './calendarApi';
 import { analyticsApi } from './analyticsApi';
+import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
 
-const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
+const PLANNER_SERVICE_URL = resolveServiceUrl(
+    process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL ?? process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL,
+    'http://localhost:4001'
+);
 
 export enum TaskStatus {
     PENDING = 'PENDING',
@@ -171,7 +175,7 @@ const plannerBaseQuery = fetchBaseQuery({
     credentials: 'include',
     prepareHeaders: (headers) => {
         headers.set('Content-Type', 'application/json');
-        const shareToken = typeof window !== 'undefined' ? localStorage.getItem('family_share_token') : null;
+        const shareToken = getFamilyShareToken();
         if (shareToken) {
             headers.set('x-family-share-token', shareToken);
         }

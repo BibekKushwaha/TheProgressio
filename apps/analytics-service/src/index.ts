@@ -10,9 +10,10 @@ import { shutdownSimulationService } from "./services/simulation.service.js";
 export const app = express();
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const isProduction = process.env.NODE_ENV === "production";
 
 app.use(cors({
-    origin: FRONTEND_URL,
+    origin: isProduction ? FRONTEND_URL : true,
     credentials: true
 }));
 

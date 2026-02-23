@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 // @ts-ignore — navigation type-mismatch under strict React 18/19 compat; safe at runtime
 const NavContainer = NavigationContainer as React.ElementType;
@@ -16,8 +16,8 @@ import type { RootStackParamList } from './navigation/types';
 initSentry();
 
 // ─── Deep linking configuration ───────────────────────────────────────────────
-const linking = {
-    prefixes: ['theprogressio://'],
+const linkingConfig = {
+    prefixes: ['transition://', 'theprogressio://', 'https://theprogressio.com'],
     config: {
         screens: {
             Auth: {
@@ -42,15 +42,16 @@ const linking = {
                             TaskList: 'tasks',
                             TaskDetail: 'tasks/:taskId',
                             CreateTask: 'tasks/new',
-                            Calendar: 'calendar',
+                            Calendar: 'calendar/:date?',
                             SubjectLibrary: 'subjects',
                             SubjectDetail: 'subjects/:subjectId',
                             Planner: 'planner',
                             SyllabusDigitizer: 'syllabus',
                         },
                     },
-                    FocusTab: {
+                    MenuTab: {
                         screens: {
+                            MenuHome: 'menu',
                             FocusSession: 'focus',
                             FocusHistory: 'focus/history',
                             SessionComplete: 'focus/complete',
@@ -90,6 +91,23 @@ const InnerApp: React.FC = () => {
     const dispatch = useAppDispatch();
     const navRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
     const user = useAppSelector((state: any) => state.auth?.user);
+    const [linkingEnabled, setLinkingEnabled] = useState(!__DEV__);
+
+    // React 19 dev mode can mount/unmount/mount roots to verify side effects.
+    // Delay linking activation in dev so only the stable mount enables handlers.
+    useEffect(() => {
+        if (!__DEV__) return;
+        const timer = setTimeout(() => setLinkingEnabled(true), 0);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const linking = useMemo(
+        () => ({
+            ...linkingConfig,
+            enabled: linkingEnabled,
+        }),
+        [linkingEnabled]
+    );
 
     // Start offline sync engine, stop on unmount
     useEffect(() => {

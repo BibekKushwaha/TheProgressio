@@ -98,7 +98,7 @@ describe('Nudge Service — detectStreakRisks', () => {
             expect.objectContaining({
                 data: expect.objectContaining({
                     userId: 'u1',
-                    type: 'BEHAVIORAL_NUDGE',
+                    type: 'STREAK_RISK',
                 }),
             })
         );
@@ -156,6 +156,53 @@ describe('Nudge Service — detectExamWarnings', () => {
             })
         );
     });
+
+    it('uses preDeadlineDays setting when generating exam warnings', async () => {
+        const examDate = new Date();
+        examDate.setDate(examDate.getDate() + 2);
+
+        mockPrisma.nudge.findFirst
+            .mockResolvedValueOnce({
+                metadata: JSON.stringify({
+                    settings: {
+                        enabledBuckets: {
+                            URGENCY_DRIVEN: true,
+                            MORNING_BRIEFING: true,
+                            BEHAVIORAL_NUDGE: true,
+                            ADVANCE_ALERT_3WEEK: true,
+                            TRANSACTION_SYSTEM: true,
+                        },
+                        quietHours: [],
+                        focusProfiles: [],
+                        groupedSummaries: true,
+                        positiveTone: true,
+                        preDeadlineDays: 2,
+                        streakReminderTime: '09:00',
+                        timezone: 'UTC',
+                        timezoneOffsetMinutes: 0,
+                    },
+                }),
+            })
+            .mockResolvedValueOnce(null);
+        mockPrisma.exam.findMany.mockResolvedValue([{
+            id: 'e2',
+            title: 'Chemistry Quiz',
+            date: examDate,
+            subjectId: 's2',
+            subject: { name: 'Chemistry' },
+        }]);
+        mockPrisma.nudge.create.mockResolvedValue({ id: 'n2' });
+
+        await detectExamWarnings('u1');
+
+        expect(mockPrisma.nudge.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    type: 'ADVANCE_ALERT_3WEEK',
+                }),
+            })
+        );
+    });
 });
 
 describe('Nudge Service — notification settings', () => {
@@ -168,6 +215,10 @@ describe('Nudge Service — notification settings', () => {
 
         expect(settings.groupedSummaries).toBe(true);
         expect(settings.enabledBuckets).toHaveProperty('URGENCY_DRIVEN', true);
+        expect(settings.preDeadlineDays).toBe(2);
+        expect(settings.streakReminderTime).toBe('09:00');
+        expect(settings.timezone).toBe('UTC');
+        expect(settings.timezoneOffsetMinutes).toBe(0);
     });
 
     it('upserts merged settings payload', async () => {
@@ -185,6 +236,10 @@ describe('Nudge Service — notification settings', () => {
                     focusProfiles: [],
                     groupedSummaries: true,
                     positiveTone: true,
+                    preDeadlineDays: 2,
+                    streakReminderTime: '09:00',
+                    timezone: 'UTC',
+                    timezoneOffsetMinutes: 0,
                 },
             }),
         });
@@ -197,7 +252,94 @@ describe('Nudge Service — notification settings', () => {
 
         expect(result.groupedSummaries).toBe(false);
         expect(result.quietHours).toHaveLength(1);
+        expect(result.preDeadlineDays).toBe(2);
+        expect(result.streakReminderTime).toBe('09:00');
+        expect(result.timezone).toBe('UTC');
+        expect(result.timezoneOffsetMinutes).toBe(0);
         expect(mockPrisma.nudge.create).toHaveBeenCalled();
+    });
+
+    it('normalizes invalid new settings fields back to defaults', async () => {
+        mockPrisma.nudge.findFirst.mockResolvedValue({
+            metadata: JSON.stringify({
+                settings: {
+                    enabledBuckets: {
+                        URGENCY_DRIVEN: true,
+                        MORNING_BRIEFING: true,
+                        BEHAVIORAL_NUDGE: true,
+                        ADVANCE_ALERT_3WEEK: true,
+                        TRANSACTION_SYSTEM: true,
+                    },
+                    quietHours: [],
+                    focusProfiles: [],
+                    groupedSummaries: true,
+                    positiveTone: true,
+                    preDeadlineDays: 9,
+                    streakReminderTime: 'invalid',
+                    timezone: 'Bad/Timezone',
+                    timezoneOffsetMinutes: 9999,
+                },
+            }),
+        });
+
+        const settings = await getNotificationSettings('u1');
+
+        expect(settings.preDeadlineDays).toBe(2);
+        expect(settings.streakReminderTime).toBe('09:00');
+        expect(settings.timezone).toBe('UTC');
+        expect(settings.timezoneOffsetMinutes).toBe(0);
+    });
+});
+
+describe('Nudge Service — schedule alignment', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('uses streakReminderTime for streak-risk scheduling', async () => {
+        mockPrisma.nudge.findFirst
+            .mockResolvedValueOnce({
+                metadata: JSON.stringify({
+                    settings: {
+                        enabledBuckets: {
+                            URGENCY_DRIVEN: true,
+                            MORNING_BRIEFING: true,
+                            BEHAVIORAL_NUDGE: true,
+                            ADVANCE_ALERT_3WEEK: true,
+                            TRANSACTION_SYSTEM: true,
+                        },
+                        quietHours: [],
+                        focusProfiles: [],
+                        groupedSummaries: true,
+                        positiveTone: true,
+                        preDeadlineDays: 2,
+                        streakReminderTime: '18:00',
+                        timezone: 'UTC',
+                        timezoneOffsetMinutes: 0,
+                    },
+                }),
+            })
+            .mockResolvedValueOnce(null);
+        mockPrisma.habit.findMany.mockResolvedValue([{
+            id: 'h2',
+            name: 'Meditate',
+            frequency: 'DAILY',
+            currentStreak: 12,
+            logs: [{ loggedAt: hoursAgo(24) }],
+        }]);
+        mockPrisma.nudge.create.mockResolvedValue({ id: 'n3' });
+
+        await detectStreakRisks('u1');
+
+        expect(mockPrisma.nudge.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    scheduledAt: expect.any(Date),
+                }),
+            })
+        );
+
+        const payload = mockPrisma.nudge.create.mock.calls[0]?.[0] as { data: { scheduledAt: Date } };
+        expect(payload.data.scheduledAt.getUTCHours()).toBe(18);
+        expect(payload.data.scheduledAt.getUTCMinutes()).toBe(0);
     });
 });
 

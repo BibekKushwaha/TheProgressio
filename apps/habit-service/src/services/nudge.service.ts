@@ -8,6 +8,7 @@
  * 4. Slip detection (pattern-based)
  */
 import { prisma, type Nudge, type Prisma } from "@repo/db";
+import { incrementMetric, logMetricEvent } from "./metrics.service.js";
 
 // ── Nudge Types ────────────────────────────────────────────────────────
 
@@ -49,6 +50,10 @@ export interface NotificationSettings {
     focusProfiles: FocusProfile[];
     groupedSummaries: boolean;
     positiveTone: boolean;
+    preDeadlineDays: 1 | 2 | 3;
+    streakReminderTime: string;
+    timezone: string;
+    timezoneOffsetMinutes: number;
 }
 
 const DEFAULT_SETTINGS: NotificationSettings = {
@@ -63,6 +68,10 @@ const DEFAULT_SETTINGS: NotificationSettings = {
     focusProfiles: [],
     groupedSummaries: true,
     positiveTone: true,
+    preDeadlineDays: 2,
+    streakReminderTime: "09:00",
+    timezone: "UTC",
+    timezoneOffsetMinutes: 0,
 };
 
 const INTERNAL_SETTINGS_TITLE = "Notification settings";
@@ -79,6 +88,19 @@ const parseMetadata = (raw: string | null | undefined): Record<string, unknown> 
 };
 
 const isValidTime = (value: string): boolean => /^([0-1]\d|2[0-3]):([0-5]\d)$/.test(value);
+const isValidPreDeadlineDays = (value: unknown): value is 1 | 2 | 3 =>
+    value === 1 || value === 2 || value === 3;
+const isValidTimezoneOffsetMinutes = (value: unknown): value is number =>
+    typeof value === "number" && Number.isInteger(value) && value >= -840 && value <= 840;
+const isValidTimezone = (value: unknown): value is string => {
+    if (typeof value !== "string" || value.length < 3 || value.length > 64) return false;
+    try {
+        Intl.DateTimeFormat("en-US", { timeZone: value }).format(new Date());
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 const toMinutes = (value: string): number => {
     const [h = "0", m = "0"] = value.split(":");
@@ -149,6 +171,15 @@ const normalizeSettings = (candidate: unknown): NotificationSettings => {
         groupedSummaries:
             typeof record.groupedSummaries === "boolean" ? record.groupedSummaries : DEFAULT_SETTINGS.groupedSummaries,
         positiveTone: typeof record.positiveTone === "boolean" ? record.positiveTone : DEFAULT_SETTINGS.positiveTone,
+        preDeadlineDays: isValidPreDeadlineDays(record.preDeadlineDays) ? record.preDeadlineDays : DEFAULT_SETTINGS.preDeadlineDays,
+        streakReminderTime:
+            typeof record.streakReminderTime === "string" && isValidTime(record.streakReminderTime)
+                ? record.streakReminderTime
+                : DEFAULT_SETTINGS.streakReminderTime,
+        timezone: isValidTimezone(record.timezone) ? record.timezone : DEFAULT_SETTINGS.timezone,
+        timezoneOffsetMinutes: isValidTimezoneOffsetMinutes(record.timezoneOffsetMinutes)
+            ? record.timezoneOffsetMinutes
+            : DEFAULT_SETTINGS.timezoneOffsetMinutes,
     };
 };
 
@@ -209,6 +240,77 @@ const computePreferredNudgeTime = (timestamps: Date[], fallback: Date): Date => 
         scheduled.setDate(scheduled.getDate() + 1);
     }
     return scheduled;
+};
+
+const getZonedParts = (date: Date, timezone: string): { year: number; month: number; day: number; hour: number; minute: number; second: number } => {
+    const dtf = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    });
+    const parts = dtf.formatToParts(date);
+    const pick = (type: Intl.DateTimeFormatPartTypes): number =>
+        Number.parseInt(parts.find((part) => part.type === type)?.value ?? "0", 10);
+    return {
+        year: pick("year"),
+        month: pick("month"),
+        day: pick("day"),
+        hour: pick("hour"),
+        minute: pick("minute"),
+        second: pick("second"),
+    };
+};
+
+const getTimeZoneOffsetAt = (date: Date, timezone: string): number => {
+    const zoned = getZonedParts(date, timezone);
+    const asUtc = Date.UTC(zoned.year, zoned.month - 1, zoned.day, zoned.hour, zoned.minute, zoned.second);
+    return Math.round((asUtc - date.getTime()) / 60_000);
+};
+
+const getIsoLocalDate = (date: Date, timezone: string): string => {
+    const zoned = getZonedParts(date, timezone);
+    const mm = `${zoned.month}`.padStart(2, "0");
+    const dd = `${zoned.day}`.padStart(2, "0");
+    return `${zoned.year}-${mm}-${dd}`;
+};
+
+const buildReminderDateFromTime = (
+    time: string,
+    fallback: Date,
+    timezone: string,
+    timezoneOffsetMinutes: number,
+): Date => {
+    const [h = "9", m = "0"] = time.split(":");
+    const targetHour = Number.parseInt(h, 10);
+    const targetMinute = Number.parseInt(m, 10);
+
+    if (!isValidTimezone(timezone)) {
+        const localNow = new Date(fallback.getTime() - timezoneOffsetMinutes * 60_000);
+        const scheduledLocal = new Date(localNow);
+        scheduledLocal.setHours(targetHour, targetMinute, 0, 0);
+        if (scheduledLocal.getTime() < localNow.getTime()) scheduledLocal.setDate(scheduledLocal.getDate() + 1);
+        return new Date(scheduledLocal.getTime() + timezoneOffsetMinutes * 60_000);
+    }
+
+    const localNow = getZonedParts(fallback, timezone);
+    let y = localNow.year;
+    let mo = localNow.month;
+    let d = localNow.day;
+    if (targetHour < localNow.hour || (targetHour === localNow.hour && targetMinute <= localNow.minute)) {
+        const next = new Date(Date.UTC(y, mo - 1, d + 1, 0, 0, 0));
+        y = next.getUTCFullYear();
+        mo = next.getUTCMonth() + 1;
+        d = next.getUTCDate();
+    }
+
+    const candidateUtc = Date.UTC(y, mo - 1, d, targetHour, targetMinute, 0);
+    const offset = getTimeZoneOffsetAt(new Date(candidateUtc), timezone);
+    return new Date(candidateUtc - offset * 60_000);
 };
 
 const toDigestNudge = (userId: string, nudges: Nudge[]): Nudge => {
@@ -285,6 +387,7 @@ export async function upsertNotificationSettings(
 // ── Streak Risk Detection ──────────────────────────────────────────────
 
 export async function detectStreakRisks(userId: string): Promise<void> {
+    const settings = await getNotificationSettings(userId);
     const habits = await prisma.habit.findMany({
         where: { userId },
         include: { logs: { orderBy: { loggedAt: "desc" }, take: 1 } },
@@ -300,43 +403,64 @@ export async function detectStreakRisks(userId: string): Promise<void> {
         const threshold = habit.frequency === "WEEKLY" ? 144 : 20; // hours before risk
 
         if (hoursSinceLastLog >= threshold) {
-            // Check if we already sent a nudge today
-            const todayStart = new Date(now);
-            todayStart.setHours(0, 0, 0, 0);
+            const localDate = getIsoLocalDate(now, settings.timezone);
+            const idempotencyKey = `streak:${userId}:${localDate}`;
             const existing = await prisma.nudge.findFirst({
                 where: {
                     userId,
                     type: NUDGE_TYPES.STREAK_RISK,
-                    createdAt: { gte: todayStart },
-                    metadata: { contains: habit.id },
+                    localDate,
                 },
             });
 
             if (!existing) {
                 const mercyRemaining = (habit.mercyDaysAllowed ?? 1) - (habit.mercyDaysUsed ?? 0);
                 const recentLogTimes = habit.logs.map((log) => log.loggedAt);
-                const scheduledAt = computePreferredNudgeTime(recentLogTimes, now);
+                const fallback = computePreferredNudgeTime(recentLogTimes, now);
+                const scheduledAt = buildReminderDateFromTime(
+                    settings.streakReminderTime,
+                    fallback,
+                    settings.timezone,
+                    settings.timezoneOffsetMinutes,
+                );
 
-                await prisma.nudge.create({
-                    data: {
-                        userId,
-                        type: NUDGE_TYPES.BEHAVIORAL_NUDGE,
-                        title: `${habit.name} streak at risk!`,
-                        message: mercyRemaining > 0
-                            ? `You’re doing great — one quick check-in keeps your ${habit.currentStreak}-day "${habit.name}" streak moving.`
-                            : `A short session now will protect your progress on "${habit.name}" and keep momentum strong.`,
-                        priority: mercyRemaining === 0 ? "HIGH" : "MEDIUM",
-                        scheduledAt,
-                        metadata: JSON.stringify({
-                            habitId: habit.id,
-                            streak: habit.currentStreak,
-                            mercyRemaining,
-                            bucket: "BEHAVIORAL_NUDGE",
-                            quickActions: ["MARK_COMPLETED", "SNOOZE_1_HOUR", "BREAK_IT_DOWN"],
-                        }),
-                    },
-                });
+                try {
+                    await prisma.nudge.create({
+                        data: {
+                            userId,
+                            type: NUDGE_TYPES.STREAK_RISK,
+                            title: `${habit.name} streak at risk!`,
+                            message: mercyRemaining > 0
+                                ? `You’re doing great — one quick check-in keeps your ${habit.currentStreak}-day "${habit.name}" streak moving.`
+                                : `A short session now will protect your progress on "${habit.name}" and keep momentum strong.`,
+                            priority: mercyRemaining === 0 ? "HIGH" : "MEDIUM",
+                            scheduledAt,
+                            localDate,
+                            idempotencyKey,
+                            metadata: JSON.stringify({
+                                habitId: habit.id,
+                                streak: habit.currentStreak,
+                                mercyRemaining,
+                                bucket: "BEHAVIORAL_NUDGE",
+                                idempotencyKey,
+                                localDate,
+                                quickActions: ["MARK_COMPLETED", "SNOOZE_1_HOUR", "BREAK_IT_DOWN"],
+                            }),
+                        },
+                    });
+                } catch (error) {
+                    if ((error as Prisma.PrismaClientKnownRequestError)?.code === "P2002") {
+                        incrementMetric("duplicate_prevention_hits");
+                        logMetricEvent("streak_duplicate_prevented", { userId, idempotencyKey });
+                        break;
+                    }
+                    incrementMetric("failed_scheduling_attempts");
+                    throw error;
+                }
+                break;
             }
+            incrementMetric("duplicate_prevention_hits");
+            logMetricEvent("streak_duplicate_prevented", { userId, idempotencyKey });
         }
     }
 }
@@ -344,13 +468,17 @@ export async function detectStreakRisks(userId: string): Promise<void> {
 // ── Exam Warning (3-week advance) ──────────────────────────────────────
 
 export async function detectExamWarnings(userId: string): Promise<void> {
-    const threeWeeksFromNow = new Date();
-    threeWeeksFromNow.setDate(threeWeeksFromNow.getDate() + 21);
+    const settings = await getNotificationSettings(userId);
+    const maxLeadDays = 21;
+    const leadDays = new Set<number>([settings.preDeadlineDays, 21, 14, 7, 1]);
+    const horizon = Math.max(...Array.from(leadDays));
+    const futureLimit = new Date();
+    futureLimit.setDate(futureLimit.getDate() + Math.max(maxLeadDays, horizon));
 
     const upcomingExams = await prisma.exam.findMany({
         where: {
             userId,
-            date: { gte: new Date(), lte: threeWeeksFromNow },
+            date: { gte: new Date(), lte: futureLimit },
         },
         include: { subject: true },
     });
@@ -370,32 +498,73 @@ export async function detectExamWarnings(userId: string): Promise<void> {
             },
         });
 
-        if (!existing && (daysUntil === 21 || daysUntil === 14 || daysUntil === 7 || daysUntil === 3 || daysUntil === 1)) {
+        if (!existing && leadDays.has(daysUntil)) {
             const scheduledAt = new Date();
             if (daysUntil >= 7) {
-                scheduledAt.setHours(18, 0, 0, 0);
+                const localScheduled = buildReminderDateFromTime("18:00", new Date(), settings.timezone, settings.timezoneOffsetMinutes);
+                scheduledAt.setTime(localScheduled.getTime());
             }
 
-            await prisma.nudge.create({
-                data: {
+            try {
+                await prisma.nudge.create({
+                    data: {
+                        userId,
+                        type: NUDGE_TYPES.ADVANCE_ALERT_3WEEK,
+                        title: `${exam.title} in ${daysUntil} day(s)!`,
+                        message: `Your ${exam.subject?.name ?? "exam"} "${exam.title}" is on ${exam.date.toLocaleDateString()}. ${daysUntil <= 3 ? "You’re close — lock in a final revision block." : "A short review block today keeps prep stress low."}`,
+                        priority: daysUntil <= 3 ? "HIGH" : "MEDIUM",
+                        scheduledAt,
+                        expiresAt: exam.date,
+                        metadata: JSON.stringify({
+                            examId: exam.id,
+                            subjectId: exam.subjectId,
+                            daysUntil,
+                            bucket: "ADVANCE_ALERT_3WEEK",
+                            quickActions: ["MARK_COMPLETED", "SNOOZE_1_HOUR", "BREAK_IT_DOWN"],
+                        }),
+                    },
+                });
+                logMetricEvent("exam_warning_scheduled", {
                     userId,
-                    type: NUDGE_TYPES.ADVANCE_ALERT_3WEEK,
-                    title: `${exam.title} in ${daysUntil} day(s)!`,
-                    message: `Your ${exam.subject?.name ?? "exam"} "${exam.title}" is on ${exam.date.toLocaleDateString()}. ${daysUntil <= 3 ? "You’re close — lock in a final revision block." : "A short review block today keeps prep stress low."}`,
-                    priority: daysUntil <= 3 ? "HIGH" : "MEDIUM",
-                    scheduledAt,
-                    expiresAt: exam.date,
-                    metadata: JSON.stringify({
-                        examId: exam.id,
-                        subjectId: exam.subjectId,
-                        daysUntil,
-                        bucket: "ADVANCE_ALERT_3WEEK",
-                        quickActions: ["MARK_COMPLETED", "SNOOZE_1_HOUR", "BREAK_IT_DOWN"],
-                    }),
-                },
-            });
+                    examId: exam.id,
+                    scheduled_at_utc: scheduledAt.toISOString(),
+                });
+            } catch (error) {
+                incrementMetric("failed_scheduling_attempts");
+                throw error;
+            }
         }
     }
+}
+
+export async function reschedulePendingStreakNudges(
+    userId: string,
+    streakReminderTime: string,
+    timezone: string,
+    timezoneOffsetMinutes: number,
+): Promise<number> {
+    const now = new Date();
+    const pending = await prisma.nudge.findMany({
+        where: {
+            userId,
+            type: NUDGE_TYPES.STREAK_RISK,
+            scheduledAt: { gt: now },
+        },
+        select: { id: true, scheduledAt: true },
+        take: 200,
+    });
+
+    for (const nudge of pending) {
+        const adjusted = buildReminderDateFromTime(streakReminderTime, nudge.scheduledAt, timezone, timezoneOffsetMinutes);
+        await prisma.nudge.update({
+            where: { id: nudge.id },
+            data: { scheduledAt: adjusted },
+        });
+    }
+
+    incrementMetric("reschedule_operations", pending.length);
+    logMetricEvent("streak_rescheduled", { userId, updated: pending.length });
+    return pending.length;
 }
 
 // ── Morning Briefing Generator ─────────────────────────────────────────

@@ -179,9 +179,19 @@ export async function drainQueue(): Promise<void> {
 // ─── NetInfo listener ─────────────────────────────────────────────────────────
 
 let _unsubscribe: (() => void) | null = null;
+let _startRefCount = 0;
 
 export function startSyncEngine(dispatch: AppDispatch) {
     registerDispatch(dispatch);
+    _startRefCount += 1;
+
+    // Prevent duplicate NetInfo subscriptions when React dev mode remounts roots.
+    if (_unsubscribe) {
+        if (__DEV__) {
+            console.log('[SyncEngine] Start requested while already running.');
+        }
+        return;
+    }
 
     _unsubscribe = NetInfo.addEventListener((state) => {
         const online = !!(state.isConnected && state.isInternetReachable);
@@ -201,6 +211,17 @@ export function startSyncEngine(dispatch: AppDispatch) {
 }
 
 export function stopSyncEngine() {
+    if (_startRefCount > 0) {
+        _startRefCount -= 1;
+    }
+
+    if (_startRefCount > 0) {
+        if (__DEV__) {
+            console.log('[SyncEngine] Stop deferred; active mounts remain.');
+        }
+        return;
+    }
+
     _unsubscribe?.();
     _unsubscribe = null;
     console.log('[SyncEngine] Stopped.');

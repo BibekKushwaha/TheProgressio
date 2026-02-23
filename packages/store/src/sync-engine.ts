@@ -16,6 +16,7 @@ import {
     syncQueue,
     type SyncQueueItem,
 } from './local-db';
+import { isOnline, supportsWindowNetworkEvents } from './runtime';
 
 const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
 const MAX_RETRIES = 5;
@@ -53,13 +54,15 @@ class BackgroundSyncEngine {
     private status: SyncStatus = 'idle';
     private intervalId: ReturnType<typeof setInterval> | null = null;
     private listeners: Set<(status: SyncStatus, pendingCount: number) => void> = new Set();
+    private readonly onlineListener = () => this.onOnline();
+    private readonly offlineListener = () => this.onOffline();
 
     start(): void {
         if (this.intervalId) return;
 
-        if (typeof window !== 'undefined') {
-            window.addEventListener('online', () => this.onOnline());
-            window.addEventListener('offline', () => this.onOffline());
+        if (supportsWindowNetworkEvents()) {
+            window.addEventListener('online', this.onlineListener);
+            window.addEventListener('offline', this.offlineListener);
         }
 
         this.intervalId = setInterval(() => {
@@ -78,9 +81,9 @@ class BackgroundSyncEngine {
             clearInterval(this.intervalId);
             this.intervalId = null;
         }
-        if (typeof window !== 'undefined') {
-            window.removeEventListener('online', () => this.onOnline());
-            window.removeEventListener('offline', () => this.onOffline());
+        if (supportsWindowNetworkEvents()) {
+            window.removeEventListener('online', this.onlineListener);
+            window.removeEventListener('offline', this.offlineListener);
         }
     }
 
@@ -98,7 +101,7 @@ class BackgroundSyncEngine {
     }
 
     async pullFromServer(): Promise<void> {
-        if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+        if (!isOnline()) return;
 
         await this.pullOperations();
 
@@ -114,7 +117,7 @@ class BackgroundSyncEngine {
     // ─── Private ────────────────────────────────────────────────────────────────
 
     private async processQueue(): Promise<void> {
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (!isOnline()) {
             this.setStatus('offline');
             return;
         }

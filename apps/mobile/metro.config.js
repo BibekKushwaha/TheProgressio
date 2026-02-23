@@ -4,6 +4,8 @@ const path = require('path');
 // Find the workspace root
 const workspaceRoot = path.resolve(__dirname, '../..');
 const projectRoot = __dirname;
+const projectNodeModules = path.resolve(projectRoot, 'node_modules');
+const workspaceNodeModules = path.resolve(workspaceRoot, 'node_modules');
 
 const config = getDefaultConfig(projectRoot);
 
@@ -12,9 +14,18 @@ config.watchFolders = [workspaceRoot];
 
 // 2. Resolve packages — local first, then workspace root
 config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, 'node_modules'),
-  path.resolve(workspaceRoot, 'node_modules'),
+  projectNodeModules,
+  workspaceNodeModules,
 ];
+// Avoid resolving dependencies by walking up from workspace package paths.
+config.resolver.disableHierarchicalLookup = true;
+// Force a single React instance for the mobile runtime.
+config.resolver.extraNodeModules = {
+  ...(config.resolver.extraNodeModules || {}),
+  react: path.resolve(projectNodeModules, 'react'),
+  'react/jsx-runtime': path.resolve(projectNodeModules, 'react/jsx-runtime.js'),
+  'react/jsx-dev-runtime': path.resolve(projectNodeModules, 'react/jsx-dev-runtime.js'),
+};
 
 // 3. Disable package.json "exports" field (fixes monorepo symlinks with RN)
 config.resolver.unstable_enablePackageExports = false;

@@ -50,17 +50,24 @@ export const TabNavigator: React.FC = () => (
         <Tab.Screen
             name="TasksTab"
             component={TasksNavigator}
+            listeners={({ navigation }) => ({
+                tabPress: () => {
+                    // Always land on the task list when selecting the Tasks tab.
+                    // This prevents stale nested state from trapping users on an invalid detail route.
+                    (navigation as any).navigate('TasksTab', { screen: 'TaskList' });
+                },
+            })}
             options={{
                 tabBarLabel: 'Tasks',
                 tabBarIcon: ({ focused }) => <TabIcon emoji="📋" label="Tasks" focused={focused} />,
             }}
         />
         <Tab.Screen
-            name="FocusTab"
+            name="MenuTab"
             component={FocusNavigator}
             options={{
-                tabBarLabel: 'Focus',
-                tabBarIcon: ({ focused }) => <TabIcon emoji="⏱️" label="Focus" focused={focused} />,
+                tabBarLabel: 'Menu',
+                tabBarIcon: ({ focused }) => <TabIcon emoji="🔲" label="Menu" focused={focused} />,
             }}
         />
         <Tab.Screen

@@ -23,9 +23,11 @@ import { errorMiddleware } from "./middleware/error.middleware.js";
 import { initPushWorker } from "./workers/push.worker.js";
 
 export const app = express();
+const FRONTEND_ORIGIN = process.env.FRONTEND_URL ?? "http://localhost:3000";
+const isProduction = process.env.NODE_ENV === "production";
 
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: isProduction ? FRONTEND_ORIGIN : true,
     credentials: true
 }));
 

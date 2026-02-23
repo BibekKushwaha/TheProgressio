@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     View,
     Text,
@@ -6,18 +6,19 @@ import {
     FlatList,
     TouchableOpacity,
     TextInput,
+    Alert,
 } from 'react-native';
 import { ScreenWrapper, GlassCard } from '../../components';
-import { ApiErrorFallback } from '../../components/ApiErrorFallback';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
     useGetTasksQuery,
     useToggleTaskMutation,
+    TaskStatus,
 } from '@repo/store';
-import { useDebounce, FLATLIST_PERF_PROPS } from '../../utils/performance';
+import { useDebounce } from '../../utils/performance';
 import type { TasksScreenProps } from '../../navigation/types';
-
-import { TaskStatus } from '@repo/store';
+import { toArray } from '../../utils/data';
+import { extractTaskId, formatTaskStatusLabel, normalizeTaskStatus } from '../../utils/task';
 
 type StatusFilter = 'all' | TaskStatus;
 
@@ -40,67 +41,34 @@ export const TaskListScreen: React.FC<TasksScreenProps<'TaskList'>> = ({ navigat
     const search = useDebounce(searchRaw, 250);  // Only filter after 250ms idle
 
     const queryArg = statusFilter === 'all' ? {} : { status: statusFilter };
-    const { data, isLoading, isError, error, refetch } = useGetTasksQuery(queryArg as any);
+    const { data, isLoading, refetch } = useGetTasksQuery(queryArg as any);
     const [toggleTask] = useToggleTaskMutation();
 
     // Memoize filtered list — recomputes only when data or search changes
     const tasks = useMemo(
-        () => ((data as any)?.data ?? (data ?? [])).filter((t: any) =>
-            t.title?.toLowerCase().includes(search.toLowerCase())
-        ),
+        () =>
+            toArray<any>(data, ['data', 'tasks']).filter((t: any) =>
+                String(t?.title ?? '').toLowerCase().includes(search.toLowerCase())
+            ),
         [data, search]
     );
 
-    // Stable renderItem reference — never re-creates unless navigation changes
-    const renderItem = useCallback(({ item }: { item: any }) => (
-        <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}
-        >
-            <GlassCard style={styles.taskCard}>
-                <View style={styles.taskRow}>
-                    <TouchableOpacity
-                        onPress={() => toggleTask(item.id)}
-                        style={item.completed ? [styles.checkbox, styles.checkboxDone] : styles.checkbox}
-                    >
-                        {item.completed && <Text style={styles.checkmark}>{'✓'}</Text>}
-                    </TouchableOpacity>
+    const handleOpenTask = (taskId: string | null) => {
+        if (!taskId) {
+            Alert.alert('Task unavailable', 'This task could not be opened because its ID is missing.');
+            return;
+        }
+        navigation.navigate('TaskDetail', { taskId });
+    };
 
-                    <View style={styles.taskBody}>
-                        <Text
-                            style={item.completed ? [styles.taskTitle, styles.taskTitleDone] : styles.taskTitle}
-                            numberOfLines={2}
-                        >
-                            {item.title}
-                        </Text>
-                        <View style={styles.taskMeta}>
-                            {item.dueDate && (
-                                <View style={styles.metaChip}>
-                                    <Text style={styles.metaText}>
-                                        {'📅 '}{new Date(item.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                    </Text>
-                                </View>
-                            )}
-                            {item.priority && (
-                                <View style={[styles.metaChip, { borderColor: PRIORITY_COLOR[item.priority] + '50' }]}>
-                                    <View style={[styles.metaDot, { backgroundColor: PRIORITY_COLOR[item.priority] }]} />
-                                    <Text style={[styles.metaText, { color: PRIORITY_COLOR[item.priority] }]}>
-                                        {item.priority}
-                                    </Text>
-                                </View>
-                            )}
-                            {item.subject?.name && (
-                                <View style={styles.metaChip}>
-                                    <Text style={styles.metaText}>{'📚 '}{item.subject.name}</Text>
-                                </View>
-                            )}
-                        </View>
-                    </View>
-                    <Text style={styles.chevron}>{'›'}</Text>
-                </View>
-            </GlassCard>
-        </TouchableOpacity>
-    ), [navigation, toggleTask]);
+    const handleToggleTask = async (taskId: string | null) => {
+        if (!taskId) return;
+        try {
+            await toggleTask(taskId).unwrap();
+        } catch {
+            Alert.alert('Update failed', 'Could not update task status. Please try again.');
+        }
+    };
 
     return (
         <ScreenWrapper edges={['top', 'left', 'right']}>
@@ -152,7 +120,7 @@ export const TaskListScreen: React.FC<TasksScreenProps<'TaskList'>> = ({ navigat
             {/* Task list */}
             <FlatList
                 data={tasks}
-                keyExtractor={(item: any) => item.id}
+                keyExtractor={(item: any, index: number) => extractTaskId(item) ?? `task-${index}`}
                 refreshing={isLoading}
                 onRefresh={refetch}
                 contentContainerStyle={styles.list}
@@ -165,61 +133,96 @@ export const TaskListScreen: React.FC<TasksScreenProps<'TaskList'>> = ({ navigat
                         </Text>
                     </View>
                 }
-                renderItem={({ item }: { item: any }) => (
-                    <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}
-                    >
-                        <GlassCard style={styles.taskCard}>
-                            <View style={styles.taskRow}>
-                                {/* Completion toggle */}
-                                <TouchableOpacity
-                                    onPress={() => toggleTask(item.id)}
-                                    style={[
-                                        styles.checkbox,
-                                        item.completed && styles.checkboxDone,
-                                    ]}
-                                >
-                                    {item.completed && <Text style={styles.checkmark}>✓</Text>}
-                                </TouchableOpacity>
+                renderItem={({ item }: { item: any }) => {
+                    const taskId = extractTaskId(item);
+                    const taskStatus = normalizeTaskStatus(item);
+                    const isCompleted = taskStatus === TaskStatus.COMPLETED;
+                    const statusColor = taskStatus === TaskStatus.COMPLETED
+                        ? Colors.success
+                        : taskStatus === TaskStatus.IN_PROGRESS
+                            ? Colors.warning
+                            : Colors.textMuted;
+                    const subtasks: any[] = Array.isArray(item?.subtasks)
+                        ? item.subtasks
+                        : Array.isArray(item?.subTasks)
+                            ? item.subTasks
+                            : [];
+                    const doneSubtasks = subtasks.filter((s: any) => s?.completed).length;
 
-                                <View style={styles.taskBody}>
-                                    <Text
-                                        style={[styles.taskTitle, item.completed && styles.taskTitleDone]}
-                                        numberOfLines={2}
+                    return (
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() => handleOpenTask(taskId)}
+                        >
+                            <GlassCard style={styles.taskCard}>
+                                <View style={styles.taskRow}>
+                                    {/* Completion toggle */}
+                                    <TouchableOpacity
+                                        onPress={() => void handleToggleTask(taskId)}
+                                        style={[
+                                            styles.checkbox,
+                                            isCompleted && styles.checkboxDone,
+                                        ]}
                                     >
-                                        {item.title}
-                                    </Text>
-                                    <View style={styles.taskMeta}>
-                                        {item.dueDate && (
-                                            <View style={styles.metaChip}>
-                                                <Text style={styles.metaText}>
-                                                    📅 {new Date(item.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        {isCompleted && <Text style={styles.checkmark}>✓</Text>}
+                                    </TouchableOpacity>
+
+                                    <View style={styles.taskBody}>
+                                        <Text
+                                            style={[styles.taskTitle, isCompleted && styles.taskTitleDone]}
+                                            numberOfLines={2}
+                                        >
+                                            {item.title}
+                                        </Text>
+                                        <View style={styles.taskMeta}>
+                                            <View style={[styles.metaChip, { borderColor: `${statusColor}50` }]}>
+                                                <Text style={[styles.metaText, { color: statusColor }]}>
+                                                    {formatTaskStatusLabel(taskStatus)}
                                                 </Text>
                                             </View>
-                                        )}
-                                        {item.priority && (
-                                            <View style={[styles.metaChip, { borderColor: PRIORITY_COLOR[item.priority] + '50' }]}>
-                                                <View style={[styles.metaDot, { backgroundColor: PRIORITY_COLOR[item.priority] }]} />
-                                                <Text style={[styles.metaText, { color: PRIORITY_COLOR[item.priority] }]}>
-                                                    {item.priority}
-                                                </Text>
-                                            </View>
-                                        )}
-                                        {item.subject?.name && (
-                                            <View style={styles.metaChip}>
-                                                <Text style={styles.metaText}>📚 {item.subject.name}</Text>
+                                            {item.dueDate && (
+                                                <View style={styles.metaChip}>
+                                                    <Text style={styles.metaText}>
+                                                        📅 {new Date(item.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                            {item.priority && (
+                                                <View style={[styles.metaChip, { borderColor: (PRIORITY_COLOR[item.priority] ?? Colors.textMuted) + '50' }]}>
+                                                    <View style={[styles.metaDot, { backgroundColor: PRIORITY_COLOR[item.priority] ?? Colors.textMuted }]} />
+                                                    <Text style={[styles.metaText, { color: PRIORITY_COLOR[item.priority] ?? Colors.textMuted }]}>
+                                                        {item.priority}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                            {(item.category?.name || item.subject?.name) && (
+                                                <View style={styles.metaChip}>
+                                                    <Text style={styles.metaText}>📚 {item.category?.name ?? item.subject?.name}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        {subtasks.length > 0 && (
+                                            <View style={styles.subProgressRow}>
+                                                <View style={styles.subProgressTrack}>
+                                                    <View
+                                                        style={[
+                                                            styles.subProgressFill,
+                                                            { width: `${Math.round((doneSubtasks / subtasks.length) * 100)}%` },
+                                                        ]}
+                                                    />
+                                                </View>
+                                                <Text style={styles.subProgressText}>{doneSubtasks}/{subtasks.length}</Text>
                                             </View>
                                         )}
                                     </View>
-                                </View>
 
-                                {/* Swipe hint chevron */}
-                                <Text style={styles.chevron}>›</Text>
-                            </View>
-                        </GlassCard>
-                    </TouchableOpacity>
-                )}
+                                    {/* Swipe hint chevron */}
+                                    <Text style={styles.chevron}>›</Text>
+                                </View>
+                            </GlassCard>
+                        </TouchableOpacity>
+                    );
+                }}
             />
 
             {/* Floating action buttons */}
@@ -284,6 +287,10 @@ const styles = StyleSheet.create({
     },
     metaDot: { width: 5, height: 5, borderRadius: 3 },
     metaText: { color: Colors.textMuted, fontSize: Typography.fontSize.xs },
+    subProgressRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing['2'], marginTop: Spacing['1'] },
+    subProgressTrack: { flex: 1, height: 4, borderRadius: 4, backgroundColor: Colors.border, overflow: 'hidden' },
+    subProgressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 4 },
+    subProgressText: { color: Colors.textMuted, fontSize: 10, fontWeight: '600' },
     chevron: { color: Colors.textMuted, fontSize: 18, alignSelf: 'center' },
     emptyBox: { alignItems: 'center', paddingVertical: Spacing['16'] },
     emptyIcon: { fontSize: 48, marginBottom: Spacing['3'] },

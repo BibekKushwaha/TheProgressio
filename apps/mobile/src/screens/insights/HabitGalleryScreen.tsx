@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-    View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, ActivityIndicator,
+    View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, ActivityIndicator, Alert,
 } from 'react-native';
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
-    useGetHabitsQuery,
-    useLogHabitMutation,
-    useGetUserXPQuery,
-    useCreateHabitMutation,
     Frequency,
+    useCreateHabitMutation,
+    useDeleteHabitMutation,
+    useGetCategoriesQuery,
+    useGetHabitsQuery,
+    useGetUserXPQuery,
+    useLogHabitMutation,
+    useResetHabitMutation,
+    useUpdateHabitMutation,
 } from '@repo/store';
 import type { InsightsScreenProps } from '../../navigation/types';
+import { toArray } from '../../utils/data';
+import { HABIT_COLOR_PRESETS, isHabitDoneOnDate, normalizeHabitColor } from '../../utils/habit';
 
 const LEVEL_THRESHOLD = [0, 500, 1500, 3500, 7500, 15000];
 
@@ -32,57 +38,142 @@ function getProgress(xp: number) {
 }
 
 export const HabitGalleryScreen: React.FC<InsightsScreenProps<'HabitGallery'>> = ({ navigation }) => {
-    const { data: habits, isLoading, refetch } = useGetHabitsQuery(undefined);
+    const { data: habitsData, isLoading, refetch } = useGetHabitsQuery(undefined);
+    const { data: categoriesData } = useGetCategoriesQuery(undefined);
     const { data: xpData } = useGetUserXPQuery(undefined);
     const [logHabit] = useLogHabitMutation();
     const [createHabit, { isLoading: isCreating }] = useCreateHabitMutation();
+    const [updateHabit, { isLoading: isUpdating }] = useUpdateHabitMutation();
+    const [deleteHabit] = useDeleteHabitMutation();
+    const [resetHabit] = useResetHabitMutation();
+
+    const habits = toArray<any>(habitsData, ['habits', 'data']);
+    const categories = toArray<any>(categoriesData, ['categories', 'data']);
+
     const [actionModal, setActionModal] = useState<any>(null);
-    const [createModal, setCreateModal] = useState(false);
-    const [newName, setNewName] = useState('');
-    const [newEmoji, setNewEmoji] = useState('✅');
-    const [newFreq, setNewFreq] = useState<'DAILY' | 'WEEKLY'>('DAILY');
-    const [newTarget, setNewTarget] = useState('1');
+    const [formModal, setFormModal] = useState(false);
+    const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
+    const [name, setName] = useState('');
+    const [icon, setIcon] = useState('✅');
+    const [frequency, setFrequency] = useState<Frequency>(Frequency.DAILY);
+    const [targetValue, setTargetValue] = useState('1');
+    const [color, setColor] = useState(HABIT_COLOR_PRESETS[0] ?? Colors.primary);
+    const [linkedCategoryId, setLinkedCategoryId] = useState<string>('none');
 
-    const handleCreate = async () => {
-        if (!newName.trim()) return;
-        try {
-            await createHabit({
-                name: newName.trim(),
-                icon: newEmoji,
-                frequency: newFreq as any,
-                targetValue: parseInt(newTarget) || 1,
-            } as any).unwrap();
-            setCreateModal(false);
-            setNewName(''); setNewEmoji('✅'); setNewFreq('DAILY'); setNewTarget('1');
-            refetch();
-        } catch (e) { console.error('Create habit failed', e); }
-    };
-
-    const xp = (xpData as any)?.totalXP ?? 0;
+    const isSaving = isCreating || isUpdating;
+    const xp = (xpData as any)?.totalXP ?? (xpData as any)?.xp?.xp ?? 0;
     const level = getLevel(xp);
     const progress = getProgress(xp);
 
+    const openCreate = () => {
+        setEditingHabitId(null);
+        setName('');
+        setIcon('✅');
+        setFrequency(Frequency.DAILY);
+        setTargetValue('1');
+        setColor(HABIT_COLOR_PRESETS[0] ?? Colors.primary);
+        setLinkedCategoryId('none');
+        setFormModal(true);
+    };
+
+    const openEdit = (habit: any) => {
+        setEditingHabitId(String(habit?.id ?? ''));
+        setName(String(habit?.name ?? ''));
+        setIcon(String(habit?.icon ?? habit?.emoji ?? '✅'));
+        setFrequency((habit?.frequency as Frequency) ?? Frequency.DAILY);
+        setTargetValue(String(habit?.targetValue ?? 1));
+        setColor(normalizeHabitColor(habit?.color));
+        setLinkedCategoryId(String(habit?.linkedCategoryId ?? 'none'));
+        setFormModal(true);
+    };
+
+    const handleSave = async () => {
+        if (!name.trim()) return;
+        try {
+            if (editingHabitId) {
+                await updateHabit({
+                    id: editingHabitId,
+                    name: name.trim(),
+                    icon,
+                    frequency,
+                    targetValue: Math.max(1, Number(targetValue || 1)),
+                    color,
+                    linkedCategoryId: linkedCategoryId === 'none' ? null : linkedCategoryId,
+                }).unwrap();
+            } else {
+                await createHabit({
+                    name: name.trim(),
+                    icon,
+                    frequency,
+                    targetValue: Math.max(1, Number(targetValue || 1)),
+                    color,
+                    linkedCategoryId: linkedCategoryId === 'none' ? null : linkedCategoryId,
+                }).unwrap();
+            }
+            setFormModal(false);
+            refetch();
+        } catch (e) {
+            console.error('Save habit failed', e);
+        }
+    };
+
     const handleLog = async (habitId: string) => {
         try {
-            await logHabit({ id: habitId }).unwrap();
+            await logHabit({ id: habitId, completedValue: 1 }).unwrap();
             refetch();
         } catch (e) {
             console.error('Log habit failed', e);
         }
     };
 
+    const handleReset = (habit: any) => {
+        Alert.alert('Reset progress?', `Reset streak for "${habit?.name ?? 'habit'}"?`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Reset',
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await resetHabit(String(habit?.id)).unwrap();
+                        refetch();
+                    } catch (e) {
+                        console.error('Reset habit failed', e);
+                    }
+                },
+            },
+        ]);
+    };
+
+    const handleDelete = (habit: any) => {
+        Alert.alert('Delete habit?', `Delete "${habit?.name ?? 'habit'}"? This cannot be undone.`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await deleteHabit(String(habit?.id)).unwrap();
+                        refetch();
+                    } catch (e) {
+                        console.error('Delete habit failed', e);
+                    }
+                },
+            },
+        ]);
+    };
+
+    const modalTitle = useMemo(() => (editingHabitId ? 'Edit Habit' : 'New Habit'), [editingHabitId]);
+
     return (
         <ScreenWrapper edges={['top', 'left', 'right']}>
-            {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.title}>🔥 Habit Gallery</Text>
-                <TouchableOpacity style={styles.addBtn} onPress={() => setCreateModal(true)}>
+                <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
                     <Text style={styles.addBtnText}>＋</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* Level card */}
-            {xpData && (
+            {!!xpData && (
                 <GlassCard style={styles.xpCard}>
                     <View style={styles.xpRow}>
                         <View style={styles.xpBadge}>
@@ -102,64 +193,62 @@ export const HabitGalleryScreen: React.FC<InsightsScreenProps<'HabitGallery'>> =
                 </GlassCard>
             )}
 
-            {/* Habit list */}
             <FlatList
-                data={(habits as any)?.data ?? (habits as any)?.habits ?? habits ?? []}
-                keyExtractor={(item: any) => item.id}
+                data={habits}
+                keyExtractor={(item: any) => String(item.id)}
                 refreshing={isLoading}
                 onRefresh={refetch}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
+                ListEmptyComponent={(
                     <View style={styles.emptyBox}>
                         <Text style={styles.emptyIcon}>{isLoading ? '⏳' : '🌱'}</Text>
                         <Text style={styles.emptyText}>
                             {isLoading ? 'Loading habits…' : 'Start your first habit!'}
                         </Text>
                     </View>
-                }
+                )}
                 renderItem={({ item }: { item: any }) => {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    const doneToday = item.logs?.some((l: any) => l.date?.startsWith(todayStr) && l.completed);
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    const doneToday = isHabitDoneOnDate(toArray<any>(item?.logs), todayStr);
+                    const streak = Number(item?.currentStreak ?? item?.streak ?? 0);
+                    const accent = normalizeHabitColor(item?.color);
+
                     return (
                         <TouchableOpacity
                             activeOpacity={0.85}
-                            onPress={() => navigation.navigate('HabitDetail', { habitId: item.id })}
+                            onPress={() => navigation.navigate('HabitDetail', { habitId: String(item.id) })}
                             onLongPress={() => setActionModal(item)}
                         >
                             <GlassCard style={[styles.habitCard, doneToday && styles.habitCardDone]}>
                                 <View style={styles.habitRow}>
-                                    {/* Icon */}
-                                    <View style={[styles.habitIcon, { backgroundColor: (item.color ?? Colors.primary) + '20' }]}>
-                                        <Text style={styles.habitEmoji}>{item.emoji ?? '✅'}</Text>
+                                    <View style={[styles.habitIcon, { backgroundColor: `${accent}20` }]}>
+                                        <Text style={styles.habitEmoji}>{item?.icon ?? item?.emoji ?? '✅'}</Text>
                                     </View>
 
-                                    {/* Info */}
                                     <View style={styles.habitBody}>
-                                        <Text style={styles.habitName}>{item.name}</Text>
-                                        {item.streak > 0 && (
-                                            <Text style={styles.streakText}>🔥 {item.streak} day streak</Text>
+                                        <Text style={styles.habitName}>{String(item?.name ?? 'Habit')}</Text>
+                                        {streak > 0 && (
+                                            <Text style={styles.streakText}>🔥 {streak} day streak</Text>
                                         )}
-                                        {/* Mini heatmap – last 7 days */}
                                         <View style={styles.miniHeatmap}>
                                             {Array.from({ length: 7 }).map((_, i) => {
                                                 const d = new Date();
                                                 d.setDate(d.getDate() - (6 - i));
-                                                const ds = d.toISOString().split('T')[0];
-                                                const done = item.logs?.some((l: any) => l.date?.startsWith(ds) && l.completed);
+                                                const ds = d.toISOString().slice(0, 10);
+                                                const done = isHabitDoneOnDate(toArray<any>(item?.logs), ds);
                                                 return (
                                                     <View
                                                         key={i}
-                                                        style={[styles.heatDot, done && { backgroundColor: item.color ?? Colors.primary }]}
+                                                        style={[styles.heatDot, done && { backgroundColor: accent }]}
                                                     />
                                                 );
                                             })}
                                         </View>
                                     </View>
 
-                                    {/* Log button */}
                                     <TouchableOpacity
-                                        onPress={() => !doneToday && handleLog(item.id)}
+                                        onPress={() => !doneToday && handleLog(String(item.id))}
                                         style={[styles.logBtn, doneToday && styles.logBtnDone]}
                                         disabled={doneToday}
                                     >
@@ -172,77 +261,109 @@ export const HabitGalleryScreen: React.FC<InsightsScreenProps<'HabitGallery'>> =
                 }}
             />
 
-            {/* Create Habit Modal */}
-            <Modal visible={createModal} transparent animationType="slide" onRequestClose={() => setCreateModal(false)}>
-                <TouchableOpacity style={styles.modalOverlay} onPress={() => setCreateModal(false)}>
+            <Modal visible={formModal} transparent animationType="slide" onRequestClose={() => setFormModal(false)}>
+                <TouchableOpacity style={styles.modalOverlay} onPress={() => setFormModal(false)}>
                     <View style={styles.modalSheet}>
-                        <Text style={styles.modalTitle}>New Habit</Text>
+                        <Text style={styles.modalTitle}>{modalTitle}</Text>
+
                         <Text style={styles.inputLabel}>Emoji</Text>
                         <TextInput
                             style={styles.input}
-                            value={newEmoji}
-                            onChangeText={setNewEmoji}
+                            value={icon}
+                            onChangeText={setIcon}
                             placeholder="✅"
                             placeholderTextColor={Colors.textMuted}
                         />
+
                         <Text style={styles.inputLabel}>Name *</Text>
                         <TextInput
                             style={styles.input}
-                            value={newName}
-                            onChangeText={setNewName}
+                            value={name}
+                            onChangeText={setName}
                             placeholder="e.g. Morning Exercise"
                             placeholderTextColor={Colors.textMuted}
                         />
+
                         <Text style={styles.inputLabel}>Frequency</Text>
                         <View style={styles.freqRow}>
-                            {(['DAILY', 'WEEKLY'] as const).map(f => (
+                            {[Frequency.DAILY, Frequency.WEEKLY].map((f) => (
                                 <TouchableOpacity
                                     key={f}
-                                    style={[styles.freqChip, newFreq === f && styles.freqChipActive]}
-                                    onPress={() => setNewFreq(f)}
+                                    style={[styles.freqChip, frequency === f && styles.freqChipActive]}
+                                    onPress={() => setFrequency(f)}
                                 >
-                                    <Text style={[styles.freqText, newFreq === f && styles.freqTextActive]}>{f}</Text>
+                                    <Text style={[styles.freqText, frequency === f && styles.freqTextActive]}>{f}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
+
                         <Text style={styles.inputLabel}>Target (times per period)</Text>
                         <TextInput
                             style={styles.input}
-                            value={newTarget}
-                            onChangeText={setNewTarget}
+                            value={targetValue}
+                            onChangeText={setTargetValue}
                             keyboardType="number-pad"
                             placeholder="1"
                             placeholderTextColor={Colors.textMuted}
                         />
+
+                        <Text style={styles.inputLabel}>Color</Text>
+                        <View style={styles.colorRow}>
+                            {HABIT_COLOR_PRESETS.map((c) => (
+                                <TouchableOpacity
+                                    key={c}
+                                    style={[styles.colorDot, { backgroundColor: c }, color === c && styles.colorDotActive]}
+                                    onPress={() => setColor(c)}
+                                />
+                            ))}
+                        </View>
+
+                        <Text style={styles.inputLabel}>Auto-Link Category</Text>
+                        <View style={styles.categoryWrap}>
+                            <TouchableOpacity style={[styles.categoryChip, linkedCategoryId === 'none' && styles.categoryChipActive]} onPress={() => setLinkedCategoryId('none')}>
+                                <Text style={[styles.categoryChipText, linkedCategoryId === 'none' && styles.categoryChipTextActive]}>None</Text>
+                            </TouchableOpacity>
+                            {categories.map((category: any) => (
+                                <TouchableOpacity
+                                    key={String(category.id)}
+                                    style={[styles.categoryChip, linkedCategoryId === String(category.id) && styles.categoryChipActive]}
+                                    onPress={() => setLinkedCategoryId(String(category.id))}
+                                >
+                                    <Text style={[styles.categoryChipText, linkedCategoryId === String(category.id) && styles.categoryChipTextActive]}>{String(category.name)}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
                         <TouchableOpacity
-                            style={[styles.createBtn, (!newName.trim() || isCreating) && { opacity: 0.5 }]}
-                            onPress={handleCreate}
-                            disabled={!newName.trim() || isCreating}
+                            style={[styles.createBtn, (!name.trim() || isSaving) && styles.disabled]}
+                            onPress={handleSave}
+                            disabled={!name.trim() || isSaving}
                         >
-                            {isCreating
+                            {isSaving
                                 ? <ActivityIndicator color="#fff" size="small" />
-                                : <Text style={styles.createBtnText}>Create Habit</Text>
+                                : <Text style={styles.createBtnText}>{editingHabitId ? 'Save Changes' : 'Create Habit'}</Text>
                             }
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
             </Modal>
 
-            {/* Action Modal */}
             <Modal visible={!!actionModal} transparent animationType="slide" onRequestClose={() => setActionModal(null)}>
                 <TouchableOpacity style={styles.modalOverlay} onPress={() => setActionModal(null)}>
                     <View style={styles.modalSheet}>
-                        <Text style={styles.modalTitle}>{actionModal?.name}</Text>
-                        {[
-                            { label: '✏️  Edit Habit', onPress: () => setActionModal(null) },
-                            { label: '📊  View Stats', onPress: () => { setActionModal(null); navigation.navigate('HabitDetail', { habitId: actionModal?.id }); } },
-                            { label: '⏸️  Pause Habit', onPress: () => setActionModal(null) },
-                            { label: '🗑️  Delete', onPress: () => setActionModal(null) },
-                        ].map((a) => (
-                            <TouchableOpacity key={a.label} style={styles.modalAction} onPress={a.onPress}>
-                                <Text style={styles.modalActionText}>{a.label}</Text>
-                            </TouchableOpacity>
-                        ))}
+                        <Text style={styles.modalTitle}>{String(actionModal?.name ?? 'Habit')}</Text>
+                        <TouchableOpacity style={styles.modalAction} onPress={() => { const h = actionModal; setActionModal(null); openEdit(h); }}>
+                            <Text style={styles.modalActionText}>✏️  Edit Habit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.modalAction} onPress={() => { const id = String(actionModal?.id ?? ''); setActionModal(null); if (id) navigation.navigate('HabitDetail', { habitId: id }); }}>
+                            <Text style={styles.modalActionText}>📊  View Stats</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.modalAction} onPress={() => { const h = actionModal; setActionModal(null); handleReset(h); }}>
+                            <Text style={styles.modalActionText}>🔄  Reset Progress</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.modalAction} onPress={() => { const h = actionModal; setActionModal(null); handleDelete(h); }}>
+                            <Text style={[styles.modalActionText, { color: Colors.error }]}>🗑️  Delete</Text>
+                        </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
             </Modal>
@@ -270,7 +391,7 @@ const styles = StyleSheet.create({
     emptyIcon: { fontSize: 48, marginBottom: Spacing['3'] },
     emptyText: { color: Colors.textMuted, fontSize: Typography.fontSize.base },
     habitCard: { padding: Spacing['3'] },
-    habitCardDone: { borderColor: Colors.success + '40' },
+    habitCardDone: { borderColor: `${Colors.success}40` },
     habitRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing['3'] },
     habitIcon: { width: 44, height: 44, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
     habitEmoji: { fontSize: 22 },
@@ -287,7 +408,6 @@ const styles = StyleSheet.create({
     modalTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '700', marginBottom: Spacing['4'] },
     modalAction: { paddingVertical: Spacing['4'], borderBottomWidth: 1, borderBottomColor: Colors.border },
     modalActionText: { color: Colors.textPrimary, fontSize: Typography.fontSize.base },
-    // Create Habit modal styles
     inputLabel: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing['1'], marginTop: Spacing['3'] },
     input: { color: Colors.textPrimary, fontSize: Typography.fontSize.base, backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing['3'], paddingVertical: Spacing['2'] },
     freqRow: { flexDirection: 'row', gap: Spacing['2'], marginBottom: Spacing['2'] },
@@ -295,7 +415,15 @@ const styles = StyleSheet.create({
     freqChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
     freqText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, fontWeight: '600' },
     freqTextActive: { color: '#fff' },
+    colorRow: { flexDirection: 'row', gap: Spacing['3'], marginTop: Spacing['1'] },
+    colorDot: { width: 22, height: 22, borderRadius: Radius.full, opacity: 0.8 },
+    colorDotActive: { borderWidth: 2, borderColor: '#fff', opacity: 1 },
+    categoryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing['2'], marginTop: Spacing['1'] },
+    categoryChip: { paddingHorizontal: Spacing['3'], paddingVertical: Spacing['2'], borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
+    categoryChipActive: { backgroundColor: `${Colors.primary}20`, borderColor: Colors.primary },
+    categoryChipText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, fontWeight: '600' },
+    categoryChipTextActive: { color: Colors.primaryLight },
     createBtn: { backgroundColor: Colors.primary, borderRadius: Radius.xl, paddingVertical: Spacing['3'], alignItems: 'center', marginTop: Spacing['4'] },
     createBtnText: { color: '#fff', fontSize: Typography.fontSize.base, fontWeight: '700' },
+    disabled: { opacity: 0.5 },
 });
-

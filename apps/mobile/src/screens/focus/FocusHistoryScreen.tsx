@@ -4,10 +4,11 @@ import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import { useGetAuditLogsQuery } from '@repo/store';
 import type { FocusScreenProps } from '../../navigation/types';
+import { toArray } from '../../utils/data';
 
 export const FocusHistoryScreen: React.FC<FocusScreenProps<'FocusHistory'>> = ({ navigation }) => {
     const { data, isLoading, refetch } = useGetAuditLogsQuery({ limit: 50 });
-    const logs: any[] = (data as any)?.data ?? data ?? [];
+    const logs = toArray<any>(data, ['logs', 'data']);
 
     const totalMinutes = logs.reduce((acc: number, l: any) => acc + (l.durationMinutes ?? 0), 0);
     const totalSessions = logs.length;

@@ -65,6 +65,10 @@ vi.mock('../src/services/nudge.service.js', () => ({
         focusProfiles: [],
         groupedSummaries: true,
         positiveTone: true,
+        preDeadlineDays: 2,
+        streakReminderTime: '09:00',
+        timezone: 'UTC',
+        timezoneOffsetMinutes: 0,
     }),
     upsertNotificationSettings: vi.fn().mockResolvedValue({
         enabledBuckets: {
@@ -78,7 +82,12 @@ vi.mock('../src/services/nudge.service.js', () => ({
         focusProfiles: [],
         groupedSummaries: true,
         positiveTone: true,
+        preDeadlineDays: 2,
+        streakReminderTime: '09:00',
+        timezone: 'UTC',
+        timezoneOffsetMinutes: 0,
     }),
+    reschedulePendingStreakNudges: vi.fn().mockResolvedValue(undefined),
     createTransactionSystemNudge: vi.fn().mockResolvedValue({ id: 'txn-1' }),
     getUserNudges: vi.fn().mockResolvedValue([
         { id: 'n1', type: 'STREAK_RISK', title: 'Streak at risk', message: 'Log now!', isRead: false },
@@ -361,6 +370,23 @@ describe('Habit endpoints — Nudges', () => {
         const res = await request(app).post('/api/habits/nudges/read-all');
 
         expect(res.status).toBe(200);
+    });
+
+    it('GET /api/habits/nudges/settings — returns notification settings including schedule fields', async () => {
+        const res = await request(app).get('/api/habits/nudges/settings');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('settings.preDeadlineDays', 2);
+        expect(res.body).toHaveProperty('settings.streakReminderTime', '09:00');
+    });
+
+    it('PUT /api/habits/nudges/settings — accepts partial schedule settings updates', async () => {
+        const res = await request(app)
+            .put('/api/habits/nudges/settings')
+            .send({ preDeadlineDays: 3 });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('settings.preDeadlineDays');
     });
 });
 

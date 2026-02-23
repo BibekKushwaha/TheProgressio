@@ -7,6 +7,12 @@ import { useGetProfileQuery } from './services/authApi';
 import { useAppDispatch } from './hooks';
 import { hydrateAuth, logout } from './slices/authSlice';
 import { syncEngine } from './sync-engine';
+import {
+  getLocalStorageItem,
+  removeLocalStorageItem,
+  setLocalStorageItem,
+  supportsIndexedDb,
+} from './runtime';
 
 const STORE_BUILD_VERSION = '2026-02-19-calendar-fix';
 
@@ -18,16 +24,13 @@ function AuthHydrator() {
   });
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const hasSession = localStorage.getItem('auth:hasSession') === '1';
+    const hasSession = getLocalStorageItem('auth:hasSession') === '1';
     setShouldFetch(hasSession);
   }, []);
 
   useEffect(() => {
     if (isSuccess && data?.user) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('auth:hasSession', '1');
-      }
+      setLocalStorageItem('auth:hasSession', '1');
       dispatch(hydrateAuth({ user: data.user }));
     }
   }, [isSuccess, data, dispatch]);
@@ -36,9 +39,7 @@ function AuthHydrator() {
     if (!error) return;
     const status = 'status' in error ? error.status : undefined;
     if (status === 401 || status === 404) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth:hasSession');
-      }
+      removeLocalStorageItem('auth:hasSession');
       dispatch(logout());
       setShouldFetch(false);
     }
@@ -49,6 +50,10 @@ function AuthHydrator() {
 
 function SyncBootstrap() {
   useEffect(() => {
+    if (!supportsIndexedDb()) {
+      return;
+    }
+
     syncEngine.start();
 
     return () => {

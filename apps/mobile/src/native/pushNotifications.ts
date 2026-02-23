@@ -148,7 +148,7 @@ export function navigateFromNotification(
                 }
                 break;
             case 'FocusSession':
-                (navRef as any).navigate('FocusTab', { screen: 'FocusSession' });
+                (navRef as any).navigate('MenuTab', { screen: 'FocusSession' });
                 break;
             case 'Dashboard':
                 (navRef as any).navigate('HomeTab', { screen: 'Dashboard' });

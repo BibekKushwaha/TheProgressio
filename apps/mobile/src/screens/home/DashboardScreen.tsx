@@ -13,6 +13,8 @@ import {
     useGetHabitsQuery,
 } from '@repo/store';
 import type { HomeScreenProps } from '../../navigation/types';
+import { toArray } from '../../utils/data';
+import { extractTaskId } from '../../utils/task';
 
 function getGreeting(): string {
     const h = new Date().getHours();
@@ -43,14 +45,11 @@ export const DashboardScreen: React.FC<HomeScreenProps<'Dashboard'>> = ({ naviga
         ).length;
     }, [habits]);
 
-    const taskList: any[] = useMemo(
-        () => (tasks as any)?.data ?? (tasks as any)?.tasks ?? (Array.isArray(tasks) ? tasks : []),
-        [tasks]
-    );
+    const taskList: any[] = useMemo(() => toArray<any>(tasks, ['data', 'tasks']), [tasks]);
 
     const QUICK_ACTIONS = [
         { icon: '➕', label: 'New Task', onPress: () => (navigation as any).navigate('TasksTab', { screen: 'CreateTask' }) },
-        { icon: '⏱️', label: 'Start Focus', onPress: () => (navigation as any).navigate('FocusTab') },
+        { icon: '⏱️', label: 'Start Focus', onPress: () => (navigation as any).navigate('MenuTab') },
         { icon: '✅', label: 'Log Habit', onPress: () => (navigation as any).navigate('InsightsTab', { screen: 'HabitGallery' }) },
         { icon: '📊', label: 'Analytics', onPress: () => (navigation as any).navigate('InsightsTab', { screen: 'AnalyticsOverview' }) },
     ];
@@ -74,7 +73,7 @@ export const DashboardScreen: React.FC<HomeScreenProps<'Dashboard'>> = ({ naviga
             {/* Live Session Banner */}
             {liveSession && (
                 <TouchableOpacity
-                    onPress={() => (navigation as any).navigate('FocusTab')}
+                    onPress={() => (navigation as any).navigate('MenuTab')}
                 >
                     <GlassCard style={styles.liveCard}>
                         <View style={styles.liveDot} />
@@ -130,24 +129,30 @@ export const DashboardScreen: React.FC<HomeScreenProps<'Dashboard'>> = ({ naviga
                     <Text style={styles.emptyText}>All caught up! 🎉</Text>
                 )}
                 {taskList.slice(0, 5).map((task: any) => (
-                    <TouchableOpacity
-                        key={task.id}
-                        style={styles.taskRow}
-                        onPress={() => (navigation as any).navigate('TasksTab', { screen: 'TaskDetail', params: { taskId: task.id } })}
-                    >
-                        <View style={[styles.priorityDot, {
-                            backgroundColor:
-                                task.priority === 'HIGH' || task.priority === 'high' ? Colors.error
-                                    : task.priority === 'MEDIUM' || task.priority === 'medium' ? Colors.warning
-                                        : Colors.success
-                        }]} />
-                        <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
-                        {task.dueDate && (
-                            <Text style={styles.taskDue}>
-                                {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </Text>
-                        )}
-                    </TouchableOpacity>
+                    (() => {
+                        const taskId = extractTaskId(task);
+                        return (
+                            <TouchableOpacity
+                                key={taskId ?? task.title}
+                                style={styles.taskRow}
+                                disabled={!taskId}
+                                onPress={() => taskId && (navigation as any).navigate('TasksTab', { screen: 'TaskDetail', params: { taskId } })}
+                            >
+                                <View style={[styles.priorityDot, {
+                                    backgroundColor:
+                                        task.priority === 'HIGH' || task.priority === 'high' ? Colors.error
+                                            : task.priority === 'MEDIUM' || task.priority === 'medium' ? Colors.warning
+                                                : Colors.success
+                                }]} />
+                                <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
+                                {task.dueDate && (
+                                    <Text style={styles.taskDue}>
+                                        {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })()
                 ))}
             </GlassCard>
 

@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { prisma } from "@repo/db";
+import { incrementMetric, logMetricEvent } from "./metrics.service.js";
 
 const prismaAny = prisma as any;
 
@@ -22,6 +23,18 @@ export interface DispatchResult {
     status: DispatchResultStatus;
     reason?: string;
     attempts?: number;
+}
+
+interface NudgeLike {
+    id: string;
+    userId: string;
+    message: string;
+    priority: string;
+    metadata: string | null;
+    scheduledAt: Date;
+    expiresAt: Date | null;
+    idempotencyKey?: string | null;
+    user?: { whatsappOptIn?: boolean } | null;
 }
 
 const parseJsonObject = (raw: string | null | undefined): Record<string, unknown> => {
@@ -183,7 +196,65 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
     let skipped = 0;
     let failed = 0;
 
-    for (const nudge of nudges) {
+    for (const nudge of nudges as unknown as NudgeLike[]) {
+        const outcome = await dispatchSingleNudge({
+            nudge,
+            now,
+            dayStart,
+            dayEnd,
+            userPhoneMap,
+            dedupeCache,
+            holidayPauseCache,
+        });
+        if (outcome.status === "sent") sent += 1;
+        if (outcome.status === "skipped") skipped += 1;
+        if (outcome.status === "failed") failed += 1;
+        results.push(outcome.result);
+    }
+
+    return { sent, skipped, failed, results };
+};
+
+export const dispatchWhatsAppNudgeById = async (nudgeId: string): Promise<DispatchResult> => {
+    const now = new Date();
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(now);
+    dayEnd.setHours(23, 59, 59, 999);
+    const userPhoneMap = getUserPhoneMapping();
+    const dedupeCache = new Set<string>();
+    const holidayPauseCache = new Map<string, boolean>();
+
+    const nudge = await prisma.nudge.findFirst({
+        where: { id: nudgeId },
+    });
+
+    if (!nudge) {
+        return { nudgeId, status: "skipped", reason: "nudge_not_found" };
+    }
+
+    const outcome = await dispatchSingleNudge({
+        nudge: nudge as unknown as NudgeLike,
+        now,
+        dayStart,
+        dayEnd,
+        userPhoneMap,
+        dedupeCache,
+        holidayPauseCache,
+    });
+    return outcome.result;
+};
+
+const dispatchSingleNudge = async (params: {
+    nudge: NudgeLike;
+    now: Date;
+    dayStart: Date;
+    dayEnd: Date;
+    userPhoneMap: Record<string, string>;
+    dedupeCache: Set<string>;
+    holidayPauseCache: Map<string, boolean>;
+}): Promise<{ status: DispatchResultStatus; result: DispatchResult }> => {
+    const { nudge, now, dayStart, dayEnd, userPhoneMap, dedupeCache, holidayPauseCache } = params;
         if (!holidayPauseCache.has(nudge.userId)) {
             if (typeof prismaAny.schoolHoliday?.findFirst === "function") {
                 const holiday = await prismaAny.schoolHoliday.findFirst({
@@ -202,26 +273,40 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
         }
 
         if (holidayPauseCache.get(nudge.userId)) {
-            skipped += 1;
-            results.push({ nudgeId: nudge.id, status: "skipped", reason: "holiday_pause" });
-            continue;
+            await prisma.nudge.update({
+                where: { id: nudge.id },
+                data: { skippedReason: "holiday_pause" },
+            });
+            return { status: "skipped", result: { nudgeId: nudge.id, status: "skipped", reason: "holiday_pause" } };
         }
 
         const recipient = normalizePhone(userPhoneMap[nudge.userId]);
         if (!recipient) {
-            skipped += 1;
-            results.push({ nudgeId: nudge.id, status: "skipped", reason: "recipient_not_mapped" });
-            continue;
+            await prisma.nudge.update({
+                where: { id: nudge.id },
+                data: { skippedReason: "recipient_not_mapped" },
+            });
+            return { status: "skipped", result: { nudgeId: nudge.id, status: "skipped", reason: "recipient_not_mapped" } };
         }
 
         const userPreferences = (nudge as any).user;
         if (userPreferences?.whatsappOptIn === false) {
-            skipped += 1;
-            results.push({ nudgeId: nudge.id, status: "skipped", reason: "user_opted_out" });
-            continue;
+            await prisma.nudge.update({
+                where: { id: nudge.id },
+                data: { skippedReason: "user_opted_out" },
+            });
+            return { status: "skipped", result: { nudgeId: nudge.id, status: "skipped", reason: "user_opted_out" } };
         }
 
         const metadata = parseJsonObject(nudge.metadata);
+        if (metadata.suppressedDueToQuietHours === true) {
+            incrementMetric("skipped_due_to_quiet_hours");
+            await prisma.nudge.update({
+                where: { id: nudge.id },
+                data: { skippedReason: "quiet_hours" },
+            });
+            return { status: "skipped", result: { nudgeId: nudge.id, status: "skipped", reason: "quiet_hours" } };
+        }
         const dedupeHash = buildDispatchHash({
             nudgeId: nudge.id,
             recipient,
@@ -230,9 +315,12 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
         const lastHash = typeof metadata.lastDispatchHash === "string" ? metadata.lastDispatchHash : null;
 
         if (lastHash === dedupeHash || dedupeCache.has(dedupeHash)) {
-            skipped += 1;
-            results.push({ nudgeId: nudge.id, status: "skipped", reason: "deduped" });
-            continue;
+            incrementMetric("deduplicated_count");
+            await prisma.nudge.update({
+                where: { id: nudge.id },
+                data: { skippedReason: "deduped" },
+            });
+            return { status: "skipped", result: { nudgeId: nudge.id, status: "skipped", reason: "deduped" } };
         }
 
         const delivery = await sendWithRetry({
@@ -244,12 +332,17 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
 
         if (delivery.success) {
             dedupeCache.add(dedupeHash);
-            sent += 1;
-            results.push({ nudgeId: nudge.id, status: "sent", attempts: delivery.attempts });
+            logMetricEvent("nudge_delivered", {
+                nudgeId: nudge.id,
+                scheduled_at_utc: nudge.scheduledAt.toISOString(),
+                delivered_at_utc: now.toISOString(),
+            });
 
             await prisma.nudge.update({
                 where: { id: nudge.id },
                 data: {
+                    deliveredAt: now,
+                    skippedReason: null,
                     metadata: JSON.stringify({
                         ...metadata,
                         channel: "WHATSAPP",
@@ -259,20 +352,13 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
                     }),
                 },
             });
-            continue;
+            return { status: "sent", result: { nudgeId: nudge.id, status: "sent", attempts: delivery.attempts } };
         }
-
-        failed += 1;
-        results.push({
-            nudgeId: nudge.id,
-            status: "failed",
-            attempts: delivery.attempts,
-            ...(delivery.error ? { reason: delivery.error } : {}),
-        });
 
         await prisma.nudge.update({
             where: { id: nudge.id },
             data: {
+                skippedReason: "delivery_failed",
                 metadata: JSON.stringify({
                     ...metadata,
                     channel: "WHATSAPP",
@@ -283,7 +369,13 @@ export const dispatchWhatsAppNudges = async (params?: { limit?: number }): Promi
                 }),
             },
         });
-    }
-
-    return { sent, skipped, failed, results };
+        return {
+            status: "failed",
+            result: {
+                nudgeId: nudge.id,
+                status: "failed",
+                attempts: delivery.attempts,
+                ...(delivery.error ? { reason: delivery.error } : {}),
+            },
+        };
 };

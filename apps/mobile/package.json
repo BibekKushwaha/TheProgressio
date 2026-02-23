@@ -2,16 +2,19 @@
   "name": "mobile",
   "private": true,
   "version": "1.0.0",
-  "main": "src/App.tsx",
+  "type": "module",
+  "main": "index.js",
   "engines": {
     "node": ">=20.19.0"
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo run:android",
+    "start:android-local": "EXPO_PUBLIC_AUTH_SERVICE_URL=http://10.0.2.2:4000 EXPO_PUBLIC_PLANNER_SERVICE_URL=http://10.0.2.2:4001 EXPO_PUBLIC_HABIT_SERVICE_URL=http://10.0.2.2:4002 EXPO_PUBLIC_ANALYTICS_SERVICE_URL=http://10.0.2.2:4003 expo start --dev-client -c",
+    "android": "rm -rf android/build/generated/autolinking && expo run:android",
+    "android:local": "rm -rf android/build/generated/autolinking && EXPO_PUBLIC_AUTH_SERVICE_URL=http://10.0.2.2:4000 EXPO_PUBLIC_PLANNER_SERVICE_URL=http://10.0.2.2:4001 EXPO_PUBLIC_HABIT_SERVICE_URL=http://10.0.2.2:4002 EXPO_PUBLIC_ANALYTICS_SERVICE_URL=http://10.0.2.2:4003 expo run:android",
     "ios": "expo run:ios",
     "build": "tsc -p tsconfig.json",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "eslint . --quiet",
     "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

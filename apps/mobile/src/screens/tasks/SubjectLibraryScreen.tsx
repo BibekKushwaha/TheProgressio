@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { ScreenWrapper, GlassCard } from '../../components';
+import { ScreenWrapper } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
-import { useGetCategoriesQuery, useGetTasksQuery } from '@repo/store';
+import { useGetCategoriesQuery } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
+import { toArray } from '../../utils/data';
 
 export const SubjectLibraryScreen: React.FC<TasksScreenProps<'SubjectLibrary'>> = ({ navigation }) => {
     const { data: categories, isLoading, refetch } = useGetCategoriesQuery(undefined);
-    const cats: any[] = (categories as any)?.data ?? categories ?? [];
+    const cats = toArray<any>(categories, ['data', 'categories']);
 
     return (
         <ScreenWrapper edges={['top', 'left', 'right']}>

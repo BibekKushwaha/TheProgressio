@@ -1,6 +1,10 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
 
-const HABIT_SERVICE_URL = process.env.NEXT_PUBLIC_HABIT_SERVICE_URL || 'http://localhost:4002';
+const HABIT_SERVICE_URL = resolveServiceUrl(
+    process.env.EXPO_PUBLIC_HABIT_SERVICE_URL ?? process.env.NEXT_PUBLIC_HABIT_SERVICE_URL,
+    'http://localhost:4002'
+);
 
 export enum Frequency {
     DAILY = 'DAILY',
@@ -135,6 +139,10 @@ export interface NotificationSettings {
     focusProfiles: Array<{ label: string; enabled: boolean; muteNonUrgent: boolean }>;
     groupedSummaries: boolean;
     positiveTone: boolean;
+    preDeadlineDays: 1 | 2 | 3;
+    streakReminderTime: string;
+    timezone: string;
+    timezoneOffsetMinutes: number;
 }
 
 export interface MorningBriefing {
@@ -152,7 +160,7 @@ export const habitsApi = createApi({
         credentials: 'include',
         prepareHeaders: (headers) => {
             headers.set('Content-Type', 'application/json');
-            const shareToken = typeof window !== 'undefined' ? localStorage.getItem('family_share_token') : null;
+            const shareToken = getFamilyShareToken();
             if (shareToken) {
                 headers.set('x-family-share-token', shareToken);
             }

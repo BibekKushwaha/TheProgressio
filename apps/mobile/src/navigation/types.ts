@@ -23,10 +23,10 @@ export type HomeStackParamList = {
 export type TasksStackParamList = {
     TaskList: undefined;
     TaskDetail: { taskId: string };
-    CreateTask: { prefillSubjectId?: string } | undefined;
+    CreateTask: { prefillSubjectId?: string; taskId?: string } | undefined;
     SubjectLibrary: undefined;
     SubjectDetail: { subjectId: string; subjectName: string };
-    Calendar: undefined;
+    Calendar: { date?: string } | undefined;
     EventDetail: { eventId: string; eventType: 'task' | 'exam' | 'holiday' };
     Planner: undefined;
     SyllabusDigitizer: undefined;
@@ -34,6 +34,7 @@ export type TasksStackParamList = {
 
 // ─── Focus Stack ─────────────────────────────────────────────────────────────
 export type FocusStackParamList = {
+    MenuHome: undefined;
     FocusSession: { taskId?: string } | undefined;
     SessionComplete: { sessionId: string; duration: number; taskId?: string };
     FocusHistory: undefined;
@@ -65,7 +66,7 @@ export type ProfileStackParamList = {
 export type TabParamList = {
     HomeTab: undefined;
     TasksTab: undefined;
-    FocusTab: undefined;
+    MenuTab: undefined;
     InsightsTab: undefined;
     ProfileTab: undefined;
 };

@@ -15,6 +15,8 @@ import habitsReducer from './slices/habitsSlice';
 import analyticsReducer from './slices/analyticsSlice';
 
 export const makeStore = () => {
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+
   return configureStore({
     reducer: {
       auth: authReducer,
@@ -33,7 +35,10 @@ export const makeStore = () => {
       [paymentApi.reducerPath]: paymentApi.reducer,
     },
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(
+      getDefaultMiddleware({
+        immutableCheck: isDevelopment ? { warnAfter: 96 } : false,
+        serializableCheck: isDevelopment ? { warnAfter: 96 } : false,
+      }).concat(
         authApi.middleware,
         tasksApi.middleware,
         categoriesApi.middleware,

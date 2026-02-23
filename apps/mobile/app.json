@@ -51,7 +51,7 @@
           ]
         }
       ],
-      "versionCode": 4
+      "versionCode": 8
     },
     "notification": {
       "iosDisplayInForeground": true,
@@ -86,6 +86,7 @@
       }
     },
     "owner": "mbibeks-organization",
+    "newArchEnabled": true,
     "runtimeVersion": {
       "policy": "appVersion"
     },

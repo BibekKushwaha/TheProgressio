@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { ScreenWrapper, GlassCard } from '../../components';
-import { Colors, Typography, Spacing, Radius } from '../../theme';
+import { Colors, Typography, Spacing } from '../../theme';
 import { useGetStrategicSummaryQuery } from '@repo/store';
 import type { InsightsScreenProps } from '../../navigation/types';
 
