@@ -1,7 +1,7 @@
 'use client';
 
 import { useGetTasksQuery, useGetHabitsQuery, useGetDailySummaryQuery, useGetProfileQuery, useComposeNotificationMutation, Task, Habit } from '@repo/store';
-import { Eye, Shield, Heart, TrendingUp, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, Share2, MessageSquare, Download } from 'lucide-react';
+import { Eye, Shield, TrendingUp, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, Share2, MessageSquare, Download } from 'lucide-react';
 import { exportTasksToCSV, downloadCSV } from '@/lib/exportUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -96,9 +96,7 @@ export default function FamilyConnectPage() {
                 title="Family Connect"
                 subtitle={`Read-only progress dashboard for ${user?.username || 'Student'}`}
             >
-                <div className="p-4 bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl shadow-lg shadow-pink-500/20 mr-4 hidden md:block">
-                    <Heart className="w-8 h-8 text-white" />
-                </div>
+
                 <div className="flex items-center gap-2">
                     <Button variant="outline" className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-slate-200">
                         <Share2 className="w-4 h-4 mr-2" />

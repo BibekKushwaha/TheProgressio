@@ -29,8 +29,8 @@ export default function DashboardPage() {
             >
                 <div className="space-y-6">
                     <WeeklyActivity />
-                    <QRAttendance />
                     <TodaysTasks />
+                    <QRAttendance />
                     <ActivityLedger />
                 </div>
             </DashboardGrid>

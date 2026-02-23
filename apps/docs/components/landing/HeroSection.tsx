@@ -52,7 +52,6 @@ export function HeroSection() {
           transition={{ duration: 0.5, ease: 'easeOut' as const }}
           className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600/10 border border-purple-500/20 rounded-full mb-8"
         >
-          <Sparkles className="w-4 h-4 text-purple-400" />
           <span className="text-sm font-medium text-purple-300">
             {isLive ? `Live Session: ${activeLive?.session?.taskTitle}` : 'AI Academic Advisor is Live'}
           </span>

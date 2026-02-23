@@ -87,7 +87,10 @@ export const authApi = createApi({
       }
       try {
         return await fetch(input, init);
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          throw error;
+        }
         console.error(`[authApi] network error for ${method} ${url}`, error);
         throw error;
       }
