@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { withRetry } from '../baseQuery';
 import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
 
 const ANALYTICS_SERVICE_URL = resolveServiceUrl(
@@ -320,7 +321,7 @@ export const analyticsApi = createApi({
     // Keep data fresh for 5 minutes after all subscribers unmount. Prevents
     // re-fetching on rapid navigation between exam-warroom sub-pages.
     keepUnusedDataFor: 300,
-    baseQuery: fetchBaseQuery({
+    baseQuery: withRetry(fetchBaseQuery({
         baseUrl: `${ANALYTICS_SERVICE_URL}/api`,
         credentials: 'include',
         prepareHeaders: (headers) => {
@@ -331,7 +332,7 @@ export const analyticsApi = createApi({
             }
             return headers;
         },
-    }),
+    })),
     tagTypes: ['Activity', 'Stats'],
     endpoints: (builder) => ({
         logSession: builder.mutation<{ message: string; log: ActivityLog }, LogSessionRequest>({

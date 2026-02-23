@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useIsMounted } from '@/hooks/useIsMounted';
 
 import { selectCurrentUser, useAppSelector, useLogoutMutation } from '@repo/store';
 import { motion } from 'framer-motion';
@@ -23,13 +23,9 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useIsMounted();
   const [logout] = useLogoutMutation();
   const router = useRouter();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const goTo = (path: string) => () => router.push(path);
   const handleLogout = async () => {

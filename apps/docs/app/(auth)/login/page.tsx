@@ -9,45 +9,7 @@ import GradientButton from "@/components/auth/gradient-button";
 import Input from "@/components/auth/input";
 import { hydrateAuth, useAppDispatch, useLoginMutation } from "@repo/store";
 import { loginSchema } from "@repo/schemas/auth";
-
-interface ApiError {
-    data?: string | { message?: string; errors?: { fieldErrors?: Record<string, string[]> } };
-    error?: string;
-    message?: string;
-}
-
-const extractLoginErrorMessage = (error: unknown): string => {
-    const errorAny = error as ApiError;
-
-    if (errorAny?.data) {
-        if (typeof errorAny.data === 'string') {
-            return errorAny.data;
-        }
-        if (errorAny.data.message) {
-            return errorAny.data.message;
-        }
-        if (errorAny.data.errors?.fieldErrors) {
-            const firstKey = Object.keys(errorAny.data.errors.fieldErrors)[0];
-            if (firstKey) {
-                const firstFieldError = errorAny.data.errors.fieldErrors[firstKey]?.[0];
-                if (firstFieldError) return firstFieldError;
-            }
-        }
-    }
-
-    if (typeof errorAny?.error === 'string') {
-        if (errorAny.error.includes('FETCH_ERROR')) {
-            return 'Unable to reach auth service. Ensure docker services are running and auth-service is accessible on port 4000.';
-        }
-        return errorAny.error;
-    }
-
-    if (typeof errorAny?.message === 'string' && errorAny.message.trim().length > 0) {
-        return errorAny.message;
-    }
-
-    return 'Login failed. If you recently reset the database, sign up again to create a new account.';
-};
+import { getApiErrorMessage } from "@/lib/api-error";
 
 const LoginPage = () => {
     const router = useRouter();
@@ -63,29 +25,23 @@ const LoginPage = () => {
         e.preventDefault();
         const validate = loginSchema.safeParse({ email, password });
         if (!validate.success) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setError((validate.error as any).message || "Invalid input");
+            setError(validate.error.issues[0]?.message ?? "Invalid input");
             return;
         }
         setIsLoading(true);
         setError("");
-        console.log(validate.data);
 
         try {
             const response = await loginApi(validate.data).unwrap();
-            console.log(response);
 
             if (response) {
                 dispatch(hydrateAuth(response));
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem('auth:hasSession', '1');
-                }
+                localStorage.setItem('auth:hasSession', '1');
                 // Assuming cookie is set by backend, just redirect
                 router.push("/dashboard");
             }
         } catch (err) {
-            const errorMessage = extractLoginErrorMessage(err);
-            console.error('Login failed:', errorMessage, err);
+            const errorMessage = getApiErrorMessage(err, 'Login failed. Please try again.');
             setError(errorMessage);
         } finally {
             setIsLoading(false);

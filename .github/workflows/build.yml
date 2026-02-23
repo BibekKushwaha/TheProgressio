@@ -30,14 +30,9 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate --schema=./packages/db/prisma/schema.prisma
 
-      - name: Check types
-        run: npm run check-types
-
-      - name: Build
-        run: npm run build
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm run test
+      - name: Check types, Build, Lint and Test
+        run: |
+          npm run check-types
+          npm run build
+          npm run lint
+          npm run test

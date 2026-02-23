@@ -1,5 +1,3 @@
-'use client';
-
 const LINKS = ['Privacy', 'Terms', 'Security', 'Contact'];
 
 export function HowItWorkFooter() {

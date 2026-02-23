@@ -3,7 +3,7 @@
 
 import { Mic } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useToast } from '@/components/ui/toast-provider';
+import { toast } from 'sonner';
 
 interface VoiceInputProps {
     onResult: (text: string) => void;
@@ -28,7 +28,6 @@ export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
     };
 
     const [recognition, setRecognition] = useState<SpeechRecognitionLike | null>(null);
-    const { toast } = useToast();
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -48,7 +47,7 @@ export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
                         return;
                     }
                     onResult(transcript);
-                    toast('🎤 Voice captured!', 'success');
+                    toast.success('🎤 Voice captured!');
                     if (window.navigator?.vibrate) window.navigator.vibrate(200);
                     setIsActive(false);
                 };
@@ -65,7 +64,7 @@ export function VoiceInput({ onResult, isCompact }: VoiceInputProps) {
                 setRecognition(recognitionInstance);
             }
         }
-    }, [onResult, toast]);
+    }, [onResult]);
 
     const toggleRecording = () => {
         if (!recognition) return;

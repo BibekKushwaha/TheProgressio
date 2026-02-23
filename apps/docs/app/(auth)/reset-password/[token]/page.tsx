@@ -10,6 +10,8 @@ import Input from "@/components/auth/input";
 import { useResetPasswordMutation } from "@repo/store";
 import { getApiErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
+import { resetPasswordSchema } from '@repo/schemas/auth';
+import { z } from 'zod';
 
 const ResetPasswordPage = () => {
     const params = useParams();
@@ -27,13 +29,16 @@ const ResetPasswordPage = () => {
         e.preventDefault();
         setError(null);
 
-        if (password !== confirmPassword) {
-            setError("Passwords do not match");
-            return;
-        }
+        const confirmSchema = resetPasswordSchema.extend({
+            confirmPassword: z.string(),
+        }).refine((d) => d.password === d.confirmPassword, {
+            message: 'Passwords do not match',
+            path: ['confirmPassword'],
+        });
 
-        if (password.length < 8) {
-            setError("Password must be at least 8 characters long");
+        const validation = confirmSchema.safeParse({ password, confirmPassword });
+        if (!validation.success) {
+            setError(validation.error.issues[0]?.message ?? 'Invalid input');
             return;
         }
 

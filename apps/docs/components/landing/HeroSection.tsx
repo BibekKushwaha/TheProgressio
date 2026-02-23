@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useIsMounted } from '@/hooks/useIsMounted';
 
 
 import { motion } from 'framer-motion';
@@ -28,17 +29,13 @@ const FLOAT_CARD = {
 };
 
 export function HeroSection() {
-  const [mounted, setMounted] = React.useState(false);
+  const mounted = useIsMounted();
   const user = useAppSelector(selectCurrentUser);
   const router = useRouter();
   const { data: activeLive } = useGetActiveLiveSessionQuery(undefined, {
     skip: !user,
-    pollingInterval: 10000,
+    pollingInterval: user ? 10000 : 0, // only poll when a user is logged in
   });
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const isLive = !!activeLive?.session;
   const showUserContent = mounted && !!user;

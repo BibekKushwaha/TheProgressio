@@ -4,41 +4,11 @@ import { KanbanBoard } from '@/components/planner/KanbanBoard';
 import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
 import { TimelineView } from '@/components/planner/TimelineView';
-import { LocalTask, Task, TaskStatus, useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
+import { TaskStatus, useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-
+import { mergeTaskSources } from '@/lib/mergeTasks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SearchBar } from '@/components/SearchBar';
-
-
-
-const toTimestamp = (value: string | Date | null | undefined): number => {
-    if (!value) return Number.POSITIVE_INFINITY;
-    return new Date(value).getTime();
-};
-
-const mergeTaskSources = (remoteTasks: Task[], localTasks: LocalTask[]): Task[] => {
-    const merged = new Map<string, Task>();
-
-    remoteTasks.forEach((task) => {
-        merged.set(task.id, task);
-    });
-
-    localTasks.forEach((localTask) => {
-        if (localTask._deletedLocally) {
-            merged.delete(localTask.id);
-            return;
-        }
-
-        if (localTask._dirty || localTask._localOnly) {
-            merged.set(localTask.id, localTask as unknown as Task);
-        }
-    });
-
-    return Array.from(merged.values()).sort(
-        (a, b) => toTimestamp(a.dueDate) - toTimestamp(b.dueDate)
-    );
-};
 
 export default function TasksPage() {
     const router = useRouter();
@@ -159,7 +129,7 @@ export default function TasksPage() {
                 setSelectedCategory={setSelectedCategory}
                 view={view}
                 setView={handleViewChange}
-                CATEGORY_OPTIONS={categoryOptions}
+                categoryOptions={categoryOptions}
             />
             </div>
             {view === 'kanban' ? (

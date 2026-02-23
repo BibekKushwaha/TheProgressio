@@ -1,37 +1,10 @@
 "use client"
 
 import { RecoveryModePanel } from '@/components/planner/RecoveryModePanel'
-import { LocalTask, Task, useGetTasksQuery, useLocalTasks } from '@repo/store';
+import { useGetTasksQuery, useLocalTasks } from '@repo/store';
 import React, { useMemo } from 'react'
 import { AlertCircle, Zap, Clock } from 'lucide-react';
-
-const toTimestamp = (value: string | Date | null | undefined): number => {
-    if (!value) return Number.POSITIVE_INFINITY;
-    return new Date(value).getTime();
-};
-
-const mergeTaskSources = (remoteTasks: Task[], localTasks: LocalTask[]): Task[] => {
-    const merged = new Map<string, Task>();
-
-    remoteTasks.forEach((task) => {
-        merged.set(task.id, task);
-    });
-
-    localTasks.forEach((localTask) => {
-        if (localTask._deletedLocally) {
-            merged.delete(localTask.id);
-            return;
-        }
-
-        if (localTask._dirty || localTask._localOnly || !merged.has(localTask.id)) {
-            merged.set(localTask.id, localTask as unknown as Task);
-        }
-    });
-
-    return Array.from(merged.values()).sort(
-        (a, b) => toTimestamp(a.dueDate) - toTimestamp(b.dueDate)
-    );
-};
+import { mergeTaskSources } from '@/lib/mergeTasks';
 
 const PlannerPage = () => {
     const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 50 });
@@ -138,4 +111,3 @@ const PlannerPage = () => {
 };
 
 export default PlannerPage;
-

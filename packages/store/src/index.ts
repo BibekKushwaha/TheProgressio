@@ -1,6 +1,9 @@
 // Store exports
 export { makeStore } from './store';
 export type { AppStore, RootState, AppDispatch } from './store';
+
+// Base query utility
+export { withRetry } from './baseQuery';
 export { StoreProvider } from './StoreProvider';
 
 // Hooks

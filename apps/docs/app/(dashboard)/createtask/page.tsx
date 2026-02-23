@@ -9,7 +9,7 @@ import { MetaChips } from '@/components/createtask/MetaChips';
 import { Edit, GraduationCap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/toast-provider';
+import { toast } from 'sonner';
 import {
     useSmartCreateTaskMutation,
     usePreviewSubtasksMutation,
@@ -31,7 +31,6 @@ function CreateTaskPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const taskId = searchParams.get('id');
-    const { toast } = useToast();
     const dispatch = useAppDispatch();
 
     const [taskDescription, setTaskDescription] = useState('');
@@ -145,7 +144,7 @@ function CreateTaskPageContent() {
                 const response = await smartCreateTask({ text: taskDescription }).unwrap();
                 if (response?.task) {
                     dispatch(addTask(response.task));
-                    toast('✅ Task created!', 'success');
+                    toast.success('✅ Task created!');
                     if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
                     router.push('/planner');
                     return;
@@ -154,7 +153,7 @@ function CreateTaskPageContent() {
 
             if (entryType === 'exam') {
                 if (!taskDescription) {
-                    toast('Please enter an exam title or subject', 'error');
+                    toast.error('Please enter an exam title or subject');
                     return;
                 }
 
@@ -163,7 +162,7 @@ function CreateTaskPageContent() {
                     const total = parseFloat(totalMarks);
 
                     if (Number.isNaN(marks) || Number.isNaN(total) || total <= 0) {
-                        toast('Please enter valid marks', 'error');
+                        toast.error('Please enter valid marks');
                         return;
                     }
 
@@ -175,12 +174,12 @@ function CreateTaskPageContent() {
                         totalMarks: total,
                     }).unwrap();
 
-                    toast('✅ Exam result logged!', 'success');
+                    toast.success('✅ Exam result logged!');
                     router.push('/exam-warroom');
                 } else {
                     // Schedule Upcoming Exam
                     if (!parsedDueDate) {
-                        toast('Please specify an exam date', 'error');
+                        toast.error('Please specify an exam date');
                         return;
                     }
 
@@ -194,7 +193,7 @@ function CreateTaskPageContent() {
                         priority: 'HIGH'
                     }).unwrap();
 
-                    toast('🗓️ Exam scheduled!', 'success');
+                    toast.success('🗓️ Exam scheduled!');
                     router.push('/calendar');
                 }
 
@@ -225,7 +224,6 @@ function CreateTaskPageContent() {
                             colorCode: 'from-blue-600/40 to-blue-500/40', // Default color
                         }).unwrap();
                         categoryIdToUse = newCategory.id;
-                        console.log('Created new category:', newCategory);
                     } catch (error) {
                         console.error('Failed to create new category:', error);
                         // Fallback: don't use category if creation failed
@@ -239,12 +237,6 @@ function CreateTaskPageContent() {
                     categoryIdToUse = undefined;
                 }
             }
-            console.log("title", taskDescription);
-            console.log("description", description);
-            console.log("priority", priorityEnum);
-            console.log("categoryId", categoryIdToUse);
-            console.log("dueDate", parsedDueDate);
-
             if (taskId) {
                 await updateTask({
                     id: taskId,
@@ -274,12 +266,12 @@ function CreateTaskPageContent() {
                 }
             }
 
-            toast(taskId ? '✏️ Task updated!' : '✅ Task created!', 'success');
+            toast.success(taskId ? '✏️ Task updated!' : '✅ Task created!');
             if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
             router.push('/planner');
         } catch (error) {
             console.error('Failed to save task:', error);
-            toast('Failed to save task', 'error');
+            toast.error('Failed to save task');
         }
     };
     const handleGenerateSubtasks = async () => {

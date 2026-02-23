@@ -127,6 +127,19 @@ export const isAuth = async (
             return;
         }
 
+        // Reject tokens that have been blacklisted (e.g. after logout)
+        try {
+            const mod = (await import('@repo/cache').catch(() => null)) as any;
+            if (mod?.getCache) {
+                const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                const blacklisted = await mod.getCache(`bl:${tokenHash}`);
+                if (blacklisted) {
+                    res.status(401).json({ message: 'Token has been revoked' });
+                    return;
+                }
+            }
+        } catch { /* non-blocking */ }
+
         const user = await prisma.user.findUnique({
             where: { id: decodedPayload.id as string },
             select: {

@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { prisma } from "@repo/db";
 
 type PlainObject = Record<string, unknown>;
@@ -189,8 +190,16 @@ export const resolveWhatsAppUserId = async (params: {
 
 export const isWhatsAppCaptureAuthorized = (secretHeader: unknown): boolean => {
     const expected = process.env.WHATSAPP_WEBHOOK_SECRET;
-    if (!expected) return true;
-    return secretHeader === expected;
+    if (!expected) return false; // fail closed: reject when secret not configured
+    if (typeof secretHeader !== 'string' || !secretHeader) return false;
+    try {
+        const expBuf = Buffer.from(expected, 'utf8');
+        const sigBuf = Buffer.from(secretHeader, 'utf8');
+        if (expBuf.length !== sigBuf.length) return false;
+        return crypto.timingSafeEqual(expBuf, sigBuf);
+    } catch {
+        return false;
+    }
 };
 
 export const isWhatsAppVerificationValid = (token: unknown): boolean => {

@@ -5,14 +5,14 @@ import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { ScheduleDetailPanel } from '@/components/calendar/ScheduleDetailPanel';
 import { UpcomingTasksPanel } from '@/components/calendar/UpcomingTasksPanel';
 import { DayGrid } from '@/components/calendar/DayGrid';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useResolveRotationQuery } from '@repo/store';
 import { RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { normalizeDateInput } from '@/lib/date';
 
-export default function CalendarPage() {
+function CalendarContent() {
     const [selectedView, setSelectedView] = useState('Month');
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showDailyDetail, setShowDailyDetail] = useState(false);
@@ -108,5 +108,13 @@ export default function CalendarPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function CalendarPage() {
+    return (
+        <Suspense fallback={<div className="space-y-6" />}>
+            <CalendarContent />
+        </Suspense>
     );
 }

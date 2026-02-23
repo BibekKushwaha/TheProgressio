@@ -411,12 +411,15 @@ describe('Task endpoints', () => {
   })
 
   it('returns 400 when WhatsApp payload does not resolve a user', async () => {
+    process.env.WHATSAPP_WEBHOOK_SECRET = 'wa-secret'
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
       .send({ text: 'Create task from WhatsApp' })
 
     expect(res.status).toBe(400)
     expect(res.body.message).toContain('User not found')
+    delete process.env.WHATSAPP_WEBHOOK_SECRET
   })
 
   it('verifies WhatsApp webhook challenge', async () => {

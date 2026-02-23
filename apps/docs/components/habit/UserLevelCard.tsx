@@ -4,7 +4,7 @@ import { Trophy, Zap, TrendingUp } from 'lucide-react';
 import { useGetUserXPQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useRef } from 'react';
-import { useToast } from '@/components/ui/toast-provider';
+import { toast } from 'sonner';
 
 const getErrorMessage = (error: unknown): string => {
     if (!error) return 'Unknown error';
@@ -18,7 +18,6 @@ const getErrorMessage = (error: unknown): string => {
 
 export function UserLevelCard() {
     const { data: xpData, isLoading, isError, error, refetch } = useGetUserXPQuery();
-    const { toast } = useToast();
 
     const prevXpRef = useRef<number | null>(null);
     const prevLevelRef = useRef<number | null>(null);
@@ -32,15 +31,15 @@ export function UserLevelCard() {
         if (prevXp !== null && currentXp !== null && currentXp > prevXp) {
             const delta = currentXp - prevXp;
             if (prevLevel !== null && currentLevel !== null && currentLevel > prevLevel) {
-                toast(`+${delta} XP — Level ${prevLevel} → ${currentLevel}`, 'success');
+                toast.success(`+${delta} XP — Level ${prevLevel} → ${currentLevel}`);
             } else {
-                toast(`+${delta} XP`, 'success');
+                toast.success(`+${delta} XP`);
             }
         }
 
         prevXpRef.current = currentXp;
         prevLevelRef.current = currentLevel;
-    }, [xpData, toast]);
+    }, [xpData]);
 
     if (isLoading) {
         return (

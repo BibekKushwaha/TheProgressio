@@ -38,6 +38,7 @@ export function exportTasksToCSV(tasks: Task[]): string {
 }
 
 export function downloadCSV(csvContent: string, filename: string) {
+    if (typeof document === 'undefined') return;
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
 

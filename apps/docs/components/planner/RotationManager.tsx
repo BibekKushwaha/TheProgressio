@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useIsMounted } from '@/hooks/useIsMounted';
 import {
     useGetRotationPatternsQuery,
     useCreateRotationPatternMutation,
@@ -16,21 +17,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Plus, Edit, Trash2, RotateCw, CheckCircle, XCircle, CalendarDays } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export function RotationManager() {
-    const [isMounted, setIsMounted] = useState(false);
+    const isMounted = useIsMounted();
     const { data: patternsData, isLoading } = useGetRotationPatternsQuery();
     const { data: todayRotation } = useResolveRotationQuery();
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
     const [createPattern] = useCreateRotationPatternMutation();
     const [updatePattern] = useUpdateRotationPatternMutation();
     const [deletePattern] = useDeleteRotationPatternMutation();
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
     const [editingPattern, setEditingPattern] = useState<RotationPattern | null>(null);
     const [formData, setFormData] = useState({
         name: '',
@@ -85,14 +84,19 @@ export function RotationManager() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this rotation pattern?')) return;
+    const handleDelete = (id: string) => {
+        setPendingDeleteId(id);
+    };
 
+    const performDelete = async () => {
+        if (!pendingDeleteId) return;
         try {
-            await deletePattern(id).unwrap();
+            await deletePattern(pendingDeleteId).unwrap();
             toast.success('Rotation pattern deleted successfully!');
         } catch {
             toast.error('Failed to delete rotation pattern');
+        } finally {
+            setPendingDeleteId(null);
         }
     };
 
@@ -364,6 +368,14 @@ export function RotationManager() {
                     </div>
                 </DialogContent>
             </Dialog>
+            <ConfirmDialog
+                open={!!pendingDeleteId}
+                onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+                title="Delete Rotation Pattern"
+                description="Are you sure you want to delete this rotation pattern? This cannot be undone."
+                confirmLabel="Delete"
+                onConfirm={performDelete}
+            />
         </div>
     );
 }

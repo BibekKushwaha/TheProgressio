@@ -35,7 +35,7 @@ export function TopStats() {
     );
 
     const { data: activeLive } = useGetActiveLiveSessionQuery(undefined, {
-        pollingInterval: 10000, // real-time — keep fast
+        pollingInterval: isVisible ? 10000 : 0, // fast when visible, pause in background
         refetchOnFocus: true,
     });
 

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import {
     useGetDashboardSummaryQuery,
     useGetPredictivePerformanceQuery,
@@ -26,8 +25,6 @@ export function ProductivityInsights({
     initialPeak,
     initialPredictive,
 }: ProductivityInsightsProps = {}) {
-    const [isMounted, setIsMounted] = useState(false);
-
     // Skip BFF if parent already provided both leakage + peak
     const hasDashboard = !!(initialLeakage && initialPeak);
     const { data: dashboardData, isLoading: dashLoading } = useGetDashboardSummaryQuery(
@@ -43,13 +40,9 @@ export function ProductivityInsights({
         { skip: !!initialPredictive }
     );
 
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
     const isLoading = (!hasDashboard && dashLoading) || (!initialPredictive && performanceLoading);
 
-    if (!isMounted || isLoading) {
+    if (isLoading) {
         return (
             <div className="space-y-6">
                 <Skeleton className="h-48 w-full bg-white/5" />

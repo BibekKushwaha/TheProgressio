@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSubscribeToPushMutation, useUnsubscribeFromPushMutation } from '@repo/store';
+import { useSubscribeToPushMutation } from '@repo/store';
 import { toast } from 'sonner';
 
-const VAPID_PUBLIC_KEY = 'BPcaksYqPqkxBKtYMjp6hcjjkDM3zo0jEl27rmSUFC2xmeO_kPnfCnbtO6Gz_7fx15pG84qlusvOQN8MmlN8dGE';
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -23,7 +23,6 @@ export function PushNotificationManager() {
     const [isSupported, setIsSupported] = useState(false);
     const [subscription, setSubscription] = useState<PushSubscription | null>(null);
     const [subscribeToPush] = useSubscribeToPushMutation();
-    const [_unsubscribeFromPush] = useUnsubscribeFromPushMutation();
 
     useEffect(() => {
         if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -46,6 +45,11 @@ export function PushNotificationManager() {
     }
 
     async function subscribe() {
+        if (!VAPID_PUBLIC_KEY) {
+            console.error('Push notifications are unavailable: NEXT_PUBLIC_VAPID_PUBLIC_KEY is not configured.');
+            toast.error('Push notifications are not configured.');
+            return;
+        }
         try {
             const registration = await navigator.serviceWorker.ready;
             const sub = await registration.pushManager.subscribe({
@@ -69,20 +73,6 @@ export function PushNotificationManager() {
             toast.error('Failed to enable notifications');
         }
     }
-
-    // async function unsubscribe() {
-    //     if (!subscription) return;
-    //
-    //     try {
-    //         await subscription.unsubscribe();
-    //         await unsubscribeFromPush({ endpoint: subscription.endpoint }).unwrap();
-    //         setSubscription(null);
-    //         toast.success('Notifications disabled');
-    //     } catch (err) {
-    //         console.error('Failed to unsubscribe:', err);
-    //         toast.error('Failed to disable notifications');
-    //     }
-    // }
 
     if (!isSupported) {
         return null;

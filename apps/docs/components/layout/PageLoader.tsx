@@ -1,5 +1,3 @@
-"use client";
-
 import { Loader2 } from "lucide-react";
 
 interface PageLoaderProps {
@@ -59,7 +57,7 @@ export function PageLoader({
                     animation: glow 3s ease-in-out infinite;
                 }
             `}</style>
-            
+
             <div className="page-loader-card w-full max-w-md rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] backdrop-blur-xl p-8 text-center shadow-2xl">
                 {/* Animated spinner */}
                 <div className="mx-auto mb-6 relative w-14 h-14">
@@ -68,10 +66,10 @@ export function PageLoader({
                         <Loader2 className="w-7 h-7 text-cyan-300 loader-spinner" />
                     </div>
                 </div>
-                
+
                 {/* Title */}
                 <h2 className="text-xl font-bold text-white mb-2 tracking-tight">{title}</h2>
-                
+
                 {/* Subtitle with animated dots */}
                 <p className="text-sm text-slate-400 mb-6 inline-block">
                     {subtitle}
@@ -81,7 +79,7 @@ export function PageLoader({
                         <span className="animate-bounce" style={{ animationDelay: "0.4s" }}>.</span>
                     </span>
                 </p>
-                
+
                 {/* Enhanced progress bar */}
                 <div className="mt-6 space-y-2">
                     <div className="h-1 rounded-full bg-white/10 overflow-hidden shadow-lg">

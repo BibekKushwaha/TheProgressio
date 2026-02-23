@@ -15,7 +15,7 @@ export function NotesWidget() {
         try {
             await deleteNoteMutation(id).unwrap();
         } catch (_e) {
-            console.error("Failed to delete note");
+            console.error('Failed to delete note:', _e);
         }
     };
 

@@ -4,12 +4,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, Pause, Play, Loader2 } from 'lucide-react';
 import { useGetActiveLiveSessionQuery } from '@repo/store';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 // This widget checks remote DB (primary) then fallback to localStorage for an active focus session
 export function LiveActivityWidget() {
     const router = useRouter();
+    const isVisible = usePageVisibility();
     const { data: remoteData, isLoading: isRemoteLoading, refetch, isUninitialized } = useGetActiveLiveSessionQuery(undefined, {
-        pollingInterval: 10000,
+        pollingInterval: isVisible ? 10000 : 0,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });

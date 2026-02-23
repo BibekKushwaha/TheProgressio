@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { withRetry } from '../baseQuery';
 import { resolveServiceUrl } from '../runtime';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
@@ -33,7 +34,6 @@ export interface PaymentIntent {
 export interface CreateOrderRequest {
   plan: PlanId;
   paymentMethod: PaymentMethod;
-  amountPaise?: number;
 }
 
 export interface CreateOrderResponse {
@@ -75,14 +75,14 @@ export interface UpiCollectResponse {
 
 export const paymentApi = createApi({
   reducerPath: 'paymentApi',
-  baseQuery: fetchBaseQuery({
+  baseQuery: withRetry(fetchBaseQuery({
     baseUrl: `${PLANNER_SERVICE_URL}/api`,
     credentials: 'include',
     prepareHeaders: (headers) => {
       headers.set('Content-Type', 'application/json');
       return headers;
     },
-  }),
+  })),
   tagTypes: ['Payments'],
   endpoints: (builder) => ({
     getBillingProfile: builder.query<{ message: string; profile: BillingProfile }, void>({
@@ -91,7 +91,7 @@ export const paymentApi = createApi({
     }),
     createPaymentIntent: builder.mutation<
       { message: string; intent: PaymentIntent },
-      { plan: BillingPlan; provider: PaymentProvider; amountPaise?: number }
+      { plan: BillingPlan; provider: PaymentProvider }
     >({
       query: (body) => ({
         url: '/payments/intents',
@@ -118,7 +118,6 @@ export const paymentApi = createApi({
         body: {
           plan: body.plan,
           provider: body.paymentMethod,
-          amountPaise: body.amountPaise,
         },
       }),
       invalidatesTags: ['Payments'],

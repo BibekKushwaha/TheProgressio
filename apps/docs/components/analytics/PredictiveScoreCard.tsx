@@ -1,19 +1,33 @@
 'use client';
 
-import { useGetPredictivePerformanceQuery, LearningPace } from '@repo/store';
+import { useMemo } from 'react';
+import { useGetGradeEntriesQuery, useGetPredictivePerformanceQuery, LearningPace } from '@repo/store';
 import { TrendingUp, TrendingDown, Minus, Trophy, Target } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
 
 interface PredictiveScoreCardProps {
     /** Pre-fetched data from a BFF call. When provided the query is skipped. */
     initialData?: LearningPace[];
+    /** Optional explicit exam type override for prediction fetch. */
+    examType?: string;
 }
 
-export function PredictiveScoreCard({ initialData }: PredictiveScoreCardProps = {}) {
-    const { data, isLoading } = useGetPredictivePerformanceQuery('JEE', { skip: !!initialData });
+export function PredictiveScoreCard({ initialData, examType }: PredictiveScoreCardProps = {}) {
+    const normalizedExamType = examType?.trim();
+    const shouldInferExamType = !initialData && !normalizedExamType;
+
+    const { data: entriesData, isLoading: isLoadingEntries } = useGetGradeEntriesQuery(undefined, {
+        skip: !shouldInferExamType,
+    });
+    const inferredExamType = useMemo(() => entriesData?.entries?.[0]?.examType?.trim(), [entriesData?.entries]);
+    const activeExamType = normalizedExamType || inferredExamType;
+
+    const { data, isLoading } = useGetPredictivePerformanceQuery(activeExamType ?? 'JEE', {
+        skip: !!initialData || !activeExamType,
+    });
     const subjects = initialData ?? data?.data ?? [];
 
-    if (isLoading) {
+    if (isLoading || (shouldInferExamType && isLoadingEntries)) {
         return (
             <StatCard
                 title="Predictive Score Indicator"
@@ -36,7 +50,11 @@ export function PredictiveScoreCard({ initialData }: PredictiveScoreCardProps = 
                 iconColor="text-slate-600"
                 iconBgColor="bg-transparent"
                 error={true}
-                emptyMessage="Add grade entries to see predictive scores based on your learning pace."
+                emptyMessage={
+                    shouldInferExamType
+                        ? "Add grade entries with an exam type to see predictive scores."
+                        : "Add grade entries to see predictive scores based on your learning pace."
+                }
                 variant="default"
             />
         );

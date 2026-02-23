@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+'use client';
+
 import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
@@ -14,17 +15,11 @@ const DEFAULT_TRENDS = [
 ];
 
 export function FocusTrends({ pastDays }: { pastDays: string }) {
-    const [isMounted, setIsMounted] = useState(false);
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
     const isVisible = usePageVisibility();
     // Weekly trend data changes at most once per session-log; 5-minute polling
     // when the tab is visible, paused entirely when hidden.
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
         pollingInterval: isVisible ? 300000 : 0,
-        skip: !isMounted,
     });
     const chartWidth = 600;
     const chartHeight = 256;
@@ -70,7 +65,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
             </div>
 
             <div className="relative h-64 mb-4">
-                {(!isMounted || isLoading) ? (
+                {isLoading ? (
                     <Skeleton className="w-full h-full bg-white/5" />
                 ) : (
                     <>

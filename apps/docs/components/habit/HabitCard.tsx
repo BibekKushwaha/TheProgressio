@@ -2,7 +2,7 @@ import { Flame, Shield, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Habit, useLogHabitMutation, useUpdateHabitMutation } from '@repo/store';
 import { HabitActionMenu } from './HabitActionMenu';
-import { useToast } from '@/components/ui/toast-provider';
+import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 
 export function HabitCard({ habit, highlighted = false }: { habit: Habit; highlighted?: boolean }) {
@@ -13,7 +13,6 @@ export function HabitCard({ habit, highlighted = false }: { habit: Habit; highli
 
     const [logHabit, { isLoading }] = useLogHabitMutation();
     const [updateHabit, { isLoading: isUpdatingMercy }] = useUpdateHabitMutation();
-    const { toast } = useToast();
     const [mercyDays, setMercyDays] = useState(habit.mercyDaysAllowed ?? 1);
 
     useEffect(() => {
@@ -25,25 +24,25 @@ export function HabitCard({ habit, highlighted = false }: { habit: Habit; highli
             await logHabit({ id: habit.id, completedValue: 1 }).unwrap();
 
             // Show success toast
-            toast('✅ Habit logged successfully!', 'success');
+            toast.success('✅ Habit logged successfully!');
         } catch (error) {
             console.error("Failed to check in habit:", error);
-            toast('Failed to check in habit', 'error');
+            toast.error('Failed to check in habit');
         }
     };
 
     const handleSaveMercyDays = async () => {
         if (mercyDays === (habit.mercyDaysAllowed ?? 1)) {
-            toast('No changes to save', 'info');
+            toast('No changes to save');
             return;
         }
 
         try {
             await updateHabit({ id: habit.id, mercyDaysAllowed: mercyDays }).unwrap();
-            toast('✅ Mercy days updated', 'success');
+            toast.success('✅ Mercy days updated');
         } catch (error) {
             console.error('Failed to update mercy days:', error);
-            toast('Failed to update mercy days', 'error');
+            toast.error('Failed to update mercy days');
         }
     };
 

@@ -25,19 +25,14 @@ import {
   useGetTaskMetricsQuery,
 } from "@repo/store";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { exportTasksToCSV, downloadCSV } from "@/lib/exportUtils";
 import { toast } from "sonner";
 
 export default function AnalyticsOverviewPage() {
-  const [isMounted, setIsMounted] = useState(false);
   const [pastDays, setPastDays] = useState("1");
   const isVisible = usePageVisibility();
   const pollMs = isVisible ? 60000 : 0;
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const {
     data: summaryData,
@@ -45,7 +40,6 @@ export default function AnalyticsOverviewPage() {
     isFetching: isSummaryFetching
   } = useGetDailySummaryQuery(pastDays, {
     pollingInterval: pollMs,
-    skip: !isMounted,
   });
 
   // BFF replaces useGetFocusScoreQuery — gets score+breakdown in the same
@@ -56,25 +50,25 @@ export default function AnalyticsOverviewPage() {
     isFetching: isDashFetching
   } = useGetDashboardSummaryQuery(
     { leakageDays: parseInt(pastDays) || 7, peakDays: 30 },
-    { pollingInterval: pollMs, skip: !isMounted }
+    { pollingInterval: pollMs }
   );
 
   // Lightweight count-only endpoint — no full task rows transferred.
   const {
     data: taskMetricsData,
     isLoading: isTaskMetricsLoading,
-  } = useGetTaskMetricsQuery(undefined, { skip: !isMounted });
+  } = useGetTaskMetricsQuery(undefined);
 
   // Full task list only for the table render and CSV export.
   const {
     data: tasks = [],
     isLoading: isTasksLoading
-  } = useGetTasksQuery({ page: 1, limit: 50 }, { skip: !isMounted });
+  } = useGetTasksQuery({ page: 1, limit: 50 });
 
   const {
     data: habitsResponse,
     isLoading: isHabitsLoading
-  } = useGetHabitsQuery(undefined, { skip: !isMounted });
+  } = useGetHabitsQuery(undefined);
 
   const habits = useMemo(() => habitsResponse?.habits || [], [habitsResponse]);
 
@@ -312,7 +306,7 @@ export default function AnalyticsOverviewPage() {
                       <TableCell className="py-2 pr-4 font-medium max-w-[260px] truncate">{task.title}</TableCell>
                       <TableCell className="py-2 pr-4">{task.status}</TableCell>
                       <TableCell className="py-2 pr-4">{task.priority}</TableCell>
-                      <TableCell className="py-2 pr-4">{isMounted && task.dueDate ? new Date(task.dueDate).toLocaleString() : "—"}</TableCell>
+                      <TableCell className="py-2 pr-4">{task.dueDate ? new Date(task.dueDate).toLocaleString() : "—"}</TableCell>
                       <TableCell className="py-2 pr-4">{task.category?.name || "—"}</TableCell>
                       <TableCell className="py-2 pr-4">{task.isRecurring ? "Yes" : "No"}</TableCell>
                       <TableCell className="py-2 pr-4">{task.subtasks?.length ?? 0}</TableCell>
@@ -367,7 +361,7 @@ export default function AnalyticsOverviewPage() {
                       <TableCell className="py-2 pr-4">{habit.longestStreak}</TableCell>
                       <TableCell className="py-2 pr-4">{habit.streakStatus}</TableCell>
                       <TableCell className="py-2 pr-4">{habit.streakHealth || "—"}</TableCell>
-                      <TableCell className="py-2 pr-4">{isMounted && habit.lastLogDate ? new Date(habit.lastLogDate).toLocaleString() : "—"}</TableCell>
+                      <TableCell className="py-2 pr-4">{habit.lastLogDate ? new Date(habit.lastLogDate).toLocaleString() : "—"}</TableCell>
                       <TableCell className="py-2 pr-4">{habit.isMercyActive ? `Active (${habit.mercyDaysUsed || 0}/${habit.mercyDaysAllowed || 0})` : "Inactive"}</TableCell>
                     </TableRow>
                   ))}

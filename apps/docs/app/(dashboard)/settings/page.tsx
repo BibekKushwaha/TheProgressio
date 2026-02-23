@@ -456,7 +456,7 @@ export default function SettingsPage() {
                         <div className="p-6 bg-green-950/20 border border-green-500/20 rounded-xl space-y-4">
                             <div className="text-sm text-slate-300 font-medium">To pair your WhatsApp:</div>
                             <ol className="text-sm text-slate-400 space-y-2 list-decimal list-inside pl-2">
-                                <li>Save <span className="text-green-400 font-mono bg-green-950/40 px-1 rounded">{process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER || "+91 99999-99999"}</span> as &quot;Study Bot&quot;</li>
+                                <li>Save <span className="text-green-400 font-mono bg-green-950/40 px-1 rounded">{process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER ?? 'the bot number'}</span> as &quot;Study Bot&quot;</li>
                                 <li>Send the pairing code below to the bot</li>
                                 <li>You&apos;ll receive a confirmation message</li>
                             </ol>

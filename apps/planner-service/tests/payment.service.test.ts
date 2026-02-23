@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { describe, it, beforeEach, expect, vi } from 'vitest';
+import crypto from 'crypto';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,8 @@ vi.mock('@repo/db', () => {
   const Priority = { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH' };
   const AttendanceStatus = { PRESENT: 'PRESENT', ABSENT: 'ABSENT', LATE: 'LATE' };
   const AttendanceMethod = { QR: 'QR', MANUAL: 'MANUAL', GEOFENCE: 'GEOFENCE' };
+  const BillingStatus = { INACTIVE: 'INACTIVE', ACTIVE: 'ACTIVE', PAST_DUE: 'PAST_DUE', CANCELED: 'CANCELED' };
+  const BillingPlan = { FREE: 'FREE', PRO: 'PRO', INSTITUTION: 'INSTITUTION' };
   return {
     prisma: {
       task: {
@@ -68,6 +71,7 @@ vi.mock('@repo/db', () => {
       },
       user: {
         findUnique: vi.fn(),
+        update: vi.fn(),
       },
       payment: {
         create: vi.fn(),
@@ -75,6 +79,10 @@ vi.mock('@repo/db', () => {
         findMany: vi.fn(),
         update: vi.fn(),
         updateMany: vi.fn(),
+      },
+      paymentEvent: {
+        findUnique: vi.fn(),
+        update: vi.fn(),
       },
       subscription: {
         create: vi.fn(),
@@ -88,6 +96,8 @@ vi.mock('@repo/db', () => {
     Priority,
     AttendanceStatus,
     AttendanceMethod,
+    BillingStatus,
+    BillingPlan,
   };
 });
 
@@ -99,6 +109,8 @@ import { prisma } from '@repo/db';
 describe('Payment endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.RAZORPAY_KEY_SECRET;
+    delete process.env.PAYMENT_WEBHOOK_SECRET;
   });
 
   // ─── POST /api/payments/create-order ──────────────────────────────────────────
@@ -165,6 +177,7 @@ describe('Payment endpoints', () => {
 
   describe('POST /api/payments/verify', () => {
     it('verifies payment and creates subscription (mock mode)', async () => {
+      process.env.RAZORPAY_KEY_SECRET = 'rzp_test_secret';
       const mockPayment = {
         id: 'pay-1',
         userId: 'user-1',
@@ -184,12 +197,19 @@ describe('Payment endpoints', () => {
       (prisma as any).$transaction.mockResolvedValue([mockSubscription, mockPayment]);
       (prisma as any).payment.update.mockResolvedValue(mockPayment);
 
+      const razorpayOrderId = 'order_mock_123';
+      const razorpayPaymentId = 'pay_mock_111';
+      const razorpaySignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest('hex');
+
       const res = await request(app)
         .post('/api/payments/verify')
         .send({
-          razorpayOrderId: 'order_mock_123',
-          razorpayPaymentId: 'pay_mock_111',
-          razorpaySignature: 'mock_sig',
+          razorpayOrderId,
+          razorpayPaymentId,
+          razorpaySignature,
           plan: 'PRO',
         });
 
@@ -201,14 +221,21 @@ describe('Payment endpoints', () => {
     });
 
     it('rejects when payment not found', async () => {
+      process.env.RAZORPAY_KEY_SECRET = 'rzp_test_secret';
       (prisma as any).payment.findUnique.mockResolvedValue(null);
+      const razorpayOrderId = 'nonexistent';
+      const razorpayPaymentId = 'pay_xyz';
+      const razorpaySignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest('hex');
 
       const res = await request(app)
         .post('/api/payments/verify')
         .send({
-          razorpayOrderId: 'nonexistent',
-          razorpayPaymentId: 'pay_xyz',
-          razorpaySignature: 'sig',
+          razorpayOrderId,
+          razorpayPaymentId,
+          razorpaySignature,
           plan: 'PRO',
         });
 
@@ -327,51 +354,59 @@ describe('Payment endpoints', () => {
 
   describe('POST /api/payments/webhook', () => {
     it('handles payment.captured webhook', async () => {
-      (prisma as any).payment.updateMany.mockResolvedValue({ count: 1 });
+      process.env.PAYMENT_WEBHOOK_SECRET = 'pay-webhook-secret';
+      (prisma as any).paymentEvent.findUnique.mockResolvedValue({
+        paymentRef: 'pay_rzp_111',
+        userId: 'user-1',
+        plan: 'PRO',
+      });
+      (prisma as any).paymentEvent.update.mockResolvedValue({
+        paymentRef: 'pay_rzp_111',
+        status: 'SUCCESS',
+      });
+      (prisma as any).$transaction.mockImplementation(async (fn: any) => fn(prisma));
 
       const body = {
-        event: 'payment.captured',
-        payload: {
-          payment: {
-            entity: {
-              id: 'pay_rzp_111',
-              order_id: 'order_mock_123',
-              amount: 14900,
-            },
-          },
-        },
+        paymentRef: 'pay_rzp_111',
+        status: 'SUCCESS',
+        provider: 'RAZORPAY',
       };
 
       const res = await request(app)
         .post('/api/payments/webhook')
-        .set('x-razorpay-signature', 'test_sig')
+        .set('x-payment-signature', 'pay-webhook-secret')
         .send(body);
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('handled', true);
-      expect(res.body.event).toBe('payment.captured');
+      expect(res.body).toHaveProperty('result.processed', true);
     });
 
     it('handles payment.failed webhook', async () => {
-      (prisma as any).payment.updateMany.mockResolvedValue({ count: 1 });
+      process.env.PAYMENT_WEBHOOK_SECRET = 'pay-webhook-secret';
+      (prisma as any).paymentEvent.findUnique.mockResolvedValue({
+        paymentRef: 'pay_rzp_222',
+        userId: 'user-1',
+        plan: 'PRO',
+      });
+      (prisma as any).paymentEvent.update.mockResolvedValue({
+        paymentRef: 'pay_rzp_222',
+        status: 'FAILED',
+      });
+      (prisma as any).$transaction.mockImplementation(async (fn: any) => fn(prisma));
 
       const body = {
-        event: 'payment.failed',
-        payload: {
-          payment: {
-            entity: { id: 'pay_rzp_222', order_id: 'order_mock_456' },
-          },
-        },
+        paymentRef: 'pay_rzp_222',
+        status: 'FAILED',
+        provider: 'RAZORPAY',
       };
 
       const res = await request(app)
         .post('/api/payments/webhook')
-        .set('x-razorpay-signature', 'test_sig')
+        .set('x-payment-signature', 'pay-webhook-secret')
         .send(body);
 
       expect(res.status).toBe(200);
-      expect(res.body.handled).toBe(true);
-      expect(res.body.event).toBe('payment.failed');
+      expect(res.body).toHaveProperty('result.processed', true);
     });
   });
 });

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { rateLimit } from 'express-rate-limit';
 import { enforceReadOnlyWrites, isAuth } from "./middleware/auth.middleware.js";
 import habitRouter from "./routes/habit.route.js";
 import { dispatchNudges, getInternalActiveDates, handleHabitEvent } from "./controllers/habit.controller.js";
@@ -25,6 +26,16 @@ app.use(cookieParser());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Global rate limit
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many requests, please try again later' },
+});
+app.use(globalLimiter);
 
 app.get("/", (_req, res) => {
     res.json({ message: "Habit Service API", status: "UP" });

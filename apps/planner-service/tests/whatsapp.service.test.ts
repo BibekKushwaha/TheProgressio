@@ -221,7 +221,7 @@ describe('whatsapp.controller — capture endpoint', () => {
     process.env.WHATSAPP_NUMBER_USER_MAP = JSON.stringify({
       '919876543210': 'user-1',
     });
-    delete process.env.WHATSAPP_WEBHOOK_SECRET;
+    process.env.WHATSAPP_WEBHOOK_SECRET = 'wa-secret';
     delete process.env.WHATSAPP_TRANSCRIBE_URL;
 
     mockCreateTaskFromText.mockResolvedValue({
@@ -233,6 +233,7 @@ describe('whatsapp.controller — capture endpoint', () => {
   it('creates task from direct text payload', async () => {
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
       .send({ userId: 'user-1', text: 'Finish chemistry assignment at 9pm', from: '919876543210' });
 
     expect(res.status).toBe(201);
@@ -249,6 +250,7 @@ describe('whatsapp.controller — capture endpoint', () => {
   it('creates task from voice transcript payload', async () => {
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
       .send({
         userId: 'user-1',
         from: '919876543210',
@@ -274,6 +276,7 @@ describe('whatsapp.controller — capture endpoint', () => {
   it('returns 400 when no text or transcript can be resolved', async () => {
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
       .send({ userId: 'user-1', from: '919876543210' });
 
     expect(res.status).toBe(400);
