@@ -1,7 +1,11 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { Task } from './tasksApi';
+import { resolveServiceUrl } from '../runtime';
 
-const PLANNER_SERVICE_URL = process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
+const PLANNER_SERVICE_URL = resolveServiceUrl(
+    process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL ?? process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL,
+    'http://localhost:4001'
+);
 
 export interface Category {
     id: string;

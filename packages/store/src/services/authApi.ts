@@ -1,6 +1,15 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
 
-const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:4000';
+export const AUTH_SERVICE_URL = resolveServiceUrl(
+  process.env.EXPO_PUBLIC_AUTH_SERVICE_URL ?? process.env.NEXT_PUBLIC_AUTH_SERVICE_URL,
+  'http://localhost:4000'
+);
+const isDevRuntime = Boolean((globalThis as { __DEV__?: unknown }).__DEV__);
+
+if (isDevRuntime) {
+  console.log(`[authApi] base URL: ${AUTH_SERVICE_URL}`);
+}
 
 export interface User {
   id: string;
@@ -65,17 +74,35 @@ export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: fetchBaseQuery({
     baseUrl: `${AUTH_SERVICE_URL}/api/auth`,
+    fetchFn: async (input, init) => {
+      const method = init?.method ?? 'GET';
+      const url =
+        typeof input === 'string'
+          ? input
+          : typeof (input as { url?: unknown }).url === 'string'
+            ? ((input as { url: string }).url)
+            : input.toString();
+      if (isDevRuntime) {
+        console.log(`[authApi] request: ${method} ${url}`);
+      }
+      try {
+        return await fetch(input, init);
+      } catch (error) {
+        console.error(`[authApi] network error for ${method} ${url}`, error);
+        throw error;
+      }
+    },
     credentials: 'include', // Include cookies in requests
     prepareHeaders: (headers) => {
       headers.set('Content-Type', 'application/json');
-      const shareToken = typeof window !== 'undefined' ? localStorage.getItem('family_share_token') : null;
+      const shareToken = getFamilyShareToken();
       if (shareToken) {
         headers.set('x-family-share-token', shareToken);
       }
       return headers;
     },
   }),
-  tagTypes: ['User'],
+  tagTypes: ['User', 'WhatsAppPairing'],
   endpoints: (builder) => ({
     register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (credentials) => ({
@@ -125,13 +152,14 @@ export const authApi = createApi({
         url: '/whatsapp/pairing',
         method: 'GET',
       }),
+      providesTags: ['WhatsAppPairing'],
     }),
     unpairWhatsApp: builder.mutation<{ success: boolean; message: string }, void>({
       query: () => ({
         url: '/whatsapp/unpair',
         method: 'POST',
       }),
-      invalidatesTags: ['User']
+      invalidatesTags: ['User', 'WhatsAppPairing']
     }),
     logout: builder.mutation<void, void>({
       query: () => ({

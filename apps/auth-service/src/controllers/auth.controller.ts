@@ -301,6 +301,51 @@ export const unpairWhatsApp = TryCatch(async (req, res) => {
   return res.json({ success: true, message: 'WhatsApp unpaired successfully' });
 });
 
+/**
+ * POST /whatsapp/webhook
+ * Called by the WhatsApp bot when a user sends their pairing code.
+ * Body: { pairingCode: string, phoneNumber: string, botSecret?: string }
+ * Marks the user as verified and stores their WhatsApp number.
+ */
+export const verifyWhatsAppWebhook = TryCatch(async (req, res) => {
+  const { pairingCode, phoneNumber, botSecret } = req.body as {
+    pairingCode: string;
+    phoneNumber: string;
+    botSecret?: string;
+  };
+
+  // Optional shared secret to protect the webhook from unauthorised callers
+  const expectedSecret = process.env.WHATSAPP_WEBHOOK_SECRET;
+  if (expectedSecret && botSecret !== expectedSecret) {
+    throw new ErrorHandler(403, 'Invalid webhook secret');
+  }
+
+  if (!pairingCode || !phoneNumber) {
+    throw new ErrorHandler(400, 'pairingCode and phoneNumber are required');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { whatsappPairingCode: pairingCode },
+    select: { id: true, whatsappVerified: true },
+  });
+
+  if (!user) throw new ErrorHandler(404, 'No user found for this pairing code');
+  if (user.whatsappVerified) {
+    return res.json({ success: true, message: 'Already verified' });
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      whatsappVerified: true,
+      whatsappNumber: phoneNumber,
+      whatsappPairingCode: null,  // invalidate code after use
+    },
+  });
+
+  return res.json({ success: true, message: 'WhatsApp verified successfully' });
+});
+
 export const updateProfile = TryCatch(async (req, res) => {
   const token = req.cookies?.token;
   if (!token) {

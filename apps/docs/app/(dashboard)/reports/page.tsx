@@ -49,9 +49,14 @@ export default function ReportsPage() {
         );
     }
 
+    const weeklyTasksCompleted = weeklyData.reduce(
+        (sum: number, day: { tasks?: number }) => sum + (day.tasks || 0),
+        0
+    );
+
     const stats = {
         totalHours: Math.round((dashboardData?.focus?.totalMinutes ?? 0) / 60 * 10) / 10,
-        tasksCompleted: 0,
+        tasksCompleted: weeklyTasksCompleted,
         avgFocus: dashboardData?.focus?.avgHoursPerDay ?? 0,
         streak: dashboardData?.streak ?? 0,
     };
@@ -72,7 +77,7 @@ export default function ReportsPage() {
                         <div className="text-sm text-slate-400">Total Hours</div>
                     </div>
                     <div className="text-3xl font-bold text-white">{stats.totalHours}h</div>
-                    <div className="text-xs text-green-400 mt-1">+12% from last week</div>
+                    <div className="text-xs text-slate-400 mt-1">This week</div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
                     <div className="flex items-center gap-3 mb-2">
@@ -80,7 +85,7 @@ export default function ReportsPage() {
                         <div className="text-sm text-slate-400">Tasks Completed</div>
                     </div>
                     <div className="text-3xl font-bold text-white">{stats.tasksCompleted}</div>
-                    <div className="text-xs text-green-400 mt-1">+8% from last week</div>
+                    <div className="text-xs text-slate-400 mt-1">This week</div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
                     <div className="flex items-center gap-3 mb-2">

@@ -1,27 +1,97 @@
 {
   "expo": {
-    "name": "Transition",
+    "name": "TheProgressio",
     "slug": "transition",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "transition",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
     "ios": {
       "bundleIdentifier": "com.transition.app",
       "supportsTablet": true,
       "infoPlist": {
         "NSSupportsLiveActivities": true
-      }
+      },
+      "associatedDomains": [
+        "applinks:theprogressio.com"
+      ]
     },
     "android": {
       "package": "com.transition.app",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F172A"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "theprogressio.com",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "transition"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "versionCode": 8
+    },
+    "notification": {
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new updates"
     },
     "plugins": [
-      "expo-notifications",
-      "expo-task-manager"
-    ]
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6366F1",
+          "sounds": [],
+          "mode": "production"
+        }
+      ],
+      "expo-task-manager",
+      "expo-sqlite",
+      "expo-font",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "theprogressio-mobile",
+          "organization": "theprogressio"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3a6a45df-e74d-45d7-a184-65e7d0a2b19e"
+      }
+    },
+    "owner": "mbibeks-organization",
+    "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3a6a45df-e74d-45d7-a184-65e7d0a2b19e"
+    }
   }
 }

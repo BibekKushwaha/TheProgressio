@@ -25,11 +25,15 @@
     "vitest": "^3.2.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.0"
   },
   "packageManager": "npm@10.9.4",
   "workspaces": [
-    "apps/*",
+    "apps/analytics-service",
+    "apps/auth-service",
+    "apps/docs",
+    "apps/habit-service",
+    "apps/planner-service",
     "packages/*"
   ],
   "dependencies": {

@@ -416,13 +416,19 @@ model Nudge {
   priority    Priority  @default(MEDIUM)
   isRead      Boolean   @default(false)
   scheduledAt DateTime  @default(now())
+  deliveredAt DateTime?
   expiresAt   DateTime?
+  localDate   String?   // YYYY-MM-DD in user's local timezone
+  idempotencyKey String?
+  skippedReason String?
   metadata    String?   // JSON string for extra context
   
   createdAt   DateTime  @default(now())
   
   @@index([userId, isRead])
   @@index([userId, scheduledAt])
+  @@unique([idempotencyKey])
+  @@unique([userId, localDate, type])
 }
 
 // ── Phase 3: GPA / Grade Tracking ──────────────────────────────────────

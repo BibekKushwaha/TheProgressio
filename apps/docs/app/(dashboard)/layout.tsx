@@ -19,7 +19,7 @@ export default function DashboardLayout({
                 <Sidebar />
 
                 <main className="lg:pl-72 min-h-screen relative z-10 transition-all duration-300">
-                    <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8 py-10">
+                    <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8 ">
                         {children}
                     </div>
                 </main>

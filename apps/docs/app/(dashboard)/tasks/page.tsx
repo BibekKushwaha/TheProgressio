@@ -148,7 +148,8 @@ export default function TasksPage() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 pt-5 md:pt-15 lg:pt-0 ">
+            <div className='hidden md:flex'>
             <SearchBar
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
@@ -160,6 +161,7 @@ export default function TasksPage() {
                 setView={handleViewChange}
                 CATEGORY_OPTIONS={categoryOptions}
             />
+            </div>
             {view === 'kanban' ? (
                 <KanbanBoard
                     searchQuery={searchQuery}

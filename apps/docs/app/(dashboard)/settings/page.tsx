@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { User, Bell, Lock, Palette, Loader2, Moon, Wifi, MessageSquare, Smartphone, CreditCard, Clock, QrCode, Languages } from "lucide-react";
 import {
     useGetProfileQuery,
@@ -51,11 +51,27 @@ export default function SettingsPage() {
     const [updateNudgeSettings, { isLoading: isUpdatingNudgeSettings }] = useUpdateNudgeSettingsMutation();
     const { data: intelligenceData } = useGetNotificationIntelligenceQuery();
     const { data: contextSignals } = useGetNotificationContextSignalsQuery({ locationTag: "CAMPUS", motionState: "WALKING", brightness: 0.7 });
-    const { data: pairingData, isLoading: isPairingLoading } = useGetWhatsAppPairingCodeQuery();
+    const [isPairingPolling, setIsPairingPolling] = useState(true);
+    const { data: pairingData, isLoading: isPairingLoading, refetch: refetchPairing } = useGetWhatsAppPairingCodeQuery(undefined, {
+        pollingInterval: isPairingPolling ? 5000 : 0,
+        refetchOnMountOrArgChange: true,
+    });
     const [unpairWhatsApp, { isLoading: isUnpairing }] = useUnpairWhatsAppMutation();
+
+    // Stop polling once the WhatsApp number is verified
+    useEffect(() => {
+        if (pairingData?.verified) setIsPairingPolling(false);
+    }, [pairingData?.verified]);
 
     const user = profileData?.user;
     const nudgeSettings = nudgeSettingsData?.settings;
+    const preDeadlineSelectValue = `${nudgeSettings?.preDeadlineDays ?? 2} ${((nudgeSettings?.preDeadlineDays ?? 2) === 1) ? "day" : "days"}`;
+    const streakReminderSelectValue = (() => {
+        const value = nudgeSettings?.streakReminderTime ?? "09:00";
+        if (value === "08:00") return "8:00 AM";
+        if (value === "18:00") return "6:00 PM";
+        return "9:00 AM";
+    })();
 
     const handleDailyGoalChange = async (val: string) => {
         const value = parseFloat(val.split(" ")[0] || "4");
@@ -96,6 +112,36 @@ export default function SettingsPage() {
         if (pairingData?.pairingCode) {
             navigator.clipboard.writeText(pairingData.pairingCode);
             toast.success("Pairing code copied to clipboard");
+        }
+    };
+
+    const handlePreDeadlineChange = async (value: string) => {
+        const match = value.match(/^([1-3])\sday(s)?$/);
+        const days = Number(match?.[1] ?? "2") as 1 | 2 | 3;
+        const timezoneOffsetMinutes = new Date().getTimezoneOffset();
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        try {
+            await updateNudgeSettings({ preDeadlineDays: days, timezone, timezoneOffsetMinutes }).unwrap();
+            toast.success("Pre-deadline reminder updated");
+        } catch (_error) {
+            toast.error("Failed to update pre-deadline reminder");
+        }
+    };
+
+    const handleStreakReminderChange = async (value: string) => {
+        const mapping: Record<string, string> = {
+            "8:00 AM": "08:00",
+            "9:00 AM": "09:00",
+            "6:00 PM": "18:00",
+        };
+        const reminderTime = mapping[value] ?? "09:00";
+        const timezoneOffsetMinutes = new Date().getTimezoneOffset();
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        try {
+            await updateNudgeSettings({ streakReminderTime: reminderTime, timezone, timezoneOffsetMinutes }).unwrap();
+            toast.success("Streak reminder time updated");
+        } catch (_error) {
+            toast.error("Failed to update streak reminder time");
         }
     };
 
@@ -416,7 +462,7 @@ export default function SettingsPage() {
                             </ol>
                             <div className="flex items-center gap-3 pt-2">
                                 <code className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-lg text-green-400 font-mono text-lg tracking-widest text-center">
-                                    {isPairingLoading ? "Generating..." : (pairingData?.pairingCode || "---")}
+                                    {isPairingLoading ? "Generating..." : (pairingData?.pairingCode || "Code unavailable")}
                                 </code>
                                 <Button
                                     className="bg-green-600 hover:bg-green-700 h-full"
@@ -426,6 +472,15 @@ export default function SettingsPage() {
                                     Copy Code
                                 </Button>
                             </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full text-xs border-white/10 text-slate-400 hover:text-slate-200"
+                                onClick={() => refetchPairing()}
+                                disabled={isPairingLoading}
+                            >
+                                {isPairingLoading ? "Checking..." : "Refresh Pairing Status"}
+                            </Button>
                         </div>
                     )}
 
@@ -440,6 +495,8 @@ export default function SettingsPage() {
                                 onClick={async () => {
                                     try {
                                         await unpairWhatsApp().unwrap();
+                                        setIsPairingPolling(true);  // resume polling so new pairing code is detected
+                                        await refetchPairing();
                                         toast.success("WhatsApp account unpaired");
                                     } catch (_err) {
                                         toast.error("Failed to unpair WhatsApp");
@@ -466,7 +523,11 @@ export default function SettingsPage() {
                                     <div className="text-xs text-slate-400">Days before due date</div>
                                 </div>
                                 <div className="w-[100px]">
-                                    <Select defaultValue="2 days" onValueChange={() => toast.info('Nudge schedule customisation coming soon')}>
+                                    <Select
+                                        value={preDeadlineSelectValue}
+                                        onValueChange={handlePreDeadlineChange}
+                                        disabled={isUpdatingNudgeSettings}
+                                    >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
@@ -484,7 +545,11 @@ export default function SettingsPage() {
                                     <div className="text-xs text-slate-400">Daily reminder time</div>
                                 </div>
                                 <div className="w-[110px]">
-                                    <Select defaultValue="9:00 AM" onValueChange={() => toast.info('Nudge schedule customisation coming soon')}>
+                                    <Select
+                                        value={streakReminderSelectValue}
+                                        onValueChange={handleStreakReminderChange}
+                                        disabled={isUpdatingNudgeSettings}
+                                    >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>

@@ -48,6 +48,10 @@ export const notificationSettingsSchema = z.object({
     focusProfiles: z.array(focusProfileSchema).default([]),
     groupedSummaries: z.boolean().default(true),
     positiveTone: z.boolean().default(true),
+    preDeadlineDays: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(2),
+    streakReminderTime: z.string().regex(/^([0-1]\d|2[0-3]):([0-5]\d)$/).default("09:00"),
+    timezone: z.string().min(3).max(64).default("UTC"),
+    timezoneOffsetMinutes: z.number().int().min(-840).max(840).default(0),
 });
 
 export const notificationSettingsPatchSchema = notificationSettingsSchema.partial();

@@ -1,6 +1,10 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
 
-const ANALYTICS_SERVICE_URL = process.env.NEXT_PUBLIC_ANALYTICS_SERVICE_URL || 'http://localhost:4003';
+const ANALYTICS_SERVICE_URL = resolveServiceUrl(
+    process.env.EXPO_PUBLIC_ANALYTICS_SERVICE_URL ?? process.env.NEXT_PUBLIC_ANALYTICS_SERVICE_URL,
+    'http://localhost:4003'
+);
 
 export enum SessionType {
     DEEP_WORK = 'DEEP_WORK',
@@ -321,7 +325,7 @@ export const analyticsApi = createApi({
         credentials: 'include',
         prepareHeaders: (headers) => {
             headers.set('Content-Type', 'application/json');
-            const shareToken = typeof window !== 'undefined' ? localStorage.getItem('family_share_token') : null;
+            const shareToken = getFamilyShareToken();
             if (shareToken) {
                 headers.set('x-family-share-token', shareToken);
             }
