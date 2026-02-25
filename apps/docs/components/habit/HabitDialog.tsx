@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useCreateHabitMutation, useUpdateHabitMutation, useGetCategoriesQuery, Frequency, Habit } from '@repo/store'
 import { cn } from '@/lib/utils'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 interface HabitDialogProps {
     open: boolean
@@ -102,7 +103,7 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md bg-slate-900 text-white border-white/10">
+            <DialogContent className="sm:max-w-md bg-slate-900 text-white border-white/10 max-h-[90vh] overflow-y-auto outline-none">
                 <form onSubmit={handleFormSubmit}>
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -113,7 +114,7 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <FieldGroup className="py-2 space-y-4">
+                    <FieldGroup className="py-2 gap-4 mt-4">
                         <div className="flex gap-4 items-end">
                             <div className="flex-1">
                                 <Field>
@@ -128,29 +129,34 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                                     />
                                 </Field>
                             </div>
-                            <div className="w-16 h-12 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center text-3xl shrink-0">
-                                {selectedEmoji}
-                            </div>
-                        </div>
-
-                        <Field>
-                            <Label className="text-slate-300">Choose Icon</Label>
-                            <div className="grid grid-cols-8 gap-2 mt-2">
-                                {EMOJIS.map(emoji => (
+                            <Popover>
+                                <PopoverTrigger asChild>
                                     <button
-                                        key={emoji}
                                         type="button"
-                                        onClick={() => setSelectedEmoji(emoji)}
-                                        className={cn(
-                                            "w-8 h-8 flex items-center justify-center rounded-lg transition-all",
-                                            selectedEmoji === emoji ? "bg-white/20 scale-110 ring-2 ring-purple-500" : "hover:bg-white/10 opacity-70 hover:opacity-100"
-                                        )}
+                                        className="w-16 h-12 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center text-3xl shrink-0 transition-all hover:bg-white/10 focus:ring-2 focus:ring-purple-500/50 outline-none"
                                     >
-                                        {emoji}
+                                        {selectedEmoji}
                                     </button>
-                                ))}
-                            </div>
-                        </Field>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 bg-slate-900 border-white/10 p-3" align="end">
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {EMOJIS.map(emoji => (
+                                            <button
+                                                key={emoji}
+                                                type="button"
+                                                onClick={() => setSelectedEmoji(emoji)}
+                                                className={cn(
+                                                    "w-12 h-12 flex items-center justify-center rounded-xl transition-all text-2xl",
+                                                    selectedEmoji === emoji ? "bg-purple-500/20 ring-2 ring-purple-500" : "hover:bg-white/10"
+                                                )}
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
 
                         <Field>
                             <Label className="text-slate-300">Theme Color</Label>

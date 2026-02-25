@@ -9,6 +9,7 @@ import {
     listFamilyShareLinks,
     loginUser,
     logoutUser,
+    refreshUser,
     mobileLogin,
     mobileLogout,
     mobileMe,
@@ -24,6 +25,7 @@ const router = express.Router();
 
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.post("/refresh", refreshUser);
 router.delete("/logout", logoutUser);
 router.get("/me", getCurrentUser);
 router.put("/profile", updateProfile);

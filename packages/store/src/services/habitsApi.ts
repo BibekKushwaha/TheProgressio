@@ -1,6 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
-import { withRetry } from '../baseQuery';
+import { withAuthRefresh, withRetry } from '../baseQuery';
 
 const HABIT_SERVICE_URL = resolveServiceUrl(
     process.env.EXPO_PUBLIC_HABIT_SERVICE_URL ?? process.env.NEXT_PUBLIC_HABIT_SERVICE_URL,
@@ -156,7 +156,7 @@ export interface MorningBriefing {
 
 export const habitsApi = createApi({
     reducerPath: 'habitsApi',
-    baseQuery: withRetry(fetchBaseQuery({
+    baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
         baseUrl: `${HABIT_SERVICE_URL}/api/habits`,
         credentials: 'include',
         prepareHeaders: (headers) => {
@@ -167,7 +167,7 @@ export const habitsApi = createApi({
             }
             return headers;
         },
-    })),
+    }))),
     tagTypes: ['Habits'],
     endpoints: (builder) => ({
         getHabits: builder.query<{ message: string; habits: Habit[] }, void>({

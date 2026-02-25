@@ -1,6 +1,6 @@
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { withRetry } from '../baseQuery';
+import { withAuthRefresh, withRetry } from '../baseQuery';
 import { resolveServiceUrl } from '../runtime';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
@@ -63,14 +63,14 @@ export interface DailySchedule {
 
 export const timetableApi = createApi({
     reducerPath: 'timetableApi',
-    baseQuery: withRetry(fetchBaseQuery({
+    baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
         baseUrl: `${PLANNER_SERVICE_URL}/api/timetable`,
         credentials: 'include',
         prepareHeaders: (headers) => {
             headers.set('Content-Type', 'application/json');
             return headers;
         },
-    })),
+    }))),
     tagTypes: ['Timetable', 'Subjects'],
     endpoints: (builder) => ({
         getDailySchedule: builder.query<DailySchedule, { date?: string } | void>({

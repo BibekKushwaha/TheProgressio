@@ -61,7 +61,7 @@ async function safeDeleteUserCache(userId: string): Promise<void> {
 // import { publishToTopic } from "../producer.js";
 // import { redisClient } from "../index.js";
 
-const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "15m";
+const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "1h";
 const MOBILE_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.MOBILE_REFRESH_TOKEN_DAYS ?? "30", 10);
 
 const COOKIE_OPTIONS = {
@@ -69,6 +69,13 @@ const COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'strict' as const,
   maxAge: 60 * 60 * 1000, // 1 hour
+};
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  maxAge: Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000,
 };
 
 const ensureJwtSecret = (): string => {
@@ -90,6 +97,31 @@ const hashOpaqueToken = (raw: string): string =>
 
 const generateOpaqueToken = (): string =>
   crypto.randomBytes(48).toString("hex");
+
+async function issueWebSessionCookies(res: any, userId: string): Promise<void> {
+  const token = issueAccessToken(userId, { expiresIn: "1h" });
+  res.cookie('token', token, COOKIE_OPTIONS);
+
+  const rawRefreshToken = generateOpaqueToken();
+  const expiresAt = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+
+  await prisma.$transaction([
+    prisma.mobileRefreshToken.updateMany({
+      where: { userId, deviceId: null, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+    prisma.mobileRefreshToken.create({
+      data: {
+        userId,
+        deviceId: null,
+        tokenHash: hashOpaqueToken(rawRefreshToken),
+        expiresAt,
+      },
+    }),
+  ]);
+
+  res.cookie('refreshToken', rawRefreshToken, REFRESH_COOKIE_OPTIONS);
+}
 
 const getBearerToken = (req: any): string | null => {
   const authHeader = req.headers?.authorization;
@@ -159,8 +191,7 @@ export const registerUser = TryCatch(async (req, res) => {
     },
   });
 
-  const token = issueAccessToken(response.id);
-  res.cookie('token', token, COOKIE_OPTIONS);
+  await issueWebSessionCookies(res, response.id);
 
   // best-effort cache
   await safeSetUserCache(response.id, buildUserCachePayload(response));
@@ -219,8 +250,7 @@ export const loginUser = TryCatch(async (req, res) => {
     if (mod?.deleteCache) await mod.deleteCache(failKey);
   } catch { /* non-blocking */ }
 
-  const token = issueAccessToken(user.id);
-  res.cookie('token', token, COOKIE_OPTIONS);
+  await issueWebSessionCookies(res, user.id);
 
   const { password: _, ...userWithoutPassword } = user;
 
@@ -234,6 +264,7 @@ export const loginUser = TryCatch(async (req, res) => {
 
 export const logoutUser = TryCatch(async (req, res) => {
   const token = req.cookies?.token;
+  const refreshToken = req.cookies?.refreshToken;
   if (token) {
     try {
       const decoded = jwt.decode(token) as jwt.JwtPayload | null;
@@ -251,7 +282,61 @@ export const logoutUser = TryCatch(async (req, res) => {
   }
 
   res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
+  res.clearCookie('refreshToken', { ...REFRESH_COOKIE_OPTIONS, maxAge: 0 });
+
+  if (refreshToken && typeof refreshToken === 'string') {
+    await prisma.mobileRefreshToken.updateMany({
+      where: { tokenHash: hashOpaqueToken(refreshToken), revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
   res.json({ message: 'User logged out successfully' });
+});
+
+export const refreshUser = TryCatch(async (req, res) => {
+  const refreshToken = req.cookies?.refreshToken;
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return res.status(401).json({ message: 'Missing refresh token' });
+  }
+
+  const tokenHash = hashOpaqueToken(refreshToken);
+  const existing = await prisma.mobileRefreshToken.findFirst({
+    where: {
+      tokenHash,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+      deviceId: null,
+    },
+    select: { id: true, userId: true },
+  });
+
+  if (!existing) {
+    return res.status(401).json({ message: 'Invalid or expired refresh token' });
+  }
+
+  const rotatedRefresh = generateOpaqueToken();
+  const nextExpiry = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+
+  await prisma.$transaction([
+    prisma.mobileRefreshToken.update({
+      where: { id: existing.id },
+      data: { revokedAt: new Date() },
+    }),
+    prisma.mobileRefreshToken.create({
+      data: {
+        userId: existing.userId,
+        deviceId: null,
+        tokenHash: hashOpaqueToken(rotatedRefresh),
+        expiresAt: nextExpiry,
+      },
+    }),
+  ]);
+
+  const token = issueAccessToken(existing.userId, { expiresIn: "1h" });
+  res.cookie('token', token, COOKIE_OPTIONS);
+  res.cookie('refreshToken', rotatedRefresh, REFRESH_COOKIE_OPTIONS);
+
+  return res.status(200).json({ message: 'Token refreshed' });
 });
 
 export const getCurrentUser = TryCatch(async (req, res) => {

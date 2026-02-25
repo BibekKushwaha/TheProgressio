@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { withRetry } from '../baseQuery';
+import { withAuthRefresh, withRetry } from '../baseQuery';
 import { resolveServiceUrl } from '../runtime';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
@@ -53,10 +53,10 @@ export interface DailyScheduleResponse {
 
 export const calendarApi = createApi({
     reducerPath: 'calendarApi',
-    baseQuery: withRetry(fetchBaseQuery({
+    baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
         baseUrl: `${PLANNER_SERVICE_URL}/api/calendar`,
         credentials: 'include',
-    })),
+    }))),
     tagTypes: ['Calendar'] as const,
     endpoints: (builder) => ({
         getMonthlyEvents: builder.query<MonthlyEvents, { month: number; year: number }>({

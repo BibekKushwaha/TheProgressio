@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { withRetry } from '../baseQuery';
+import { withAuthRefresh, withRetry } from '../baseQuery';
 import { resolveServiceUrl } from '../runtime';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
@@ -75,14 +75,14 @@ export interface UpiCollectResponse {
 
 export const paymentApi = createApi({
   reducerPath: 'paymentApi',
-  baseQuery: withRetry(fetchBaseQuery({
+  baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
     baseUrl: `${PLANNER_SERVICE_URL}/api`,
     credentials: 'include',
     prepareHeaders: (headers) => {
       headers.set('Content-Type', 'application/json');
       return headers;
     },
-  })),
+  }))),
   tagTypes: ['Payments'],
   endpoints: (builder) => ({
     getBillingProfile: builder.query<{ message: string; profile: BillingProfile }, void>({
