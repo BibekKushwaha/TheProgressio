@@ -6,7 +6,11 @@ WORKDIR /app
 COPY . .
 
 # Install all workspace dependencies
-RUN npm ci
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-factor 2 && \
+    npm config set fetch-retry-mintimeout 10000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    (npm ci --no-audit --prefer-offline || npm ci --no-audit --prefer-offline || npm ci --no-audit --prefer-offline)
 
 # Generate Prisma client
 RUN npx prisma generate --schema=packages/db/prisma/schema.prisma

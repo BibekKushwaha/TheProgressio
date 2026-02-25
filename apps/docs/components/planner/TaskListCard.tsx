@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { formatDueDate } from '@/lib/date';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface TaskListCardProps {
     task: Task;
@@ -67,8 +68,9 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                 result.status === TaskStatus.IN_PROGRESS ? 'started' : 'reset';
             toast.success(`Task ${statusLabel}`);
         } catch (err) {
-            toast.error('Failed to update task status');
-            console.error('Failed to update task status:', err);
+            const message = getApiErrorMessage(err, 'Failed to update task status');
+            toast.error(message);
+            console.warn('Failed to update task status:', message);
         }
     };
 
@@ -190,4 +192,3 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
         </div>
     );
 }
-

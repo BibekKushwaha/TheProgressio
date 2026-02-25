@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 /**
  * Routes that require an authenticated session.
- * The middleware does a fast cookie-presence check so unauthenticated
+ * The proxy does a fast cookie-presence check so unauthenticated
  * users are redirected before any page bundle is sent to the browser,
  * eliminating the "Verifying session" flash.
  *
@@ -33,7 +33,7 @@ const PROTECTED_PREFIXES = [
  */
 const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password'];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const token = request.cookies.get('token')?.value;
 

@@ -61,6 +61,6 @@ router.delete("/:id", deleteTask);
 // PATCH /tasks/:id/toggle - Toggle task status
 router.patch("/:id/toggle", toggleTask);
 
-router.post("/categories", taskCategories);
+router.get("/categories", taskCategories);
 
 export default router;

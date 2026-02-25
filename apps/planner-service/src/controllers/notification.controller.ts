@@ -9,7 +9,7 @@ import {
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import ErrorHandler from "../utils/errorHandler.js";
-// import { sendPushNotification } from "../services/push.service.js";
+import { sendPushNotification } from "../services/push.service.js";
 import { emitPushEvent } from "../services/queue.service.js";
 
 const parseMetadata = (raw: string | null | undefined): Record<string, unknown> => {
@@ -58,24 +58,23 @@ export const composeNotification = TryCatch(async (req: AuthenticatedRequest, re
   });
 
   // Ensure stored metadata includes canonical nudgeId for client-side actions
+  let record = created;
+  let recordMetadata = parseMetadata(record.metadata);
   try {
     const parsedMeta = parseMetadata(created.metadata);
     if (!parsedMeta.nudgeId) parsedMeta.nudgeId = created.id;
-    const updated = await prisma.nudge.update({ where: { id: created.id }, data: { metadata: JSON.stringify(parsedMeta) } });
-
-    return res.status(201).json({
-      message: "Rich notification composed",
-      notification: {
-        ...updated,
-        metadata: parseMetadata(updated.metadata),
-      },
+    record = await prisma.nudge.update({
+      where: { id: created.id },
+      data: { metadata: JSON.stringify(parsedMeta) },
     });
+    recordMetadata = parseMetadata(record.metadata);
   } catch (e) {
     // If update fails for any reason, fall back to returning created record with injected metadata
     console.warn('Failed to persist nudgeId into metadata, returning injected value', e);
+    recordMetadata = { ...recordMetadata, nudgeId: created.id };
   }
 
-  // Enqueue Web Push Notification (Asynchronous via BullMQ)
+  // Enqueue or send Web Push Notification
   try {
     const todayStr = new Date().toISOString().split("T")[0];
     const pushPayload: any = {
@@ -89,7 +88,16 @@ export const composeNotification = TryCatch(async (req: AuthenticatedRequest, re
       pushPayload.icon = payload.imageUrl;
     }
 
-    await emitPushEvent(pushPayload);
+    if (process.env.QUEUE_ENABLED === "true") {
+      await emitPushEvent(pushPayload);
+    } else {
+      await sendPushNotification(userId, {
+        title: pushPayload.title,
+        body: pushPayload.body,
+        ...(pushPayload.icon ? { icon: pushPayload.icon } : {}),
+        deepLink: pushPayload.deepLink,
+      });
+    }
   } catch (pushErr) {
     console.error("Critical: Failed to enqueue web push:", pushErr);
   }
@@ -97,9 +105,73 @@ export const composeNotification = TryCatch(async (req: AuthenticatedRequest, re
   return res.status(201).json({
     message: "Rich notification composed",
     notification: {
-      ...created,
-      metadata: parseMetadata(JSON.stringify({ ...(parseMetadata(created.metadata) || {}), nudgeId: created.id })),
+      ...record,
+      metadata: recordMetadata,
     },
+  });
+});
+
+export const sendPushTest = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const queueEnabled = process.env.QUEUE_ENABLED === "true";
+  const subscriptionCount = await prisma.webPushSubscription.count({ where: { userId } });
+  const nowIso = new Date().toISOString();
+
+  if (subscriptionCount === 0) {
+    return res.status(200).json({
+      mode: queueEnabled ? "queued" : "direct",
+      subscriptionCount,
+      message: "No push subscriptions found. Enable push notifications first.",
+    });
+  }
+
+  const title = "Test Notification";
+  const body = `Push test at ${nowIso}`;
+  const deepLink = "/dashboard";
+
+  try {
+    if (queueEnabled) {
+      await emitPushEvent({
+        userId,
+        title,
+        body,
+        deepLink,
+        dedupeKey: `push-test-${userId}-${Date.now()}`,
+      });
+      return res.status(200).json({
+        mode: "queued",
+        subscriptionCount,
+        message: `Test push queued (${nowIso})`,
+      });
+    }
+
+    await sendPushNotification(userId, { title, body, deepLink });
+    return res.status(200).json({
+      mode: "direct",
+      subscriptionCount,
+      message: `Test push sent (${nowIso})`,
+    });
+  } catch (error) {
+    console.error("Failed to send test push:", error);
+    const vapidConfigured = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+    return res.status(500).json({
+      mode: queueEnabled ? "queued" : "direct",
+      subscriptionCount,
+      message: vapidConfigured ? "Failed to send push notification" : "VAPID keys are not configured on server",
+    });
+  }
+});
+
+export const getPushStatus = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const subscriptionCount = await prisma.webPushSubscription.count({ where: { userId } });
+  const queueEnabled = process.env.QUEUE_ENABLED === "true";
+  const vapidConfigured = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+
+  return res.status(200).json({
+    queueEnabled,
+    vapidConfigured,
+    subscriptionCount,
   });
 });
 

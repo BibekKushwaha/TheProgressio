@@ -5,6 +5,7 @@ import { useGetTasksQuery, useToggleTaskMutation, TaskStatus, PriorityEnum } fro
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 export function TodaysTasks() {
     const today = new Date().toISOString().split('T')[0];
@@ -50,7 +51,8 @@ export function TodaysTasks() {
         try {
             await toggleTask(id).unwrap();
         } catch (error) {
-            console.error('Failed to toggle task:', error);
+            const message = getApiErrorMessage(error, 'Failed to toggle task');
+            console.warn('Failed to toggle task:', message);
         }
     };
 

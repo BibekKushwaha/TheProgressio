@@ -79,9 +79,9 @@ export function ActivityLedger() {
     }
 
     return (
-        <Card variant="glass" className="h-full max-h-[500px] overflow-y-auto">
-            <CardHeader className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-md rounded-t-xl pb-4 border-b border-white/5 mb-4">
-                <CardTitle className="flex items-center gap-2 text-white">
+        <Card variant="glass" className="h-full max-h-[500px] overflow-y-auto py-0">
+            <CardHeader className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-md rounded-t-xl pb-2 border-b border-white/5 ">
+                <CardTitle className="flex items-center gap-2 text-white pt-4">
                     <Activity className="w-5 h-5 text-purple-400" />
                     Activity & Audit Ledger
                 </CardTitle>

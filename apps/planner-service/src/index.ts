@@ -34,7 +34,13 @@ app.use(cors({
 
 app.use(cookieParser());
 
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({
+    limit: '50mb',
+    verify: (req, _res, buf) => {
+        // Used for validating Meta WhatsApp webhook signatures (x-hub-signature-256).
+        (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+    },
+}));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Global rate limit

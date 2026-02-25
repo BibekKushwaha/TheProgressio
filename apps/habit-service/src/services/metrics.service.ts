@@ -3,7 +3,8 @@ type MetricName =
     | "reschedule_operations"
     | "failed_scheduling_attempts"
     | "deduplicated_count"
-    | "skipped_due_to_quiet_hours";
+    | "skipped_due_to_quiet_hours"
+    | "wa_fallback_cancelled_by_activity";
 
 const counters = new Map<MetricName, number>();
 

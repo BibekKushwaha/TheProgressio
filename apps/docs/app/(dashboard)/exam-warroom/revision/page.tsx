@@ -8,6 +8,8 @@ import { RevisionScheduler } from '@/components/analytics/RevisionScheduler';
 export default function ExamWarRoomPage() {
     const { data: performanceData, isLoading: perfLoading } = useGetAllSubjectPerformanceQuery();
     const subjects = performanceData?.data ?? [];
+    const formatAvgScore = (score?: number | null) =>
+        typeof score === 'number' ? `${score.toFixed(1)}%` : 'N/A';
 
     // Difficulty breakdown calculation removed as it is currently unused and causing lint warnings.
 
@@ -37,7 +39,7 @@ export default function ExamWarRoomPage() {
                                     <div className="space-y-1 text-sm">
                                         <div className="flex justify-between">
                                             <span className="text-slate-400">Avg Score</span>
-                                            <span className="text-white font-semibold">{subject.avgScore?.toFixed(1) || 'N/A'}%</span>
+                                            <span className="text-white font-semibold">{formatAvgScore(subject.avgScore)}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-slate-400">Entries</span>

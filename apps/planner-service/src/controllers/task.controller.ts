@@ -9,7 +9,7 @@ import {
     taskSchema,
 } from "@repo/schemas/task";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
-import { aiService } from "../services/ai.service.js";
+import { aiService, type ParsedTaskIntent } from "../services/ai.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/queue.service.js";
 import { recoveryService } from "../services/recovery.service.js";
 import { TryCatch } from "../utils/tryCatch.js";
@@ -598,6 +598,7 @@ interface CreateTaskFromTextParams {
     text: string;
     source: string;
     metadata?: Record<string, unknown>;
+    parsedDataOverride?: Partial<ParsedTaskIntent>;
 }
 
 export const createTaskFromText = async ({
@@ -605,8 +606,20 @@ export const createTaskFromText = async ({
     text,
     source,
     metadata = {},
+    parsedDataOverride,
 }: CreateTaskFromTextParams) => {
-    const parsedData = await aiService.parseTaskIntent(text);
+    const parsedData = parsedDataOverride
+        ? {
+            title: parsedDataOverride.title || text,
+            description: parsedDataOverride.description,
+            dueDate: parsedDataOverride.dueDate,
+            priority: parsedDataOverride.priority,
+            subject: parsedDataOverride.subject,
+            effort: parsedDataOverride.effort,
+            isRecurring: parsedDataOverride.isRecurring,
+            type: parsedDataOverride.type,
+        }
+        : await aiService.parseTaskIntent(text);
 
     const task = await prisma.task.create({
         data: {

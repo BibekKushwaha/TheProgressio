@@ -208,6 +208,46 @@ export const isWhatsAppVerificationValid = (token: unknown): boolean => {
     return token === expected;
 };
 
+const parseMetaSignature = (signatureHeader: unknown): string | null => {
+    if (typeof signatureHeader !== "string") return null;
+    const trimmed = signatureHeader.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.startsWith("sha256=")) {
+        return trimmed.slice("sha256=".length);
+    }
+
+    // Allow passing the raw hex signature directly (useful for tests/tools).
+    return trimmed;
+};
+
+export const isWhatsAppMetaSignatureValid = (params: {
+    signatureHeader: unknown;
+    rawBody: Buffer | undefined;
+}): boolean => {
+    const secret = process.env.WHATSAPP_APP_SECRET;
+    if (!secret) return false;
+    if (!params.rawBody || !Buffer.isBuffer(params.rawBody)) return false;
+
+    const providedHex = parseMetaSignature(params.signatureHeader);
+    if (!providedHex) return false;
+    if (!/^[0-9a-f]{64}$/i.test(providedHex)) return false;
+
+    try {
+        const expectedHex = crypto
+            .createHmac("sha256", secret)
+            .update(params.rawBody)
+            .digest("hex");
+
+        const expected = Buffer.from(expectedHex, "hex");
+        const provided = Buffer.from(providedHex, "hex");
+        if (expected.length !== provided.length) return false;
+        return crypto.timingSafeEqual(expected, provided);
+    } catch {
+        return false;
+    }
+};
+
 export interface WhatsAppTranscriptResult {
     transcript: string | null;
     language: string | null;

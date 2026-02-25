@@ -555,6 +555,18 @@ export const tasksApi = createApi({
                 body,
             }),
         }),
+        sendPushTest: builder.mutation<{ mode: "queued" | "direct"; subscriptionCount: number; message: string }, void>({
+            query: () => ({
+                url: '/notifications/push/test',
+                method: 'POST',
+            }),
+        }),
+        getPushStatus: builder.query<{ queueEnabled: boolean; vapidConfigured: boolean; subscriptionCount: number }, void>({
+            query: () => ({
+                url: '/notifications/push/status',
+                method: 'GET',
+            }),
+        }),
     }),
 });
 
@@ -591,4 +603,6 @@ export const {
     useGetAuditLogsQuery,
     useSubscribeToPushMutation,
     useUnsubscribeFromPushMutation,
+    useSendPushTestMutation,
+    useGetPushStatusQuery,
 } = tasksApi;

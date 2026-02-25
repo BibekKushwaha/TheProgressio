@@ -3,6 +3,18 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 import crypto from "crypto";
 import { prisma } from "@repo/db";
 import ErrorHandler from "../utils/errorHandler.js";
+import {
+    cancelPendingWhatsAppFallbackJobsForUser,
+    isNudgeDispatchQueueEnabled,
+} from "../services/nudge-dispatch.queue.js";
+import { incrementMetric, logMetricEvent } from "../services/metrics.service.js";
+
+const prismaAny = prisma as any;
+const ACTIVITY_CANCEL_DEBOUNCE_MS = Math.max(
+    5_000,
+    Number.parseInt(process.env.WHATSAPP_ACTIVITY_CANCEL_DEBOUNCE_MS ?? "60000", 10),
+);
+const lastCancellationSignalAt = new Map<string, number>();
 
 export interface User {
     id: string;
@@ -37,6 +49,36 @@ const extractBearerToken = (req: Request): string | null => {
 
 const hashToken = (value: string): string =>
     crypto.createHash("sha256").update(value).digest("hex");
+
+const touchUserLastActive = (userId: string): void => {
+    if (typeof prismaAny.user?.update !== "function") return;
+    void prismaAny.user.update({
+        where: { id: userId },
+        data: { lastActiveAt: new Date() },
+    }).catch((_error: unknown) => {
+    });
+
+    if (!isNudgeDispatchQueueEnabled) return;
+
+    const nowMs = Date.now();
+    const lastSignalMs = lastCancellationSignalAt.get(userId) ?? 0;
+    if (nowMs - lastSignalMs < ACTIVITY_CANCEL_DEBOUNCE_MS) return;
+    lastCancellationSignalAt.set(userId, nowMs);
+
+    void cancelPendingWhatsAppFallbackJobsForUser(userId)
+        .then((result) => {
+            if (result.cancelled > 0) {
+                incrementMetric("wa_fallback_cancelled_by_activity", result.cancelled);
+                logMetricEvent("wa_fallback_cancelled_by_activity", {
+                    userId,
+                    source: "habit_auth",
+                    cancelled: result.cancelled,
+                });
+            }
+        })
+        .catch((_error: unknown) => {
+        });
+};
 
 const resolveShareSession = async (rawShareToken: string): Promise<{ user: User; permissions: string; linkId: string } | null> => {
     const tokenHash = hashToken(rawShareToken);
@@ -150,6 +192,7 @@ export const isAuth = async (
 
         req.user = user as User;
         req.authContext = { mode: "user" };
+        touchUserLastActive(user.id);
         next();
     } catch (_error) {
         next(new ErrorHandler(401, "Authentication failed. Please login again"));

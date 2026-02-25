@@ -14,7 +14,7 @@ export interface TaskEvent {
 const REDIS_HOST = process.env.REDIS_HOST || "localhost";
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379", 10);
 const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
-const QUEUE_ENABLED = process.env.QUEUE_ENABLED === "true";
+const QUEUE_ENABLED = process.env.QUEUE_ENABLED === "true" && process.env.NODE_ENV !== "test";
 
 const connection: ConnectionOptions = {
     host: REDIS_HOST,

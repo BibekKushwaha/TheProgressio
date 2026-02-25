@@ -51,14 +51,13 @@ const EXAM_ROUTINES: Record<ExamType, { hours: number; blocks: { subject: string
 
 export function RevisionScheduler() {
     const [selectedExam, setSelectedExam] = useState<ExamType>('JEE');
-    const { data: scheduleData, isLoading, refetch } = useGetRevisionScheduleQuery(selectedExam);
+    const { data: scheduleData, isLoading, isError, refetch } = useGetRevisionScheduleQuery(selectedExam);
     const [schedule, setSchedule] = useState<ScheduledBlock[]>([]);
     const [showRoutine, setShowRoutine] = useState(false);
 
     useEffect(() => {
-        if (scheduleData?.schedule) {
-            setSchedule(scheduleData.schedule as ScheduledBlock[]);
-        }
+        // Keep UI in sync with latest server response and clear stale data when empty/error.
+        setSchedule((scheduleData?.schedule as ScheduledBlock[] | undefined) ?? []);
     }, [scheduleData]);
 
     const routine = EXAM_ROUTINES[selectedExam];
@@ -71,6 +70,8 @@ export function RevisionScheduler() {
         PYQ: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
         REVISION: 'bg-green-500/20 text-green-400 border-green-500/30',
     };
+    const getTypeColor = (type: string) =>
+        typeColors[type as ProblemType] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';
 
     const toggleComplete = (id: string) => {
         setSchedule(prev => prev.map(s => s.id === id ? { ...s, completed: !s.completed } : s));
@@ -152,6 +153,14 @@ export function RevisionScheduler() {
                             <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
                             <p className="text-sm text-slate-400">Optimizing schedule from SWOT...</p>
                         </div>
+                    ) : isError ? (
+                        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+                            Couldn&apos;t load revision schedule for {selectedExam}. Try regenerating.
+                        </div>
+                    ) : schedule.length === 0 ? (
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-slate-400">
+                            No schedule blocks available yet. Use auto-generate to create tomorrow&apos;s plan.
+                        </div>
                     ) : (
                         schedule.map(block => (
                             <button
@@ -174,7 +183,7 @@ export function RevisionScheduler() {
                                     </div>
                                     <span className="text-xs text-slate-500">{block.subject}</span>
                                 </div>
-                                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${typeColors[block.type]}`}>
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${getTypeColor(block.type)}`}>
                                     {block.type}
                                 </span>
                                 <div className="text-right flex-shrink-0">

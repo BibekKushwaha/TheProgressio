@@ -24,6 +24,8 @@ import {
   useGetTasksQuery,
   useGetTaskMetricsQuery,
 } from "@repo/store";
+import { useLocalTasks } from "@repo/store";
+import { mergeTaskSources } from "@/lib/mergeTasks";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useMemo, useState } from "react";
 import { exportTasksToCSV, downloadCSV } from "@/lib/exportUtils";
@@ -65,6 +67,14 @@ export default function AnalyticsOverviewPage() {
     isLoading: isTasksLoading
   } = useGetTasksQuery({ page: 1, limit: 50 });
 
+  // Also fetch a larger server task set for accurate merged metrics (keeps payload reasonable)
+  const { data: allServerTasks = [] } = useGetTasksQuery({ page: 1, limit: 500 });
+
+  // Local (IndexedDB) tasks used to merge with server data (offline / local-only items)
+  const { tasks: cachedTasks } = useLocalTasks();
+
+  const mergedTasks = useMemo(() => mergeTaskSources(allServerTasks || [], cachedTasks || []), [allServerTasks, cachedTasks]);
+
   const {
     data: habitsResponse,
     isLoading: isHabitsLoading
@@ -72,19 +82,62 @@ export default function AnalyticsOverviewPage() {
 
   const habits = useMemo(() => habitsResponse?.habits || [], [habitsResponse]);
 
-  // Use server-computed counts from the lightweight /tasks/metrics endpoint.
-  const taskMetrics = useMemo(() => ({
-    total:          taskMetricsData?.total          ?? 0,
-    pending:        taskMetricsData?.pending        ?? 0,
-    inProgress:     taskMetricsData?.inProgress     ?? 0,
-    completed:      taskMetricsData?.completed      ?? 0,
-    highPriority:   taskMetricsData?.highPriority   ?? 0,
-    mediumPriority: taskMetricsData?.mediumPriority ?? 0,
-    lowPriority:    taskMetricsData?.lowPriority    ?? 0,
-    withoutDueDate: taskMetricsData?.withoutDueDate ?? 0,
-    overdue:        taskMetricsData?.overdue        ?? 0,
-    dueToday:       taskMetricsData?.dueToday       ?? 0,
-  }), [taskMetricsData]);
+  // Prefer client-side merged counts (server + local) so analytics reflect what the UI shows.
+  const taskMetrics = useMemo(() => {
+    // If we have merged tasks (server + local), compute counts locally.
+    if (mergedTasks && mergedTasks.length > 0) {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+      let total = 0;
+      let pending = 0;
+      let inProgress = 0;
+      let completed = 0;
+      let highPriority = 0;
+      let mediumPriority = 0;
+      let lowPriority = 0;
+      let overdue = 0;
+      let dueToday = 0;
+      let withoutDueDate = 0;
+
+      mergedTasks.forEach((t) => {
+        total += 1;
+        const status = t.status;
+        if (status === TaskStatus.PENDING) pending += 1;
+        else if (status === TaskStatus.IN_PROGRESS) inProgress += 1;
+        else if (status === TaskStatus.COMPLETED) completed += 1;
+
+        const priority = t.priority;
+        if (priority === 'HIGH') highPriority += 1;
+        else if (priority === 'MEDIUM') mediumPriority += 1;
+        else if (priority === 'LOW') lowPriority += 1;
+
+        if (!t.dueDate) withoutDueDate += 1;
+        else {
+          const due = new Date(t.dueDate);
+          if (t.status !== TaskStatus.COMPLETED && due < now) overdue += 1;
+          if (t.status !== TaskStatus.COMPLETED && due >= todayStart && due < todayEnd) dueToday += 1;
+        }
+      });
+
+      return { total, pending, inProgress, completed, highPriority, mediumPriority, lowPriority, withoutDueDate, overdue, dueToday };
+    }
+
+    // Fallback to lightweight server metrics when merged data isn't ready yet.
+    return {
+      total:          taskMetricsData?.total          ?? 0,
+      pending:        taskMetricsData?.pending        ?? 0,
+      inProgress:     taskMetricsData?.inProgress     ?? 0,
+      completed:      taskMetricsData?.completed      ?? 0,
+      highPriority:   taskMetricsData?.highPriority   ?? 0,
+      mediumPriority: taskMetricsData?.mediumPriority ?? 0,
+      lowPriority:    taskMetricsData?.lowPriority    ?? 0,
+      withoutDueDate: taskMetricsData?.withoutDueDate ?? 0,
+      overdue:        taskMetricsData?.overdue        ?? 0,
+      dueToday:       taskMetricsData?.dueToday       ?? 0,
+    };
+  }, [mergedTasks, taskMetricsData]);
 
   const habitMetrics = useMemo(() => {
     const total = habits.length;
