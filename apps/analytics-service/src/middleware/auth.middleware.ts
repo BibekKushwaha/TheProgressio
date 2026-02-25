@@ -4,6 +4,13 @@ import crypto from "crypto";
 import { prisma } from "@repo/db";
 
 const prismaAny = prisma as any;
+const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
+const HABIT_INTERNAL_SECRET = process.env.HABIT_INTERNAL_SECRET || process.env.ANALYTICS_INTERNAL_SECRET || "";
+const ACTIVITY_CANCEL_DEBOUNCE_MS = Math.max(
+    5_000,
+    Number.parseInt(process.env.WHATSAPP_ACTIVITY_CANCEL_DEBOUNCE_MS ?? "60000", 10),
+);
+const lastCancellationSignalAt = new Map<string, number>();
 
 export interface User {
     id: string;
@@ -38,6 +45,32 @@ const extractBearerToken = (req: Request): string | null => {
 
 const hashToken = (value: string): string =>
     crypto.createHash("sha256").update(value).digest("hex");
+
+const touchUserLastActive = (userId: string): void => {
+    if (typeof prismaAny.user?.update !== "function") return;
+    void prismaAny.user.update({
+        where: { id: userId },
+        data: { lastActiveAt: new Date() },
+    }).catch((_error: unknown) => {
+    });
+
+    if (!HABIT_INTERNAL_SECRET) return;
+
+    const nowMs = Date.now();
+    const lastSignalMs = lastCancellationSignalAt.get(userId) ?? 0;
+    if (nowMs - lastSignalMs < ACTIVITY_CANCEL_DEBOUNCE_MS) return;
+    lastCancellationSignalAt.set(userId, nowMs);
+
+    void fetch(`${HABIT_SERVICE_URL}/api/habits/internal/wa-fallback/cancel`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "x-internal-secret": HABIT_INTERNAL_SECRET,
+        },
+        body: JSON.stringify({ userId, source: "analytics_auth" }),
+    }).catch((_error: unknown) => {
+    });
+};
 
 const resolveShareSession = async (rawShareToken: string): Promise<{ user: User; permissions: string; linkId: string } | null> => {
     const tokenHash = hashToken(rawShareToken);
@@ -127,6 +160,19 @@ export const isAuth = async (
             return;
         }
 
+        // Reject tokens that have been blacklisted (e.g. after logout)
+        try {
+            const mod = (await import('@repo/cache').catch(() => null)) as any;
+            if (mod?.getCache) {
+                const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                const blacklisted = await mod.getCache(`bl:${tokenHash}`);
+                if (blacklisted) {
+                    res.status(401).json({ message: 'Token has been revoked' });
+                    return;
+                }
+            }
+        } catch { /* non-blocking */ }
+
         const user = await prisma.user.findUnique({
             where: { id: decodedPayload.id as string },
             select: {
@@ -144,6 +190,7 @@ export const isAuth = async (
 
         req.user = user;
         req.authContext = { mode: "user" };
+        touchUserLastActive(user.id);
         next();
     } catch (error) {
         console.error(error);

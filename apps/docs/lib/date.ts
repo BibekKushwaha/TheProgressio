@@ -58,3 +58,25 @@ export function formatRelativeDate(dateInput: Date | string): string {
 
     return targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+/**
+ * Returns a human-readable relative due-date label for a task.
+ * e.g. "Due today", "Due tomorrow", "3d left", "2d overdue", "Jan 5"
+ */
+export function formatDueDate(dueDate?: string | null): string {
+    if (!dueDate) return 'No due date';
+    const date = new Date(dueDate);
+    const now = new Date();
+
+    // Normalize to start of day for accurate day difference
+    const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const d2 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
+    if (diffDays === 0) return 'Due today';
+    if (diffDays === 1) return 'Due tomorrow';
+    if (diffDays <= 7) return `${diffDays}d left`;
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}

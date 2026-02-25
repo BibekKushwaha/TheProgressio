@@ -11,7 +11,7 @@ interface MetaCloudResponse {
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION || 'v22.0';
 
 const readConfig = () => {
-  const token = process.env.WHATSAPP_CLOUD_API_TOKEN;
+  const token = process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATSAPP_CLOUD_API_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
   return {

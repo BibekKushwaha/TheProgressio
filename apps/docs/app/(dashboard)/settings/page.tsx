@@ -63,6 +63,13 @@ export default function SettingsPage() {
         if (pairingData?.verified) setIsPairingPolling(false);
     }, [pairingData?.verified]);
 
+    const whatsAppBotNumber = process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER;
+    const whatsAppBotNumberDigits = whatsAppBotNumber ? whatsAppBotNumber.replace(/[^\d]/g, "") : "";
+    const whatsAppPairingLink =
+        whatsAppBotNumberDigits && pairingData?.pairingCode
+            ? `https://wa.me/${whatsAppBotNumberDigits}?text=${encodeURIComponent(pairingData.pairingCode)}`
+            : null;
+
     const user = profileData?.user;
     const nudgeSettings = nudgeSettingsData?.settings;
     const preDeadlineSelectValue = `${nudgeSettings?.preDeadlineDays ?? 2} ${((nudgeSettings?.preDeadlineDays ?? 2) === 1) ? "day" : "days"}`;
@@ -456,10 +463,15 @@ export default function SettingsPage() {
                         <div className="p-6 bg-green-950/20 border border-green-500/20 rounded-xl space-y-4">
                             <div className="text-sm text-slate-300 font-medium">To pair your WhatsApp:</div>
                             <ol className="text-sm text-slate-400 space-y-2 list-decimal list-inside pl-2">
-                                <li>Save <span className="text-green-400 font-mono bg-green-950/40 px-1 rounded">{process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER || "+91 99999-99999"}</span> as &quot;Study Bot&quot;</li>
+                                <li>Save <span className="text-green-400 font-mono bg-green-950/40 px-1 rounded">{whatsAppBotNumber ?? 'the bot number'}</span> as &quot;Study Bot&quot;</li>
                                 <li>Send the pairing code below to the bot</li>
                                 <li>You&apos;ll receive a confirmation message</li>
                             </ol>
+                            {!whatsAppBotNumber && (
+                                <div className="text-xs text-amber-300/90">
+                                    Missing <span className="font-mono">NEXT_PUBLIC_WHATSAPP_BOT_NUMBER</span>. Set it in <span className="font-mono">apps/docs/.env.local</span> to show the bot number and enable the one-click WhatsApp link.
+                                </div>
+                            )}
                             <div className="flex items-center gap-3 pt-2">
                                 <code className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-lg text-green-400 font-mono text-lg tracking-widest text-center">
                                     {isPairingLoading ? "Generating..." : (pairingData?.pairingCode || "Code unavailable")}
@@ -472,6 +484,19 @@ export default function SettingsPage() {
                                     Copy Code
                                 </Button>
                             </div>
+                            <Button
+                                asChild={Boolean(whatsAppPairingLink)}
+                                className="bg-green-600/80 hover:bg-green-700 disabled:opacity-50"
+                                disabled={!whatsAppPairingLink}
+                            >
+                                {whatsAppPairingLink ? (
+                                    <a href={whatsAppPairingLink} target="_blank" rel="noreferrer">
+                                        Open WhatsApp
+                                    </a>
+                                ) : (
+                                    <span>Open WhatsApp</span>
+                                )}
+                            </Button>
                             <Button
                                 variant="outline"
                                 size="sm"

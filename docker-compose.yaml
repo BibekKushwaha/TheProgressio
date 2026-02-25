@@ -2,6 +2,7 @@
 # Start everything:    docker compose up -d
 # Infra only:          docker compose up -d redis postgres
 # Single service:      docker compose up -d analytics-service
+# With backups:         docker compose --profile backup up -d
 # ──────────────────────────────────────────────────────────────────────
 
 services:
@@ -9,7 +10,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6380}:6379"
     restart: unless-stopped
     deploy:
       resources:
@@ -20,7 +21,7 @@ services:
   postgres:
     image: postgres:15-alpine
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: transition
@@ -116,5 +117,29 @@ services:
           memory: 256m
           cpus: '0.50'
 
+  # ── Database Backup ───────────────────────────────────────────────────
+  pgbackup:
+    profiles: ["backup"]
+    image: prodrigestivill/postgres-backup-local:15
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=transition
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_WEEKS=4
+      - BACKUP_KEEP_MONTHS=6
+    volumes:
+      - pgbackups:/backups
+    depends_on: [postgres]
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: '0.10'
+
 volumes:
   pgdata:
+  pgbackups:

@@ -56,7 +56,7 @@ export const getMonthlyEvents = TryCatch(async (req: AuthenticatedRequest, res: 
     });
 
     // Fetch ALL Exams in this month
-    const exams = await (prisma as any).exam.findMany({
+    const exams = await prisma.exam.findMany({
         where: {
             userId,
             date: {
@@ -81,7 +81,7 @@ export const getMonthlyEvents = TryCatch(async (req: AuthenticatedRequest, res: 
         }
     });
 
-    exams.forEach((exam: any) => {
+    exams.forEach((exam) => {
         if (exam.date) {
             const dateKey = toLocalIsoDate(exam.date);
             if (!eventMap[dateKey]) eventMap[dateKey] = { taskCount: 0, examCount: 0 };
@@ -132,7 +132,7 @@ export const getDailySchedule = TryCatch(async (req: AuthenticatedRequest, res: 
     });
 
     // 3. Get Exams today
-    const exams = await (prisma as any).exam.findMany({
+    const exams = await prisma.exam.findMany({
         where: {
             userId,
             date: {
@@ -180,7 +180,7 @@ export const getDailySchedule = TryCatch(async (req: AuthenticatedRequest, res: 
         })),
 
         // Exams
-        ...exams.map((exam: any) => ({
+        ...exams.map((exam) => ({
             id: `exam-${exam.id}`,
             type: 'exam',
             title: `${exam.title}`,

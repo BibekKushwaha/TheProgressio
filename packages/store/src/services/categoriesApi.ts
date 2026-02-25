@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { withRetry } from '../baseQuery';
 import { Task } from './tasksApi';
 import { resolveServiceUrl } from '../runtime';
 
@@ -34,14 +35,14 @@ export interface UpdateCategoryRequest {
 
 export const categoriesApi = createApi({
     reducerPath: 'categoriesApi',
-    baseQuery: fetchBaseQuery({
+    baseQuery: withRetry(fetchBaseQuery({
         baseUrl: `${PLANNER_SERVICE_URL}/api/categories`,
         credentials: 'include', // Include cookies for isAuth middleware
         prepareHeaders: (headers) => {
             headers.set('Content-Type', 'application/json');
             return headers;
         },
-    }),
+    })),
     tagTypes: ['Categories'],
     endpoints: (builder) => ({
         getCategories: builder.query<Category[], void>({

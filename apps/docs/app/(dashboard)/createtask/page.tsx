@@ -9,7 +9,7 @@ import { MetaChips } from '@/components/createtask/MetaChips';
 import { Edit, GraduationCap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/toast-provider';
+import { toast } from 'sonner';
 import {
     useSmartCreateTaskMutation,
     usePreviewSubtasksMutation,
@@ -24,6 +24,7 @@ import {
     useCreateCategoryMutation,
     useAddGradeEntryMutation,
     useCreateExamMutation,
+    useGetSubjectsQuery,
     useAppDispatch
 } from '@repo/store';
 
@@ -31,12 +32,12 @@ function CreateTaskPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const taskId = searchParams.get('id');
-    const { toast } = useToast();
     const dispatch = useAppDispatch();
 
     const [taskDescription, setTaskDescription] = useState('');
     const [description, setDescription] = useState('');
     const [selectedSubjectId, setSelectedSubjectId] = useState<string | number>(1);
+    const [selectedExamSubjectId, setSelectedExamSubjectId] = useState<string>('');
     const [selectedPriority, setSelectedPriority] = useState('Routine');
     const [selectedEffort, setSelectedEffort] = useState('1h');
     const [subtasks, setSubtasks] = useState<{ id: string | number; text: string; completed: boolean; loading?: boolean }[]>([]);
@@ -68,6 +69,7 @@ function CreateTaskPageContent() {
     const [createCategory] = useCreateCategoryMutation();
 
     const { data: categories } = useGetCategoriesQuery();
+    const { data: subjects } = useGetSubjectsQuery();
     useEffect(() => {
         if (existingTask) {
             setTaskDescription(existingTask.title);
@@ -85,6 +87,12 @@ function CreateTaskPageContent() {
                     text: s.title,
                     completed: s.completed
                 })));
+            }
+            if (existingTask.dueDate) {
+                // Convert real UTC to apparent UTC for stable UI
+                const d = new Date(existingTask.dueDate);
+                const apparent = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
+                setParsedDueDate(apparent);
             }
             setIsRecurring(Boolean(existingTask.isRecurring));
         }
@@ -108,7 +116,10 @@ function CreateTaskPageContent() {
                         });
 
                         if (result.dueDate) {
-                            setParsedDueDate(result.dueDate);
+                            // Convert real UTC to apparent UTC
+                            const d = new Date(result.dueDate);
+                            const apparent = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
+                            setParsedDueDate(apparent);
                         }
 
                         if (result.priority === PriorityEnum.LOW) setSelectedPriority('Routine');
@@ -139,13 +150,13 @@ function CreateTaskPageContent() {
     const handleSaveTask = async () => {
         try {
             const shouldUseSmartCreate =
-                !taskId && taskDescription.trim().length > 80 && description.trim().length === 0;
+                !taskId && entryType === 'task' && taskDescription.trim().length > 80 && description.trim().length === 0;
 
             if (shouldUseSmartCreate) {
                 const response = await smartCreateTask({ text: taskDescription }).unwrap();
                 if (response?.task) {
                     dispatch(addTask(response.task));
-                    toast('✅ Task created!', 'success');
+                    toast.success('✅ Task created!');
                     if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
                     router.push('/planner');
                     return;
@@ -154,7 +165,7 @@ function CreateTaskPageContent() {
 
             if (entryType === 'exam') {
                 if (!taskDescription) {
-                    toast('Please enter an exam title or subject', 'error');
+                    toast.error('Please enter an exam title or subject');
                     return;
                 }
 
@@ -163,7 +174,7 @@ function CreateTaskPageContent() {
                     const total = parseFloat(totalMarks);
 
                     if (Number.isNaN(marks) || Number.isNaN(total) || total <= 0) {
-                        toast('Please enter valid marks', 'error');
+                        toast.error('Please enter valid marks');
                         return;
                     }
 
@@ -175,26 +186,29 @@ function CreateTaskPageContent() {
                         totalMarks: total,
                     }).unwrap();
 
-                    toast('✅ Exam result logged!', 'success');
+                    toast.success('✅ Exam result logged!');
                     router.push('/exam-warroom');
                 } else {
                     // Schedule Upcoming Exam
                     if (!parsedDueDate) {
-                        toast('Please specify an exam date', 'error');
+                        toast.error('Please specify an exam date');
                         return;
                     }
+
+                    const duration = parseInt(examDuration);
+                    const safeDuration = isNaN(duration) ? 120 : duration;
 
                     await createExam({
                         title: taskDescription,
                         date: parsedDueDate,
-                        durationMinutes: parseInt(examDuration),
+                        durationMinutes: safeDuration,
                         location: examLocation || undefined,
                         subjectName: parsedMeta.subject || taskDescription,
-                        subjectId: typeof selectedSubjectId === 'string' ? selectedSubjectId : undefined,
+                        subjectId: (typeof selectedExamSubjectId === 'string' && selectedExamSubjectId.length > 5) ? selectedExamSubjectId : undefined,
                         priority: 'HIGH'
                     }).unwrap();
 
-                    toast('🗓️ Exam scheduled!', 'success');
+                    toast.success('🗓️ Exam scheduled!');
                     router.push('/calendar');
                 }
 
@@ -225,7 +239,6 @@ function CreateTaskPageContent() {
                             colorCode: 'from-blue-600/40 to-blue-500/40', // Default color
                         }).unwrap();
                         categoryIdToUse = newCategory.id;
-                        console.log('Created new category:', newCategory);
                     } catch (error) {
                         console.error('Failed to create new category:', error);
                         // Fallback: don't use category if creation failed
@@ -239,12 +252,6 @@ function CreateTaskPageContent() {
                     categoryIdToUse = undefined;
                 }
             }
-            console.log("title", taskDescription);
-            console.log("description", description);
-            console.log("priority", priorityEnum);
-            console.log("categoryId", categoryIdToUse);
-            console.log("dueDate", parsedDueDate);
-
             if (taskId) {
                 await updateTask({
                     id: taskId,
@@ -274,12 +281,34 @@ function CreateTaskPageContent() {
                 }
             }
 
-            toast(taskId ? '✏️ Task updated!' : '✅ Task created!', 'success');
+            toast.success(taskId ? '✏️ Task updated!' : '✅ Task created!');
             if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
             router.push('/planner');
-        } catch (error) {
-            console.error('Failed to save task:', error);
-            toast('Failed to save task', 'error');
+        } catch (error: unknown) {
+            const normalized = (err: unknown): { message?: string; data?: unknown; status?: unknown; fullError: unknown } => {
+                if (err && typeof err === 'object') {
+                    const e = err as Record<string, unknown>;
+                    return {
+                        message: typeof e.message === 'string' ? (e.message as string) : undefined,
+                        data: e.data,
+                        status: e.status,
+                        fullError: err,
+                    };
+                }
+                return { fullError: err };
+            };
+
+            const info = normalized(error);
+            console.error('Failed to save task:', info);
+
+            let dataMessage: string | undefined;
+            if (info.data && typeof info.data === 'object') {
+                const d = info.data as Record<string, unknown>;
+                if (typeof d.message === 'string') dataMessage = d.message;
+            }
+
+            const errorMsg = dataMessage || info.message || 'Failed to save task';
+            toast.error(errorMsg);
         }
     };
     const handleGenerateSubtasks = async () => {
@@ -305,20 +334,25 @@ function CreateTaskPageContent() {
         );
     }
 
-    const localDateTimeValue = parsedDueDate
-        ? new Date(new Date(parsedDueDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-        : '';
+    const localDateTimeValue = parsedDueDate ? parsedDueDate.slice(0, 16) : '';
     const dueDateValue = localDateTimeValue ? localDateTimeValue.slice(0, 10) : '';
     const dueTimeValue = localDateTimeValue ? localDateTimeValue.slice(11, 16) : '';
 
     const updateDueDateTime = (nextDate: string, nextTime: string) => {
-        if (!nextDate && !nextTime) {
+        if (!nextDate) {
             setParsedDueDate(null);
             return;
         }
-        const safeDate = nextDate || new Date().toISOString().slice(0, 10);
+        // Use local system date if none provided, but formatted as YYYY-MM-DD
+        const safeDate = nextDate || new Date().toLocaleDateString('en-CA');
         const safeTime = nextTime || '00:00';
-        setParsedDueDate(new Date(`${safeDate}T${safeTime}`).toISOString());
+
+        // Create a local Date object and shift it to "Apparent UTC"
+        const localD = new Date(`${safeDate}T${safeTime}`);
+        if (!isNaN(localD.getTime())) {
+            const apparent = new Date(localD.getTime() - localD.getTimezoneOffset() * 60000);
+            setParsedDueDate(apparent.toISOString());
+        }
     };
 
     const isSubmitting = isCreating || isSmartCreating || isUpdating || isAddingGrade || isCreatingExam;
@@ -361,7 +395,7 @@ function CreateTaskPageContent() {
                             >
                                 {[
                                     { id: 'task', label: 'New Task', icon: Edit },
-                                    { id: 'exam', label: 'Exam Result', icon: GraduationCap }
+                                    { id: 'exam', label: 'Exam Mode', icon: GraduationCap }
                                 ].map((mode) => {
                                     const isActive = entryType === mode.id;
                                     return (
@@ -399,7 +433,9 @@ function CreateTaskPageContent() {
                             className="panel-surface rounded-4xl p-6 md:p-8 space-y-3"
                         >
                             <div className="space-y-3">
-                                <p className="text-[11px] tracking-[0.18em] font-semibold text-purple-300/90 uppercase">Task Summary</p>
+                                <p className="text-[11px] tracking-[0.18em] font-semibold text-purple-300/90 uppercase">
+                                    {entryType === 'task' ? 'Task Summary' : 'Exam Title / Subject'}
+                                </p>
                                 <TaskInputCard
                                     value={taskDescription}
                                     onChange={setTaskDescription}
@@ -588,6 +624,20 @@ function CreateTaskPageContent() {
                                         ))}
                                     </div>
 
+                                    <div className="space-y-2">
+                                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Subject (Optional)</Label>
+                                        <select
+                                            value={selectedExamSubjectId}
+                                            onChange={(e) => setSelectedExamSubjectId(e.target.value)}
+                                            className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                                        >
+                                            <option value="">Select subject</option>
+                                            {subjects?.map((s) => (
+                                                <option key={s.id} value={String(s.id)} className="text-black">{s.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
                                     {examSubMode === 'result' ? (
                                         <>
                                             <div className="space-y-2">
@@ -696,7 +746,7 @@ function CreateTaskPageContent() {
                                     disabled={isSubmitting}
                                     className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold disabled:opacity-50"
                                 >
-                                    {isSubmitting ? 'Saving...' : (taskId ? 'Update Task' : (entryType === 'exam' ? 'Log Result' : 'Create Task'))}
+                                    {isSubmitting ? 'Saving...' : (taskId ? 'Update Task' : (entryType === 'exam' ? (examSubMode === 'result' ? 'Log Result' : 'Schedule Exam') : 'Create Task'))}
                                 </button>
                             </div>
                         </motion.div>

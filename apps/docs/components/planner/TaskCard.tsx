@@ -1,3 +1,5 @@
+'use client';
+
 import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Edit, Paperclip, Sparkles, Loader2, BellRing, MessageSquare } from 'lucide-react';
 import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation, useGenerateSubtasksMutation, useCreateRevisionDripCampaignMutation, useComposeNotificationMutation } from '@repo/store';
 import {
@@ -8,8 +10,15 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useState } from 'react';
+import { formatDueDate } from '@/lib/date';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface TaskCardProps {
     task: Task;
@@ -22,24 +31,6 @@ const PRIORITY_COLORS = {
     [PriorityEnum.LOW]: 'text-green-400 bg-green-500/20 border-green-500/30',
 };
 
-function formatDueDate(dueDate?: string | null) {
-    if (!dueDate) return 'No due date';
-    const date = new Date(dueDate);
-    const now = new Date();
-
-    // Normalize to start of day for accurate day difference
-    const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const d2 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
-    if (diffDays === 0) return 'Due today';
-    if (diffDays === 1) return 'Due tomorrow';
-    if (diffDays <= 7) return `${diffDays}d left`;
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 export function TaskCard({ task, completed }: TaskCardProps) {
     const router = useRouter();
     const [deleteTask] = useDeleteTaskMutation();
@@ -47,6 +38,8 @@ export function TaskCard({ task, completed }: TaskCardProps) {
     const [generateSubtasks, { isLoading: isBreakingDown }] = useGenerateSubtasksMutation();
     const [createRevisionCampaign] = useCreateRevisionDripCampaignMutation();
     const [composeNotification] = useComposeNotificationMutation();
+    const [nudgeOpen, setNudgeOpen] = useState(false);
+    const [nudgeMessage, setNudgeMessage] = useState('');
 
     const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[PriorityEnum.LOW];
     const categoryColor = task.category?.colorCode || '#6B7280'; // Default gray
@@ -54,16 +47,20 @@ export function TaskCard({ task, completed }: TaskCardProps) {
 
     const isFamilyView = typeof window !== 'undefined' ? !!localStorage.getItem('family_share_token') : false;
 
-    const handleDelete = async (e: React.MouseEvent) => {
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+    const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (confirm('Are you sure you want to delete this task?')) {
-            try {
-                await deleteTask(task.id).unwrap();
-                toast.success('Task deleted');
-            } catch (err) {
-                toast.error('Failed to delete task');
-                console.error(err);
-            }
+        setDeleteConfirmOpen(true);
+    };
+
+    const performDelete = async () => {
+        try {
+            await deleteTask(task.id).unwrap();
+            toast.success('Task deleted');
+        } catch (err) {
+            toast.error('Failed to delete task');
+            console.error('Failed to delete task:', err);
         }
     };
 
@@ -75,8 +72,9 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                 result.status === TaskStatus.IN_PROGRESS ? 'started' : 'reset';
             toast.success(`Task ${statusLabel}`);
         } catch (err) {
-            toast.error('Failed to update task status');
-            console.error(err);
+            const message = getApiErrorMessage(err, 'Failed to update task status');
+            toast.error(message);
+            console.warn('Failed to update task status:', message);
         }
     };
 
@@ -115,20 +113,24 @@ export function TaskCard({ task, completed }: TaskCardProps) {
         }
     };
 
-    const handleSendNudge = async (e: React.MouseEvent) => {
+    const handleSendNudge = (e: React.MouseEvent) => {
         e.stopPropagation();
-        const message = window.prompt("Enter a nudge message for the student:");
-        if (!message) return;
+        setNudgeMessage('');
+        setNudgeOpen(true);
+    };
 
+    const handleSendNudgeConfirm = async () => {
+        if (!nudgeMessage.trim()) return;
         try {
             await composeNotification({
                 category: 'BEHAVIORAL_NUDGE',
                 title: `Family Nudge: ${task.title}`,
-                body: message,
+                body: nudgeMessage,
                 priority: 'HIGH',
                 deepLink: '/dashboard'
             }).unwrap();
             toast.success('Nudge sent to student');
+            setNudgeOpen(false);
         } catch (err) {
             toast.error('Failed to send nudge');
             console.error(err);
@@ -282,6 +284,40 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                     )}
                 </div>
             </div>
+
+            <Dialog open={nudgeOpen} onOpenChange={setNudgeOpen}>
+                <DialogContent className="bg-slate-900 border-white/10 text-white">
+                    <DialogHeader>
+                        <DialogTitle>Send Nudge</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-slate-400 mb-2">Enter a message to encourage the student about <span className="font-semibold text-slate-200">{task.title}</span>:</p>
+                    <Input
+                        autoFocus
+                        value={nudgeMessage}
+                        onChange={(e) => setNudgeMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendNudgeConfirm()}
+                        placeholder="e.g. You're doing great, keep it up!"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                    />
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setNudgeOpen(false)} className="bg-white/5 border-white/10 text-slate-300">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSendNudgeConfirm} disabled={!nudgeMessage.trim()} className="bg-indigo-600 hover:bg-indigo-500">
+                            <BellRing className="w-4 h-4 mr-2" />
+                            Send Nudge
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <ConfirmDialog
+                open={deleteConfirmOpen}
+                onOpenChange={setDeleteConfirmOpen}
+                title="Delete Task"
+                description="Are you sure you want to delete this task? This action cannot be undone."
+                confirmLabel="Delete"
+                onConfirm={performDelete}
+            />
         </div>
     );
 }

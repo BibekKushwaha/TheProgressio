@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { useIsMounted } from '@/hooks/useIsMounted';
 
 
 import { motion } from 'framer-motion';
@@ -7,15 +8,11 @@ import { Trophy, Flame, Clock, Zap } from 'lucide-react';
 import { useGetUserStreakQuery, useGetFocusScoreQuery, selectCurrentUser, useAppSelector, useGetUserXPQuery } from '@repo/store';
 
 export function ProgressSection() {
-  const [mounted, setMounted] = React.useState(false);
+  const mounted = useIsMounted();
   const user = useAppSelector(selectCurrentUser);
   const { data: streakData } = useGetUserStreakQuery(undefined, { skip: !user });
   const { data: focusScoreData } = useGetFocusScoreQuery(undefined, { skip: !user });
   const { data: xpData } = useGetUserXPQuery(undefined, { skip: !user });
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const showUserContent = mounted && !!user;
 

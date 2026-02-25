@@ -6,7 +6,7 @@ export type PaymentStatus = 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED';
 export interface CreatePaymentIntentInput {
   plan: BillingPlan;
   provider: PaymentProvider;
-  amountPaise?: number;
+  // amountPaise intentionally removed — amount is always derived server-side from DEFAULT_PLAN_PRICE_PAISE
 }
 
 export interface PaymentWebhookInput {
@@ -71,7 +71,7 @@ export async function createPaymentIntent(userId: string, input: CreatePaymentIn
     throw new Error('FREE plan does not require payment intent');
   }
 
-  const amountPaise = Math.max(100, Math.round(input.amountPaise ?? DEFAULT_PLAN_PRICE_PAISE[input.plan]));
+  const amountPaise = DEFAULT_PLAN_PRICE_PAISE[input.plan];
   const intentId = randomToken('intent');
   const paymentRef = randomToken('pay');
 

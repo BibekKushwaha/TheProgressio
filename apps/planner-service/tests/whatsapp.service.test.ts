@@ -1,8 +1,21 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import crypto from 'crypto';
 
 const { mockCreateTaskFromText } = vi.hoisted(() => ({
   mockCreateTaskFromText: vi.fn(),
+}));
+
+const { mockSanitizeIncomingText, mockClassifyWhatsAppIntent, mockExtractWhatsAppTaskJson } = vi.hoisted(() => ({
+  mockSanitizeIncomingText: vi.fn((text: string) => text),
+  mockClassifyWhatsAppIntent: vi.fn().mockResolvedValue('create_task'),
+  mockExtractWhatsAppTaskJson: vi.fn().mockResolvedValue({
+    title: 'Generated Task',
+    dueAt: null,
+    recurrence: null,
+    confidence: 0.95,
+    source: 'rule',
+  }),
 }));
 
 vi.mock('../src/controllers/task.controller.js', async (importOriginal) => {
@@ -12,6 +25,15 @@ vi.mock('../src/controllers/task.controller.js', async (importOriginal) => {
     createTaskFromText: mockCreateTaskFromText,
   };
 });
+
+vi.mock('../src/services/ai.service.js', () => ({
+  aiService: {
+    sanitizeIncomingText: mockSanitizeIncomingText,
+    classifyWhatsAppIntent: mockClassifyWhatsAppIntent,
+    extractWhatsAppTaskJson: mockExtractWhatsAppTaskJson,
+    generateSubtasks: vi.fn().mockResolvedValue(['Step 1', 'Step 2']),
+  },
+}));
 
 vi.mock('../src/services/producer.service.js', () => ({
   producer: { connect: vi.fn(), send: vi.fn(), disconnect: vi.fn() },
@@ -37,7 +59,7 @@ vi.mock('@repo/db', () => ({
 }));
 
 import { app } from '../src/index.js';
-import { extractWhatsAppInbound, resolveWhatsAppOcr, resolveWhatsAppTranscript } from '../src/services/whatsapp.service.js';
+import { extractWhatsAppInbound, isWhatsAppMetaSignatureValid, resolveWhatsAppOcr, resolveWhatsAppTranscript } from '../src/services/whatsapp.service.js';
 
 describe('whatsapp.service — extractWhatsAppInbound', () => {
   it('extracts direct text payload', () => {
@@ -221,18 +243,29 @@ describe('whatsapp.controller — capture endpoint', () => {
     process.env.WHATSAPP_NUMBER_USER_MAP = JSON.stringify({
       '919876543210': 'user-1',
     });
-    delete process.env.WHATSAPP_WEBHOOK_SECRET;
+    process.env.WHATSAPP_WEBHOOK_SECRET = 'wa-secret';
     delete process.env.WHATSAPP_TRANSCRIBE_URL;
 
     mockCreateTaskFromText.mockResolvedValue({
       task: { id: 't1', title: 'Generated Task' },
       parsedData: { title: 'Generated Task' },
     });
+
+    mockSanitizeIncomingText.mockImplementation((text: string) => text);
+    mockClassifyWhatsAppIntent.mockResolvedValue('create_task');
+    mockExtractWhatsAppTaskJson.mockResolvedValue({
+      title: 'Generated Task',
+      dueAt: null,
+      recurrence: null,
+      confidence: 0.95,
+      source: 'rule',
+    });
   });
 
   it('creates task from direct text payload', async () => {
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
       .send({ userId: 'user-1', text: 'Finish chemistry assignment at 9pm', from: '919876543210' });
 
     expect(res.status).toBe(201);
@@ -249,6 +282,7 @@ describe('whatsapp.controller — capture endpoint', () => {
   it('creates task from voice transcript payload', async () => {
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
       .send({
         userId: 'user-1',
         from: '919876543210',
@@ -274,9 +308,116 @@ describe('whatsapp.controller — capture endpoint', () => {
   it('returns 400 when no text or transcript can be resolved', async () => {
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
       .send({ userId: 'user-1', from: '919876543210' });
 
     expect(res.status).toBe(400);
     expect(res.body.message).toContain('No parseable text message found');
+  });
+
+  it('asks clarification when extraction confidence is low', async () => {
+    mockExtractWhatsAppTaskJson.mockResolvedValueOnce({
+      title: 'Generated Task',
+      dueAt: null,
+      recurrence: null,
+      confidence: 0.55,
+      source: 'ai',
+    });
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'Call mom tomorrow', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('Clarification required');
+    expect(mockCreateTaskFromText).not.toHaveBeenCalled();
+  });
+
+  it('does not create task for non-create intents', async () => {
+    mockClassifyWhatsAppIntent.mockResolvedValueOnce('list_tasks');
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'show my tasks', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Non-create intent handled');
+    expect(res.body.intent).toBe('list_tasks');
+    expect(mockCreateTaskFromText).not.toHaveBeenCalled();
+  });
+});
+
+describe('whatsapp.service — isWhatsAppMetaSignatureValid', () => {
+  const rawBody = Buffer.from(JSON.stringify({ hello: 'world' }));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.WHATSAPP_APP_SECRET;
+  });
+
+  it('returns false when WHATSAPP_APP_SECRET is missing', () => {
+    const signature = crypto.createHmac('sha256', 'secret').update(rawBody).digest('hex');
+    expect(isWhatsAppMetaSignatureValid({ signatureHeader: `sha256=${signature}`, rawBody })).toBe(false);
+  });
+
+  it('returns true for a valid signature', () => {
+    process.env.WHATSAPP_APP_SECRET = 'secret';
+    const signature = crypto.createHmac('sha256', 'secret').update(rawBody).digest('hex');
+    expect(isWhatsAppMetaSignatureValid({ signatureHeader: `sha256=${signature}`, rawBody })).toBe(true);
+  });
+
+  it('returns false for an invalid signature', () => {
+    process.env.WHATSAPP_APP_SECRET = 'secret';
+    expect(isWhatsAppMetaSignatureValid({ signatureHeader: 'sha256=deadbeef', rawBody })).toBe(false);
+  });
+});
+
+describe('whatsapp.controller — webhook endpoint (signature)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.WHATSAPP_APP_SECRET = 'app-secret';
+  });
+
+  it('rejects the request when signature header is missing', async () => {
+    const payload = { entry: [] };
+    const raw = JSON.stringify(payload);
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/webhook')
+      .set('Content-Type', 'application/json')
+      .send(raw);
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain('Unauthorized');
+  });
+
+  it('rejects the request when signature is invalid', async () => {
+    const payload = { entry: [] };
+    const raw = JSON.stringify(payload);
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/webhook')
+      .set('Content-Type', 'application/json')
+      .set('x-hub-signature-256', 'sha256=deadbeef')
+      .send(raw);
+
+    expect(res.status).toBe(401);
+  });
+
+  it('acknowledges non-message events when signature is valid', async () => {
+    const payload = { entry: [] };
+    const raw = JSON.stringify(payload);
+    const signature = crypto.createHmac('sha256', 'app-secret').update(Buffer.from(raw)).digest('hex');
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/webhook')
+      .set('Content-Type', 'application/json')
+      .set('x-hub-signature-256', `sha256=${signature}`)
+      .send(raw);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('Ignored');
   });
 });

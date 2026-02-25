@@ -35,25 +35,42 @@ export function QRAttendance() {
 
     const attendanceEntries = useMemo(() => {
         if (!historyData?.history) return [];
-        return historyData.history.map((entry: { id: string; date: string; status: string; method: string; location?: string }) => ({
+        const byDay = new Map<string, { id: string; date: string; status: string; method: string; location?: string }>();
+        for (const entry of historyData.history as Array<{ id: string; date: string; status: string; method: string; location?: string }>) {
+            const dayKey = new Date(entry.date).toISOString().slice(0, 10);
+            const existing = byDay.get(dayKey);
+            if (!existing || new Date(entry.date).getTime() > new Date(existing.date).getTime()) {
+                byDay.set(dayKey, entry);
+            }
+        }
+
+        return Array.from(byDay.values())
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .map((entry) => ({
             id: entry.id,
             date: new Date(entry.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }),
             time: new Date(entry.date).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }),
             status: entry.status as 'PRESENT' | 'ABSENT' | 'LATE',
             method: entry.method as 'QR' | 'MANUAL' | 'GEOFENCE',
             location: entry.location
-        }));
+            }));
+    }, [historyData]);
+
+    const hasMarkedToday = useMemo(() => {
+        if (!historyData?.history?.length) return false;
+        const todayUtc = new Date().toISOString().slice(0, 10);
+        return historyData.history.some((entry: { date: string }) => new Date(entry.date).toISOString().slice(0, 10) === todayUtc);
     }, [historyData]);
 
     const handleMarkAttendance = async () => {
         try {
-            await markAttendance({
+            const result = await markAttendance({
                 qrCode,
                 status: 'PRESENT',
                 method: 'QR',
                 location: 'Campus'
             }).unwrap();
-            toast.success("Attendance marked via QR!");
+            toast.success(result?.message || "Attendance marked via QR!");
             setQrCode(`STU-${userId.slice(-6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`);
         } catch (_error) {
             toast.error("Failed to mark attendance");
@@ -111,9 +128,9 @@ export function QRAttendance() {
                     <Button
                         className="w-full bg-indigo-600 hover:bg-indigo-700 font-bold"
                         onClick={handleMarkAttendance}
-                        disabled={isMarking}
+                        disabled={isMarking || hasMarkedToday}
                     >
-                        {isMarking ? "Marking..." : "Simulate QR Scan"}
+                        {isMarking ? "Marking..." : hasMarkedToday ? "Already Marked Today" : "Simulate QR Scan"}
                     </Button>
                 </div>
 
@@ -200,4 +217,3 @@ export function QRAttendance() {
         </div>
     );
 }
-

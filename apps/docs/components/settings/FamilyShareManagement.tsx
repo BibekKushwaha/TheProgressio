@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export function FamilyShareManagement() {
     const { data, isLoading } = useGetFamilyLinksQuery();
@@ -18,6 +19,7 @@ export function FamilyShareManagement() {
 
     const [label, setLabel] = useState('');
     const [permissions, setPermissions] = useState('READ_ONLY');
+    const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
     const [expiresInDays, setExpiresInDays] = useState('14');
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -41,14 +43,20 @@ export function FamilyShareManagement() {
         }
     };
 
-    const handleRevoke = async (id: string) => {
-        if (!confirm('Are you sure you want to revoke this share link? Mentors using it will lose access immediately.')) return;
+    const handleRevoke = (id: string) => {
+        setPendingRevokeId(id);
+    };
+
+    const performRevoke = async () => {
+        if (!pendingRevokeId) return;
         try {
-            await revokeLink(id).unwrap();
+            await revokeLink(pendingRevokeId).unwrap();
             toast.success('Share link revoked');
         } catch (error) {
             console.error('Failed to revoke share link:', error);
             toast.error('Failed to revoke share link');
+        } finally {
+            setPendingRevokeId(null);
         }
     };
 
@@ -63,12 +71,13 @@ export function FamilyShareManagement() {
     const links = data?.links || [];
 
     return (
+        <>
         <Card variant="glass" className="overflow-hidden">
             <CardHeader>
                 <div className="flex items-center gap-3">
                     <Share2 className="w-5 h-5 text-indigo-400" />
                     <div>
-                        <CardTitle>Family & Mentor Sharing</CardTitle>
+                        <CardTitle>Family &amp; Mentor Sharing</CardTitle>
                         <CardDescription>Generate read-only links to share your progress with parents or mentors.</CardDescription>
                     </div>
                 </div>
@@ -204,6 +213,15 @@ export function FamilyShareManagement() {
                 </div>
             </CardContent>
         </Card>
+        <ConfirmDialog
+            open={!!pendingRevokeId}
+            onOpenChange={(open) => { if (!open) setPendingRevokeId(null); }}
+            title="Revoke Share Link"
+            description="Are you sure you want to revoke this share link? Mentors using it will lose access immediately."
+            confirmLabel="Revoke"
+            onConfirm={performRevoke}
+        />
+        </>
     );
 }
 

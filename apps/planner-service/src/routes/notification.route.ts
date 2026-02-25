@@ -2,8 +2,10 @@ import { Router } from "express";
 import {
   composeNotification,
   createRevisionDripCampaign,
+  getPushStatus,
   getNotificationDeepLink,
   postDirectReply,
+  sendPushTest,
   subscribeToPush,
   triggerGeofencePing,
   unsubscribeFromPush,
@@ -17,6 +19,8 @@ router.post("/drip-campaign/revision", createRevisionDripCampaign);
 router.post("/geofence/ping", triggerGeofencePing);
 router.post("/subscribe", subscribeToPush);
 router.post("/unsubscribe", unsubscribeFromPush);
+router.post("/push/test", sendPushTest);
+router.get("/push/status", getPushStatus);
 router.get("/deeplink/:entityType/:entityId", getNotificationDeepLink);
 
 export default router;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useIsMounted } from '@/hooks/useIsMounted';
 import {
     useGetDailyScheduleQuery,
     useCreateTimetableEntryMutation,
@@ -28,11 +29,11 @@ export function ClassManager() {
     const [deleteSubject] = useDeleteSubjectMutation();
 
     const [dayOfWeek, setDayOfWeek] = useState<number>(0);
-    const [isMounted, setIsMounted] = useState(false);
+
+    const isMounted = useIsMounted();
 
     useEffect(() => {
         setDayOfWeek(new Date().getDay());
-        setIsMounted(true);
     }, []);
 
     const [isAddingSubject, setIsAddingSubject] = useState(false);

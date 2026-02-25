@@ -3,22 +3,21 @@ import { Search, Filter, Tag, LayoutGrid, Calendar, ListTodo, BarChart3 } from '
 import { TaskStatus, PriorityEnum } from '@repo/store';
 import { FilterDropdown } from './planner/FilterDropdown';
 
-
-const STATUS_OPTIONS = [
+const DEFAULT_STATUS_OPTIONS = [
     { label: "Status", value: "all" },
     { label: "Pending", value: TaskStatus.PENDING },
     { label: "In Progress", value: TaskStatus.IN_PROGRESS },
     { label: "Completed", value: TaskStatus.COMPLETED },
 ] as const;
 
-const PRIORITY_OPTIONS = [
+const DEFAULT_PRIORITY_OPTIONS = [
     { label: "Priority", value: "all" },
     { label: "Low", value: PriorityEnum.LOW },
     { label: "Medium", value: PriorityEnum.MEDIUM },
     { label: "High", value: PriorityEnum.HIGH },
 ] as const;
 
-const CATEGORY_OPTIONS = [
+const DEFAULT_CATEGORY_OPTIONS = [
     { label: "Category", value: "all", color: "#6B7280" },
     { label: "Personal", value: "personal", color: "#A855F7" },
     { label: "Studies", value: "studies", color: "#3B82F6", },
@@ -38,9 +37,9 @@ interface SearchBarProps {
     setSelectedCategory?: (category: string) => void;
     view?: 'kanban' | 'list' | 'timetable' | 'timeline';
     setView?: (view: 'kanban' | 'list' | 'timetable' | 'timeline') => void;
-    STATUS_OPTIONS?: readonly { label: string; value: string }[];
-    PRIORITY_OPTIONS?: readonly { label: string; value: string }[];
-    CATEGORY_OPTIONS?: readonly { label: string; value: string; color?: string }[];
+    statusOptions?: readonly { label: string; value: string }[];
+    priorityOptions?: readonly { label: string; value: string }[];
+    categoryOptions?: readonly { label: string; value: string; color?: string }[];
 }
 
 export function SearchBar({
@@ -54,14 +53,10 @@ export function SearchBar({
     setSelectedCategory,
     view,
     setView,
-    STATUS_OPTIONS: propStatusOptions,
-    PRIORITY_OPTIONS: propPriorityOptions,
-    CATEGORY_OPTIONS: propCategoryOptions
+    statusOptions = DEFAULT_STATUS_OPTIONS,
+    priorityOptions = DEFAULT_PRIORITY_OPTIONS,
+    categoryOptions = DEFAULT_CATEGORY_OPTIONS,
 }: SearchBarProps) {
-
-    const currentStatusOptions = propStatusOptions || STATUS_OPTIONS;
-    const currentPriorityOptions = propPriorityOptions || PRIORITY_OPTIONS;
-    const currentCategoryOptions = propCategoryOptions || CATEGORY_OPTIONS;
 
     return (
         <header className="border-b border-white/10 bg-black/30 backdrop-blur-xl p-3 md:p-4 ml-0.5">
@@ -82,7 +77,7 @@ export function SearchBar({
                         {status && setStatus && (
                             <FilterDropdown
                                 value={status}
-                                options={currentStatusOptions}
+                                options={statusOptions}
                                 onChange={setStatus}
                                 placeholder="Status"
                                 icon={<Filter className="w-4 h-4" />}
@@ -91,7 +86,7 @@ export function SearchBar({
                         {priority && setPriority && (
                             <FilterDropdown
                                 value={priority}
-                                options={currentPriorityOptions}
+                                options={priorityOptions}
                                 onChange={setPriority}
                                 placeholder="Priority"
                                 icon={<Tag className="w-4 h-4" />}
@@ -100,7 +95,7 @@ export function SearchBar({
                         {selectedCategory && setSelectedCategory && (
                             <FilterDropdown
                                 value={selectedCategory}
-                                options={currentCategoryOptions}
+                                options={categoryOptions}
                                 onChange={setSelectedCategory}
                                 placeholder="Category"
                                 icon={<Tag className="w-4 h-4" />}

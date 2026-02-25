@@ -4,7 +4,8 @@
  * Tests all HTTP endpoints through supertest with mocked Prisma and auth.
  */
 import request from 'supertest';
-import { describe, it, beforeEach, expect, vi } from 'vitest';
+import http from 'http';
+import { describe, it, beforeAll, afterAll, beforeEach, expect, vi } from 'vitest';
 
 // ─── Global Mocks ───────────────────────────────────────────────────────────────
 
@@ -134,6 +135,18 @@ vi.mock('@repo/db', () => {
 import { app } from '../src/index.js';
 import { prisma } from '@repo/db';
 
+let server: any;
+
+beforeAll((done) => {
+    server = http.createServer(app);
+    server.listen(0, '127.0.0.1', done);
+});
+
+afterAll((done) => {
+    if (!server) return done();
+    server.close(done);
+});
+
 // ─── Habit CRUD Tests ───────────────────────────────────────────────────────────
 
 describe('Habit endpoints — CRUD', () => {
@@ -148,7 +161,7 @@ describe('Habit endpoints — CRUD', () => {
         };
         (prisma.habit.create as any).mockResolvedValue(created);
 
-        const res = await request(app)
+        const res = await request(server)
             .post('/api/habits')
             .send({ name: 'Morning Run' });
 
@@ -158,7 +171,7 @@ describe('Habit endpoints — CRUD', () => {
     });
 
     it('POST /api/habits — 400 when name is missing', async () => {
-        const res = await request(app)
+        const res = await request(server)
             .post('/api/habits')
             .send({});
 
@@ -173,7 +186,7 @@ describe('Habit endpoints — CRUD', () => {
         };
         (prisma.habit.create as any).mockResolvedValue(created);
 
-        const res = await request(app)
+        const res = await request(server)
             .post('/api/habits')
             .send({ name: 'Meditate', mercyDaysAllowed: 2 });
 
@@ -191,7 +204,7 @@ describe('Habit endpoints — CRUD', () => {
             { id: 'h1', name: 'Run', frequency: 'DAILY', currentStreak: 3, longestStreak: 5, lastLogDate: null, logs: [], userId: 'user-1' },
         ]);
 
-        const res = await request(app).get('/api/habits');
+        const res = await request(server).get('/api/habits');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('habits');
@@ -207,7 +220,7 @@ describe('Habit endpoints — CRUD', () => {
             userId: 'user-1',
         });
 
-        const res = await request(app).get('/api/habits/h1/stats');
+        const res = await request(server).get('/api/habits/h1/stats');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('stats');
@@ -222,7 +235,7 @@ describe('Habit endpoints — CRUD', () => {
             id: 'h1', name: 'Evening Run', frequency: 'DAILY', userId: 'user-1',
         });
 
-        const res = await request(app)
+        const res = await request(server)
             .put('/api/habits/h1')
             .send({ name: 'Evening Run' });
 
@@ -235,7 +248,7 @@ describe('Habit endpoints — CRUD', () => {
         (prisma.habit.findFirst as any).mockResolvedValue({ id: 'h1', userId: 'user-1' });
         (prisma.habit.delete as any).mockResolvedValue({ id: 'h1' });
 
-        const res = await request(app).delete('/api/habits/h1');
+        const res = await request(server).delete('/api/habits/h1');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('message');
@@ -260,7 +273,7 @@ describe('Habit endpoints — Log Completion', () => {
             id: 'h1', name: 'Run', currentStreak: 5, longestStreak: 10,
         });
 
-        const res = await request(app)
+        const res = await request(server)
             .post('/api/habits/h1/log')
             .send({});
 
@@ -279,7 +292,7 @@ describe('Habit endpoints — Log Completion', () => {
             id: 'existing-log', habitId: 'h1', completedValue: 1, loggedAt: new Date(),
         });
 
-        const res = await request(app)
+        const res = await request(server)
             .post('/api/habits/h1/log')
             .send({});
 
@@ -309,7 +322,7 @@ describe('Habit endpoints — Log Completion', () => {
             mercyDaysUsed: 0, lastLogDate: new Date(),
         });
 
-        const res = await request(app)
+        const res = await request(server)
             .post('/api/habits/h1/log')
             .send({});
 
@@ -331,14 +344,14 @@ describe('Habit endpoints — XP & Gamification', () => {
             id: 'user-1', xp: 250, level: 3,
         });
 
-        const res = await request(app).get('/api/habits/xp');
+        const res = await request(server).get('/api/habits/xp');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('xp');
     });
 
     it('GET /api/habits/heatmap — returns 365-day heatmap', async () => {
-        const res = await request(app).get('/api/habits/heatmap');
+        const res = await request(server).get('/api/habits/heatmap');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('heatmap');
@@ -353,7 +366,7 @@ describe('Habit endpoints — Nudges', () => {
     beforeEach(() => vi.clearAllMocks());
 
     it('GET /api/habits/nudges — returns nudge list', async () => {
-        const res = await request(app).get('/api/habits/nudges');
+        const res = await request(server).get('/api/habits/nudges');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('nudges');
@@ -361,19 +374,19 @@ describe('Habit endpoints — Nudges', () => {
     });
 
     it('POST /api/habits/nudges/:id/read — marks nudge as read', async () => {
-        const res = await request(app).post('/api/habits/nudges/n1/read');
+        const res = await request(server).post('/api/habits/nudges/n1/read');
 
         expect(res.status).toBe(200);
     });
 
     it('POST /api/habits/nudges/read-all — marks all nudges as read', async () => {
-        const res = await request(app).post('/api/habits/nudges/read-all');
+        const res = await request(server).post('/api/habits/nudges/read-all');
 
         expect(res.status).toBe(200);
     });
 
     it('GET /api/habits/nudges/settings — returns notification settings including schedule fields', async () => {
-        const res = await request(app).get('/api/habits/nudges/settings');
+        const res = await request(server).get('/api/habits/nudges/settings');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('settings.preDeadlineDays', 2);
@@ -381,7 +394,7 @@ describe('Habit endpoints — Nudges', () => {
     });
 
     it('PUT /api/habits/nudges/settings — accepts partial schedule settings updates', async () => {
-        const res = await request(app)
+        const res = await request(server)
             .put('/api/habits/nudges/settings')
             .send({ preDeadlineDays: 3 });
 
@@ -396,7 +409,7 @@ describe('Habit endpoints — Morning Briefing', () => {
     beforeEach(() => vi.clearAllMocks());
 
     it('GET /api/habits/briefing — returns morning briefing', async () => {
-        const res = await request(app).get('/api/habits/briefing');
+        const res = await request(server).get('/api/habits/briefing');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('briefing');
@@ -420,7 +433,7 @@ describe('Habit endpoints — Reset', () => {
             id: 'h1', currentStreak: 0, longestStreak: 0, mercyDaysUsed: 0, lastLogDate: null,
         });
 
-        const res = await request(app).post('/api/habits/h1/reset');
+        const res = await request(server).post('/api/habits/h1/reset');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('habit');
@@ -435,7 +448,7 @@ describe('Habit endpoints — Event Handler', () => {
     it('POST /api/habits/events — handles habit event', async () => {
         (prisma.habit.findMany as any).mockResolvedValue([]);
 
-        const res = await request(app)
+        const res = await request(server)
             .post('/api/habits/events')
             .send({ type: 'TaskCompleted', habitId: 'h1', completedValue: 1 });
 
@@ -443,10 +456,48 @@ describe('Habit endpoints — Event Handler', () => {
     });
 
     it('POST /api/habits/events — 400 on invalid payload', async () => {
-        const res = await request(app)
+        const res = await request(server)
             .post('/api/habits/events')
             .send({});
 
         expect([200, 400]).toContain(res.status);
+    });
+});
+
+describe('Habit endpoints — Internal', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('GET /api/habits/internal/metrics — returns lightweight internal counters', async () => {
+        const res = await request(server).get('/api/habits/internal/metrics');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('metrics');
+        expect(res.body).toHaveProperty('generatedAt');
+    });
+
+    it('GET /api/habits/internal/metrics?keys=... — safely filters to requested keys', async () => {
+        const res = await request(server).get('/api/habits/internal/metrics?keys=not_a_real_metric,another_fake_key');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('metrics');
+        expect(res.body.metrics).toEqual({});
+    });
+
+    it('POST /api/habits/internal/wa-fallback/cancel — cancels pending fallback jobs for user', async () => {
+        const res = await request(server)
+            .post('/api/habits/internal/wa-fallback/cancel')
+            .send({ userId: 'user-1' });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('userId', 'user-1');
+        expect(res.body).toHaveProperty('cancelled');
+    });
+
+    it('POST /api/habits/internal/wa-fallback/cancel — returns 400 without userId', async () => {
+        const res = await request(server)
+            .post('/api/habits/internal/wa-fallback/cancel')
+            .send({});
+
+        expect(res.status).toBe(400);
     });
 });

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { rateLimit } from 'express-rate-limit';
 import activityRouter from "./routes/activity.route.js";
 import statsRouter from "./routes/stats.route.js";
 import { shutdownWorker } from "./services/worker.service.js";
@@ -21,6 +22,16 @@ app.use(cookieParser());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Global rate limit
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many requests, please try again later' },
+});
+app.use(globalLimiter);
 
 app.get("/", (_req, res) => {
     res.json({ message: "Analytics Service API", status: "UP" });

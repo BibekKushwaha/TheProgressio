@@ -22,6 +22,38 @@ export const markAttendance = TryCatch(async (req: AuthenticatedRequest, res: Re
   }
 
   const { status, method, location } = result.data;
+  const now = new Date();
+  const dayStartUtc = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    0, 0, 0, 0,
+  ));
+  const dayEndUtc = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    23, 59, 59, 999,
+  ));
+
+  const existingToday = await prisma.attendance.findFirst({
+    where: {
+      userId,
+      date: {
+        gte: dayStartUtc,
+        lte: dayEndUtc,
+      },
+    },
+    orderBy: { date: "desc" },
+  });
+
+  if (existingToday) {
+    return res.status(200).json({
+      message: "Attendance already marked for today",
+      attendance: existingToday,
+      duplicate: true,
+    });
+  }
 
   // For QR, we could validate the code against a session, but for now we'll just log it
   const attendance = await prisma.attendance.create({
@@ -30,7 +62,7 @@ export const markAttendance = TryCatch(async (req: AuthenticatedRequest, res: Re
       status,
       method,
       location: location || "Campus",
-      date: new Date(),
+      date: now,
     }
   });
 

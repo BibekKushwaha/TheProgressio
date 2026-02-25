@@ -54,7 +54,7 @@ import { app } from '../src/index.js';
 describe('Payment API integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.PAYMENT_WEBHOOK_SECRET;
+    process.env.PAYMENT_WEBHOOK_SECRET = 'pay-webhook-secret';
 
     mockPrisma.$transaction.mockImplementation(async (handler: any) => handler(mockPrisma));
 
@@ -144,6 +144,7 @@ describe('Payment API integration', () => {
 
     const res = await request(app)
       .post('/api/payments/webhook')
+      .set('x-payment-signature', 'pay-webhook-secret')
       .send({ paymentRef: 'pay_1', status: 'SUCCESS', provider: 'UPI' });
 
     expect(res.status).toBe(200);

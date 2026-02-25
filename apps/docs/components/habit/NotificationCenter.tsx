@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useIsMounted } from '@/hooks/useIsMounted';
+import Image from 'next/image';
 import type { MouseEvent } from 'react';
 import {
     useGetNudgesQuery,
@@ -54,13 +56,10 @@ const toProgress = (metadata: Record<string, unknown>) => {
 };
 
 export function NotificationCenter() {
-    const [isMounted, setIsMounted] = useState(false);
+    const isMounted = useIsMounted();
     const router = useRouter();
     const { data, isLoading, refetch } = useGetNudgesQuery();
 
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
     const [markRead] = useMarkNudgeAsReadMutation();
     const [markAllRead, { isLoading: isMarkingAllRead }] = useMarkAllNudgesAsReadMutation();
     const [postDirectReply, { isLoading: isReplying }] = usePostNotificationDirectReplyMutation();
@@ -393,8 +392,15 @@ export function NotificationCenter() {
                                                         {String(richMediaType).toUpperCase() === 'VIDEO' ? (
                                                             <video src={richMediaUrl} controls className="w-full max-h-52 object-cover" />
                                                         ) : (
-                                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                                            <img src={richMediaUrl} alt="Notification media" className="w-full max-h-52 object-cover" />
+                                                            <div className="relative w-full h-52">
+                                                                <Image
+                                                                    src={richMediaUrl}
+                                                                    alt="Notification media"
+                                                                    fill
+                                                                    unoptimized
+                                                                    className="object-cover"
+                                                                />
+                                                            </div>
                                                         )}
                                                     </div>
                                                 )}

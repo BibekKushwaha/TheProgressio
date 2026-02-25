@@ -67,8 +67,8 @@ const MOBILE_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.MOBILE_REFRESH_TOK
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  maxAge: 15 * 24 * 60 * 60 * 1000,
+  sameSite: 'strict' as const,
+  maxAge: 60 * 60 * 1000, // 1 hour
 };
 
 const ensureJwtSecret = (): string => {
@@ -80,7 +80,7 @@ const ensureJwtSecret = (): string => {
 };
 
 const issueAccessToken = (userId: string, options?: { expiresIn?: string }) => {
-  const expiresIn = (options?.expiresIn ?? "15d") as NonNullable<SignOptions["expiresIn"]>;
+  const expiresIn = (options?.expiresIn ?? "1h") as NonNullable<SignOptions["expiresIn"]>;
   const signOptions: SignOptions = { expiresIn };
   return jwt.sign({ id: userId }, ensureJwtSecret(), signOptions);
 };
@@ -183,13 +183,41 @@ export const loginUser = TryCatch(async (req, res) => {
   }
   const { email, password } = result.data;
 
+  // Brute-force protection: block IPs/emails with > 5 failed attempts in 15 min
+  const failKey = `login_fail:${email.toLowerCase()}`;
+  const MAX_FAILURES = 5;
+  const WINDOW_SECONDS = 15 * 60;
+  try {
+    const mod = (await import('@repo/cache').catch(() => null)) as any;
+    if (mod?.getCache) {
+      const failures = (await mod.getCache(failKey) as number | null) ?? 0;
+      if (failures >= MAX_FAILURES) {
+        return res.status(429).json({ message: 'Too many failed login attempts. Please try again later.' });
+      }
+    }
+  } catch { /* non-blocking */ }
+
   const user = await prisma.user.findUnique({
     where: { email },
   });
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
+    // Increment failure counter
+    try {
+      const mod = (await import('@repo/cache').catch(() => null)) as any;
+      if (mod?.getCache && mod?.setCache) {
+        const prev = (await mod.getCache(failKey) as number | null) ?? 0;
+        await mod.setCache(failKey, prev + 1, { ex: WINDOW_SECONDS });
+      }
+    } catch { /* non-blocking */ }
     throw new ErrorHandler(400, "Invalid credentials");
   }
+
+  // Clear failure counter on success
+  try {
+    const mod = (await import('@repo/cache').catch(() => null)) as any;
+    if (mod?.deleteCache) await mod.deleteCache(failKey);
+  } catch { /* non-blocking */ }
 
   const token = issueAccessToken(user.id);
   res.cookie('token', token, COOKIE_OPTIONS);
@@ -208,6 +236,15 @@ export const logoutUser = TryCatch(async (req, res) => {
   const token = req.cookies?.token;
   if (token) {
     try {
+      const decoded = jwt.decode(token) as jwt.JwtPayload | null;
+      const exp = decoded?.exp;
+      const remaining = exp ? Math.max(0, exp - Math.floor(Date.now() / 1000)) : 3600;
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      // Blacklist the token so it cannot be reused after logout
+      const mod = (await import('@repo/cache').catch(() => null)) as any;
+      if (mod?.setCache) {
+        await mod.setCache(`bl:${tokenHash}`, 1, { ex: remaining }).catch(() => null);
+      }
       const { id } = decodeAccessToken(token);
       await safeDeleteUserCache(id);
     } catch { /* ignore */ }

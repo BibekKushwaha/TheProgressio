@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export function AttachmentsList() {
     const { id: taskId } = useParams();
@@ -17,6 +18,7 @@ export function AttachmentsList() {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [name, setName] = useState('');
     const [url, setUrl] = useState('');
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
     const handleAdd = async () => {
         if (!name || !url || !taskId) return;
@@ -30,10 +32,14 @@ export function AttachmentsList() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (confirm('Delete this attachment?')) {
-            await deleteAttachment({ id, taskId: taskId as string });
-        }
+    const handleDelete = (id: string) => {
+        setPendingDeleteId(id);
+    };
+
+    const performDelete = async () => {
+        if (!pendingDeleteId) return;
+        await deleteAttachment({ id: pendingDeleteId, taskId: taskId as string });
+        setPendingDeleteId(null);
     };
 
     const attachments = task?.attachments || [];
@@ -131,6 +137,14 @@ export function AttachmentsList() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ConfirmDialog
+                open={!!pendingDeleteId}
+                onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+                title="Delete Attachment"
+                description="Delete this attachment? This cannot be undone."
+                confirmLabel="Delete"
+                onConfirm={performDelete}
+            />
         </div>
     );
 }

@@ -23,32 +23,16 @@ const SignupPage = () => {
 
 
   const validateForm = () => {
-    const newErrors: { username?: string; email?: string; password?: string; confirmPassword?: string } = {};
-
-    if (!username) {
-      newErrors.username = 'Full Name is required';
-    } else if (username.length < 2) {
-      newErrors.username = 'Full Name must be at least 2 characters';
-    }
-
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Email is invalid';
-    }
-
-    if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-
-    if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const parsed = registerSchema.safeParse({ username, email, password, confirmPassword });
+    if (parsed.success) return true;
+    const fieldErrors = parsed.error.flatten().fieldErrors;
+    setErrors({
+      username: fieldErrors.username?.[0],
+      email: fieldErrors.email?.[0],
+      password: fieldErrors.password?.[0],
+      confirmPassword: fieldErrors.confirmPassword?.[0],
+    });
+    return false;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -58,34 +42,16 @@ const SignupPage = () => {
       return;
     }
 
-    // Validate with shared Zod schema (client-side UX validation)
-    const parsed = registerSchema.safeParse({ username, email, password, confirmPassword });
-    if (!parsed.success) {
-      const fieldErrors = parsed.error.flatten().fieldErrors;
-      setErrors({
-        username: fieldErrors.username?.[0],
-        email: fieldErrors.email?.[0],
-        password: fieldErrors.password?.[0],
-        confirmPassword: fieldErrors.confirmPassword?.[0],
-      });
-      return;
-    }
-    console.log(parsed.data);
-
     try {
-      const res = await registerApi({ ...parsed.data, confirmPassword: parsed.data.confirmPassword! }).unwrap();
-      console.log("user is register successfully", res);
+      const res = await registerApi({ username, email, password, confirmPassword }).unwrap();
 
       if (res && res.user) {
         dispatch(setCredentials({ user: res.user }));
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('auth:hasSession', '1');
-        }
+        localStorage.setItem('auth:hasSession', '1');
       }
       router.push('/');
     } catch (err) {
       const errorMessage = getApiErrorMessage(err, 'Signup failed. Please try again.');
-      console.error('Signup failed:', errorMessage, err);
       setErrors({ email: errorMessage });
     }
   };

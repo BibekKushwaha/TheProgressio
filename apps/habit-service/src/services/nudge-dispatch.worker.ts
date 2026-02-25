@@ -1,11 +1,19 @@
 import { Worker, type Job, type ConnectionOptions } from "bullmq";
-import { dispatchWhatsAppNudgeById } from "./whatsapp-outbound.service.js";
-import { NUDGE_DISPATCH_QUEUE_NAME, type NudgeDispatchJobData } from "./nudge-dispatch.queue.js";
+import {
+    dispatchNudgePushById,
+    processWhatsAppFallbackNudgeById,
+} from "./whatsapp-outbound.service.js";
+import {
+    NUDGE_DISPATCH_QUEUE_NAME,
+    WHATSAPP_FALLBACK_QUEUE_NAME,
+    type NudgeDispatchJobData,
+    type WhatsAppFallbackJobData,
+} from "./nudge-dispatch.queue.js";
 
 const REDIS_HOST = process.env.REDIS_HOST || "localhost";
 const REDIS_PORT = Number.parseInt(process.env.REDIS_PORT || "6379", 10);
 const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
-const QUEUE_ENABLED = process.env.QUEUE_ENABLED === "true";
+const QUEUE_ENABLED = process.env.QUEUE_ENABLED === "true" && process.env.NODE_ENV !== "test";
 
 const connection: ConnectionOptions = {
     host: REDIS_HOST,
@@ -14,18 +22,19 @@ const connection: ConnectionOptions = {
 } as ConnectionOptions;
 
 let worker: Worker<NudgeDispatchJobData> | null = null;
+let waFallbackWorker: Worker<WhatsAppFallbackJobData> | null = null;
 
 export const initNudgeDispatchWorker = (): Worker<NudgeDispatchJobData> | null => {
     if (!QUEUE_ENABLED) {
         console.log("⚠️  Nudge dispatch worker running in direct mode (QUEUE_ENABLED=false)");
         return null;
     }
-    if (worker) return worker;
+    if (worker && waFallbackWorker) return worker;
 
     worker = new Worker<NudgeDispatchJobData>(
         NUDGE_DISPATCH_QUEUE_NAME,
         async (job: Job<NudgeDispatchJobData>) => {
-            await dispatchWhatsAppNudgeById(job.data.nudgeId);
+            await dispatchNudgePushById(job.data.nudgeId);
         },
         { connection, concurrency: 10 },
     );
@@ -37,7 +46,24 @@ export const initNudgeDispatchWorker = (): Worker<NudgeDispatchJobData> | null =
         console.error(`[NudgeDispatchWorker] ❌ Job ${job?.id} failed: ${err.message}`);
     });
 
-    console.log(`✅ Nudge Dispatch BullMQ Worker initialized (Queue: ${NUDGE_DISPATCH_QUEUE_NAME})`);
+    waFallbackWorker = new Worker<WhatsAppFallbackJobData>(
+        WHATSAPP_FALLBACK_QUEUE_NAME,
+        async (job: Job<WhatsAppFallbackJobData>) => {
+            await processWhatsAppFallbackNudgeById(job.data.nudgeId, { pushSentAt: job.data.pushSentAt });
+        },
+        { connection, concurrency: 10 },
+    );
+
+    waFallbackWorker.on("completed", (job) => {
+        console.log(`[WaFallbackWorker] ✅ Job ${job.id} completed`);
+    });
+    waFallbackWorker.on("failed", (job, err) => {
+        console.error(`[WaFallbackWorker] ❌ Job ${job?.id} failed: ${err.message}`);
+    });
+
+    console.log(
+        `✅ Nudge dispatch workers initialized (Queues: ${NUDGE_DISPATCH_QUEUE_NAME}, ${WHATSAPP_FALLBACK_QUEUE_NAME})`,
+    );
     return worker;
 };
 
@@ -45,5 +71,9 @@ export const closeNudgeDispatchWorker = async (): Promise<void> => {
     if (worker) {
         await worker.close();
         worker = null;
+    }
+    if (waFallbackWorker) {
+        await waFallbackWorker.close();
+        waFallbackWorker = null;
     }
 };

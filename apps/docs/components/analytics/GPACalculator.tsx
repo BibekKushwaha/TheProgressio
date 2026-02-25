@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useGetGPAQuery, useAddCourseGradeMutation, useUpdateCourseGradeMutation, useDeleteCourseGradeMutation, usePreviewGPAComponentsMutation } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,22 +8,18 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GraduationCap, Plus, TrendingUp, Award, Edit2, Trash2 } from 'lucide-react';
-import { useToast } from '@/components/ui/toast-provider';
+import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export function GPACalculator() {
-    const [isMounted, setIsMounted] = useState(false);
     const { data, isLoading } = useGetGPAQuery();
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
     const [addCourse] = useAddCourseGradeMutation();
     const [updateCourse] = useUpdateCourseGradeMutation();
     const [deleteCourse] = useDeleteCourseGradeMutation();
     const [previewComponents, { data: componentPreview, isLoading: isPreviewingComponents }] = usePreviewGPAComponentsMutation();
-    const { toast } = useToast();
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
+    const [pendingDeleteCourseId, setPendingDeleteCourseId] = useState<string | null>(null);
     const [newCourse, setNewCourse] = useState({
         courseName: '',
         credits: '',
@@ -52,7 +48,7 @@ export function GPACalculator() {
                     grade: newCourse.grade || undefined,
                     semester: newCourse.semester ? parseInt(newCourse.semester) : undefined,
                 }).unwrap();
-                toast('Course updated successfully!', 'success');
+                toast.success('Course updated successfully!');
             } else {
                 await addCourse({
                     courseName: newCourse.courseName,
@@ -61,24 +57,30 @@ export function GPACalculator() {
                     grade: newCourse.grade || undefined,
                     semester: newCourse.semester ? parseInt(newCourse.semester) : undefined,
                 }).unwrap();
-                toast('Course added successfully!', 'success');
+                toast.success('Course added successfully!');
             }
 
             setIsAddOpen(false);
             setEditingCourseId(null);
             setNewCourse({ courseName: '', credits: '', gradePoint: '', grade: '', semester: '' });
         } catch {
-            toast(editingCourseId ? 'Failed to update course' : 'Failed to add course', 'error');
+            toast.error(editingCourseId ? 'Failed to update course' : 'Failed to add course');
         }
     };
 
-    const handleDeleteCourse = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this course grade?')) return;
+    const handleDeleteCourse = (id: string) => {
+        setPendingDeleteCourseId(id);
+    };
+
+    const performDeleteCourse = async () => {
+        if (!pendingDeleteCourseId) return;
         try {
-            await deleteCourse(id).unwrap();
-            toast('Course deleted successfully!', 'success');
+            await deleteCourse(pendingDeleteCourseId).unwrap();
+            toast.success('Course deleted successfully!');
         } catch {
-            toast('Failed to delete course', 'error');
+            toast.error('Failed to delete course');
+        } finally {
+            setPendingDeleteCourseId(null);
         }
     };
 
@@ -94,7 +96,7 @@ export function GPACalculator() {
         setIsAddOpen(true);
     };
 
-    if (!isMounted || isLoading) {
+    if (isLoading) {
         return (
             <Card className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border-white/20 p-6">
                 <Skeleton className="h-8 w-48 bg-white/5 mb-4" />
@@ -126,7 +128,7 @@ export function GPACalculator() {
                 })),
             }).unwrap();
         } catch {
-            toast('Unable to preview component GPA', 'error');
+            toast.error('Unable to preview component GPA');
         }
     };
 
@@ -376,6 +378,14 @@ export function GPACalculator() {
                     </div>
                 </Card>
             )}
+            <ConfirmDialog
+                open={!!pendingDeleteCourseId}
+                onOpenChange={(open) => { if (!open) setPendingDeleteCourseId(null); }}
+                title="Delete Course"
+                description="Are you sure you want to delete this course grade? This cannot be undone."
+                confirmLabel="Delete"
+                onConfirm={performDeleteCourse}
+            />
         </div>
     );
 }

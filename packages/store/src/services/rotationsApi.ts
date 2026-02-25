@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { withRetry } from '../baseQuery';
 import { resolveServiceUrl } from '../runtime';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
@@ -48,14 +49,14 @@ export interface ResolvedRotation {
 
 export const rotationsApi = createApi({
     reducerPath: 'rotationsApi',
-    baseQuery: fetchBaseQuery({
+    baseQuery: withRetry(fetchBaseQuery({
         baseUrl: `${PLANNER_SERVICE_URL}/api/rotations`,
         credentials: 'include',
         prepareHeaders: (headers) => {
             headers.set('Content-Type', 'application/json');
             return headers;
         },
-    }),
+    })),
     tagTypes: ['Rotations'],
     endpoints: (builder) => ({
         getRotationPatterns: builder.query<RotationPattern[], void>({

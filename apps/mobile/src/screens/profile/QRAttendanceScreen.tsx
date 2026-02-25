@@ -32,7 +32,25 @@ export const QRAttendanceScreen: React.FC<ProfileScreenProps<'QRAttendance'>> = 
 
     const history = useMemo(() => {
         const list = (data as any)?.history;
-        return Array.isArray(list) ? list : [];
+        if (!Array.isArray(list)) return [];
+
+        const byDay = new Map<string, any>();
+        for (const entry of list) {
+            const dayKey = new Date(entry.date).toISOString().slice(0, 10);
+            const existing = byDay.get(dayKey);
+            if (!existing || new Date(entry.date).getTime() > new Date(existing.date).getTime()) {
+                byDay.set(dayKey, entry);
+            }
+        }
+
+        return Array.from(byDay.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [data]);
+
+    const hasMarkedToday = useMemo(() => {
+        const list = (data as any)?.history;
+        if (!Array.isArray(list) || list.length === 0) return false;
+        const todayUtc = new Date().toISOString().slice(0, 10);
+        return list.some((entry: any) => new Date(entry.date).toISOString().slice(0, 10) === todayUtc);
     }, [data]);
 
     const attendancePercent = useMemo(() => {
@@ -96,10 +114,12 @@ export const QRAttendanceScreen: React.FC<ProfileScreenProps<'QRAttendance'>> = 
 
                     <TouchableOpacity
                         onPress={handleMark}
-                        disabled={isMarking}
-                        style={[styles.primaryBtn, isMarking && styles.disabled]}
+                        disabled={isMarking || hasMarkedToday}
+                        style={[styles.primaryBtn, (isMarking || hasMarkedToday) && styles.disabled]}
                     >
-                        <Text style={styles.primaryBtnText}>{isMarking ? 'Marking…' : 'Simulate QR Scan'}</Text>
+                        <Text style={styles.primaryBtnText}>
+                            {isMarking ? 'Marking…' : hasMarkedToday ? 'Already Marked Today' : 'Simulate QR Scan'}
+                        </Text>
                     </TouchableOpacity>
                 </GlassCard>
 

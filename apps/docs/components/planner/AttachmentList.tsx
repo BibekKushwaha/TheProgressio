@@ -3,6 +3,7 @@
 import { Paperclip, Trash2, ExternalLink } from 'lucide-react';
 import { Attachment, useDeleteAttachmentMutation } from '@repo/store';
 import { useState } from 'react';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 interface AttachmentListProps {
     attachments: Attachment[];
@@ -13,17 +14,22 @@ interface AttachmentListProps {
 export function AttachmentList({ attachments, taskId, editable = false }: AttachmentListProps) {
     const [deleteAttachment] = useDeleteAttachmentMutation();
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-    const handleDelete = async (attachmentId: string) => {
-        if (!confirm('Delete this attachment?')) return;
+    const handleDelete = (attachmentId: string) => {
+        setPendingDeleteId(attachmentId);
+    };
 
-        setDeletingId(attachmentId);
+    const performDelete = async () => {
+        if (!pendingDeleteId) return;
+        setDeletingId(pendingDeleteId);
         try {
-            await deleteAttachment({ id: attachmentId, taskId }).unwrap();
+            await deleteAttachment({ id: pendingDeleteId, taskId }).unwrap();
         } catch (error) {
             console.error('Failed to delete attachment:', error);
         } finally {
             setDeletingId(null);
+            setPendingDeleteId(null);
         }
     };
 
@@ -42,6 +48,7 @@ export function AttachmentList({ attachments, taskId, editable = false }: Attach
     }
 
     return (
+        <>
         <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 <Paperclip className="w-3 h-3" />
@@ -96,5 +103,14 @@ export function AttachmentList({ attachments, taskId, editable = false }: Attach
                 ))}
             </div>
         </div>
+        <ConfirmDialog
+            open={!!pendingDeleteId}
+            onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+            title="Delete Attachment"
+            description="Delete this attachment? This cannot be undone."
+            confirmLabel="Delete"
+            onConfirm={performDelete}
+        />
+        </>
     );
 }

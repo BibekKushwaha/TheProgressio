@@ -23,7 +23,7 @@ import {
 import { cn } from "../../lib/utils";
 import { Card } from "../ui/card";
 import { logout as logoutAction, useAppDispatch, useLogoutMutation } from "@repo/store";
-import { useToast } from "@/components/ui/toast-provider";
+import { toast } from "sonner";
 import { trackFeatureOpened } from "@/lib/navigationTelemetry";
 
 type MenuKey = "planner" | "analytics" | "exam-warroom";
@@ -82,7 +82,6 @@ const Sidebar = () => {
     const pathname = usePathname();
     const router = useRouter();
     const dispatch = useAppDispatch();
-    const { toast } = useToast();
     const [logoutApi, { isLoading: isLoggingOut }] = useLogoutMutation();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [openMenus, setOpenMenus] = useState<Record<MenuKey, boolean>>({
@@ -114,10 +113,10 @@ const Sidebar = () => {
             if (typeof window !== "undefined") {
                 localStorage.removeItem("auth:hasSession");
             }
-            toast("Logged out successfully", "success");
+            toast.success("Logged out successfully");
             router.push("/login");
         } catch {
-            toast("Failed to logout. Please try again.", "error");
+            toast.error("Failed to logout. Please try again.");
         }
     };
 

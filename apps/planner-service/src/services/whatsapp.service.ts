@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { prisma } from "@repo/db";
 
 type PlainObject = Record<string, unknown>;
@@ -189,14 +190,62 @@ export const resolveWhatsAppUserId = async (params: {
 
 export const isWhatsAppCaptureAuthorized = (secretHeader: unknown): boolean => {
     const expected = process.env.WHATSAPP_WEBHOOK_SECRET;
-    if (!expected) return true;
-    return secretHeader === expected;
+    if (!expected) return false; // fail closed: reject when secret not configured
+    if (typeof secretHeader !== 'string' || !secretHeader) return false;
+    try {
+        const expBuf = Buffer.from(expected, 'utf8');
+        const sigBuf = Buffer.from(secretHeader, 'utf8');
+        if (expBuf.length !== sigBuf.length) return false;
+        return crypto.timingSafeEqual(expBuf, sigBuf);
+    } catch {
+        return false;
+    }
 };
 
 export const isWhatsAppVerificationValid = (token: unknown): boolean => {
     const expected = process.env.WHATSAPP_VERIFY_TOKEN;
     if (!expected) return false;
     return token === expected;
+};
+
+const parseMetaSignature = (signatureHeader: unknown): string | null => {
+    if (typeof signatureHeader !== "string") return null;
+    const trimmed = signatureHeader.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.startsWith("sha256=")) {
+        return trimmed.slice("sha256=".length);
+    }
+
+    // Allow passing the raw hex signature directly (useful for tests/tools).
+    return trimmed;
+};
+
+export const isWhatsAppMetaSignatureValid = (params: {
+    signatureHeader: unknown;
+    rawBody: Buffer | undefined;
+}): boolean => {
+    const secret = process.env.WHATSAPP_APP_SECRET;
+    if (!secret) return false;
+    if (!params.rawBody || !Buffer.isBuffer(params.rawBody)) return false;
+
+    const providedHex = parseMetaSignature(params.signatureHeader);
+    if (!providedHex) return false;
+    if (!/^[0-9a-f]{64}$/i.test(providedHex)) return false;
+
+    try {
+        const expectedHex = crypto
+            .createHmac("sha256", secret)
+            .update(params.rawBody)
+            .digest("hex");
+
+        const expected = Buffer.from(expectedHex, "hex");
+        const provided = Buffer.from(providedHex, "hex");
+        if (expected.length !== provided.length) return false;
+        return crypto.timingSafeEqual(expected, provided);
+    } catch {
+        return false;
+    }
 };
 
 export interface WhatsAppTranscriptResult {

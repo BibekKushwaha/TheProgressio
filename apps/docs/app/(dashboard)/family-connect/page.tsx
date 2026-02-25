@@ -1,11 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { useGetTasksQuery, useGetHabitsQuery, useGetDailySummaryQuery, useGetProfileQuery, useComposeNotificationMutation, Task, Habit } from '@repo/store';
 import { Eye, Shield, TrendingUp, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, Share2, MessageSquare, Download } from 'lucide-react';
 import { exportTasksToCSV, downloadCSV } from '@/lib/exportUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui/stat-card';
 import { TaskListItem } from '@/components/family-connect/TaskListItem';
@@ -25,6 +28,8 @@ export default function FamilyConnectPage() {
     const { data: habitsData, isLoading: habitsLoading } = useGetHabitsQuery();
     const { data: summaryData, isLoading: summaryLoading } = useGetDailySummaryQuery('7');
     const [composeNotification] = useComposeNotificationMutation();
+    const [nudgeOpen, setNudgeOpen] = useState(false);
+    const [nudgeMessage, setNudgeMessage] = useState('');
 
     const user = profileData?.user;
     const tasks = (allTasks || []) as Task[];
@@ -50,19 +55,23 @@ export default function FamilyConnectPage() {
         return due >= now && due <= threeDaysLater;
     });
 
-    const handleSendQuickNudge = async () => {
-        const message = window.prompt("Enter a message to encourage the student:");
-        if (!message) return;
+    const handleSendQuickNudge = () => {
+        setNudgeMessage('');
+        setNudgeOpen(true);
+    };
 
+    const handleSendNudgeConfirm = async () => {
+        if (!nudgeMessage.trim()) return;
         try {
             await composeNotification({
                 category: 'BEHAVIORAL_NUDGE',
                 title: 'Family Message',
-                body: message,
+                body: nudgeMessage,
                 priority: 'MEDIUM',
                 deepLink: '/dashboard'
             }).unwrap();
             toast.success("Nudge sent to student!");
+            setNudgeOpen(false);
         } catch (_err) {
             toast.error("Failed to send nudge");
         }
@@ -233,6 +242,32 @@ export default function FamilyConnectPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <Dialog open={nudgeOpen} onOpenChange={setNudgeOpen}>
+                <DialogContent className="bg-slate-900 border-white/10 text-white">
+                    <DialogHeader>
+                        <DialogTitle>Send Encouragement</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-slate-400 mb-2">Enter a message to motivate <span className="font-semibold text-slate-200">{user?.username || 'the student'}</span>:</p>
+                    <Input
+                        autoFocus
+                        value={nudgeMessage}
+                        onChange={(e) => setNudgeMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendNudgeConfirm()}
+                        placeholder="e.g. You're on a great streak, keep it up!"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                    />
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setNudgeOpen(false)} className="bg-white/5 border-white/10 text-slate-300">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSendNudgeConfirm} disabled={!nudgeMessage.trim()} className="bg-indigo-600 hover:bg-indigo-500">
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            Send
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

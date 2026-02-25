@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { SubTask, useCreateSubTaskMutation, useUpdateSubTaskMutation, useDeleteSubTaskMutation, useGenerateSubtasksMutation } from '@repo/store';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 interface SubTaskListProps {
     taskId: string;
@@ -18,6 +19,7 @@ export function SubTaskList({ taskId, subtasks }: SubTaskListProps) {
 
     const [isAdding, setIsAdding] = useState(false);
     const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
+    const [pendingSubTask, setPendingSubTask] = useState<SubTask | null>(null);
 
     const handleToggle = (subtask: SubTask) => {
         updateSubTask({
@@ -28,8 +30,16 @@ export function SubTaskList({ taskId, subtasks }: SubTaskListProps) {
     };
 
     const handleDelete = (subtask: SubTask) => {
-        if (confirm('Delete subtask?')) {
-            deleteSubTask({ id: subtask.id, taskId: subtask.taskId });
+        setPendingSubTask(subtask);
+    };
+
+    const confirmDelete = async () => {
+        if (!pendingSubTask) return;
+        try {
+            await deleteSubTask({ taskId, id: pendingSubTask.id }).unwrap();
+            setPendingSubTask(null);
+        } catch (error) {
+            console.error('Failed to delete subtask', error);
         }
     };
 
@@ -106,6 +116,22 @@ export function SubTaskList({ taskId, subtasks }: SubTaskListProps) {
                     </button>
                 </div>
             )}
+            <ConfirmDialog
+                open={!!pendingSubTask}
+                onOpenChange={(open) => {
+                    if (!open) setPendingSubTask(null);
+                }}
+                title="Delete sub-task?"
+                description={
+                    pendingSubTask
+                        ? `This will permanently remove "${pendingSubTask.title}".`
+                        : 'This action cannot be undone.'
+                }
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                variant="destructive"
+                onConfirm={confirmDelete}
+            />
         </div>
     );
 }

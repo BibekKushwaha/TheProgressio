@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import { Target, Flame } from 'lucide-react';
 import {
     useGetDailySummaryQuery,
@@ -12,11 +12,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toLocalDateKey, normalizeDateInput } from '@/lib/date';
 
 export function TopStats() {
+    const toSafeNumber = (value: unknown, fallback = 0) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+    };
+
     const isVisible = usePageVisibility();
+    const gradientId = useId().replace(/:/g, '');
     const pollMs = isVisible ? 60000 : 0;
 
     // Enable polling and refetch-on-focus to keep stats fresh
-    const { data: summaryData, isLoading: isSummaryLoading } = useGetDailySummaryQuery("1", {
+    const {
+        data: summaryData,
+        isLoading: isSummaryLoading,
+        isError: isSummaryError,
+    } = useGetDailySummaryQuery("1", {
         pollingInterval: pollMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
@@ -25,7 +35,11 @@ export function TopStats() {
     // BFF replaces useGetFocusScoreQuery: delivers score+breakdown in one call
     // that the dashboard-summary cache (2-min TTL) already has warm.
     // v2 of the BFF also includes activeDates[], eliminating useGetUserStreakQuery.
-    const { data: dashboardData, isLoading: isFocusLoading } = useGetDashboardSummaryQuery(
+    const {
+        data: dashboardData,
+        isLoading: isFocusLoading,
+        isError: isDashboardError,
+    } = useGetDashboardSummaryQuery(
         { leakageDays: 1, peakDays: 7 },
         {
             pollingInterval: pollMs,
@@ -35,25 +49,26 @@ export function TopStats() {
     );
 
     const { data: activeLive } = useGetActiveLiveSessionQuery(undefined, {
-        pollingInterval: 10000, // real-time — keep fast
+        pollingInterval: isVisible ? 10000 : 0, // fast when visible, pause in background
         refetchOnFocus: true,
     });
 
     // 1. Calculate Daily Progress
     const stats = summaryData?.stats;
-    const activeElapsedMinutes = activeLive?.session?.elapsedSeconds
-        ? Math.floor(activeLive.session.elapsedSeconds / 60)
-        : 0;
+    const activeElapsedMinutes = Math.max(
+        0,
+        Math.floor(toSafeNumber(activeLive?.session?.elapsedSeconds) / 60)
+    );
 
-    const totalMinutes = (stats?.totalMinutes ?? 0) + activeElapsedMinutes;
+    const totalMinutes = toSafeNumber(stats?.totalMinutes) + activeElapsedMinutes;
     const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
-    const dailyGoalHours = stats?.dailyGoalHours || 4;
-    const progress = Math.min(100, Math.round((totalHours / dailyGoalHours) * 100));
+    const dailyGoalHours = Math.max(0.1, toSafeNumber(stats?.dailyGoalHours, 4));
+    const progress = Math.max(0, Math.min(100, Math.round((totalHours / dailyGoalHours) * 100)));
 
     // 2. Focus Score Logic
     const focusScoreStats = dashboardData?.focus;
-    const rawFocusScore = focusScoreStats?.score ?? 0;
-    const focusScoreNumeric = Math.max(0, Math.min(100, Number(rawFocusScore)));
+    const rawFocusScore = toSafeNumber(focusScoreStats?.score);
+    const focusScoreNumeric = Math.max(0, Math.min(100, rawFocusScore));
     const displayFocusScore = isFocusLoading ? '—' : focusScoreNumeric.toFixed(1);
 
     const focusStatus = useMemo(() => {
@@ -65,21 +80,21 @@ export function TopStats() {
     const scoreBreakdown = [
         {
             label: 'Consistency',
-            value: Number(focusScoreStats?.breakdown?.consistency ?? 0),
+            value: toSafeNumber(focusScoreStats?.breakdown?.consistency),
             max: 40,
             textColor: 'text-indigo-400',
             barColor: 'bg-indigo-500',
         },
         {
             label: 'Intensity',
-            value: Number(focusScoreStats?.breakdown?.intensity ?? 0),
+            value: toSafeNumber(focusScoreStats?.breakdown?.intensity),
             max: 30,
             textColor: 'text-pink-400',
             barColor: 'bg-pink-500',
         },
         {
             label: 'Depth',
-            value: Number(focusScoreStats?.breakdown?.depth ?? 0),
+            value: toSafeNumber(focusScoreStats?.breakdown?.depth),
             max: 30,
             textColor: 'text-purple-400',
             barColor: 'bg-purple-500',
@@ -87,7 +102,8 @@ export function TopStats() {
     ];
 
     // 3. Streak and History Logic — sourced from BFF (no separate round-trip)
-    const currentStreak = dashboardData?.streak ?? 0;
+    const currentStreak = Math.max(0, Math.floor(toSafeNumber(dashboardData?.streak)));
+    const hasCardError = isSummaryError || isDashboardError;
 
     const activeDateSet = useMemo(() => {
         const dates = dashboardData?.activeDates || [];
@@ -157,14 +173,14 @@ export function TopStats() {
                                 cy="32"
                                 r="28"
                                 fill="none"
-                                stroke="url(#gradient1)"
+                                stroke={`url(#${gradientId})`}
                                 strokeWidth="6"
                                 strokeDasharray={`${(progress / 100) * 175.9} 175.9`}
                                 strokeLinecap="round"
                                 className="transition-all duration-1000 ease-out"
                             />
                             <defs>
-                                <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
                                     <stop offset="0%" stopColor="rgb(168, 85, 247)" />
                                     <stop offset="100%" stopColor="rgb(236, 72, 153)" />
                                 </linearGradient>
@@ -178,6 +194,7 @@ export function TopStats() {
                 <div className="text-sm font-semibold text-purple-400">
                     {isSummaryLoading ? <Skeleton className="h-4 w-20" /> : `${progress}% Complete`}
                 </div>
+                {hasCardError ? <div className="mt-2 text-xs text-amber-300">Some stats are temporarily unavailable.</div> : null}
             </div>
 
             {/* Focus Score Card */}

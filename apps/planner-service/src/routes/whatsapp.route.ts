@@ -1,6 +1,7 @@
 import express from "express";
 import {
-	captureWhatsAppTask,
+	captureWhatsAppTaskInternal,
+	captureWhatsAppTaskWebhook,
 	sendOutcomeNudge,
 	sendWhatsAppTaskReminder,
 	sendWhatsAppTemplateMessage,
@@ -14,8 +15,8 @@ const router = express.Router();
 router.get("/webhook", verifyWhatsAppWebhook);
 
 // Accept direct capture or Meta webhook payloads
-router.post("/capture", captureWhatsAppTask);
-router.post("/webhook", captureWhatsAppTask);
+router.post("/capture", captureWhatsAppTaskInternal);
+router.post("/webhook", captureWhatsAppTaskWebhook);
 router.post("/reminders/task", sendWhatsAppTaskReminder);
 router.post("/templates/send", sendWhatsAppTemplateMessage);
 router.post("/nudges/outcome", sendOutcomeNudge);

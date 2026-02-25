@@ -68,14 +68,15 @@ export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYea
             isCurrentMonth: true,
             isToday: false, // Calculate real today if needed
             events: eventMarkers,
-            isHoliday: !!isHoliday
+            isHoliday: !!isHoliday,
+            isExam: !!dayEvents?.examCount
         });
     }
 
     // Next month padding to fill 35 or 42 slots
     const remaining = 35 - days.length > 0 ? 35 - days.length : 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
-        days.push({ date: i, isCurrentMonth: false, events: [], isHoliday: false });
+        days.push({ date: i, isCurrentMonth: false, events: [], isHoliday: false, isExam: false });
     }
 
     return (
@@ -83,8 +84,12 @@ export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYea
             <div className="flex items-center justify-between mb-4">
                 <div className="text-xs flex gap-4 text-slate-400">
                     <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded bg-blue-500/20 border border-blue-500/30"></div>
+                        <span>Exam Date</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
                         <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span>Exam</span>
+                        <span>Exam Event</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-3 h-3 rounded-full bg-purple-500"></div>
@@ -114,6 +119,7 @@ export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYea
                         isCurrentMonth={day.isCurrentMonth}
                         isToday={day.isToday}
                         isHoliday={day.isHoliday}
+                        isExam={day.isExam}
                         isSelected={day.date === selectedDate && day.isCurrentMonth}
                         onClick={() => day.isCurrentMonth && onDateSelect(day.date)}
                     />

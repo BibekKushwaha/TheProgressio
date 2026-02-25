@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import { Clock, MoreVertical, Trash2, CheckCircle, XCircle, Calendar, Edit } from 'lucide-react';
 import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation } from '@repo/store';
 import {
@@ -10,6 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { formatDueDate } from '@/lib/date';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface TaskListCardProps {
     task: Task;
@@ -35,36 +41,22 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
 
     const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[PriorityEnum.LOW];
     const categoryName = task.category?.name || 'No Category';
-
-    const formatDueDate = (dueDate?: string | null) => {
-        if (!dueDate) return 'No due date';
-        const date = new Date(dueDate);
-        const now = new Date();
-
-        const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const d2 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
-        if (diffDays === 0) return 'Due today';
-        if (diffDays === 1) return 'Due tomorrow';
-        if (diffDays <= 7) return `${diffDays}d left`;
-
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    };
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     const isOverdue = !completed && task.dueDate && new Date(task.dueDate) < new Date() && formatDueDate(task.dueDate).includes('overdue');
 
-    const handleDelete = async (e: React.MouseEvent) => {
+    const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (confirm('Are you sure you want to delete this task?')) {
-            try {
-                await deleteTask(task.id).unwrap();
-                toast.success('Task deleted');
-            } catch (err) {
-                toast.error('Failed to delete task');
-                console.error(err);
-            }
+        setDeleteConfirmOpen(true);
+    };
+
+    const performDelete = async () => {
+        try {
+            await deleteTask(task.id).unwrap();
+            toast.success('Task deleted');
+        } catch (err) {
+            toast.error('Failed to delete task');
+            console.error('Failed to delete task:', err);
         }
     };
 
@@ -76,8 +68,9 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                 result.status === TaskStatus.IN_PROGRESS ? 'started' : 'reset';
             toast.success(`Task ${statusLabel}`);
         } catch (err) {
-            toast.error('Failed to update task status');
-            console.error(err);
+            const message = getApiErrorMessage(err, 'Failed to update task status');
+            toast.error(message);
+            console.warn('Failed to update task status:', message);
         }
     };
 
@@ -188,7 +181,14 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                 className="absolute inset-0 z-0"
                 onClick={handleCardClick}
             />
+            <ConfirmDialog
+                open={deleteConfirmOpen}
+                onOpenChange={setDeleteConfirmOpen}
+                title="Delete Task"
+                description="Are you sure you want to delete this task? This action cannot be undone."
+                confirmLabel="Delete"
+                onConfirm={performDelete}
+            />
         </div>
     );
 }
-

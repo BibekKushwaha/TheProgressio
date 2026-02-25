@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
+import { withRetry } from '../baseQuery';
 
 export const AUTH_SERVICE_URL = resolveServiceUrl(
   process.env.EXPO_PUBLIC_AUTH_SERVICE_URL ?? process.env.NEXT_PUBLIC_AUTH_SERVICE_URL,
@@ -72,7 +73,7 @@ export interface FamilyShareLink {
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({
+  baseQuery: withRetry(fetchBaseQuery({
     baseUrl: `${AUTH_SERVICE_URL}/api/auth`,
     fetchFn: async (input, init) => {
       const method = init?.method ?? 'GET';
@@ -104,7 +105,7 @@ export const authApi = createApi({
       }
       return headers;
     },
-  }),
+  })),
   tagTypes: ['User', 'WhatsAppPairing'],
   endpoints: (builder) => ({
     register: builder.mutation<AuthResponse, RegisterRequest>({

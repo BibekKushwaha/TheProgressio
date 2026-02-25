@@ -5,6 +5,7 @@ interface DayCellProps {
     isCurrentMonth: boolean;
     isToday?: boolean;
     isHoliday?: boolean;
+    isExam?: boolean;
     isSelected: boolean;
     onClick: () => void;
 }
@@ -15,7 +16,7 @@ const eventColors: Record<string, string> = {
     coding: 'bg-purple-500',
 };
 
-export function DayCell({ date, events, isCurrentMonth, isToday, isHoliday, isSelected, onClick }: DayCellProps) {
+export function DayCell({ date, events, isCurrentMonth, isToday, isHoliday, isExam, isSelected, onClick }: DayCellProps) {
     return (
         <button
             onClick={onClick}
@@ -23,9 +24,11 @@ export function DayCell({ date, events, isCurrentMonth, isToday, isHoliday, isSe
                 ? 'bg-white/0 border-white/5 text-slate-600'
                 : isToday || isSelected
                     ? 'bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-purple-500 shadow-lg shadow-purple-500/20'
-                    : isHoliday
-                        ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/20'
-                        : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10'
+                    : isExam
+                        ? 'bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20'
+                        : isHoliday
+                            ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/20'
+                            : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10'
                 }`}
         >
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

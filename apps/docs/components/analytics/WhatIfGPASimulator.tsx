@@ -90,21 +90,21 @@ export function WhatIfGPASimulator() {
                                 <div className={`font-bold ${simulation.isPossible ? 'text-emerald-400' : 'text-red-400'}`}>
                                     {simulation.isPossible ? 'Target Reachable!' : 'Target Out of Reach'}
                                 </div>
-                                <p className="text-sm text-slate-300 leading-relaxed">
-                                    {data.message}
-                                </p>
+                                        <p className="text-sm text-slate-300 leading-relaxed">
+                                            {data?.message ?? ''}
+                                        </p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 mt-4">
                             <div className="bg-black/20 p-2.5 rounded-lg border border-white/5">
                                 <div className="text-[10px] text-slate-500 uppercase">Projected GPA</div>
-                                <div className="text-lg font-bold text-white">{simulation.projectedGPA.toFixed(2)}</div>
+                                <div className="text-lg font-bold text-white">{typeof simulation.projectedGPA === 'number' ? simulation.projectedGPA.toFixed(2) : '---'}</div>
                             </div>
                             <div className="bg-black/20 p-2.5 rounded-lg border border-white/5">
                                 <div className="text-[10px] text-slate-500 uppercase text-center">Required Average</div>
                                 <div className={`text-lg font-bold text-center ${simulation.isPossible ? 'text-teal-400' : 'text-red-400'}`}>
-                                    {simulation.requiredAverage.toFixed(2)}
+                                    {typeof simulation.requiredAverage === 'number' ? simulation.requiredAverage.toFixed(2) : '---'}
                                 </div>
                             </div>
                         </div>
@@ -112,9 +112,9 @@ export function WhatIfGPASimulator() {
                 )}
 
                 <div className="flex gap-3 p-3 bg-white/5 rounded-lg border border-white/5">
-                    <Target className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                        <Target className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                     <p className="text-[10px] text-slate-400 leading-tight">
-                        Based on your current cumulative GPA of <strong>{simulation?.currentGPA.toFixed(2) || '---'}</strong>. Simulation assumes standard 4.0 scale and credit weighting.
+                        Based on your current cumulative GPA of <strong>{typeof simulation?.currentGPA === 'number' ? simulation.currentGPA.toFixed(2) : '---'}</strong>. Simulation assumes standard 4.0 scale and credit weighting.
                     </p>
                 </div>
             </CardContent>

@@ -1,17 +1,31 @@
 'use client';
+import dynamic from 'next/dynamic';
 import { DurationPredictionCard } from '@/components/analytics/DurationPredictionCard';
 import { PredictiveScoreCard } from '@/components/analytics/PredictiveScoreCard';
 import { ProductivityInsights } from '@/components/analytics/ProductivityInsights';
-import { CycleTimeScatterPlot } from '@/components/analytics/CycleTimeScatterPlot';
 import { WhatIfGPASimulator } from '@/components/analytics/WhatIfGPASimulator';
-import { PeakProductivityCard } from '@/components/analytics/PeakProductivityCard';
-import { TimeLeakageCard } from '@/components/analytics/TimeLeakageCard';
 import { SWOTReport } from '@/components/analytics/SWOTReport';
 import { GlassHero } from '@/components/layout/GlassHero';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TaskStatus, useGetTasksQuery, useGetStrategicSummaryQuery } from "@repo/store";
 import { BrainCircuit, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+
+// Dynamically import recharts-heavy components — keeps them out of the initial bundle.
+// They're only rendered on the analytics/strategic page after user navigation.
+const CycleTimeScatterPlot = dynamic(
+  () => import('@/components/analytics/CycleTimeScatterPlot').then((m) => ({ default: m.CycleTimeScatterPlot })),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
+);
+const PeakProductivityCard = dynamic(
+  () => import('@/components/analytics/PeakProductivityCard').then((m) => ({ default: m.PeakProductivityCard })),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
+);
+const TimeLeakageCard = dynamic(
+  () => import('@/components/analytics/TimeLeakageCard').then((m) => ({ default: m.TimeLeakageCard })),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
+);
 
 export default function AnalyticsStrategicPage() {
   const [selectedPredictionTaskId, setSelectedPredictionTaskId] = useState("");

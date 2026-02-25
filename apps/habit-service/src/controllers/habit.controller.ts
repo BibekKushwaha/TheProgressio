@@ -29,8 +29,8 @@ import {
     reschedulePendingStreakNudges,
 } from "../services/nudge.service.js";
 import { dispatchWhatsAppNudges } from "../services/whatsapp-outbound.service.js";
-import { enqueueDueNudgeDispatchJobs } from "../services/nudge-dispatch.queue.js";
-import { incrementMetric, logMetricEvent } from "../services/metrics.service.js";
+import { enqueueDueNudgeDispatchJobs, cancelPendingWhatsAppFallbackJobsForUser } from "../services/nudge-dispatch.queue.js";
+import { getMetricsSnapshot, incrementMetric, logMetricEvent } from "../services/metrics.service.js";
 
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
@@ -79,6 +79,66 @@ export const getInternalActiveDates = TryCatch(async (req: Request, res: Respons
 
     const activeDates = Array.from(new Set(logs.map((log) => log.loggedAt.toISOString().split("T")[0])));
     res.status(200).json({ message: "Habit active dates fetched", userId, activeDates });
+});
+
+// Internal helper to cancel pending WA fallback jobs when user becomes active
+// POST /api/habits/internal/wa-fallback/cancel
+export const cancelInternalWhatsAppFallback = TryCatch(async (req: Request, res: Response): Promise<void> => {
+    const userId = typeof req.body?.userId === "string" ? req.body.userId.trim() : "";
+    const source = typeof req.body?.source === "string" ? req.body.source.trim() : "internal";
+    if (!userId) {
+        throw new ErrorHandler(400, "userId is required");
+    }
+
+    const result = await cancelPendingWhatsAppFallbackJobsForUser(userId);
+    if (result.cancelled > 0) {
+        incrementMetric("wa_fallback_cancelled_by_activity", result.cancelled);
+        logMetricEvent("wa_fallback_cancelled_by_activity", {
+            userId,
+            source,
+            cancelled: result.cancelled,
+        });
+    }
+    res.status(200).json({
+        message: "Pending WhatsApp fallback jobs cancelled",
+        userId,
+        source,
+        ...result,
+    });
+});
+
+// Internal helper for lightweight nudge/dispatch counters
+// GET /api/habits/internal/metrics
+export const getInternalMetrics = TryCatch(async (req: Request, res: Response): Promise<void> => {
+    const keysQuery = Array.isArray(req.query.keys) ? req.query.keys[0] : req.query.keys;
+    res.status(200).json({
+        message: "Internal metrics snapshot",
+        generatedAt: new Date().toISOString(),
+        metrics: (() => {
+            const snapshot = getMetricsSnapshot();
+            if (typeof keysQuery !== "string" || keysQuery.trim().length === 0) {
+                return snapshot;
+            }
+
+            const requestedKeys = Array.from(
+                new Set(
+                    keysQuery
+                        .split(",")
+                        .map((key) => key.trim())
+                        .filter((key) => key.length > 0)
+                        .slice(0, 25),
+                ),
+            );
+
+            const filtered: Record<string, number> = {};
+            for (const key of requestedKeys) {
+                if (Object.prototype.hasOwnProperty.call(snapshot, key)) {
+                    filtered[key] = snapshot[key] as number;
+                }
+            }
+            return filtered;
+        })(),
+    });
 });
 
 // Helper function to calculate streak (internal backup)

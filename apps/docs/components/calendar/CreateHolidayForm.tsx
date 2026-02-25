@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { useCreateHolidayMutation } from '@repo/store';
-import { useToast } from '../ui/toast-provider';
+import { toast } from 'sonner';
 
 interface Holiday {
     id: string;
@@ -24,7 +24,6 @@ export default function CreateHolidayForm({ defaultDate, onCreated }: CreateHoli
 
     const [createHoliday, { isLoading, error }] = useCreateHolidayMutation();
     const [showToast, setShowToast] = React.useState(false);
-    const toast = useToast();
     const [isSubmitting, setIsSubmitting] = React.useState(false);
 
     // Toast component imported above
@@ -35,7 +34,7 @@ export default function CreateHolidayForm({ defaultDate, onCreated }: CreateHoli
             setIsSubmitting(true);
             const res = await createHoliday({ name, startDate, endDate, pauseNotifications }).unwrap();
             // notify success
-            toast.toast('Holiday created', 'success');
+            toast.success('Holiday created');
             // pass created holiday back to parent for optimistic UI
             if (res && res.holiday) {
                 onCreated?.(res.holiday);

@@ -9,7 +9,7 @@ import type { GradeEntry } from '@repo/store';
 import { Plus, GraduationCap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/toast-provider';
+import { toast } from 'sonner';
 
 interface GradeEntryManagerProps {
     examType?: string;
@@ -23,7 +23,6 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
     const [obtainedMarks, setObtainedMarks] = useState('');
     const [totalMarks, setTotalMarks] = useState('100');
     const [addGradeEntry, { isLoading: isAdding }] = useAddGradeEntryMutation();
-    const { toast } = useToast();
 
     useEffect(() => {
         if (controlledExamType) {
@@ -56,7 +55,7 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
             setChapter('');
             setObtainedMarks('');
         } catch {
-            toast('Failed to add grade entry. Please try again.', 'error');
+            toast.error('Failed to add grade entry. Please try again.');
         }
     };
 
@@ -93,7 +92,6 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
                     placeholder="Chapter (Optional)"
                     className="bg-white/5 border-white/10"
                 />
-                <div className="flex gap-2 flex-1">
                     <Input
                         value={obtainedMarks}
                         onChange={e => setObtainedMarks(e.target.value)}
@@ -112,7 +110,6 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
                         min="1"
                         className="bg-white/5 border-white/10 w-24"
                     />
-                </div>
                 <Button
                     type="submit"
                     disabled={isAdding || !subjectName || !obtainedMarks || !activeExamType || invalidInput}

@@ -22,7 +22,7 @@ export function QuickActions() {
             setIsNoteDialogOpen(false);
             setNoteText('');
         } catch (_e) {
-            console.error("Failed to create note");
+            console.error('Failed to create note:', _e);
         }
     };
 
