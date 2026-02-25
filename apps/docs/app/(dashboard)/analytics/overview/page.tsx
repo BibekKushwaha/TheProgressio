@@ -7,15 +7,7 @@ import { MetricGrid } from "@/components/analytics/MetricCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, CheckCircle, Target, TrendingUp } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
-import { Empty, EmptyTitle } from "@/components/ui/empty";
+
 import {
   TaskStatus,
   useGetDailySummaryQuery,
@@ -64,7 +56,6 @@ export default function AnalyticsOverviewPage() {
   // Full task list only for the table render and CSV export.
   const {
     data: tasks = [],
-    isLoading: isTasksLoading
   } = useGetTasksQuery({ page: 1, limit: 50 });
 
   // Also fetch a larger server task set for accurate merged metrics (keeps payload reasonable)
@@ -126,16 +117,16 @@ export default function AnalyticsOverviewPage() {
 
     // Fallback to lightweight server metrics when merged data isn't ready yet.
     return {
-      total:          taskMetricsData?.total          ?? 0,
-      pending:        taskMetricsData?.pending        ?? 0,
-      inProgress:     taskMetricsData?.inProgress     ?? 0,
-      completed:      taskMetricsData?.completed      ?? 0,
-      highPriority:   taskMetricsData?.highPriority   ?? 0,
+      total: taskMetricsData?.total ?? 0,
+      pending: taskMetricsData?.pending ?? 0,
+      inProgress: taskMetricsData?.inProgress ?? 0,
+      completed: taskMetricsData?.completed ?? 0,
+      highPriority: taskMetricsData?.highPriority ?? 0,
       mediumPriority: taskMetricsData?.mediumPriority ?? 0,
-      lowPriority:    taskMetricsData?.lowPriority    ?? 0,
+      lowPriority: taskMetricsData?.lowPriority ?? 0,
       withoutDueDate: taskMetricsData?.withoutDueDate ?? 0,
-      overdue:        taskMetricsData?.overdue        ?? 0,
-      dueToday:       taskMetricsData?.dueToday       ?? 0,
+      overdue: taskMetricsData?.overdue ?? 0,
+      dueToday: taskMetricsData?.dueToday ?? 0,
     };
   }, [mergedTasks, taskMetricsData]);
 
@@ -181,9 +172,6 @@ export default function AnalyticsOverviewPage() {
     });
   }, [tasks]);
 
-  const sortedHabits = useMemo(() => {
-    return [...habits].sort((left, right) => (right.currentStreak || 0) - (left.currentStreak || 0));
-  }, [habits]);
 
   const handleExportReport = () => {
     const csvContent = exportTasksToCSV(sortedTasks);
@@ -323,107 +311,7 @@ export default function AnalyticsOverviewPage() {
         </Card>
       </div>
 
-      <Card variant="glass" className="p-6">
-        <CardHeader>
-          <CardTitle>All Tasks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isTasksLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <Skeleton key={index} className="h-12 bg-white/10" />
-              ))}
-            </div>
-          ) : sortedTasks.length === 0 ? (
-            <Empty>
-              <EmptyTitle>No tasks found.</EmptyTitle>
-            </Empty>
-          ) : (
-            <div className="w-full overflow-x-auto">
-              <Table className="text-sm min-w-[920px]">
-                <TableHeader>
-                  <TableRow className="text-left text-slate-400 border-b border-white/10">
-                    <TableHead className="py-2 pr-4 text-white">Title</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Status</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Priority</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Due Date</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Category</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Recurring</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Subtasks</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Attachments</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedTasks.map((task) => (
-                    <TableRow key={task.id} className="border-b border-white/5 text-slate-200">
-                      <TableCell className="py-2 pr-4 font-medium max-w-[260px] truncate">{task.title}</TableCell>
-                      <TableCell className="py-2 pr-4">{task.status}</TableCell>
-                      <TableCell className="py-2 pr-4">{task.priority}</TableCell>
-                      <TableCell className="py-2 pr-4">{task.dueDate ? new Date(task.dueDate).toLocaleString() : "—"}</TableCell>
-                      <TableCell className="py-2 pr-4">{task.category?.name || "—"}</TableCell>
-                      <TableCell className="py-2 pr-4">{task.isRecurring ? "Yes" : "No"}</TableCell>
-                      <TableCell className="py-2 pr-4">{task.subtasks?.length ?? 0}</TableCell>
-                      <TableCell className="py-2 pr-4">{task.attachments?.length ?? 0}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      <Card variant="glass" className="p-6">
-        <CardHeader>
-          <CardTitle>All Habits</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isHabitsLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <Skeleton key={index} className="h-12 bg-white/10" />
-              ))}
-            </div>
-          ) : sortedHabits.length === 0 ? (
-            <Empty>
-              <EmptyTitle>No habits found.</EmptyTitle>
-            </Empty>
-          ) : (
-            <div className="w-full overflow-x-auto">
-              <Table className="text-sm min-w-[980px]">
-                <TableHeader>
-                  <TableRow className="text-left text-slate-400 border-b border-white/10">
-                    <TableHead className="py-2 pr-4 text-white">Habit</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Frequency</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Target</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Current Streak</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Longest Streak</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Streak Status</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Streak Health</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Last Log Date</TableHead>
-                    <TableHead className="py-2 pr-4 text-white">Mercy</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedHabits.map((habit) => (
-                    <TableRow key={habit.id} className="border-b border-white/5 text-slate-200">
-                      <TableCell className="py-2 pr-4 font-medium">{habit.icon || "✨"} {habit.name}</TableCell>
-                      <TableCell className="py-2 pr-4">{habit.frequency}</TableCell>
-                      <TableCell className="py-2 pr-4">{habit.targetValue}</TableCell>
-                      <TableCell className="py-2 pr-4">{habit.currentStreak}</TableCell>
-                      <TableCell className="py-2 pr-4">{habit.longestStreak}</TableCell>
-                      <TableCell className="py-2 pr-4">{habit.streakStatus}</TableCell>
-                      <TableCell className="py-2 pr-4">{habit.streakHealth || "—"}</TableCell>
-                      <TableCell className="py-2 pr-4">{habit.lastLogDate ? new Date(habit.lastLogDate).toLocaleString() : "—"}</TableCell>
-                      <TableCell className="py-2 pr-4">{habit.isMercyActive ? `Active (${habit.mercyDaysUsed || 0}/${habit.mercyDaysAllowed || 0})` : "Inactive"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

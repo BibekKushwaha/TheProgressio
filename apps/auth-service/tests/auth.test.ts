@@ -26,10 +26,19 @@ vi.mock('@repo/db/client', () => {
   const mobileRefreshToken = {
     create: vi.fn(),
     findFirst: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
     delete: vi.fn(),
     deleteMany: vi.fn(),
   }
-  return { prisma: { user, familyShareLink, mobileRefreshToken } }
+  return {
+    prisma: {
+      user,
+      familyShareLink,
+      mobileRefreshToken,
+      $transaction: async (ops: any[]) => Promise.all(ops),
+    }
+  }
 })
 
 import app from '../src/index'
@@ -39,31 +48,39 @@ import bcrypt from 'bcrypt'
 describe('Auth endpoints', () => {
   beforeEach(() => {
     process.env.JWT_SEC = process.env.JWT_SEC ?? 'testsecret'
-    // reinitialize mocked prisma user methods to ensure they are vi.fn()s
-    ;(prisma as any).user = {
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
-    }
-    ;(prisma as any).familyShareLink = {
-      create: vi.fn(),
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      update: vi.fn(),
-    }
+      // reinitialize mocked prisma user methods to ensure they are vi.fn()s
+      ; (prisma as any).user = {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        findUnique: vi.fn(),
+        update: vi.fn(),
+      }
+      ; (prisma as any).familyShareLink = {
+        create: vi.fn(),
+        findMany: vi.fn(),
+        findFirst: vi.fn(),
+        update: vi.fn(),
+      }
+      ; (prisma as any).mobileRefreshToken = {
+        create: vi.fn(),
+        findFirst: vi.fn(),
+        update: vi.fn(),
+        updateMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+      }
   })
 
   // ─── Registration ─────────────────────────────────────────────────────────
 
   it('registers a new user', async () => {
     (prisma as any).user.findFirst.mockResolvedValue(null)
-    ;(prisma as any).user.create.mockResolvedValue({
-      id: '1',
-      username: 'Tester',
-      email: 'test@example.com',
-      createdAt: new Date(),
-    })
+      ; (prisma as any).user.create.mockResolvedValue({
+        id: '1',
+        username: 'Tester',
+        email: 'test@example.com',
+        createdAt: new Date(),
+      })
 
     const res = await request(app)
       .post('/api/auth/register')
@@ -112,12 +129,12 @@ describe('Auth endpoints', () => {
 
   it('logs in an existing user', async () => {
     const hashed = await (bcrypt as any).hash('password', 10)
-    ;(prisma as any).user.findUnique.mockResolvedValue({
-      id: '1',
-      username: 'Tester',
-      email: 'test@example.com',
-      password: hashed,
-    })
+      ; (prisma as any).user.findUnique.mockResolvedValue({
+        id: '1',
+        username: 'Tester',
+        email: 'test@example.com',
+        password: hashed,
+      })
 
     const res = await request(app)
       .post('/api/auth/login')
@@ -130,11 +147,11 @@ describe('Auth endpoints', () => {
 
   it('rejects login with wrong password', async () => {
     const hashed = await (bcrypt as any).hash('correctpassword', 10)
-    ;(prisma as any).user.findUnique.mockResolvedValue({
-      id: '1',
-      email: 'test@example.com',
-      password: hashed,
-    })
+      ; (prisma as any).user.findUnique.mockResolvedValue({
+        id: '1',
+        email: 'test@example.com',
+        password: hashed,
+      })
 
     const res = await request(app)
       .post('/api/auth/login')

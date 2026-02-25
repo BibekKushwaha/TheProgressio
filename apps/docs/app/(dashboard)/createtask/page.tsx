@@ -365,7 +365,7 @@ function CreateTaskPageContent() {
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-pink-600/8 rounded-full blur-[100px]" />
             </div>
 
-            <div className="relative z-10 max-w-6xl mx-auto px-4 py-2 md:px-8 md:py-4 pb-20 space-y-4 -mt-6 md:-mt-2">
+            <div className="relative z-10 max-w-6xl mx-auto px-4 py-2 md:px-8 md:py-4 pb-20 space-y-4 ">
                 <div className="flex flex-col items-center justify-center space-y-3 pt-0 md:pt-2">
                     <motion.div
                         initial={{ opacity: 0, y: -20 }}

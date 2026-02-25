@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { withRetry } from '../baseQuery';
+import { withAuthRefresh, withRetry } from '../baseQuery';
 import { calendarApi } from './calendarApi';
 import { analyticsApi } from './analyticsApi';
 import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
@@ -186,7 +186,7 @@ const plannerBaseQuery = fetchBaseQuery({
 
 export const tasksApi = createApi({
     reducerPath: 'tasksApi',
-    baseQuery: withRetry(plannerBaseQuery),
+    baseQuery: withAuthRefresh(withRetry(plannerBaseQuery)),
     tagTypes: ['Tasks', 'Attendance', 'Notes', 'AuditLogs'],
     endpoints: (builder) => ({
         getTasks: builder.query<Task[], { page?: number; limit?: number; status?: Status; priority?: Priority; categoryId?: string; search?: string; date?: string } | void>({

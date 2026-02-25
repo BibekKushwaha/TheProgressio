@@ -68,15 +68,23 @@ export function GenericHeatmap({
         return reverseOrder ? [...weeks].reverse() : [...weeks];
     }, [weeks, reverseOrder]);
 
-    const monthHeaders = useMemo(() => {
+    const { monthHeaders, monthStartWeekIndices } = useMemo(() => {
+        // Divider: mark the week column that contains the 1st of each month.
+        // Label: use the week column's first real day month, so weeks that start in Feb but contain Mar 1
+        // don't get labeled as "Mar" (avoids confusing "Mar" header over Feb dates).
+        const startWeekIndices = new Set<number>();
+        displayWeeks.forEach((week, weekIndex) => {
+            const monthStartDay = week.find((day) => day !== null && parseDate(day.date).getDate() === 1);
+            if (monthStartDay) {
+                startWeekIndices.add(weekIndex);
+            }
+        });
+
         const headers: Array<{ weekIndex: number; label: string }> = [];
         let previousMonth: number | null = null;
-
         displayWeeks.forEach((week, weekIndex) => {
-            // Find first non-null day in this week column
             const firstRealDay = week.find((day) => day !== null);
             if (!firstRealDay) return;
-
             const date = parseDate(firstRealDay.date);
             const month = date.getMonth();
             if (previousMonth !== month) {
@@ -88,7 +96,12 @@ export function GenericHeatmap({
             }
         });
 
-        return headers;
+        // If the dataset starts mid-week and we didn't detect any month starts, keep at least one divider.
+        if (startWeekIndices.size === 0 && headers.length > 0) {
+            startWeekIndices.add(headers[0]!.weekIndex);
+        }
+
+        return { monthHeaders: headers, monthStartWeekIndices: startWeekIndices };
     }, [displayWeeks]);
 
     const getColor = (intensity: number) => {
@@ -181,7 +194,13 @@ export function GenericHeatmap({
 
                     {/* Weeks columns */}
                     {displayWeeks.map((week, weekIdx) => (
-                        <div key={weekIdx} className="flex flex-col gap-[4px]">
+                        <div
+                            key={weekIdx}
+                            className={cn(
+                                "flex flex-col gap-[4px]",
+                                monthStartWeekIndices.has(weekIdx) && weekIdx !== 0 ? "pl-2 border-l border-white/10" : ""
+                            )}
+                        >
                             {/* Month Header for this column */}
                             <div className="h-4 mb-1 flex items-center justify-center">
                                 {monthHeaders.find((header) => header.weekIndex === weekIdx) ? (
