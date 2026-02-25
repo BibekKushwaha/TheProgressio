@@ -2,6 +2,7 @@ import { Worker, type Job } from "bullmq";
 import { QUEUE_NAMES, type PushPayload } from "../services/queue.service.js";
 import webpush from "web-push";
 import { prisma } from "@repo/db";
+import { getNotificationSettings, shouldSendNotification } from "../services/notificationPreferences.service.js";
 import { Redis } from "ioredis";
 
 const REDIS_HOST = process.env.REDIS_HOST || "localhost";
@@ -19,10 +20,17 @@ const connection = new Redis({
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 const vapidSubject = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+const PUSH_DEBUG_PREFIX = "[PushDebug][Worker]";
+const maskEndpoint = (endpoint: string) => `${endpoint.slice(0, 40)}...${endpoint.slice(-12)}`;
 
 if (vapidPublicKey && vapidPrivateKey) {
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
     console.log("✅ Web Push VAPID keys loaded");
+    console.info(`${PUSH_DEBUG_PREFIX} VAPID configured`, {
+        publicKeyLength: vapidPublicKey.length,
+        privateKeyLength: vapidPrivateKey.length,
+        subject: vapidSubject,
+    });
 } else {
     console.warn("⚠️  Web Push VAPID keys missing. Push notification worker will fail.");
 }
@@ -44,6 +52,13 @@ export const initPushWorker = () => {
         QUEUE_NAMES.WEB_PUSH,
         async (job: Job<PushPayload>) => {
             const { userId, title, body, icon, deepLink } = job.data;
+                const category = (job.data as any).category as string | undefined;
+            console.info(`${PUSH_DEBUG_PREFIX} processing job`, {
+                jobId: job.id,
+                userId,
+                title,
+                deepLink: deepLink || "/dashboard",
+            });
             const todayStr = getTodayStr();
             const rateLimitKey = `push:limit:${userId}:${todayStr}`;
 
@@ -59,6 +74,11 @@ export const initPushWorker = () => {
             // 2. Fetch User Subscriptions
             const subscriptions = await prisma.webPushSubscription.findMany({
                 where: { userId },
+            });
+
+            console.info(`${PUSH_DEBUG_PREFIX} subscriptions loaded`, {
+                userId,
+                count: subscriptions.length,
             });
 
             if (subscriptions.length === 0) {
@@ -77,10 +97,24 @@ export const initPushWorker = () => {
                 },
             });
 
-            // 3. Dispatch to all authenticated devices
+            // 3. Check user's enabled buckets (skip sends when user disabled this bucket)
+            // 3. Check user's enabled buckets, quiet-hours and focus profiles via shared helper
+            if (category) {
+                const settings = await getNotificationSettings(userId);
+                if (settings) {
+                    const decision = shouldSendNotification({ userSettings: settings, category, now: new Date() });
+                    if (!decision.allow) {
+                        console.info(`${PUSH_DEBUG_PREFIX} job skipped — user preferences/context prevent delivery`, { userId, category, reason: decision.reason });
+                        return { status: "skipped", reason: decision.reason };
+                    }
+                }
+            }
+            
+
+            // 4. Dispatch to all authenticated devices
             const pushPromises = subscriptions.map(async (sub) => {
                 try {
-                    await webpush.sendNotification(
+                    const response = await webpush.sendNotification(
                         {
                             endpoint: sub.endpoint,
                             keys: {
@@ -90,6 +124,11 @@ export const initPushWorker = () => {
                         },
                         notificationPayload
                     );
+                    console.info(`${PUSH_DEBUG_PREFIX} sendNotification success`, {
+                        subscriptionId: sub.id,
+                        endpoint: maskEndpoint(sub.endpoint),
+                        statusCode: response?.statusCode,
+                    });
                     return { endpoint: sub.endpoint, status: "success" };
                 } catch (error: any) {
                     // 4. Auto-cleanup Strategy (410 Gone / 404 Not Found)
@@ -99,7 +138,13 @@ export const initPushWorker = () => {
                         return { endpoint: sub.endpoint, status: "removed" };
                     }
 
-                    console.error(`❌ Error sending push to ${sub.id}:`, error.message);
+                    console.error(`${PUSH_DEBUG_PREFIX} sendNotification failed`, {
+                        subscriptionId: sub.id,
+                        endpoint: maskEndpoint(sub.endpoint),
+                        statusCode: error?.statusCode,
+                        message: error?.message,
+                        body: error?.body,
+                    });
                     throw error; // Let BullMQ retry for 5xx errors
                 }
             });

@@ -151,6 +151,7 @@ export interface PushPayload {
     body: string;
     icon?: string;
     deepLink?: string;
+    category?: string;
     dedupeKey?: string; // e.g., "daily-summary-user123"
 }
 

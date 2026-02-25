@@ -22,12 +22,15 @@ import {
     type LocalTimetableEntry,
 } from './local-db';
 import { syncEngine } from './sync-engine';
+import { useAppSelector } from './hooks';
+import { selectIsAuthenticated } from './slices/authSlice';
 
 type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
 
 // ─── Sync Status Hook ───────────────────────────────────────────────────────────
 
 export function useSyncStatus() {
+    const isAuthenticated = useAppSelector(selectIsAuthenticated);
     const [status, setStatus] = useState<SyncStatus>('idle');
     const [pendingCount, setPendingCount] = useState(0);
 
@@ -37,13 +40,19 @@ export function useSyncStatus() {
             setPendingCount(count);
         });
 
-        // Start the sync engine
-        syncEngine.start();
+        if (isAuthenticated) {
+            syncEngine.start();
+        } else {
+            syncEngine.stop();
+        }
 
         return () => {
             unsubscribe();
+            if (!isAuthenticated) {
+                syncEngine.stop();
+            }
         };
-    }, []);
+    }, [isAuthenticated]);
 
     const forceSync = useCallback(() => syncEngine.forceSync(), []);
 
@@ -114,16 +123,22 @@ export function useLocalCategories(userId?: string) {
 // ─── Hydration Hook (preload local DB from server on first load) ────────────────
 
 export function useLocalDbHydration() {
+    const isAuthenticated = useAppSelector(selectIsAuthenticated);
     const [hydrated, setHydrated] = useState(false);
 
     useEffect(() => {
+        if (!isAuthenticated) {
+            setHydrated(true);
+            return;
+        }
+
         syncEngine.pullFromServer().then(() => {
             setHydrated(true);
         }).catch(() => {
             // Offline or error — still mark as hydrated so UI shows local data
             setHydrated(true);
         });
-    }, []);
+    }, [isAuthenticated]);
 
     return hydrated;
 }

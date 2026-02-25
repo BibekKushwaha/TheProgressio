@@ -6,10 +6,10 @@ const { mockCreateTaskFromText } = vi.hoisted(() => ({
   mockCreateTaskFromText: vi.fn(),
 }));
 
-const { mockSanitizeIncomingText, mockClassifyWhatsAppIntent, mockExtractWhatsAppTaskJson } = vi.hoisted(() => ({
+const { mockSanitizeIncomingText, mockExtractWhatsAppIntentAndTask } = vi.hoisted(() => ({
   mockSanitizeIncomingText: vi.fn((text: string) => text),
-  mockClassifyWhatsAppIntent: vi.fn().mockResolvedValue('create_task'),
-  mockExtractWhatsAppTaskJson: vi.fn().mockResolvedValue({
+  mockExtractWhatsAppIntentAndTask: vi.fn().mockResolvedValue({
+    intent: 'create_task',
     title: 'Generated Task',
     dueAt: null,
     recurrence: null,
@@ -29,8 +29,7 @@ vi.mock('../src/controllers/task.controller.js', async (importOriginal) => {
 vi.mock('../src/services/ai.service.js', () => ({
   aiService: {
     sanitizeIncomingText: mockSanitizeIncomingText,
-    classifyWhatsAppIntent: mockClassifyWhatsAppIntent,
-    extractWhatsAppTaskJson: mockExtractWhatsAppTaskJson,
+    extractWhatsAppIntentAndTask: mockExtractWhatsAppIntentAndTask,
     generateSubtasks: vi.fn().mockResolvedValue(['Step 1', 'Step 2']),
   },
 }));
@@ -252,8 +251,8 @@ describe('whatsapp.controller — capture endpoint', () => {
     });
 
     mockSanitizeIncomingText.mockImplementation((text: string) => text);
-    mockClassifyWhatsAppIntent.mockResolvedValue('create_task');
-    mockExtractWhatsAppTaskJson.mockResolvedValue({
+    mockExtractWhatsAppIntentAndTask.mockResolvedValue({
+      intent: 'create_task',
       title: 'Generated Task',
       dueAt: null,
       recurrence: null,
@@ -316,7 +315,8 @@ describe('whatsapp.controller — capture endpoint', () => {
   });
 
   it('asks clarification when extraction confidence is low', async () => {
-    mockExtractWhatsAppTaskJson.mockResolvedValueOnce({
+    mockExtractWhatsAppIntentAndTask.mockResolvedValueOnce({
+      intent: 'create_task',
       title: 'Generated Task',
       dueAt: null,
       recurrence: null,
@@ -335,7 +335,14 @@ describe('whatsapp.controller — capture endpoint', () => {
   });
 
   it('does not create task for non-create intents', async () => {
-    mockClassifyWhatsAppIntent.mockResolvedValueOnce('list_tasks');
+    mockExtractWhatsAppIntentAndTask.mockResolvedValueOnce({
+      intent: 'list_tasks',
+      title: '',
+      dueAt: null,
+      recurrence: null,
+      confidence: 0.9,
+      source: 'rule',
+    });
 
     const res = await request(app)
       .post('/api/integrations/whatsapp/capture')

@@ -4,8 +4,8 @@ import { useRef, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { makeStore, AppStore } from './store';
 import { useGetProfileQuery } from './services/authApi';
-import { useAppDispatch } from './hooks';
-import { hydrateAuth, logout } from './slices/authSlice';
+import { useAppDispatch, useAppSelector } from './hooks';
+import { hydrateAuth, logout, selectIsAuthenticated } from './slices/authSlice';
 import { syncEngine } from './sync-engine';
 import {
   getLocalStorageItem,
@@ -16,8 +16,20 @@ import {
 
 const STORE_BUILD_VERSION = '2026-02-19-calendar-fix';
 
+function isAuthRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location?.pathname ?? '';
+  return (
+    path === '/login' ||
+    path === '/signup' ||
+    path === '/forgot-password' ||
+    path.startsWith('/reset-password')
+  );
+}
+
 function AuthHydrator() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const [shouldFetch, setShouldFetch] = useState(false);
   const { data, isSuccess, error } = useGetProfileQuery(undefined, {
     skip: !shouldFetch,
@@ -25,8 +37,8 @@ function AuthHydrator() {
 
   useEffect(() => {
     const hasSession = getLocalStorageItem('auth:hasSession') === '1';
-    setShouldFetch(hasSession);
-  }, []);
+    setShouldFetch(!isAuthenticated && hasSession && !isAuthRoute());
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isSuccess && data?.user) {
@@ -49,8 +61,15 @@ function AuthHydrator() {
 }
 
 function SyncBootstrap() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+
   useEffect(() => {
     if (!supportsIndexedDb()) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      syncEngine.stop();
       return;
     }
 
@@ -59,7 +78,7 @@ function SyncBootstrap() {
     return () => {
       syncEngine.stop();
     };
-  }, []);
+  }, [isAuthenticated]);
 
   return null;
 }

@@ -319,18 +319,18 @@ const captureWhatsAppTaskCore = async (req: Request, res: Response, source: Capt
         return res.status(200).json({ message: "Ignored empty or unsafe WhatsApp message" });
     }
 
-    const intent = await aiService.classifyWhatsAppIntent(safeText);
-    if (intent !== "create_task") {
+    const extracted = await aiService.extractWhatsAppIntentAndTask(safeText);
+    if (extracted.intent !== "create_task") {
         if (normalizedSender) {
             await sendWhatsAppText(
                 normalizedSender,
-                getIntentGuidanceMessage(intent),
+                getIntentGuidanceMessage(extracted.intent),
             ).catch(() => null);
         }
-        return res.status(200).json({ message: "Non-create intent handled", intent });
+        return res.status(200).json({ message: "Non-create intent handled", intent: extracted.intent });
     }
 
-    const extracted = await aiService.extractWhatsAppTaskJson(safeText);
+    const intent = extracted.intent;
     const dueDate = extracted.dueAt ? new Date(extracted.dueAt) : null;
     const hasPastDueDate = !!dueDate && dueDate.getTime() < Date.now();
 

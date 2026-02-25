@@ -12,6 +12,16 @@ import ErrorHandler from "../utils/errorHandler.js";
 import { sendPushNotification } from "../services/push.service.js";
 import { emitPushEvent } from "../services/queue.service.js";
 
+const PUSH_DEBUG_PREFIX = "[PushDebug][API]";
+
+const maskEndpoint = (endpoint: string) => `${endpoint.slice(0, 40)}...${endpoint.slice(-12)}`;
+
+const decodeBase64Url = (value: string): Buffer => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  return Buffer.from(padded, "base64");
+};
+
 const parseMetadata = (raw: string | null | undefined): Record<string, unknown> => {
   if (!raw) return {};
   try {
@@ -82,6 +92,7 @@ export const composeNotification = TryCatch(async (req: AuthenticatedRequest, re
       title: payload.title,
       body: payload.body,
       deepLink: payload.deepLink,
+      category: payload.category,
       dedupeKey: `push-compose-${userId}-${todayStr}-${Date.now()}`, // simple dedupe for explicit composes
     };
     if (!payload.emoji && payload.imageUrl) {
@@ -96,6 +107,7 @@ export const composeNotification = TryCatch(async (req: AuthenticatedRequest, re
         body: pushPayload.body,
         ...(pushPayload.icon ? { icon: pushPayload.icon } : {}),
         deepLink: pushPayload.deepLink,
+        category: pushPayload.category,
       });
     }
   } catch (pushErr) {
@@ -179,8 +191,31 @@ export const subscribeToPush = TryCatch(async (req: AuthenticatedRequest, res: R
   const userId = req.user!.id;
   const { endpoint, keys, userAgent } = req.body;
 
+  console.info(`${PUSH_DEBUG_PREFIX} subscribeToPush request`, {
+    userId,
+    hasEndpoint: Boolean(endpoint),
+    hasKeys: Boolean(keys),
+    hasP256dh: Boolean(keys?.p256dh),
+    hasAuth: Boolean(keys?.auth),
+    userAgentLength: typeof userAgent === "string" ? userAgent.length : 0,
+  });
+
   if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
     throw new ErrorHandler(400, "Invalid subscription payload");
+  }
+
+  if (typeof endpoint !== "string" || (!endpoint.startsWith("https://") && !endpoint.startsWith("http://localhost"))) {
+    throw new ErrorHandler(400, "Invalid endpoint format");
+  }
+
+  try {
+    const p256dhBytes = decodeBase64Url(String(keys.p256dh)).byteLength;
+    const authBytes = decodeBase64Url(String(keys.auth)).byteLength;
+    if (p256dhBytes !== 65 || authBytes < 16) {
+      throw new Error("invalid key lengths");
+    }
+  } catch {
+    throw new ErrorHandler(400, "Invalid subscription key format");
   }
 
   await prisma.webPushSubscription.upsert({
@@ -200,6 +235,11 @@ export const subscribeToPush = TryCatch(async (req: AuthenticatedRequest, res: R
     },
   });
 
+  console.info(`${PUSH_DEBUG_PREFIX} subscribeToPush saved`, {
+    userId,
+    endpoint: maskEndpoint(endpoint),
+  });
+
   return res.status(201).json({ message: "Subscribed to web push notifications" });
 });
 
@@ -213,6 +253,12 @@ export const unsubscribeFromPush = TryCatch(async (req: AuthenticatedRequest, re
   await prisma.webPushSubscription.deleteMany({
     where: { endpoint },
   });
+
+  if (typeof endpoint === "string") {
+    console.info(`${PUSH_DEBUG_PREFIX} unsubscribeFromPush removed`, {
+      endpoint: maskEndpoint(endpoint),
+    });
+  }
 
   return res.status(200).json({ message: "Unsubscribed from web push notifications" });
 });

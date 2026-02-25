@@ -2,17 +2,26 @@
 
 // self is a built-in ServiceWorker global — no declaration needed
 const sw = /** @type {ServiceWorkerGlobalScope} */ (self);
+const PUSH_DEBUG_PREFIX = '[PushDebug][SW]';
 
 sw.addEventListener('install', (event) => {
+    console.info(`${PUSH_DEBUG_PREFIX} install event`);
     event.waitUntil(sw.skipWaiting());
 });
 
 sw.addEventListener('activate', (event) => {
+    console.info(`${PUSH_DEBUG_PREFIX} activate event`);
     event.waitUntil(sw.clients.claim());
 });
 
 sw.addEventListener('push', (event) => {
-    if (!event.data) return;
+    console.info(`${PUSH_DEBUG_PREFIX} push event received`, {
+        hasData: Boolean(event.data),
+    });
+    if (!event.data) {
+        console.warn(`${PUSH_DEBUG_PREFIX} push event had no data payload`);
+        return;
+    }
 
     event.waitUntil(
         (async () => {
@@ -24,6 +33,10 @@ sw.addEventListener('push', (event) => {
                         return { body: event.data.text?.() ?? '' };
                     }
                 })();
+
+                console.info(`${PUSH_DEBUG_PREFIX} push payload parsed`, {
+                    topLevelKeys: data && typeof data === 'object' ? Object.keys(data) : [],
+                });
 
                 const notification = data?.notification && typeof data.notification === 'object' ? data.notification : data;
                 const title = typeof notification?.title === 'string' ? notification.title : 'Student Activity Tracker';
@@ -48,6 +61,11 @@ sw.addEventListener('push', (event) => {
                 };
 
                 await sw.registration.showNotification(title, options);
+                console.info(`${PUSH_DEBUG_PREFIX} showNotification success`, {
+                    title,
+                    tag: options.tag,
+                    url: absoluteUrl,
+                });
             } catch (err) {
                 console.error('Error handling push event:', err);
             }
@@ -56,6 +74,9 @@ sw.addEventListener('push', (event) => {
 });
 
 sw.addEventListener('notificationclick', (event) => {
+    console.info(`${PUSH_DEBUG_PREFIX} notification click`, {
+        url: event.notification?.data?.url,
+    });
     event.notification.close();
 
     const urlToOpen = event.notification.data?.url || new URL('/dashboard', sw.location.origin).href;

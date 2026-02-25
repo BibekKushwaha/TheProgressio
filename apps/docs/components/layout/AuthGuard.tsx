@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
     hydrateAuth,
+    logout,
     selectIsAuthenticated,
     useAppDispatch,
     useAppSelector,
@@ -41,13 +42,17 @@ export function AuthGuard({ children }: AuthGuardProps) {
         // Redirect when auth fails — token present but invalid/expired
         if (!isLoading && !isFetching) {
             if (isError || (!isSuccess && !isAuthenticated)) {
+                dispatch(logout());
+                if (typeof window !== "undefined") {
+                    localStorage.removeItem("auth:hasSession");
+                }
                 const loginUrl = `/login?next=${encodeURIComponent(pathname)}`;
                 router.replace(loginUrl);
             }
         }
     }, [data, dispatch, isAuthenticated, isError, isFetching, isLoading, isSuccess, router, pathname]);
 
-    if (isLoading || isFetching) {
+    if (isLoading) {
         return <PageLoader title="Verifying session" subtitle="Checking account and permissions..." />;
     }
 
@@ -62,4 +67,3 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     return <>{children}</>;
 }
-

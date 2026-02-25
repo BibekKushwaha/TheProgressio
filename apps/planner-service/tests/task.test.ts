@@ -36,8 +36,8 @@ vi.mock('../src/services/queue.service.js', () => ({
 vi.mock('../src/services/ai.service.js', () => ({
   aiService: {
     sanitizeIncomingText: vi.fn((text: string) => text),
-    classifyWhatsAppIntent: vi.fn().mockResolvedValue('create_task'),
-    extractWhatsAppTaskJson: vi.fn().mockResolvedValue({
+    extractWhatsAppIntentAndTask: vi.fn().mockResolvedValue({
+      intent: 'create_task',
       title: 'Chemistry lab report',
       dueAt: null,
       recurrence: null,
