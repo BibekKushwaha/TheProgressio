@@ -7,7 +7,7 @@ import { MorningBriefing } from '@/components/dashboard/MorningBriefing';
 import { LiveActivityWidget } from '@/components/dashboard/LiveActivityWidget';
 import { ActivityLedger } from '@/components/dashboard/ActivityLedger';
 import { NotesWidget } from '@/components/dashboard/NotesWidget';
-import { QRAttendance } from '@/components/settings/QRAttendance';
+
 
 import { DashboardGrid } from '@/components/layout/DashboardGrid';
 
@@ -15,13 +15,18 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6 pt-0 md:pt-12 lg:pt-0">
             <WelcomeHeader />
+            <div className="lg:hidden">
+                <MorningBriefing />
+            </div>
             <LiveActivityWidget />
             <TopStats />
 
             <DashboardGrid
                 sidebar={
                     <div className="space-y-6">
-                        <MorningBriefing />
+                        <div className="hidden lg:block">
+                            <MorningBriefing />
+                        </div>
                         <QuickActions />
                         <NotesWidget />
                     </div>
@@ -30,8 +35,10 @@ export default function DashboardPage() {
                 <div className="space-y-6">
                     <WeeklyActivity />
                     <TodaysTasks />
-                    <QRAttendance />
-                    <ActivityLedger />
+                    {/* <QRAttendance /> */}
+                    <div className="hidden lg:block">
+                        <ActivityLedger />
+                    </div>
                 </div>
             </DashboardGrid>
         </div>

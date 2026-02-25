@@ -44,7 +44,12 @@ const authLimiter = rateLimit({
 });
 
 app.use(globalLimiter);
-app.use('/api/auth', authLimiter);
+// Apply strict auth limiter only to endpoints that are authentication attempts
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot', authLimiter);
+app.use('/api/auth/reset', authLimiter);
+app.use('/api/auth/mobile/login', authLimiter);
 app.use('/api/auth', userRouter);
 
 app.get('/', (req, res) => {

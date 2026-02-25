@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import {
-    useGetProfileQuery,
+    selectCurrentUser,
     useGetPushStatusQuery,
     useSendPushTestMutation,
     useSubscribeToPushMutation,
     useUnsubscribeFromPushMutation,
+    useAppSelector,
 } from '@repo/store';
 import { toast } from 'sonner';
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const PUSH_DEBUG_PREFIX = '[PushDebug][Client]';
 
 type BackendStatus = 'idle' | 'registering' | 'registered' | 'failed';
 
@@ -27,9 +29,13 @@ function urlBase64ToUint8Array(base64String: string) {
     return outputArray;
 }
 
+function maskEndpoint(endpoint?: string): string {
+    if (!endpoint) return 'none';
+    return `${endpoint.slice(0, 40)}...${endpoint.slice(-12)}`;
+}
+
 export function PushNotificationManager() {
-    const { data: profileData } = useGetProfileQuery();
-    const user = profileData?.user;
+    const user = useAppSelector(selectCurrentUser);
     const [isSupported, setIsSupported] = useState(false);
     const [browserSubscription, setBrowserSubscription] = useState<PushSubscription | null>(null);
     const [backendStatus, setBackendStatus] = useState<BackendStatus>('idle');
@@ -51,17 +57,29 @@ export function PushNotificationManager() {
     }, [isSupported, user?.id]);
 
     const ensureRegistration = async (): Promise<ServiceWorkerRegistration> => {
+        console.info(`${PUSH_DEBUG_PREFIX} registering service worker /sw.js`);
         await navigator.serviceWorker.register('/sw.js', {
             scope: '/',
             updateViaCache: 'none',
         });
-        return navigator.serviceWorker.ready;
+        const ready = await navigator.serviceWorker.ready;
+        console.info(`${PUSH_DEBUG_PREFIX} service worker ready`, {
+            scope: ready.scope,
+            activeState: ready.active?.state,
+        });
+        return ready;
     };
 
     const syncSubscriptionToBackend = async (sub: PushSubscription): Promise<boolean> => {
         const subJson = sub.toJSON();
+        console.info(`${PUSH_DEBUG_PREFIX} syncSubscriptionToBackend start`, {
+            endpoint: maskEndpoint(subJson.endpoint),
+            hasP256dh: Boolean(subJson.keys?.p256dh),
+            hasAuth: Boolean(subJson.keys?.auth),
+        });
         if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) {
             toast.error('Push subscription is invalid. Please re-enable notifications.');
+            console.warn(`${PUSH_DEBUG_PREFIX} invalid subscription payload before backend sync`);
             return false;
         }
 
@@ -74,6 +92,9 @@ export function PushNotificationManager() {
             }).unwrap();
             setBackendStatus('registered');
             refetchPushStatus();
+            console.info(`${PUSH_DEBUG_PREFIX} backend subscription saved`, {
+                endpoint: maskEndpoint(subJson.endpoint),
+            });
             return true;
         } catch (err) {
             console.error('Failed to register subscription with backend:', err);
@@ -86,6 +107,11 @@ export function PushNotificationManager() {
         try {
             const registration = await ensureRegistration();
             const existing = await registration.pushManager.getSubscription();
+            console.info(`${PUSH_DEBUG_PREFIX} bootstrap existing subscription`, {
+                exists: Boolean(existing),
+                endpoint: maskEndpoint(existing?.endpoint),
+                permission: Notification.permission,
+            });
             setBrowserSubscription(existing);
 
             if (existing) {
@@ -99,7 +125,25 @@ export function PushNotificationManager() {
 
     async function subscribe() {
         try {
-            const permission = await Notification.requestPermission();
+            if (!VAPID_PUBLIC_KEY || !VAPID_PUBLIC_KEY.trim()) {
+                toast.error('Push notifications are not configured.');
+                return;
+            }
+
+            const initialPermission = Notification.permission;
+            console.info(`${PUSH_DEBUG_PREFIX} subscribe clicked`, { initialPermission });
+
+            if (initialPermission === 'denied') {
+                toast.error('Notifications blocked — enable in browser settings.');
+                console.warn(`${PUSH_DEBUG_PREFIX} permission denied before request`);
+                return;
+            }
+
+            const permission = initialPermission === 'granted'
+                ? 'granted'
+                : await Notification.requestPermission();
+
+            console.info(`${PUSH_DEBUG_PREFIX} permission result`, { permission });
             if (permission !== 'granted') {
                 toast.error('Notifications blocked — enable in browser settings.');
                 return;
@@ -115,15 +159,25 @@ export function PushNotificationManager() {
                 return;
             }
 
-            if (!VAPID_PUBLIC_KEY) {
-                console.error('Push notifications are unavailable: NEXT_PUBLIC_VAPID_PUBLIC_KEY is not configured.');
-                toast.error('Push notifications are not configured.');
+            const trimmedVapidKey = VAPID_PUBLIC_KEY.trim();
+            const isLikelyBase64Url = /^[A-Za-z0-9_-]+$/.test(trimmedVapidKey);
+            if (!isLikelyBase64Url || trimmedVapidKey.length < 80) {
+                console.error(`${PUSH_DEBUG_PREFIX} invalid NEXT_PUBLIC_VAPID_PUBLIC_KEY format`, {
+                    length: trimmedVapidKey.length,
+                    base64UrlLike: isLikelyBase64Url,
+                });
+                toast.error('Push key is invalid. Contact support.');
                 return;
             }
 
             const sub = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+                applicationServerKey: urlBase64ToUint8Array(trimmedVapidKey),
+            });
+
+            console.info(`${PUSH_DEBUG_PREFIX} browser subscription created`, {
+                endpoint: maskEndpoint(sub.endpoint),
+                expirationTime: sub.expirationTime,
             });
 
             setBrowserSubscription(sub);
@@ -146,6 +200,9 @@ export function PushNotificationManager() {
     async function disableNotifications() {
         if (!browserSubscription) return;
         const subJson = browserSubscription.toJSON();
+        console.info(`${PUSH_DEBUG_PREFIX} disable notifications`, {
+            endpoint: maskEndpoint(subJson.endpoint),
+        });
         try {
             if (subJson.endpoint) {
                 await unsubscribeFromPush({ endpoint: subJson.endpoint }).unwrap();
@@ -180,21 +237,30 @@ export function PushNotificationManager() {
         return null;
     }
 
+    const clientVapidConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PUBLIC_KEY.trim().length > 0);
     const vapidConfigured = pushStatus?.vapidConfigured;
 
     return (
         <div className="fixed bottom-4 right-4 z-50">
             {!browserSubscription ? (
-                <button
-                    onClick={subscribe}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-2 text-sm font-medium"
-                >
-                    <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                    </span>
-                    Enable Push Notifications
-                </button>
+                <div className="flex flex-col gap-2 items-end">
+                    <button
+                        onClick={subscribe}
+                        disabled={!clientVapidConfigured}
+                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2 rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-2 text-sm font-medium"
+                    >
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                        </span>
+                        Enable Push Notifications
+                    </button>
+                    {!clientVapidConfigured ? (
+                        <div className="text-xs text-amber-300/90 bg-black/30 px-3 py-1 rounded-full border border-amber-300/20">
+                            Client push not configured (missing public VAPID key)
+                        </div>
+                    ) : null}
+                </div>
             ) : backendStatus !== 'registered' ? (
                 <div className="flex flex-col gap-2 items-end">
                     <button

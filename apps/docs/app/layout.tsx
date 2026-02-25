@@ -5,7 +5,6 @@ import { StoreProvider } from "@repo/store";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { PushNotificationManager } from "@/components/PushNotificationManager";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -75,10 +74,9 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <TooltipProvider>
-                {children}
-                <PushNotificationManager />
-                <Toaster richColors position="bottom-right" />
-              </TooltipProvider>
+              {children}
+              <Toaster richColors position="bottom-right" />
+            </TooltipProvider>
           </ThemeProvider>
         </StoreProvider>
       </body>

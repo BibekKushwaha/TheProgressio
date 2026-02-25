@@ -96,7 +96,7 @@ export default function SettingsPage() {
         email: ""
     });
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (user) {
             setProfileFields({
                 username: user.username,
@@ -200,13 +200,7 @@ export default function SettingsPage() {
                             <div className="text-xl font-bold">{user?.username}</div>
                             <div className="text-slate-400">{user?.email}</div>
                         </div>
-                        <Button
-                            onClick={handleProfileUpdate}
-                            disabled={isUpdating}
-                            className="bg-indigo-600 hover:bg-indigo-700 w-full md:w-auto"
-                        >
-                            {isUpdating ? "Saving..." : "Save Changes"}
-                        </Button>
+
                     </div>
 
                     <Separator className="bg-white/10" />
@@ -229,6 +223,14 @@ export default function SettingsPage() {
                                 onChange={(e) => setProfileFields(prev => ({ ...prev, email: e.target.value }))}
                             />
                         </div>
+
+                        <Button
+                            onClick={handleProfileUpdate}
+                            disabled={isUpdating}
+                            className="bg-indigo-600 hover:bg-indigo-700 w-full md:w-auto lg:text-center"
+                        >
+                            {isUpdating ? "Saving..." : "Save Changes"}
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
