@@ -2,7 +2,8 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { withAuthRefresh, withRetry } from '../baseQuery';
 import { calendarApi } from './calendarApi';
 import { analyticsApi } from './analyticsApi';
-import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
+import { getFamilyShareToken, isNativeRuntime, resolveServiceUrl } from '../runtime';
+import { getAccessTokenSync } from '../mobile-token-store';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
     process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL ?? process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL,
@@ -176,6 +177,10 @@ const plannerBaseQuery = fetchBaseQuery({
     credentials: 'include',
     prepareHeaders: (headers) => {
         headers.set('Content-Type', 'application/json');
+        const accessToken = isNativeRuntime() ? getAccessTokenSync() : null;
+        if (accessToken) {
+            headers.set('Authorization', `Bearer ${accessToken}`);
+        }
         const shareToken = getFamilyShareToken();
         if (shareToken) {
             headers.set('x-family-share-token', shareToken);

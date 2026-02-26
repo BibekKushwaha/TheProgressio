@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
+import { getFamilyShareToken, isNativeRuntime, resolveServiceUrl } from '../runtime';
 import { withAuthRefresh, withRetry } from '../baseQuery';
+import { getAccessTokenSync } from '../mobile-token-store';
 
 export const AUTH_SERVICE_URL = resolveServiceUrl(
   process.env.EXPO_PUBLIC_AUTH_SERVICE_URL ?? process.env.NEXT_PUBLIC_AUTH_SERVICE_URL,
@@ -99,6 +100,10 @@ export const authApi = createApi({
     credentials: 'include', // Include cookies in requests
     prepareHeaders: (headers) => {
       headers.set('Content-Type', 'application/json');
+      const accessToken = isNativeRuntime() ? getAccessTokenSync() : null;
+      if (accessToken) {
+        headers.set('Authorization', `Bearer ${accessToken}`);
+      }
       const shareToken = getFamilyShareToken();
       if (shareToken) {
         headers.set('x-family-share-token', shareToken);
@@ -221,6 +226,13 @@ export const authApi = createApi({
         body,
       }),
     }),
+    mobileGoogleLogin: builder.mutation<MobileAuthResponse, { idToken: string; deviceId?: string }>({
+      query: (body) => ({
+        url: '/mobile/google',
+        method: 'POST',
+        body,
+      }),
+    }),
     mobileRefresh: builder.mutation<MobileAuthResponse, { refreshToken: string; deviceId?: string }>({
       query: (body) => ({
         url: '/mobile/refresh',
@@ -291,6 +303,7 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useMobileLoginMutation,
+  useMobileGoogleLoginMutation,
   useMobileRefreshMutation,
   useMobileLogoutMutation,
   useMobileMeQuery,

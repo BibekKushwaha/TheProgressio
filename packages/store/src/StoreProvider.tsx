@@ -83,7 +83,13 @@ function SyncBootstrap() {
   return null;
 }
 
-export function StoreProvider({ children }: { children: React.ReactNode }) {
+export function StoreProvider({
+  children,
+  disableAuthHydrator,
+}: {
+  children: React.ReactNode;
+  disableAuthHydrator?: boolean;
+}) {
   const storeRef = useRef<AppStore | null>(null);
   if (!storeRef.current || (storeRef.current as AppStore & { __storeBuildVersion?: string }).__storeBuildVersion !== STORE_BUILD_VERSION) {
     const store = makeStore() as AppStore & { __storeBuildVersion?: string };
@@ -96,7 +102,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       <>
         {children}
         <SyncBootstrap />
-        <AuthHydrator />
+        {disableAuthHydrator ? null : <AuthHydrator />}
       </>
     </Provider>
   );

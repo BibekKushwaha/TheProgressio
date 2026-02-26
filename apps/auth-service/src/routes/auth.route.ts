@@ -4,6 +4,8 @@ import {
     forgotPassword,
     getCurrentUser,
     getWhatsAppPairingCode,
+    googleLoginCallback,
+    googleLoginStart,
     unpairWhatsApp,
     verifyWhatsAppWebhook,
     listFamilyShareLinks,
@@ -11,6 +13,7 @@ import {
     logoutUser,
     refreshUser,
     mobileLogin,
+    mobileGoogleLogin,
     mobileLogout,
     mobileMe,
     mobileRefresh,
@@ -25,6 +28,8 @@ const router = express.Router();
 
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.get("/google", googleLoginStart);
+router.get("/google/callback", googleLoginCallback);
 router.post("/refresh", refreshUser);
 router.delete("/logout", logoutUser);
 router.get("/me", getCurrentUser);
@@ -39,6 +44,7 @@ router.post("/whatsapp/webhook", verifyWhatsAppWebhook);  // called by the bot w
 
 // Mobile token lifecycle
 router.post("/mobile/login", mobileLogin);
+router.post("/mobile/google", mobileGoogleLogin);
 router.post("/mobile/refresh", mobileRefresh);
 router.post("/mobile/logout", mobileLogout);
 router.get("/mobile/me", mobileMe);

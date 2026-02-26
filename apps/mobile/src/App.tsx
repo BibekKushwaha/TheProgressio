@@ -4,7 +4,7 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 const NavContainer = NavigationContainer as React.ElementType;
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
-import { StoreProvider, useAppSelector, useAppDispatch } from '@repo/store';
+import { StoreProvider, hydrateMobileTokens, useAppSelector, useAppDispatch } from '@repo/store';
 import { RootNavigator } from './navigation/RootNavigator';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import { initSentry, setSentryUser } from './native/sentry';
@@ -92,6 +92,10 @@ const InnerApp: React.FC = () => {
     const navRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
     const user = useAppSelector((state: any) => state.auth?.user);
     const [linkingEnabled, setLinkingEnabled] = useState(!__DEV__);
+
+    useEffect(() => {
+        void hydrateMobileTokens();
+    }, []);
 
     // React 19 dev mode can mount/unmount/mount roots to verify side effects.
     // Delay linking activation in dev so only the stable mount enables handlers.

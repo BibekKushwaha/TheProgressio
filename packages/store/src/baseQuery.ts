@@ -1,18 +1,21 @@
 import { retry } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn } from '@reduxjs/toolkit/query';
-import { resolveServiceUrl } from './runtime';
+import { isNativeRuntime, resolveServiceUrl } from './runtime';
+import { clearTokens, getRefreshTokenSync, setTokens } from './mobile-token-store';
+import { hydrateAuth, logout } from './slices/authSlice';
 
 const AUTH_SERVICE_URL = resolveServiceUrl(
   process.env.EXPO_PUBLIC_AUTH_SERVICE_URL ?? process.env.NEXT_PUBLIC_AUTH_SERVICE_URL,
   'http://localhost:4000',
 );
 
-let refreshInFlight: Promise<boolean> | null = null;
+let refreshInFlightWeb: Promise<boolean> | null = null;
+let refreshInFlightMobile: Promise<boolean> | null = null;
 
-async function ensureFreshSession(): Promise<boolean> {
-  if (refreshInFlight) return refreshInFlight;
+async function ensureFreshWebSession(): Promise<boolean> {
+  if (refreshInFlightWeb) return refreshInFlightWeb;
 
-  refreshInFlight = (async () => {
+  refreshInFlightWeb = (async () => {
     try {
       const res = await fetch(`${AUTH_SERVICE_URL}/api/auth/refresh`, {
         method: 'POST',
@@ -23,11 +26,53 @@ async function ensureFreshSession(): Promise<boolean> {
     } catch {
       return false;
     } finally {
-      refreshInFlight = null;
+      refreshInFlightWeb = null;
     }
   })();
 
-  return refreshInFlight;
+  return refreshInFlightWeb;
+}
+
+async function ensureFreshMobileSession(api: any): Promise<boolean> {
+  if (refreshInFlightMobile) return refreshInFlightMobile;
+
+  refreshInFlightMobile = (async () => {
+    try {
+      const refreshToken = getRefreshTokenSync();
+      if (!refreshToken) return false;
+
+      const res = await fetch(`${AUTH_SERVICE_URL}/api/auth/mobile/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as {
+        user?: any;
+        accessToken?: string;
+        refreshToken?: string;
+        expiresAt?: string;
+      };
+
+      if (data?.accessToken && data?.refreshToken) {
+        await setTokens({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresAt: data.expiresAt,
+        });
+      }
+      if (data?.user) {
+        api?.dispatch?.(hydrateAuth({ user: data.user }));
+      }
+      return Boolean(data?.accessToken && data?.refreshToken);
+    } catch {
+      return false;
+    } finally {
+      refreshInFlightMobile = null;
+    }
+  })();
+
+  return refreshInFlightMobile;
 }
 
 /**
@@ -74,11 +119,28 @@ export function withAuthRefresh<BaseQuery extends BaseQueryFn<any, any, any, any
 
     const url = typeof args === 'string' ? args : (args as { url?: unknown })?.url;
     const urlString = typeof url === 'string' ? url : '';
-    if (urlString.includes('/auth/refresh') || urlString.includes('/auth/login') || urlString.includes('/auth/register')) {
+    if (
+      urlString.includes('/auth/refresh') ||
+      urlString.includes('/auth/login') ||
+      urlString.includes('/auth/register') ||
+      urlString.includes('/auth/mobile/refresh') ||
+      urlString.includes('/auth/mobile/login') ||
+      urlString.includes('/auth/mobile/google')
+    ) {
       return result;
     }
 
-    const refreshed = await ensureFreshSession();
+    if (isNativeRuntime()) {
+      const refreshed = await ensureFreshMobileSession(api);
+      if (!refreshed) {
+        await clearTokens();
+        api?.dispatch?.(logout());
+        return result;
+      }
+      return (baseQuery as any)(args, api, extraOptions);
+    }
+
+    const refreshed = await ensureFreshWebSession();
     if (!refreshed) return result;
 
     return (baseQuery as any)(args, api, extraOptions);
