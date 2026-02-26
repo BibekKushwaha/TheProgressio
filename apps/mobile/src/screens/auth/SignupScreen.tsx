@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { ScreenWrapper } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
-import { useRegisterMutation, setCredentials, useAppDispatch } from '@repo/store';
+import { hydrateAuth, setMobileTokens, useAppDispatch, useMobileLoginMutation, useRegisterMutation } from '@repo/store';
 import type { AuthScreenProps } from '../../navigation/types';
 
 export const SignupScreen: React.FC<AuthScreenProps<'Signup'>> = ({ navigation }) => {
@@ -20,12 +20,23 @@ export const SignupScreen: React.FC<AuthScreenProps<'Signup'>> = ({ navigation }
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [registerApi, { isLoading }] = useRegisterMutation();
+    const [mobileLoginApi] = useMobileLoginMutation();
 
     const handleSignup = async () => {
         if (!name.trim() || !email.trim() || !password) return;
         try {
-            const result = await registerApi({ username: name.trim(), email: email.trim(), password, confirmPassword: password }).unwrap();
-            dispatch(setCredentials(result));
+            await registerApi({ username: name.trim(), email: email.trim(), password, confirmPassword: password }).unwrap();
+            const login = await mobileLoginApi({ email: email.trim(), password }).unwrap();
+            if (login?.accessToken && login?.refreshToken) {
+                await setMobileTokens({
+                    accessToken: login.accessToken,
+                    refreshToken: login.refreshToken,
+                    expiresAt: login.expiresAt,
+                });
+            }
+            if (login?.user) {
+                dispatch(hydrateAuth({ user: login.user }));
+            }
         } catch (err) {
             console.error('Signup failed', err);
         }

@@ -36,6 +36,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
         // Hydrate auth state when profile query succeeds
         if (isSuccess && data?.user && !isAuthenticated) {
             dispatch(hydrateAuth({ user: data.user }));
+            if (typeof window !== "undefined") {
+                localStorage.setItem("auth:hasSession", "1");
+            }
             return;
         }
 

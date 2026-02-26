@@ -78,6 +78,12 @@ const REFRESH_COOKIE_OPTIONS = {
   maxAge: Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000,
 };
 
+const GOOGLE_CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs";
+const GOOGLE_OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_ISSUERS = ["accounts.google.com", "https://accounts.google.com"] as const;
+const FRONTEND_BASE_URL = process.env.FRONTEND_URL ?? "http://localhost:3000";
+
 const ensureJwtSecret = (): string => {
   const secret = process.env.JWT_SEC;
   if (!secret) {
@@ -97,6 +103,175 @@ const hashOpaqueToken = (raw: string): string =>
 
 const generateOpaqueToken = (): string =>
   crypto.randomBytes(48).toString("hex");
+
+const isSafeNextPath = (nextValue: unknown): nextValue is string => {
+  if (typeof nextValue !== "string") return false;
+  if (!nextValue.startsWith("/")) return false;
+  if (nextValue.startsWith("//")) return false;
+  if (nextValue.includes("://")) return false;
+  if (nextValue.includes("\\")) return false;
+  return true;
+};
+
+const buildOAuthState = (payload: { next: string }): string => {
+  return jwt.sign(
+    {
+      next: payload.next,
+      nonce: crypto.randomBytes(16).toString("hex"),
+      type: "oauth_state",
+    },
+    ensureJwtSecret(),
+    { expiresIn: "10m" },
+  );
+};
+
+const parseOAuthState = (raw: string): { next: string } => {
+  try {
+    const decoded = jwt.verify(raw, ensureJwtSecret()) as jwt.JwtPayload;
+    if (decoded?.type !== "oauth_state") throw new ErrorHandler(401, "Invalid OAuth state");
+    const next = decoded?.next;
+    if (!isSafeNextPath(next)) throw new ErrorHandler(400, "Invalid next path");
+    return { next };
+  } catch (err) {
+    if (err instanceof ErrorHandler) throw err;
+    throw new ErrorHandler(401, "OAuth state expired or invalid");
+  }
+};
+
+type GoogleIdPayload = {
+  sub: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  aud?: string;
+  iss?: string;
+};
+
+let googleCertCache: { fetchedAtMs: number; maxAgeMs: number; certs: Record<string, string> } | null = null;
+
+const fetchGoogleCerts = async (): Promise<Record<string, string>> => {
+  const now = Date.now();
+  if (googleCertCache && now - googleCertCache.fetchedAtMs < googleCertCache.maxAgeMs) {
+    return googleCertCache.certs;
+  }
+
+  const response = await fetch(GOOGLE_CERTS_URL, { method: "GET" });
+  if (!response.ok) {
+    throw new ErrorHandler(502, "Failed to fetch Google certs");
+  }
+
+  const cacheControl = response.headers.get("cache-control") ?? "";
+  const maxAgeMatch = cacheControl.match(/max-age=(\d+)/);
+  const maxAgeSeconds = maxAgeMatch ? Number.parseInt(maxAgeMatch[1] ?? "0", 10) : 3600;
+  const maxAgeMs = Math.max(60_000, maxAgeSeconds * 1000);
+
+  const certs = (await response.json()) as Record<string, string>;
+  googleCertCache = { fetchedAtMs: now, maxAgeMs, certs };
+  return certs;
+};
+
+const verifyGoogleIdToken = async (idToken: string, expectedAudiences: string[]): Promise<GoogleIdPayload> => {
+  if (expectedAudiences.length === 0) {
+    throw new ErrorHandler(500, "Google OAuth audiences not configured");
+  }
+  const decoded = jwt.decode(idToken, { complete: true }) as { header?: { kid?: string } } | null;
+  const kid = decoded?.header?.kid;
+  if (!kid) {
+    throw new ErrorHandler(401, "Invalid Google token header");
+  }
+
+  const certs = await fetchGoogleCerts();
+  const cert = certs[kid];
+  if (!cert) {
+    googleCertCache = null;
+    const fresh = await fetchGoogleCerts();
+    if (!fresh[kid]) throw new ErrorHandler(401, "Unknown Google signing key");
+    return verifyGoogleIdToken(idToken, expectedAudiences);
+  }
+
+  const payload = jwt.verify(idToken, cert, {
+    algorithms: ["RS256"],
+    audience: expectedAudiences as [string, ...string[]],
+  }) as jwt.JwtPayload;
+
+  const googlePayload = payload as unknown as GoogleIdPayload;
+  if (!googlePayload.sub) throw new ErrorHandler(401, "Invalid Google token payload");
+  if (!googlePayload.iss || !GOOGLE_ISSUERS.includes(googlePayload.iss as any)) {
+    throw new ErrorHandler(401, "Invalid Google token issuer");
+  }
+  if (googlePayload.email_verified === false) throw new ErrorHandler(401, "Google email not verified");
+  return googlePayload;
+};
+
+const generateUsernameFromEmail = (email: string): string => {
+  const base = email.split("@")[0] ?? "user";
+  const safe = base.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").slice(0, 16);
+  return safe.length > 0 ? safe : "user";
+};
+
+const ensureUniqueUsername = async (desired: string): Promise<string> => {
+  const base = desired.slice(0, 16) || "user";
+  for (let i = 0; i < 10; i += 1) {
+    const suffix = i === 0 ? "" : `_${crypto.randomBytes(2).toString("hex")}`;
+    const candidate = `${base}${suffix}`.slice(0, 20);
+    const exists = await prisma.user.findUnique({ where: { username: candidate } });
+    if (!exists) return candidate;
+  }
+  return `${base}_${crypto.randomBytes(4).toString("hex")}`.slice(0, 20);
+};
+
+const resolveOrCreateGoogleUser = async (google: GoogleIdPayload): Promise<{ id: string }> => {
+  const provider = "google";
+  const providerAccountId = google.sub;
+  const email = google.email?.toLowerCase();
+  const prismaAny = prisma as any;
+
+  const existingAccount = await prismaAny.oAuthAccount?.findFirst?.({
+    where: { provider, providerAccountId },
+    select: { userId: true },
+  });
+
+  if (existingAccount?.userId) {
+    return { id: existingAccount.userId as string };
+  }
+
+  let user = null as null | { id: string };
+  if (email) {
+    user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  }
+
+  if (!user) {
+    const usernameBase = email ? generateUsernameFromEmail(email) : "google_user";
+    const username = await ensureUniqueUsername(usernameBase);
+    const randomPassword = crypto.randomBytes(32).toString("hex");
+    const hashPassword = await bcrypt.hash(randomPassword, 10);
+
+    user = await prisma.user.create({
+      data: {
+        username,
+        email: email ?? `${providerAccountId}@google.local`,
+        password: hashPassword,
+      },
+      select: { id: true },
+    });
+  }
+
+  try {
+    await prismaAny.oAuthAccount?.create?.({
+      data: {
+        userId: user.id,
+        provider,
+        providerAccountId,
+        email: email ?? null,
+      },
+    });
+  } catch {
+    /* ignore */
+  }
+
+  return { id: user.id };
+};
 
 async function issueWebSessionCookies(res: any, userId: string): Promise<void> {
   const token = issueAccessToken(userId, { expiresIn: "1h" });
@@ -122,6 +297,127 @@ async function issueWebSessionCookies(res: any, userId: string): Promise<void> {
 
   res.cookie('refreshToken', rawRefreshToken, REFRESH_COOKIE_OPTIONS);
 }
+
+const issueMobileSession = async (userId: string, deviceId?: string | null) => {
+  const accessToken = issueAccessToken(userId, { expiresIn: ACCESS_TOKEN_TTL });
+  const rawRefreshToken = generateOpaqueToken();
+  const expiresAt = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+
+  await prisma.mobileRefreshToken.create({
+    data: {
+      userId,
+      deviceId: deviceId?.trim() || "unknown-device",
+      tokenHash: hashOpaqueToken(rawRefreshToken),
+      expiresAt,
+    },
+  });
+
+  return { accessToken, refreshToken: rawRefreshToken, expiresAt: expiresAt.toISOString() };
+};
+
+export const googleLoginStart = TryCatch(async (req, res) => {
+  const nextParam = isSafeNextPath(req.query?.next) ? (req.query.next as string) : "/dashboard";
+  const state = buildOAuthState({ next: nextParam });
+
+  const clientId = process.env.GOOGLE_WEB_CLIENT_ID;
+  const redirectUri = process.env.GOOGLE_WEB_REDIRECT_URI;
+  if (!clientId || !redirectUri) {
+    throw new ErrorHandler(500, "Google OAuth not configured");
+  }
+
+  const authUrl = new URL(GOOGLE_OAUTH_AUTH_URL);
+  authUrl.searchParams.set("client_id", clientId);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("scope", "openid email profile");
+  authUrl.searchParams.set("state", state);
+  authUrl.searchParams.set("prompt", "select_account");
+
+  return res.redirect(authUrl.toString());
+});
+
+export const googleLoginCallback = TryCatch(async (req, res) => {
+  const code = typeof req.query?.code === "string" ? req.query.code : null;
+  const stateRaw = typeof req.query?.state === "string" ? req.query.state : null;
+  const error = typeof req.query?.error === "string" ? req.query.error : null;
+
+  if (error) {
+    return res.redirect(`${FRONTEND_BASE_URL}/login?error=${encodeURIComponent(error)}`);
+  }
+  if (!code || !stateRaw) {
+    throw new ErrorHandler(400, "Missing OAuth callback params");
+  }
+
+  const { next } = parseOAuthState(stateRaw);
+
+  const clientId = process.env.GOOGLE_WEB_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_WEB_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_WEB_REDIRECT_URI;
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new ErrorHandler(500, "Google OAuth not configured");
+  }
+
+  const body = new URLSearchParams();
+  body.set("code", code);
+  body.set("client_id", clientId);
+  body.set("client_secret", clientSecret);
+  body.set("redirect_uri", redirectUri);
+  body.set("grant_type", "authorization_code");
+
+  const tokenRes = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+
+  const tokenJson = (await tokenRes.json().catch(() => ({}))) as any;
+  if (!tokenRes.ok) {
+    throw new ErrorHandler(401, tokenJson?.error_description ?? "Google token exchange failed");
+  }
+
+  const idToken = tokenJson?.id_token;
+  if (typeof idToken !== "string") {
+    throw new ErrorHandler(401, "Missing Google id_token");
+  }
+
+  const googlePayload = await verifyGoogleIdToken(idToken, [clientId]);
+  const user = await resolveOrCreateGoogleUser(googlePayload);
+  await issueWebSessionCookies(res, user.id);
+
+  return res.redirect(`${FRONTEND_BASE_URL}${next}`);
+});
+
+export const mobileGoogleLogin = TryCatch(async (req, res) => {
+  const idToken = typeof req.body?.idToken === "string" ? req.body.idToken : "";
+  const deviceId = typeof req.body?.deviceId === "string" ? req.body.deviceId : undefined;
+  if (!idToken) {
+    return res.status(400).json({ message: "idToken is required" });
+  }
+
+  const androidClientId = process.env.GOOGLE_ANDROID_CLIENT_ID;
+  const iosClientId = process.env.GOOGLE_IOS_CLIENT_ID;
+  const audiences = [androidClientId, iosClientId].filter((v): v is string => Boolean(v && v.trim()));
+  if (audiences.length === 0) {
+    throw new ErrorHandler(500, "Google mobile OAuth not configured");
+  }
+
+  const googlePayload = await verifyGoogleIdToken(idToken, audiences);
+  const user = await resolveOrCreateGoogleUser(googlePayload);
+  const tokens = await issueMobileSession(user.id, deviceId);
+
+  const userRow = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { id: true, username: true, email: true, dailyGoalHours: true, createdAt: true, xp: true, level: true },
+  });
+
+  return res.status(200).json({
+    message: "Mobile Google login successful",
+    user: userRow,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    expiresAt: tokens.expiresAt,
+  });
+});
 
 const getBearerToken = (req: any): string | null => {
   const authHeader = req.headers?.authorization;

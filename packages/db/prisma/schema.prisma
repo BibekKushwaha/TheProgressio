@@ -56,11 +56,25 @@ model User {
   holidays         SchoolHoliday[]
   
   mobileRefreshTokens MobileRefreshToken[]
+  oauthAccounts       OAuthAccount[]
   familyShareLinks    FamilyShareLink[]
   notes               Note[]
   auditLogs           AuditLog[]
   pushSubscriptions   WebPushSubscription[]
   conversations       UserConversation[]
+}
+
+model OAuthAccount {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          String
+  providerAccountId String
+  email             String?
+  createdAt         DateTime @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model WebPushSubscription {

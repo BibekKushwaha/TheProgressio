@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import GradientButton from "@/components/auth/gradient-button";
@@ -13,6 +13,7 @@ import { getApiErrorMessage } from "@/lib/api-error";
 
 const LoginPage = () => {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -20,6 +21,12 @@ const LoginPage = () => {
 
     const dispatch = useAppDispatch();
     const [loginApi] = useLoginMutation();
+    const nextPath = searchParams.get("next") || "/dashboard";
+
+    const handleGoogleLogin = () => {
+        const authBase = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:4000";
+        window.location.href = `${authBase}/api/auth/google?next=${encodeURIComponent(nextPath)}`;
+    };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -78,6 +85,20 @@ const LoginPage = () => {
                     <div className="mb-8 text-center">
                         <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
                         <p className="text-gray-400">Sign in to continue your streak</p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        className="w-full rounded-xl border border-white/15 bg-white/[0.06] hover:bg-white/[0.09] text-white py-3 font-semibold transition-colors"
+                    >
+                        Continue with Google
+                    </button>
+
+                    <div className="flex items-center gap-3">
+                        <div className="h-px flex-1 bg-white/10" />
+                        <span className="text-xs text-slate-500">or</span>
+                        <div className="h-px flex-1 bg-white/10" />
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">

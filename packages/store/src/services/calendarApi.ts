@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { withAuthRefresh, withRetry } from '../baseQuery';
-import { resolveServiceUrl } from '../runtime';
+import { isNativeRuntime, resolveServiceUrl } from '../runtime';
+import { getAccessTokenSync } from '../mobile-token-store';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
     process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL ?? process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL,
@@ -56,6 +57,13 @@ export const calendarApi = createApi({
     baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
         baseUrl: `${PLANNER_SERVICE_URL}/api/calendar`,
         credentials: 'include',
+        prepareHeaders: (headers) => {
+            const accessToken = isNativeRuntime() ? getAccessTokenSync() : null;
+            if (accessToken) {
+                headers.set('Authorization', `Bearer ${accessToken}`);
+            }
+            return headers;
+        },
     }))),
     tagTypes: ['Calendar'] as const,
     endpoints: (builder) => ({

@@ -275,3 +275,7 @@ export function resolveServiceUrl(envValue: string | undefined, fallbackUrl: str
 
   return baseUrl;
 }
+
+export function isNativeRuntime(): boolean {
+  return isReactNativeRuntime();
+}

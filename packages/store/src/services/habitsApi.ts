@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { getFamilyShareToken, resolveServiceUrl } from '../runtime';
+import { getFamilyShareToken, isNativeRuntime, resolveServiceUrl } from '../runtime';
 import { withAuthRefresh, withRetry } from '../baseQuery';
+import { getAccessTokenSync } from '../mobile-token-store';
 
 const HABIT_SERVICE_URL = resolveServiceUrl(
     process.env.EXPO_PUBLIC_HABIT_SERVICE_URL ?? process.env.NEXT_PUBLIC_HABIT_SERVICE_URL,
@@ -161,6 +162,10 @@ export const habitsApi = createApi({
         credentials: 'include',
         prepareHeaders: (headers) => {
             headers.set('Content-Type', 'application/json');
+            const accessToken = isNativeRuntime() ? getAccessTokenSync() : null;
+            if (accessToken) {
+                headers.set('Authorization', `Bearer ${accessToken}`);
+            }
             const shareToken = getFamilyShareToken();
             if (shareToken) {
                 headers.set('x-family-share-token', shareToken);

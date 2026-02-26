@@ -9,22 +9,64 @@ import {
     Platform,
     ActivityIndicator,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { ScreenWrapper } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
-import { useLoginMutation, setCredentials, useAppDispatch } from '@repo/store';
+import { hydrateAuth, setMobileTokens, useAppDispatch, useMobileGoogleLoginMutation, useMobileLoginMutation } from '@repo/store';
 import type { AuthScreenProps } from '../../navigation/types';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export const LoginScreen: React.FC<AuthScreenProps<'Login'>> = ({ navigation }) => {
     const dispatch = useAppDispatch();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loginApi, { isLoading }] = useLoginMutation();
+    const [loginApi, { isLoading }] = useMobileLoginMutation();
+    const [googleLoginApi, { isLoading: isGoogleLoading }] = useMobileGoogleLoginMutation();
+
+    const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+        androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+        iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    });
+
+    React.useEffect(() => {
+        if (response?.type !== 'success') return;
+        const idToken = (response as any)?.params?.id_token as string | undefined;
+        if (!idToken) return;
+        void (async () => {
+            try {
+                const result = await googleLoginApi({ idToken }).unwrap();
+                if (result?.accessToken && result?.refreshToken) {
+                    await setMobileTokens({
+                        accessToken: result.accessToken,
+                        refreshToken: result.refreshToken,
+                        expiresAt: result.expiresAt,
+                    });
+                }
+                if (result?.user) {
+                    dispatch(hydrateAuth({ user: result.user }));
+                }
+            } catch (err) {
+                console.error('Google login failed', err);
+            }
+        })();
+    }, [dispatch, googleLoginApi, response]);
 
     const handleLogin = async () => {
         if (!email.trim() || !password) return;
         try {
             const result = await loginApi({ email: email.trim(), password }).unwrap();
-            dispatch(setCredentials(result));
+            if (result?.accessToken && result?.refreshToken) {
+                await setMobileTokens({
+                    accessToken: result.accessToken,
+                    refreshToken: result.refreshToken,
+                    expiresAt: result.expiresAt,
+                });
+            }
+            if (result?.user) {
+                dispatch(hydrateAuth({ user: result.user }));
+            }
         } catch (err) {
             // TODO: show toast error
             console.error('Login failed', err);
@@ -93,6 +135,18 @@ export const LoginScreen: React.FC<AuthScreenProps<'Login'>> = ({ navigation }) 
                                 <ActivityIndicator color="#fff" />
                             ) : (
                                 <Text style={styles.btnText}>Sign In</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.googleBtn, (!request || isGoogleLoading) && styles.btnDisabled]}
+                            onPress={() => void promptAsync()}
+                            disabled={!request || isGoogleLoading}
+                        >
+                            {isGoogleLoading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.googleBtnText}>Continue with Google</Text>
                             )}
                         </TouchableOpacity>
 
@@ -184,6 +238,20 @@ const styles = StyleSheet.create({
     },
     btnDisabled: { opacity: 0.6 },
     btnText: {
+        color: '#fff',
+        fontSize: Typography.fontSize.base,
+        fontWeight: '600',
+    },
+    googleBtn: {
+        backgroundColor: '#111827',
+        borderRadius: Radius.md,
+        paddingVertical: Spacing['4'],
+        alignItems: 'center',
+        marginTop: Spacing['2'],
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    googleBtnText: {
         color: '#fff',
         fontSize: Typography.fontSize.base,
         fontWeight: '600',

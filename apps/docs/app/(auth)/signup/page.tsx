@@ -2,7 +2,7 @@
 
 import React, { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Mail, User } from "lucide-react";
 import GradientButton from "@/components/auth/gradient-button";
 import Input from "@/components/auth/input";
@@ -14,12 +14,19 @@ import { getApiErrorMessage } from "@/lib/api-error";
 const SignupPage = () => {
   const [registerApi, { isLoading }] = useRegisterMutation();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
+  const nextPath = searchParams.get("next") || "/dashboard";
+
+  const handleGoogleLogin = () => {
+    const authBase = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:4000";
+    window.location.href = `${authBase}/api/auth/google?next=${encodeURIComponent(nextPath)}`;
+  };
 
 
   const validateForm = () => {
@@ -67,6 +74,20 @@ const SignupPage = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="w-full rounded-xl border border-white/15 bg-white/[0.06] hover:bg-white/[0.09] text-white py-3 font-semibold transition-colors"
+            >
+              Continue with Google
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-xs text-slate-500">or</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
             <Input
               id="username"
               label="Username"

@@ -1,10 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { StoreProvider } from "@repo/store";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppProviders } from "@/components/AppProviders";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -66,19 +63,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
       <body className="antialiased font-sans">
-        <StoreProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <TooltipProvider>
-              {children}
-              <Toaster richColors position="bottom-right" />
-            </TooltipProvider>
-          </ThemeProvider>
-        </StoreProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
