@@ -807,6 +807,131 @@ export const updateProfile = TryCatch(async (req, res) => {
   });
 });
 
+export const exportAccountData = TryCatch(async (req, res) => {
+  const token = req.cookies?.token ?? getBearerToken(req);
+  if (!token) {
+    throw new ErrorHandler(401, "Not authenticated");
+  }
+
+  const { id: userId } = decodeAccessToken(token);
+
+  const userExport = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      whatsappNumber: true,
+      whatsappVerified: true,
+      dailyGoalHours: true,
+      plan: true,
+      planStatus: true,
+      renewalAt: true,
+      paymentProvider: true,
+      paymentRef: true,
+      createdAt: true,
+      xp: true,
+      level: true,
+
+      categories: true,
+      tasks: {
+        include: {
+          subtasks: true,
+          attachments: true,
+          activityLogs: true,
+          reminders: true,
+          category: true,
+          subject: true,
+        },
+      },
+      habits: {
+        include: {
+          logs: true,
+          reminders: true,
+        },
+      },
+      nudges: true,
+      gradeEntries: true,
+      courseGrades: true,
+      paymentEvents: true,
+      syncOperations: true,
+      attendance: true,
+
+      subjects: true,
+      exams: true,
+      studyGoals: true,
+      timetable: true,
+      rotationPatterns: true,
+      holidays: true,
+
+      achievements: true,
+      notes: true,
+      auditLogs: true,
+      conversations: true,
+
+      familyShareLinks: {
+        select: {
+          id: true,
+          label: true,
+          permissions: true,
+          expiresAt: true,
+          revokedAt: true,
+          lastUsedAt: true,
+          createdAt: true,
+        },
+      },
+      pushSubscriptions: {
+        select: {
+          id: true,
+          endpoint: true,
+          userAgent: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      oauthAccounts: true,
+    },
+  });
+
+  if (!userExport) {
+    throw new ErrorHandler(404, "User not found");
+  }
+
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    user: userExport,
+  };
+
+  return res.status(200).json({ message: "Account export generated", export: payload });
+});
+
+export const deleteAccount = TryCatch(async (req, res) => {
+  const token = req.cookies?.token ?? getBearerToken(req);
+  if (!token) {
+    throw new ErrorHandler(401, "Not authenticated");
+  }
+
+  const parsedConfirm = typeof req.body?.confirm === "string" ? req.body.confirm.trim() : "";
+  if (parsedConfirm !== "DELETE") {
+    throw new ErrorHandler(400, 'Confirmation required. Send {"confirm":"DELETE"}');
+  }
+
+  const { id: userId } = decodeAccessToken(token);
+
+  await prisma.user.delete({ where: { id: userId } }).catch((_err) => {
+    throw new ErrorHandler(404, "User not found");
+  });
+
+  await safeDeleteUserCache(userId);
+
+  // Clear cookies to end the session immediately.
+  res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
+  res.clearCookie('refreshToken', { ...REFRESH_COOKIE_OPTIONS, maxAge: 0 });
+
+  return res.status(200).json({ message: "Account deleted" });
+});
+
 // ── Forgot Password (JWT-based, uses BullMQ/Redis for email worker) ────────
 
 import { addEmailToQueue } from "../services/email.queue.js";

@@ -19,6 +19,9 @@ import {
     // BFF — Dashboard
     getDashboardSummary,
     getStrategicSummary,
+    // SRL
+    getWeeklyReview,
+    getSrlPlanVsActual,
 } from "../controllers/stats.controller.js";
 import { isAuth } from "../middleware/auth.middleware.js";
 
@@ -70,6 +73,8 @@ router.post("/events/task-completed", handleTaskCompletedEvent);
 // ── BFF ────────────────────────────────────────────────────────────
 router.get("/dashboard-summary", isAuth, getDashboardSummary);
 router.get("/strategic-summary", isAuth, getStrategicSummary);
+router.get("/srl/weekly-review", isAuth, getWeeklyReview);
+router.get("/srl/plan-vs-actual", isAuth, getSrlPlanVsActual);
 // ── Internal service-to-service helpers ────────────────────────────────
 router.get("/internal/consistency", getInternalConsistency);
 

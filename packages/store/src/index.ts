@@ -15,6 +15,18 @@ export {
   getRefreshTokenSync,
 } from './mobile-token-store';
 
+// Runtime helpers (web-safe localStorage access)
+export {
+  getFamilyShareToken,
+  getLocalStorageItem,
+  setLocalStorageItem,
+  removeLocalStorageItem,
+  isAIAssistanceDisabled,
+  setAIAssistanceDisabled,
+  isOnline,
+  supportsIndexedDb,
+} from './runtime';
+
 // Hooks
 export { useAppDispatch, useAppSelector, useAppStore } from './hooks';
 
@@ -64,6 +76,9 @@ export {
   useResolveFamilyLinkQuery,
   useGetWhatsAppPairingCodeQuery,
   useUnpairWhatsAppMutation,
+  useExportAccountDataQuery,
+  useLazyExportAccountDataQuery,
+  useDeleteAccountMutation,
 } from './services/authApi';
 export type {
   RegisterRequest,
@@ -71,6 +86,7 @@ export type {
   AuthResponse,
   MobileAuthResponse,
   FamilyShareLink,
+  AccountExportPayload,
 } from './services/authApi';
 
 // Tasks API
@@ -233,6 +249,8 @@ export {
   useGetRevisionScheduleQuery,
   useGetDashboardSummaryQuery,
   useGetStrategicSummaryQuery,
+  useGetWeeklyReviewQuery,
+  useGetSrlPlanVsActualQuery,
 } from './services/analyticsApi';
 export type {
   ActivityLog,
@@ -266,6 +284,9 @@ export type {
   DashboardSummaryResponse,
   DashboardFocusStats,
   StrategicSummaryResponse,
+  WeeklyReviewInsight,
+  WeeklyReviewPriority,
+  WeeklyReviewResponse,
 } from './services/analyticsApi';
 export { SessionType } from './services/analyticsApi';
 
@@ -321,6 +342,33 @@ export type {
   UpdateRotationRequest,
   ResolvedRotation,
 } from './services/rotationsApi';
+
+// Mentorship API
+export {
+  mentorshipApi,
+  useGetMentorAlertSubscriptionsQuery,
+  useCreateMentorAlertSubscriptionMutation,
+  useUpdateMentorAlertSubscriptionMutation,
+  useRevokeMentorAlertSubscriptionMutation,
+  useGetMentorFeedbackQuery,
+  useSendMentorFeedbackMutation,
+} from './services/mentorshipApi';
+export type { MentorAlertSubscription, MentorFeedback } from './services/mentorshipApi';
+
+// Syllabus API
+export {
+  syllabusApi,
+  useGetSyllabusTopicsQuery,
+  useCreateSyllabusTopicMutation,
+  useUpdateSyllabusTopicMutation,
+  useDeleteSyllabusTopicMutation,
+  useGetSyllabusEdgesQuery,
+  useCreateSyllabusEdgeMutation,
+  useDeleteSyllabusEdgeMutation,
+  useGetTaskSyllabusTopicsQuery,
+  useSetTaskSyllabusTopicsMutation,
+} from './services/syllabusApi';
+export type { SyllabusTopic, SyllabusEdge, TaskSyllabusLink } from './services/syllabusApi';
 
 // Payment API
 export {

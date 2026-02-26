@@ -58,6 +58,12 @@ model User {
   mobileRefreshTokens MobileRefreshToken[]
   oauthAccounts       OAuthAccount[]
   familyShareLinks    FamilyShareLink[]
+  mentorAlertSubscriptions MentorAlertSubscription[]
+  mentorAlerts           MentorAlert[]
+  mentorFeedback          MentorFeedback[]
+  syllabusTopics          SyllabusTopic[]
+  syllabusEdges           SyllabusEdge[]
+  taskSyllabusTopics      TaskSyllabusTopic[]
   notes               Note[]
   auditLogs           AuditLog[]
   pushSubscriptions   WebPushSubscription[]
@@ -130,8 +136,121 @@ model FamilyShareLink {
   lastUsedAt  DateTime?
   createdAt   DateTime @default(now())
 
+  mentorAlerts   MentorAlert[]
+  mentorFeedback MentorFeedback[]
+
   @@index([userId])
   @@index([tokenHash])
+}
+
+model MentorAlertSubscription {
+  id                  String   @id @default(uuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label               String?
+  channel             String   @default("WHATSAPP") // WHATSAPP (future: EMAIL)
+  recipientPhone      String
+  cadence             String   @default("IMMEDIATE") // IMMEDIATE, DAILY, WEEKLY
+  enabled             Boolean  @default(true)
+  overdueThreshold    Int      @default(5)
+  consistencyThreshold Int     @default(50)
+  cooldownMinutes     Int      @default(360)
+  lastAlertAt         DateTime?
+  revokedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  alerts              MentorAlert[]
+
+  @@index([userId])
+  @@index([enabled, revokedAt])
+}
+
+model MentorAlert {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subscriptionId String?
+  subscription   MentorAlertSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  shareLinkId    String?
+  shareLink      FamilyShareLink? @relation(fields: [shareLinkId], references: [id], onDelete: SetNull)
+
+  trigger        String
+  message        String
+  sentToPhone    String
+  sentAt         DateTime @default(now())
+  status         String   @default("SENT") // SENT, FAILED
+  error          String?
+
+  @@index([userId, sentAt])
+  @@index([subscriptionId, sentAt])
+}
+
+model MentorFeedback {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  shareLinkId String?
+  shareLink   FamilyShareLink? @relation(fields: [shareLinkId], references: [id], onDelete: SetNull)
+
+  fromLabel   String?
+  message     String
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model SyllabusTopic {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  chapter        String
+  title          String
+  notes          String?
+  weight         Float?
+  estimatedHours Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  prerequisites  SyllabusEdge[] @relation("SyllabusEdgeTo")
+  unlocks        SyllabusEdge[] @relation("SyllabusEdgeFrom")
+  taskLinks      TaskSyllabusTopic[]
+
+  @@unique([userId, categoryId, chapter, title])
+  @@index([userId, categoryId])
+}
+
+model SyllabusEdge {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromTopicId String
+  toTopicId   String
+  fromTopic   SyllabusTopic @relation("SyllabusEdgeFrom", fields: [fromTopicId], references: [id], onDelete: Cascade)
+  toTopic     SyllabusTopic @relation("SyllabusEdgeTo", fields: [toTopicId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, fromTopicId, toTopicId])
+  @@index([userId, toTopicId])
+}
+
+model TaskSyllabusTopic {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  topicId   String
+  topic     SyllabusTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, topicId])
+  @@index([userId, topicId])
 }
 
 model Achievement {
@@ -185,6 +304,7 @@ model Category {
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks        Task[]
+  syllabusTopics SyllabusTopic[]
 
   @@unique([userId, name])
 }
@@ -216,6 +336,7 @@ model Task {
   activityLogs ActivityLog[]
   reminders    Reminder[]
   taskCompletionStat TaskCompletionStat?
+  syllabusLinks TaskSyllabusTopic[]
 }
 
 model Attachment {

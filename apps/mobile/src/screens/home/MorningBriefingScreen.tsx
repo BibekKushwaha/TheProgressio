@@ -2,10 +2,10 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
-import { useGetMorningBriefingQuery, useGetTasksQuery, TaskStatus } from '@repo/store';
+import { useGetMorningBriefingQuery, TaskStatus } from '@repo/store';
 import type { HomeScreenProps } from '../../navigation/types';
-import { toArray } from '../../utils/data';
 import { extractTaskId } from '../../utils/task';
+import { useLocalTasks } from '../../hooks/useLocalTasks';
 
 type BriefingTask = {
     id: string;
@@ -16,7 +16,7 @@ type BriefingTask = {
 
 export const MorningBriefingScreen: React.FC<HomeScreenProps<'MorningBriefing'>> = ({ navigation }) => {
     const { data, isLoading, refetch } = useGetMorningBriefingQuery(undefined);
-    const { data: pendingTasks } = useGetTasksQuery({ status: TaskStatus.PENDING, limit: 10 } as any);
+    const { tasks: pendingTasks } = useLocalTasks({ status: TaskStatus.PENDING });
 
     const briefing = ((data as any)?.briefing ?? {}) as {
         dueTasks?: number;
@@ -27,8 +27,7 @@ export const MorningBriefingScreen: React.FC<HomeScreenProps<'MorningBriefing'>>
     };
 
     const topTasks = useMemo(() => {
-        const list = toArray<BriefingTask>(pendingTasks, ['data', 'tasks']);
-        return list.slice(0, 5) as BriefingTask[];
+        return (pendingTasks ?? []).slice(0, 5) as any as BriefingTask[];
     }, [pendingTasks]);
 
     const weatherTip = useMemo(() => {

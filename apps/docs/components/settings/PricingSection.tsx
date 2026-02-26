@@ -29,7 +29,7 @@ const PLANS: Plan[] = [
     },
     {
         name: 'Pro',
-        price: '₹149',
+        price: '₹99',
         period: '/month',
         features: [
             'Unlimited tasks & habits',
@@ -45,9 +45,9 @@ const PLANS: Plan[] = [
         badge: 'Most Popular',
     },
     {
-        name: 'Institution',
+        name: 'Plus',
         price: '₹999',
-        period: '/month',
+        period: '/year',
         features: [
             'Everything in Pro',
             'QR attendance tracking',
@@ -145,10 +145,10 @@ export function PricingSection() {
                         key={plan.name}
                         onClick={() => setSelectedPlan(plan.name === 'Free' ? null : plan.name)}
                         className={`relative text-left p-5 rounded-2xl border-2 transition-all duration-300 ${plan.highlighted
-                                ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-                                : selectedPlan === plan.name
-                                    ? 'bg-white/10 border-white/30'
-                                    : 'bg-white/5 border-white/10 hover:border-white/20'
+                            ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
+                            : selectedPlan === plan.name
+                                ? 'bg-white/10 border-white/30'
+                                : 'bg-white/5 border-white/10 hover:border-white/20'
                             }`}
                     >
                         {plan.badge && (
@@ -180,8 +180,8 @@ export function PricingSection() {
                         </ul>
                         {plan.name !== 'Free' && (
                             <div className={`mt-4 py-2 rounded-xl text-center text-sm font-bold transition-all ${selectedPlan === plan.name
-                                    ? 'bg-indigo-500 text-white'
-                                    : 'bg-white/5 text-slate-400'
+                                ? 'bg-indigo-500 text-white'
+                                : 'bg-white/5 text-slate-400'
                                 }`}>
                                 {selectedPlan === plan.name ? 'Selected' : 'Choose Plan'}
                             </div>
@@ -203,8 +203,8 @@ export function PricingSection() {
                                 key={method.id}
                                 onClick={() => setSelectedMethod(method.id)}
                                 className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${selectedMethod === method.id
-                                        ? 'border-indigo-500/50 bg-indigo-500/10'
-                                        : 'border-white/10 bg-white/5 hover:bg-white/10'
+                                    ? 'border-indigo-500/50 bg-indigo-500/10'
+                                    : 'border-white/10 bg-white/5 hover:bg-white/10'
                                     }`}
                             >
                                 <div className={`p-2 rounded-lg bg-gradient-to-br ${method.color}`}>
@@ -239,7 +239,7 @@ export function PricingSection() {
                                         disabled={isSubmitting}
                                         className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center gap-2"
                                     >
-                                        {isSubmitting ? 'Processing...' : `Pay ${selectedPlan === 'Pro' ? '₹149' : '₹999'}`}
+                                        {isSubmitting ? 'Processing...' : `Pay ${selectedPlan === 'Pro' ? '₹99' : '₹999'}`}
                                         <ArrowRight className="w-4 h-4" />
                                     </button>
                                 </div>

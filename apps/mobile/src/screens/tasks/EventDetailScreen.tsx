@@ -2,17 +2,19 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
-import { TaskStatus, useGetTaskByIdQuery, useToggleTaskMutation } from '@repo/store';
+import { TaskStatus, useAppSelector } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
 import { formatTaskStatusLabel, normalizeTaskStatus, sanitizeTaskId } from '../../utils/task';
+import { useLocalTask } from '../../hooks/useLocalTask';
+import { localTasks } from '../../native/localDbAdapter';
 
 export const EventDetailScreen: React.FC<TasksScreenProps<'EventDetail'>> = ({ route, navigation }) => {
     const { eventId, eventType } = route.params;
     const isTask = eventType === 'task';
     const safeEventId = sanitizeTaskId(eventId);
     const canOpenTask = isTask && Boolean(safeEventId);
-    const { data: task, isLoading, refetch } = useGetTaskByIdQuery(safeEventId ?? '', { skip: !canOpenTask });
-    const [toggleTask] = useToggleTaskMutation();
+    const userId = useAppSelector((state: any) => state.auth?.user?.id) as string | undefined;
+    const { task, isLoading, refresh } = useLocalTask(canOpenTask ? (safeEventId as string) : null);
     const taskStatus = normalizeTaskStatus(task);
     const toggleStatusLabel = taskStatus === TaskStatus.PENDING
         ? 'Start Task'
@@ -23,8 +25,9 @@ export const EventDetailScreen: React.FC<TasksScreenProps<'EventDetail'>> = ({ r
     const handleToggleStatus = async () => {
         if (!safeEventId) return;
         try {
-            await toggleTask(safeEventId).unwrap();
-            refetch();
+            if (!userId) return;
+            await localTasks.toggle(safeEventId, userId);
+            await refresh();
         } catch {
             Alert.alert('Update failed', 'Could not update task status. Please try again.');
         }
@@ -37,7 +40,7 @@ export const EventDetailScreen: React.FC<TasksScreenProps<'EventDetail'>> = ({ r
                     <Text style={styles.back}>{'< Calendar'}</Text>
                 </TouchableOpacity>
                 <Text style={styles.title}>Event Detail</Text>
-                <TouchableOpacity onPress={() => canOpenTask && refetch()}>
+                <TouchableOpacity onPress={() => canOpenTask && refresh()}>
                     <Text style={styles.refresh}>↻</Text>
                 </TouchableOpacity>
             </View>

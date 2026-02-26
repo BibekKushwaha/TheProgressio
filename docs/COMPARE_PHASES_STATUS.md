@@ -17,7 +17,8 @@ Status rubric:
 | Context-Aware Academic Scheduler (A/B, Week 1/2) | implemented | `apps/planner-service/src/services/timetable.service.ts`, timetable + rotation controllers/routes | none critical |
 | AI Subtask Scaffolding | implemented | `apps/planner-service/src/routes/task.route.ts`, `apps/planner-service/src/services/ai.service.ts` | none critical |
 | Visual Hierarchy (subjects/categories/icons/colors) | implemented | `apps/docs/app/(dashboard)/planner/page.tsx`, `apps/docs/app/(dashboard)/subjects/page.tsx`, category APIs | none critical |
-| Local-First Persistence with CRDT sync | partial | CRDT op metadata + push/pull engine in `packages/store/src/local-db.ts`, `packages/store/src/sync-engine.ts`, sync APIs in `apps/planner-service/src/services/sync.service.ts` | mobile SQLite adapter parity is still pending |
+| Local-First Persistence with CRDT sync | implemented | Web Dexie + sync (`packages/store/src/local-db.ts`, `packages/store/src/sync-engine.ts`), mobile SQLite parity (`apps/mobile/src/native/localDbAdapter.ts`, `apps/mobile/src/native/syncEngine.ts`), sync APIs in `apps/planner-service/src/services/sync.service.ts` | E2E device-level conflict scenario automation still limited |
+| Syllabus Graph (topics + prerequisites) | implemented | DB models in `packages/db/prisma/schema.prisma`, APIs in `apps/planner-service/src/routes/syllabus.route.ts`, UI in `apps/docs/app/(dashboard)/syllabus/page.tsx` | deeper curriculum-aware scheduling not yet implemented |
 
 ### Phase 2: Habit Lifecycle & Streak Engine
 | Requirement | Status | Evidence | Gap |
@@ -40,6 +41,7 @@ Status rubric:
 |---|---|---|---|
 | WhatsApp Task Capture (text + voice) | implemented | voice + text capture/transcription in `apps/planner-service/src/controllers/whatsapp.controller.ts`, `apps/planner-service/src/services/whatsapp.service.ts` | none critical |
 | WhatsApp Proactive Reminders | implemented | outbound nudge infrastructure in habit service | conversion instrumentation not yet enforced |
+| Mentor/Parent Silent Watch + Feedback Loop | implemented | subscription + alerts + feedback models (`packages/db/prisma/schema.prisma`), sweep logic in `apps/planner-service/src/services/whatsapp-watch.service.ts`, endpoints in `apps/planner-service/src/routes/mentorship.route.ts`, dashboards in `apps/docs/app/family-connect/accept/[token]/page.tsx` + settings UI in `apps/docs/components/settings/FamilyShareManagement.tsx` | alert calibration + mentor action workflows still basic |
 | UPI/Paytm/NetBanking payments | partial | backend intents/webhook + UI integration in `apps/planner-service/src/routes/payment.route.ts`, `apps/planner-service/src/services/payment.service.ts`, `apps/docs/components/settings/PricingSection.tsx` | no external PSP settlement callback validation beyond shared-secret webhook |
 
 ### Phase 5: UI/UX + Performance

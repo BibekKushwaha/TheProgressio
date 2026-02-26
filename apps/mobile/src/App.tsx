@@ -115,9 +115,9 @@ const InnerApp: React.FC = () => {
 
     // Start offline sync engine, stop on unmount
     useEffect(() => {
-        startSyncEngine(dispatch);
+        startSyncEngine();
         return () => stopSyncEngine();
-    }, [dispatch]);
+    }, []);
 
     // Update Sentry user when auth changes
     useEffect(() => {

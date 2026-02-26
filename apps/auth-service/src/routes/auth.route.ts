@@ -1,6 +1,8 @@
 import express from 'express';
 import {
     createFamilyShareLink,
+    deleteAccount,
+    exportAccountData,
     forgotPassword,
     getCurrentUser,
     getWhatsAppPairingCode,
@@ -34,6 +36,8 @@ router.post("/refresh", refreshUser);
 router.delete("/logout", logoutUser);
 router.get("/me", getCurrentUser);
 router.put("/profile", updateProfile);
+router.get("/export", exportAccountData);
+router.delete("/account", deleteAccount);
 router.post("/forgot", forgotPassword);
 router.post("/reset/:token", resetPassword);
 

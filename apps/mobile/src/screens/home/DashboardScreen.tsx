@@ -4,7 +4,6 @@ import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
     useGetDashboardSummaryQuery,
-    useGetTasksQuery,
     useGetActiveLiveSessionQuery,
     useAppSelector,
     selectCurrentUser,
@@ -13,8 +12,8 @@ import {
     useGetHabitsQuery,
 } from '@repo/store';
 import type { HomeScreenProps } from '../../navigation/types';
-import { toArray } from '../../utils/data';
 import { extractTaskId } from '../../utils/task';
+import { useLocalTasks } from '../../hooks/useLocalTasks';
 
 function getGreeting(): string {
     const h = new Date().getHours();
@@ -27,7 +26,7 @@ export const DashboardScreen: React.FC<HomeScreenProps<'Dashboard'>> = ({ naviga
     const user = useAppSelector(selectCurrentUser);
     const firstName = (user as any)?.name?.split(' ')[0] ?? (user as any)?.username?.split(' ')[0] ?? 'Scholar';
     const { data: summary, isLoading: summaryLoading } = useGetDashboardSummaryQuery(undefined);
-    const { data: tasks } = useGetTasksQuery({ status: TaskStatus.PENDING, limit: 5 } as any);
+    const { tasks: taskList } = useLocalTasks({ status: TaskStatus.PENDING });
     const { data: liveSession } = useGetActiveLiveSessionQuery(undefined);
     const { data: habitsData } = useGetHabitsQuery(undefined);
     const streak = useAppSelector((state: any) => selectStreak(state) ?? state.analytics?.streak ?? 0);
@@ -44,8 +43,6 @@ export const DashboardScreen: React.FC<HomeScreenProps<'Dashboard'>> = ({ naviga
             h.logs?.some((l: any) => l.date?.startsWith(todayStr) && l.completed)
         ).length;
     }, [habits]);
-
-    const taskList: any[] = useMemo(() => toArray<any>(tasks, ['data', 'tasks']), [tasks]);
 
     const QUICK_ACTIONS = [
         { icon: '➕', label: 'New Task', onPress: () => (navigation as any).navigate('TasksTab', { screen: 'CreateTask' }) },

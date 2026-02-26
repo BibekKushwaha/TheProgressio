@@ -299,6 +299,99 @@ describe('sync.service', () => {
     expect(mockState.tasks[0]?.title).toBe('New title');
   });
 
+  it('rejects tie-break-lost operation when lamport is equal', async () => {
+    await processSyncPush('user-1', {
+      clientId: 'client-2',
+      operations: [
+        {
+          opId: 'client-2:10:z',
+          entityType: 'task',
+          entityId: 'task-1',
+          action: 'UPSERT',
+          lamportTs: 10,
+          vectorClock: { 'client-2': 10 },
+          payload: {
+            title: 'Winner op',
+            status: 'IN_PROGRESS',
+            priority: 'MEDIUM',
+            userId: 'user-1',
+          },
+        },
+      ],
+    });
+
+    const loser = await processSyncPush('user-1', {
+      clientId: 'client-1',
+      operations: [
+        {
+          opId: 'client-1:10:a',
+          entityType: 'task',
+          entityId: 'task-1',
+          action: 'UPSERT',
+          lamportTs: 10,
+          vectorClock: { 'client-1': 10 },
+          payload: {
+            title: 'Loser op',
+            status: 'COMPLETED',
+            priority: 'LOW',
+            userId: 'user-1',
+          },
+        },
+      ],
+    });
+
+    expect(loser.appliedOps).toEqual([]);
+    expect(loser.rejectedOps).toHaveLength(1);
+    expect(loser.rejectedOps[0]).toMatchObject({ opId: 'client-1:10:a', reason: 'tie_break_lost' });
+    expect(mockState.tasks[0]?.title).toBe('Winner op');
+  });
+
+  it('applies higher opId when lamport is equal', async () => {
+    await processSyncPush('user-1', {
+      clientId: 'client-1',
+      operations: [
+        {
+          opId: 'client-1:10:a',
+          entityType: 'task',
+          entityId: 'task-1',
+          action: 'UPSERT',
+          lamportTs: 10,
+          vectorClock: { 'client-1': 10 },
+          payload: {
+            title: 'First op',
+            status: 'PENDING',
+            priority: 'MEDIUM',
+            userId: 'user-1',
+          },
+        },
+      ],
+    });
+
+    const winner = await processSyncPush('user-1', {
+      clientId: 'client-2',
+      operations: [
+        {
+          opId: 'client-2:10:z',
+          entityType: 'task',
+          entityId: 'task-1',
+          action: 'UPSERT',
+          lamportTs: 10,
+          vectorClock: { 'client-2': 10 },
+          payload: {
+            title: 'Second op wins',
+            status: 'IN_PROGRESS',
+            priority: 'HIGH',
+            userId: 'user-1',
+          },
+        },
+      ],
+    });
+
+    expect(winner.appliedOps).toEqual(['client-2:10:z']);
+    expect(winner.rejectedOps).toHaveLength(0);
+    expect(mockState.tasks[0]?.title).toBe('Second op wins');
+  });
+
   it('pulls operations after cursor', async () => {
     await processSyncPush('user-1', {
       clientId: 'client-1',

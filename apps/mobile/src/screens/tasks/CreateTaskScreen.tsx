@@ -14,24 +14,19 @@ import {
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
-    addTask,
     PriorityEnum,
-    TaskStatus,
     useAddGradeEntryMutation,
-    useAppDispatch,
-    useCreateCategoryMutation,
     useCreateExamMutation,
     useCreateSubTaskMutation,
-    useCreateTaskMutation,
-    useGetCategoriesQuery,
-    useGetTaskByIdQuery,
     useParseTaskMutation,
     usePreviewSubtasksMutation,
     useSmartCreateTaskMutation,
-    useUpdateTaskMutation,
 } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
 import { sanitizeTaskId } from '../../utils/task';
+import { isOnline, localCategories, localTasks } from '../../native/localDbAdapter';
+import { useLocalCategories } from '../../hooks/useLocalCategories';
+import { useLocalTask } from '../../hooks/useLocalTask';
 
 const PRIORITY_OPTIONS: Array<{ label: string; value: PriorityEnum; color: string }> = [
     { label: 'Routine', value: PriorityEnum.LOW, color: Colors.success },
@@ -46,7 +41,6 @@ type ExamSubMode = 'schedule' | 'result';
 type ParsedMeta = { subject?: string; date?: string; time?: string };
 
 export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ navigation, route }) => {
-    const dispatch = useAppDispatch();
     const editingTaskId = sanitizeTaskId((route.params as any)?.taskId);
     const isEditing = Boolean(editingTaskId);
 
@@ -75,18 +69,13 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
     const [examLocation, setExamLocation] = useState('');
     const [examDuration, setExamDuration] = useState('120');
 
-    const { data: categories } = useGetCategoriesQuery(undefined);
-    const { data: existingTask, isLoading: isLoadingTask } = useGetTaskByIdQuery(editingTaskId ?? '', {
-        skip: !isEditing,
-    });
+    const { categories, userId } = useLocalCategories();
+    const { task: existingTask, isLoading: isLoadingTask } = useLocalTask(isEditing ? editingTaskId : null);
 
-    const [createTask, { isLoading: isCreatingTask }] = useCreateTaskMutation();
-    const [updateTask, { isLoading: isUpdatingTask }] = useUpdateTaskMutation();
     const [smartCreateTask, { isLoading: isSmartCreating }] = useSmartCreateTaskMutation();
     const [parseTask, { isLoading: isParsingTask }] = useParseTaskMutation();
     const [previewSubtasks, { isLoading: isGeneratingSubtasks }] = usePreviewSubtasksMutation();
     const [createSubTask] = useCreateSubTaskMutation();
-    const [createCategory] = useCreateCategoryMutation();
     const [addGradeEntry, { isLoading: isAddingGrade }] = useAddGradeEntryMutation();
     const [createExam, { isLoading: isCreatingExam }] = useCreateExamMutation();
 
@@ -192,7 +181,7 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
     };
 
     const resolveCategoryId = async (): Promise<string | undefined> => {
-        const allCategories = ((categories as any).data ?? categories ?? []) as any[];
+        const allCategories = (categories ?? []) as any[];
         const parsedSubject = parsedMeta.subject?.trim();
 
         if (parsedSubject) {
@@ -200,10 +189,12 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
             if (existing?.id) return existing.id;
 
             try {
-                const created = await createCategory({
+                if (!userId) return selectedCategoryId;
+                const created = await localCategories.create({
+                    userId,
                     name: parsedSubject,
                     colorCode: '#6366F1',
-                }).unwrap();
+                });
                 return created?.id;
             } catch {
                 return selectedCategoryId;
@@ -279,10 +270,10 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
         const shouldUseSmartCreate = !isEditing && title.trim().length > 80 && description.trim().length === 0;
         const categoryIdToUse = await resolveCategoryId();
 
-        if (shouldUseSmartCreate) {
+        if (shouldUseSmartCreate && isOnline()) {
             const response = await smartCreateTask({ text: title }).unwrap();
             if (response?.task) {
-                dispatch(addTask(response.task));
+                await localTasks.hydrate([response.task as any]);
                 Alert.alert('Success', 'Task created.');
                 navigation.goBack();
                 return;
@@ -290,36 +281,36 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
         }
 
         if (isEditing && editingTaskId) {
-            await updateTask({
-                id: editingTaskId,
+            if (!userId) return;
+            await localTasks.update(editingTaskId, userId, {
                 title: title.trim(),
                 description,
                 priority,
-                categoryId: categoryIdToUse,
-                dueDate: parsedDueDateISO || undefined,
+                categoryId: categoryIdToUse ?? null,
+                dueDate: parsedDueDateISO,
                 isRecurring,
                 effort,
-            }).unwrap();
+            } as any);
             Alert.alert('Success', 'Task updated.');
             navigation.goBack();
             return;
         }
 
-        const createdTask = await createTask({
+        if (!userId) return;
+        const createdTaskId = await localTasks.create({
+            userId,
             title: title.trim(),
             description,
-            status: TaskStatus.PENDING,
             priority,
-            categoryId: categoryIdToUse,
-            dueDate: parsedDueDateISO || undefined,
+            categoryId: categoryIdToUse ?? null,
+            dueDate: parsedDueDateISO,
             isRecurring,
             effort,
-        } as any).unwrap();
-        dispatch(addTask(createdTask as any));
-
-        const createdTaskId = sanitizeTaskId((createdTask as any)?.id);
+        });
         if (createdTaskId) {
-            await persistSubtasks(createdTaskId);
+            if (isOnline()) {
+                await persistSubtasks(createdTaskId);
+            }
         }
 
         Alert.alert('Success', 'Task created.');
@@ -339,8 +330,7 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
         }
     };
 
-    const isSubmitting =
-        isCreatingTask || isUpdatingTask || isSmartCreating || isAddingGrade || isCreatingExam;
+    const isSubmitting = isSmartCreating || isAddingGrade || isCreatingExam;
 
     if (isEditing && isLoadingTask) {
         return (

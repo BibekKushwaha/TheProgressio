@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { prisma } from "@repo/db";
+import { prisma, Status } from "@repo/db";
 import { deleteAnalyticsCache, getAnalyticsCache, setAnalyticsCache } from "@repo/cache";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { predictTaskDuration, getCycleTimePercentiles, predictGrade } from "../services/prediction.service.js";
@@ -1667,3 +1667,201 @@ export const getStrategicSummary = async (
     }
 };
 
+// ═══════════════════════════════════════════════════════════════════════
+// SRL — Weekly Review + Plan-vs-Actual
+// ═══════════════════════════════════════════════════════════════════════
+
+export const getWeeklyReview = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const daysRaw = typeof req.query.days === "string" ? Number.parseInt(req.query.days, 10) : NaN;
+        const days = Number.isFinite(daysRaw) ? Math.min(30, Math.max(3, daysRaw)) : 7;
+        const examType = (req.query.examType as string) || "JEE";
+
+        const today = startOfDay(new Date());
+        const from = startOfDay(new Date(today));
+        from.setDate(from.getDate() - (days - 1));
+
+        const cacheKey = `weekly:${examType}:${formatDateKey(from)}:${days}`;
+        const cached = await getAnalyticsCache<object>(userId, "srl", cacheKey);
+        if (cached) {
+            res.status(200).json(cached);
+            return;
+        }
+
+        const [user, completionStats, focusAgg, overdueTasks, upcomingTasks, habitLogs, gradeEntries, swot] = await Promise.all([
+            prisma.user.findUnique({ where: { id: userId }, select: { dailyGoalHours: true, username: true } }),
+            prisma.taskCompletionStat.findMany({
+                where: { userId, completedAt: { gte: from } },
+                select: { totalMinutes: true, completedAt: true, taskId: true },
+                orderBy: { completedAt: "desc" },
+            }),
+            prisma.activityLog.aggregate({
+                where: { task: { userId }, startTime: { gte: from } },
+                _sum: { durationMinutes: true },
+                _count: { id: true },
+            }),
+            prisma.task.findMany({
+                where: {
+                    userId,
+                    status: { not: Status.COMPLETED },
+                    dueDate: { lt: new Date() },
+                },
+                select: { id: true, title: true, dueDate: true, priority: true },
+                orderBy: [{ dueDate: "asc" }],
+                take: 10,
+            }),
+            prisma.task.findMany({
+                where: {
+                    userId,
+                    status: { not: Status.COMPLETED },
+                    dueDate: { gte: new Date(), lt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+                },
+                select: { id: true, title: true, dueDate: true, priority: true },
+                orderBy: [{ dueDate: "asc" }],
+                take: 10,
+            }),
+            prisma.habitLog.findMany({
+                where: { habit: { userId }, loggedAt: { gte: from } },
+                select: { loggedAt: true, habitId: true },
+                orderBy: { loggedAt: "desc" },
+            }),
+            prisma.gradeEntry.findMany({
+                where: { userId, createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) } },
+                select: { obtainedMarks: true, totalMarks: true, subjectName: true, chapter: true, createdAt: true, examType: true },
+                orderBy: { createdAt: "desc" },
+                take: 50,
+            }),
+            generateSWOT(userId, examType),
+        ]);
+
+        const completedCount = completionStats.length;
+        const completedMinutes = completionStats.reduce((sum, row) => sum + (row.totalMinutes ?? 0), 0);
+        const focusMinutes = focusAgg._sum.durationMinutes ?? 0;
+        const focusSessions = focusAgg._count.id ?? 0;
+
+        const habitDays = new Set<string>();
+        for (const log of habitLogs) {
+            habitDays.add(formatDateKey(log.loggedAt));
+        }
+        const habitActiveDays = habitDays.size;
+
+        const recentScores = gradeEntries
+            .filter((e) => e.totalMarks > 0)
+            .map((e) => Math.round((e.obtainedMarks / e.totalMarks) * 100));
+        const avgScore = recentScores.length > 0 ? Math.round(recentScores.reduce((s, n) => s + n, 0) / recentScores.length) : null;
+
+        const dailyGoalHours = user?.dailyGoalHours ?? 4;
+        const weeklyGoalMinutes = Math.round(dailyGoalHours * days * 60);
+
+        const insights = [
+            {
+                title: "Execution",
+                detail: `Completed ${completedCount} task(s) in the last ${days} days.`,
+                metrics: { completedCount, completedMinutes },
+            },
+            {
+                title: "Focus",
+                detail: `Logged ${focusMinutes} focus minute(s) across ${focusSessions} session(s).`,
+                metrics: { focusMinutes, focusSessions, weeklyGoalMinutes },
+            },
+            {
+                title: "Habits",
+                detail: `Stayed consistent on ${habitActiveDays}/${days} day(s).`,
+                metrics: { habitActiveDays, days },
+            },
+        ] as const;
+
+        const priorities: Array<{ type: "TASK" | "REVISION"; title: string; dueDate?: string; entityId?: string }> = [];
+        for (const task of overdueTasks.slice(0, 3)) {
+            priorities.push({
+                type: "TASK",
+                title: `Overdue: ${task.title}`,
+                ...(task.dueDate ? { dueDate: task.dueDate.toISOString() } : {}),
+                entityId: task.id,
+            });
+        }
+
+        if (priorities.length < 3) {
+            for (const task of upcomingTasks.slice(0, 3 - priorities.length)) {
+                priorities.push({
+                    type: "TASK",
+                    title: `Upcoming: ${task.title}`,
+                    ...(task.dueDate ? { dueDate: task.dueDate.toISOString() } : {}),
+                    entityId: task.id,
+                });
+            }
+        }
+
+        if (priorities.length < 3) {
+            for (const chapter of (swot.topPriorityChapters || []).slice(0, 3 - priorities.length)) {
+                priorities.push({
+                    type: "REVISION",
+                    title: `Revise: ${chapter.chapter}`,
+                });
+            }
+        }
+
+        const adjustment = (() => {
+            if (focusMinutes < weeklyGoalMinutes * 0.6) {
+                return `Your focus time is below your goal. Try scheduling 1 extra ${Math.max(20, Math.round((weeklyGoalMinutes - focusMinutes) / 3))}-minute block on 3 days this week.`;
+            }
+            if (overdueTasks.length > 5) {
+                return "Too many overdue items. Consider using Recovery Rebalance to shift dates and reduce stress.";
+            }
+            if (avgScore !== null && avgScore < 60) {
+                return "Recent scores are trending low. Prioritize your weakest chapters and do 1 timed practice set daily.";
+            }
+            return "Maintain the current pace. Keep your top 3 priorities small and finishable.";
+        })();
+
+        const result = {
+            message: "Weekly review",
+            days,
+            examType,
+            from: from.toISOString(),
+            to: new Date().toISOString(),
+            insights,
+            priorities,
+            adjustment,
+            score: avgScore,
+            generatedAt: new Date().toISOString(),
+        };
+
+        await setAnalyticsCache(userId, "srl", result, cacheKey, 300);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("Error generating weekly review:", error);
+        res.status(500).json({
+            message: "Failed to generate weekly review",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+
+export const getSrlPlanVsActual = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const daysRaw = typeof req.query.days === "string" ? Number.parseInt(req.query.days, 10) : NaN;
+        const days = Number.isFinite(daysRaw) ? Math.min(30, Math.max(3, daysRaw)) : 7;
+
+        const report = await getPlannedVsActual(userId, days);
+        res.status(200).json({ message: "Plan vs actual", report });
+    } catch (error) {
+        console.error("Error generating plan vs actual:", error);
+        res.status(500).json({
+            message: "Failed to generate plan vs actual",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};

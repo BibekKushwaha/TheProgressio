@@ -1,6 +1,6 @@
 'use client';
 
-import { useResolveFamilyLinkQuery, useGetTasksQuery, useGetHabitsQuery, useGetDailySummaryQuery, Task, Habit } from '@repo/store';
+import { useResolveFamilyLinkQuery, useGetTasksQuery, useGetHabitsQuery, useGetDailySummaryQuery, useSendMentorFeedbackMutation, Task, Habit } from '@repo/store';
 import { Eye, Shield, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, TrendingUp, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,10 @@ import { TaskListItem } from '@/components/family-connect/TaskListItem';
 import { HabitListItem } from '@/components/family-connect/HabitListItem';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 export default function FamilyLinkAcceptPage() {
     const params = useParams();
@@ -40,6 +44,9 @@ export default function FamilyLinkAcceptPage() {
     const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery({ page: 1, limit: 500 }, { skip: !isTokenValid });
     const { data: habitsData, isLoading: habitsLoading } = useGetHabitsQuery(undefined, { skip: !isTokenValid });
     const { data: summaryData, isLoading: summaryLoading } = useGetDailySummaryQuery('7', { skip: !isTokenValid });
+    const [sendFeedback, { isLoading: isSendingFeedback }] = useSendMentorFeedbackMutation();
+    const [fromLabel, setFromLabel] = useState('');
+    const [feedbackMessage, setFeedbackMessage] = useState('');
 
     const tasks = (allTasks || []) as Task[];
     const habits =
@@ -244,6 +251,63 @@ export default function FamilyLinkAcceptPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Mentor feedback (only when token permission allows) */}
+                {(() => {
+                    const perms = (linkData?.link?.permissions ?? '').toUpperCase();
+                    const canSend = perms === 'FEEDBACK' || perms === 'FULL_ACCESS';
+                    if (!canSend) return null;
+
+                    return (
+                        <Card variant="glass">
+                            <CardHeader>
+                                <CardTitle>Leave Feedback</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Your name (optional)</Label>
+                                        <Input
+                                            value={fromLabel}
+                                            onChange={(e) => setFromLabel(e.target.value)}
+                                            placeholder="e.g. Mom, Mentor"
+                                            className="bg-white/5 border-white/10"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Message</Label>
+                                    <textarea
+                                        value={feedbackMessage}
+                                        onChange={(e) => setFeedbackMessage(e.target.value)}
+                                        placeholder="Write a note for the student…"
+                                        className="w-full min-h-[120px] rounded-md bg-white/5 border border-white/10 p-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                                    />
+                                </div>
+                                <div className="flex justify-end">
+                                    <Button
+                                        onClick={async () => {
+                                            try {
+                                                const msg = feedbackMessage.trim();
+                                                if (!msg) return toast.error('Message is required');
+                                                await sendFeedback({ message: msg, fromLabel: fromLabel.trim() || undefined }).unwrap();
+                                                toast.success('Feedback sent');
+                                                setFeedbackMessage('');
+                                            } catch (error) {
+                                                console.error(error);
+                                                toast.error('Failed to send feedback');
+                                            }
+                                        }}
+                                        disabled={isSendingFeedback}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    >
+                                        {isSendingFeedback ? 'Sending…' : 'Send'}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })()}
             </div>
         </div>
     );

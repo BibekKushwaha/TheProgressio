@@ -3,14 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
-    useGetTasksQuery,
     usePreviewRecoveryPlanMutation,
     useApplyRecoveryPlanMutation,
 } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
-import { toArray } from '../../utils/data';
 import { extractTaskId, normalizeTaskStatus } from '../../utils/task';
 import { TaskStatus } from '@repo/store';
+import { useLocalTasks } from '../../hooks/useLocalTasks';
 
 type RecoveryItem = {
     taskId: string;
@@ -21,13 +20,11 @@ type RecoveryItem = {
 };
 
 export const PlannerScreen: React.FC<TasksScreenProps<'Planner'>> = ({ navigation }) => {
-    const { data, isLoading, refetch } = useGetTasksQuery({ page: 1, limit: 150 } as any);
+    const { tasks, isLoading, refresh } = useLocalTasks();
     const [previewPlan, { isLoading: isPreviewing }] = usePreviewRecoveryPlanMutation();
     const [applyPlan, { isLoading: isApplying }] = useApplyRecoveryPlanMutation();
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [recoveryItems, setRecoveryItems] = useState<RecoveryItem[]>([]);
-
-    const tasks = useMemo(() => toArray<any>(data, ['data', 'tasks']), [data]);
 
     const overdue = useMemo(() => {
         const now = Date.now();
@@ -86,7 +83,7 @@ export const PlannerScreen: React.FC<TasksScreenProps<'Planner'>> = ({ navigatio
             }).unwrap();
             setRecoveryItems([]);
             setSelectedIds(new Set());
-            refetch();
+            refresh();
         } catch {
             /* ignore */
         }
@@ -99,7 +96,7 @@ export const PlannerScreen: React.FC<TasksScreenProps<'Planner'>> = ({ navigatio
                     <Text style={styles.back}>{'< Tasks'}</Text>
                 </TouchableOpacity>
                 <Text style={styles.title}>Recovery Planner</Text>
-                <TouchableOpacity onPress={refetch}>
+                <TouchableOpacity onPress={refresh}>
                     <Text style={styles.refresh}>↻</Text>
                 </TouchableOpacity>
             </View>

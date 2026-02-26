@@ -73,6 +73,20 @@ export function getFamilyShareToken(): string | null {
   return getLocalStorageItem('family_share_token');
 }
 
+const AI_DISABLED_KEY = 'ai_disabled';
+
+export function isAIAssistanceDisabled(): boolean {
+  return getLocalStorageItem(AI_DISABLED_KEY) === '1';
+}
+
+export function setAIAssistanceDisabled(disabled: boolean): void {
+  if (disabled) {
+    setLocalStorageItem(AI_DISABLED_KEY, '1');
+  } else {
+    removeLocalStorageItem(AI_DISABLED_KEY);
+  }
+}
+
 export function supportsWindowNetworkEvents(): boolean {
   const maybeWindow = (globalThis as { window?: unknown }).window as
     | { addEventListener?: unknown; removeEventListener?: unknown }

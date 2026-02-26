@@ -6,6 +6,7 @@ vi.mock('../src/middleware/auth.middleware.js', () => ({
     req.user = { id: 'user-1', username: 'Tester', email: 'test@example.com', dailyGoalHours: 4 };
     next();
   },
+  enforceReadOnlyWrites: () => (req: any, res: any, next: any) => next(),
 }));
 
 vi.mock('../src/services/producer.service.js', () => ({

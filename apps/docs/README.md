@@ -1,18 +1,34 @@
-## Getting Started
+## Web Dashboard (`apps/docs`)
 
-First, run the development server:
+This is the primary (web-first) UI for the Student Activity Tracker.
+
+## Run locally
 
 ```bash
-yarn dev
+npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-To create [API routes](https://nextjs.org/docs/app/building-your-application/routing/router-handlers) add an `api/` directory to the `app/` directory with a `route.ts` file. For individual endpoints, create a subfolder in the `api` directory, like `api/hello/route.ts` would map to [http://localhost:3000/api/hello](http://localhost:3000/api/hello).
+Create `apps/docs/.env.local`:
 
-## Learn More
+```bash
+NEXT_PUBLIC_AUTH_SERVICE_URL=http://localhost:4000
+NEXT_PUBLIC_PLANNER_SERVICE_URL=http://localhost:4001
+NEXT_PUBLIC_HABIT_SERVICE_URL=http://localhost:4002
+NEXT_PUBLIC_ANALYTICS_SERVICE_URL=http://localhost:4003
+NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=+15551234567
+```
+
+## Notes
+- This app uses `@repo/store` for API calls + typed hooks.
+- Auth is cookie-based (`credentials: 'include'`), with optional Bearer tokens for native/mobile.
+
+## Links
+- Architecture overview: `docs/ARCHITECTURE.md`
+- Roadmap feature matrix: `docs/COMPARE_PHASES_STATUS.md`
 
 To learn more about Next.js, take a look at the following resources:
 

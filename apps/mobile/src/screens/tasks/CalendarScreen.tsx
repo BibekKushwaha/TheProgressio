@@ -17,11 +17,11 @@ import {
     useCreateHolidayMutation,
     useGetCalendarDailyScheduleQuery,
     useGetMonthlyEventsQuery,
-    useGetTasksQuery,
     useResolveRotationQuery,
 } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
 import { sanitizeTaskId } from '../../utils/task';
+import { useLocalTasks } from '../../hooks/useLocalTasks';
 
 type ViewMode = 'month' | 'day';
 
@@ -82,7 +82,7 @@ export const CalendarScreen: React.FC<TasksScreenProps<'Calendar'>> = ({ navigat
         month: currentMonth.month + 1,
     } as any);
     const { data: dailySchedule, isLoading: dailyLoading, refetch: refetchDaily } = useGetCalendarDailyScheduleQuery({ date: selectedDate } as any);
-    const { data: tasksData } = useGetTasksQuery({ status: TaskStatus.PENDING, page: 1, limit: 200 } as any);
+    const { tasks: pendingTasks } = useLocalTasks({ status: TaskStatus.PENDING });
     const [createHoliday, { isLoading: isCreatingHoliday }] = useCreateHolidayMutation();
 
     const events = (monthlyEvents as any) ?? {};
@@ -98,16 +98,15 @@ export const CalendarScreen: React.FC<TasksScreenProps<'Calendar'>> = ({ navigat
     const conflicts = Array.isArray((dailySchedule as any)?.conflicts) ? (dailySchedule as any).conflicts : [];
 
     const upcomingTasks = useMemo(() => {
-        const tasks = Array.isArray(tasksData) ? tasksData : (tasksData as any)?.tasks ?? (tasksData as any)?.data ?? [];
         const todayKey = toDateKey(new Date());
-        return tasks
+        return pendingTasks
             .filter((task: any) => {
                 const due = String(task?.dueDate ?? '').slice(0, 10);
                 return due && due >= todayKey;
             })
             .sort((a: any, b: any) => new Date(a?.dueDate ?? 0).getTime() - new Date(b?.dueDate ?? 0).getTime())
             .slice(0, 6);
-    }, [tasksData]);
+    }, [pendingTasks]);
 
     const firstDay = new Date(currentMonth.year, currentMonth.month, 1).getDay();
     const daysInMonth = new Date(currentMonth.year, currentMonth.month + 1, 0).getDate();
