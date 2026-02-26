@@ -1,58 +1,58 @@
-# Turborepo Tailwind CSS starter
+# Student Activity Tracker (TheProgressio)
 
-This Turborepo starter is maintained by the Turborepo core team.
+A unified academic productivity platform that combines:
+- fast task capture (NLP + WhatsApp),
+- planning (timetable/rotations),
+- habit streaks + nudges,
+- performance analytics (SWOT, GPA what-if, rank bands),
+- local-first web persistence with sync.
 
-## Using this example
+## Repo layout
 
-Run the following command:
+### Apps
+- `apps/docs`: Web dashboard (Next.js)
+- `apps/auth-service`: Auth + profile + family/mentor share links (Express)
+- `apps/planner-service`: Tasks, timetable, notes, attendance, WhatsApp bot, sync (Express)
+- `apps/habit-service`: Habits + streak engine + nudges + WhatsApp outbound (Express)
+- `apps/analytics-service`: Predictions + analytics (Express)
+- `apps/mobile`: Expo shell (not yet feature-parity with web)
 
+### Packages
+- `packages/store`: RTK Query + local-first (Dexie) + sync engine
+- `packages/db`: Prisma schema + generated client
+- `packages/schemas`: Zod API schemas/contracts
+- `packages/cache`: Redis helpers
+
+## Local development
+
+### 1) Install deps
 ```sh
-npx create-turbo@latest -e with-tailwind
+npm ci
 ```
 
-## What's inside?
-
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `web`: another [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `ui`: a stub React component library with [Tailwind CSS](https://tailwindcss.com/) shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Building packages/ui
-
-This example is set up to produce compiled styles for `ui` components into the `dist` directory. The component `.tsx` files are consumed by the Next.js apps directly using `transpilePackages` in `next.config.ts`. This was chosen for several reasons:
-
-- Make sharing one `tailwind.config.ts` to apps and packages as easy as possible.
-- Make package compilation simple by only depending on the Next.js Compiler and `tailwindcss`.
-- Ensure Tailwind classes do not overwrite each other. The `ui` package uses a `ui-` prefix for it's classes.
-- Maintain clear package export boundaries.
-
-Another option is to consume `packages/ui` directly from source without building. If using this option, you will need to update the `tailwind.config.ts` in your apps to be aware of your package locations, so it can find all usages of the `tailwindcss` class names for CSS compilation.
-
-For example, in [tailwind.config.ts](packages/tailwind-config/tailwind.config.ts):
-
-```js
-  content: [
-    // app content
-    `src/**/*.{js,ts,jsx,tsx}`,
-    // include packages if not transpiling
-    "../../packages/ui/*.{js,ts,jsx,tsx}",
-  ],
+### 2) Start infra (Postgres + Redis)
+```sh
+docker compose up -d postgres redis
 ```
 
-If you choose this strategy, you can remove the `tailwindcss` and `autoprefixer` dependencies from the `ui` package.
+### 3) Generate Prisma client
+```sh
+npx prisma generate --schema=./packages/db/prisma/schema.prisma
+```
 
-### Utilities
+### 4) Run services + web dashboard
+```sh
+npm run dev
+```
 
-This Turborepo has some additional tools already setup for you:
+Services default ports:
+- `apps/auth-service`: `http://localhost:4000`
+- `apps/planner-service`: `http://localhost:4001`
+- `apps/habit-service`: `http://localhost:4002`
+- `apps/analytics-service`: `http://localhost:4003`
+- `apps/docs`: `http://localhost:3000`
 
-- [Tailwind CSS](https://tailwindcss.com/) for styles
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+## Docs
+- `docs/COMPARE_PHASES_STATUS.md`: roadmap feature matrix
+- `docs/ARCHITECTURE.md`: C4-lite architecture + data flow + trust boundaries
+- `docs/DATABASE_STRATEGY.md`: current DB strategy and future migration notes

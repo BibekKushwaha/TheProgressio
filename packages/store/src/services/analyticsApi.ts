@@ -317,6 +317,33 @@ export interface StrategicSummaryResponse {
     examType: string;
     generatedAt: string;
 }
+
+export interface WeeklyReviewInsight {
+    title: string;
+    detail: string;
+    metrics?: Record<string, number>;
+}
+
+export interface WeeklyReviewPriority {
+    type: 'TASK' | 'REVISION';
+    title: string;
+    dueDate?: string;
+    entityId?: string;
+}
+
+export interface WeeklyReviewResponse {
+    message: string;
+    days: number;
+    examType: string;
+    from: string;
+    to: string;
+    insights: WeeklyReviewInsight[];
+    priorities: WeeklyReviewPriority[];
+    adjustment: string;
+    score: number | null;
+    generatedAt: string;
+}
+
 export const analyticsApi = createApi({
     reducerPath: 'analyticsApi',
     // Keep data fresh for 5 minutes after all subscribers unmount. Prevents
@@ -758,6 +785,32 @@ export const analyticsApi = createApi({
             },
             providesTags: ['Stats'],
         }),
+
+        // ── SRL: Weekly Review ────────────────────────────────────────────
+        getWeeklyReview: builder.query<
+            WeeklyReviewResponse,
+            { days?: number; examType?: string } | void
+        >({
+            query: (params) => ({
+                url: '/stats/srl/weekly-review',
+                params: {
+                    ...(params?.days ? { days: String(params.days) } : {}),
+                    ...(params?.examType ? { examType: params.examType } : {}),
+                },
+            }),
+            providesTags: ['Stats'],
+        }),
+
+        getSrlPlanVsActual: builder.query<
+            { message: string; report: TimeLeakageReport },
+            { days?: number } | void
+        >({
+            query: (params) => ({
+                url: '/stats/srl/plan-vs-actual',
+                params: params?.days ? { days: String(params.days) } : {},
+            }),
+            providesTags: ['Stats'],
+        }),
     }),
 });
 
@@ -799,4 +852,6 @@ export const {
     useGetNotificationContextSignalsQuery,
     useGetDashboardSummaryQuery,
     useGetStrategicSummaryQuery,
+    useGetWeeklyReviewQuery,
+    useGetSrlPlanVsActualQuery,
 } = analyticsApi;

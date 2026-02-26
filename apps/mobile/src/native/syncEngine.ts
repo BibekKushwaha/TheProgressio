@@ -1,228 +1,335 @@
 /**
- * Offline Sync Engine — React Native
+ * Offline Sync Engine — React Native (SQLite + /api/sync push/pull)
  *
- * Integrates localDbAdapter (AsyncStorage queue) with RTK store.
- * Monitors network state via NetInfo and replays the pending queue
- * against the live API whenever connectivity is restored.
+ * - Push queued operations (tasks/categories) to planner-service /api/sync/push
+ * - Pull remote operations from planner-service /api/sync/pull
+ * - Apply lamport/vector metadata deterministically into SQLite
  *
- * Architecture:
- *   NetInfo listener → onConnectivityChange()
- *   → drainQueue()
- *     → for each SyncQueueItem: dispatch RTK mutation
- *     → on success: remove from queue
- *     → on failure (retries < 3): increment retries
- *     → on failure (retries >= 3): move to dead-letter log
+ * Notes:
+ * - Uses Bearer tokens (mobile access token) for auth.
+ * - On 401, performs one refresh attempt using auth-service /api/auth/mobile/refresh.
  */
-import NetInfo, { NetInfoStateType } from '@react-native-community/netinfo';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AppDispatch } from '@repo/store';
+import NetInfo from '@react-native-community/netinfo';
+import {
+  getAccessTokenSync,
+  getRefreshTokenSync,
+  setMobileTokens,
+} from '@repo/store';
 import { captureError } from './sentry';
+import {
+  applyRemoteSyncOperation,
+  getSyncClientId,
+  getSyncCursor,
+  initLocalDb,
+  isOnline,
+  localCategories,
+  localTasks,
+  setSyncCursor,
+  syncQueue,
+  type SyncQueueItem,
+} from './localDbAdapter';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+const PLANNER_SERVICE_URL = process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001';
+const AUTH_SERVICE_URL = process.env.EXPO_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:4000';
 
-export type SyncAction = 'create' | 'update' | 'delete' | 'log';
+const SYNC_INTERVAL_MS = 30_000;
+const MAX_RETRIES = 5;
 
-export interface SyncQueueItem {
-    id: string;
-    action: SyncAction;
-    /** e.g. 'tasks', 'habits', 'sessions' */
-    entity: string;
-    payload: unknown;
-    timestamp: number;
-    retries: number;
+type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
+
+interface SyncPushResponse {
+  message: string;
+  cursor: number;
+  appliedOps: string[];
+  rejectedOps: Array<{ opId: string; reason: string }>;
+  mergeHints: Array<Record<string, unknown>>;
 }
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
+interface SyncPullResponse {
+  message: string;
+  cursor: number;
+  operations: any[];
+}
 
-const QUEUE_KEY = 'sync:queue:v1';
-const DEAD_LETTER_KEY = 'sync:dead:v1';
-const MAX_RETRIES = 3;
+let refreshInFlight: Promise<boolean> | null = null;
 
-// ─── Queue operations ─────────────────────────────────────────────────────────
+async function ensureFreshMobileSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
 
-export async function getQueue(): Promise<SyncQueueItem[]> {
+  refreshInFlight = (async () => {
     try {
-        const raw = await AsyncStorage.getItem(QUEUE_KEY);
-        return raw ? (JSON.parse(raw) as SyncQueueItem[]) : [];
-    } catch {
-        return [];
-    }
-}
+      const refreshToken = getRefreshTokenSync();
+      if (!refreshToken) return false;
 
-export async function enqueue(item: Omit<SyncQueueItem, 'timestamp' | 'retries'>): Promise<void> {
-    const queue = await getQueue();
-    queue.push({ ...item, timestamp: Date.now(), retries: 0 });
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-}
+      const res = await fetch(`${AUTH_SERVICE_URL}/api/auth/mobile/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as {
+        accessToken?: string;
+        refreshToken?: string;
+        expiresAt?: string;
+      };
 
-async function dequeue(id: string): Promise<void> {
-    const queue = await getQueue();
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue.filter((i) => i.id !== id)));
-}
-
-async function incrementRetry(id: string): Promise<void> {
-    const queue = await getQueue();
-    const updated = queue.map((i) => (i.id === id ? { ...i, retries: i.retries + 1 } : i));
-    // Move exhausted items to dead-letter
-    const dead = updated.filter((i) => i.id === id && i.retries >= MAX_RETRIES);
-    const live = updated.filter((i) => !(i.id === id && i.retries >= MAX_RETRIES));
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(live));
-    if (dead.length > 0) {
-        const dl = JSON.parse((await AsyncStorage.getItem(DEAD_LETTER_KEY)) ?? '[]') as SyncQueueItem[];
-        await AsyncStorage.setItem(DEAD_LETTER_KEY, JSON.stringify([...dl, ...dead]));
-        console.warn('[SyncEngine] Item moved to dead-letter after 3 retries:', dead[0]);
-    }
-}
-
-export async function getPendingCount(): Promise<number> {
-    return (await getQueue()).length;
-}
-
-export async function getDeadLetterItems(): Promise<SyncQueueItem[]> {
-    try {
-        const raw = await AsyncStorage.getItem(DEAD_LETTER_KEY);
-        return raw ? (JSON.parse(raw) as SyncQueueItem[]) : [];
-    } catch {
-        return [];
-    }
-}
-
-export async function clearDeadLetter(): Promise<void> {
-    await AsyncStorage.removeItem(DEAD_LETTER_KEY);
-}
-
-// ─── Flush handlers per entity ────────────────────────────────────────────────
-// These are lazy-loaded so we avoid circular imports with @repo/store.
-
-let _dispatch: AppDispatch | null = null;
-
-export function registerDispatch(dispatch: AppDispatch) {
-    _dispatch = dispatch;
-}
-
-async function replayItem(item: SyncQueueItem): Promise<boolean> {
-    if (!_dispatch) return false;
-
-    try {
-        // Dynamically import only what's needed to avoid loading the full store on startup
-        const store = await import('@repo/store');
-
-        switch (item.entity) {
-            case 'tasks': {
-                if (item.action === 'create') {
-                    await _dispatch((store as any).tasksApi.endpoints.createTask.initiate(item.payload as any));
-                } else if (item.action === 'update') {
-                    const { id, ...body } = item.payload as any;
-                    await _dispatch((store as any).tasksApi.endpoints.updateTask.initiate({ id, ...body }));
-                } else if (item.action === 'delete') {
-                    await _dispatch((store as any).tasksApi.endpoints.deleteTask.initiate(item.payload as any));
-                }
-                break;
-            }
-            case 'habits': {
-                if (item.action === 'log') {
-                    await _dispatch((store as any).habitsApi.endpoints.logHabit.initiate(item.payload as any));
-                }
-                break;
-            }
-            case 'sessions': {
-                if (item.action === 'create') {
-                    await _dispatch(
-                        (store as any).analyticsApi.endpoints.startLiveSession.initiate(item.payload as any)
-                    );
-                }
-                break;
-            }
-            default:
-                console.warn('[SyncEngine] Unknown entity in queue:', item.entity);
-                return true; // Drain unknown items to prevent queue blockage
-        }
-
+      if (data?.accessToken && data?.refreshToken) {
+        await setMobileTokens({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresAt: data.expiresAt,
+        } as any);
         return true;
-    } catch (err) {
-        captureError(err, { syncItem: item });
-        return false;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
     }
+  })();
+
+  return refreshInFlight;
 }
 
-// ─── Queue drain ─────────────────────────────────────────────────────────────
+async function fetchPlanner(input: string, init?: RequestInit): Promise<Response> {
+  const accessToken = getAccessTokenSync();
+  const headers = new Headers(init?.headers ?? {});
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`);
+  }
+  const res = await fetch(input, { ...init, headers });
+  if (res.status !== 401) return res;
 
-let _isDraining = false;
+  const refreshed = await ensureFreshMobileSession();
+  if (!refreshed) return res;
 
-export async function drainQueue(): Promise<void> {
-    if (_isDraining) return;
-    _isDraining = true;
-
-    const queue = await getQueue();
-    if (queue.length === 0) {
-        _isDraining = false;
-        return;
-    }
-
-    console.log(`[SyncEngine] Draining ${queue.length} item(s)…`);
-
-    for (const item of queue) {
-        const ok = await replayItem(item);
-        if (ok) {
-            await dequeue(item.id);
-            console.log(`[SyncEngine] ✅ Synced ${item.entity}/${item.action} (id: ${item.id})`);
-        } else {
-            await incrementRetry(item.id);
-            console.warn(`[SyncEngine] ⚠️ Failed ${item.entity}/${item.action} (retries: ${item.retries + 1})`);
-        }
-    }
-
-    _isDraining = false;
-    console.log('[SyncEngine] Drain complete.');
+  const nextToken = getAccessTokenSync();
+  const retryHeaders = new Headers(init?.headers ?? {});
+  if (nextToken) retryHeaders.set('Authorization', `Bearer ${nextToken}`);
+  return fetch(input, { ...init, headers: retryHeaders });
 }
 
-// ─── NetInfo listener ─────────────────────────────────────────────────────────
+class MobileBackgroundSyncEngine {
+  private status: SyncStatus = 'idle';
+  private intervalId: ReturnType<typeof setInterval> | null = null;
+  private unsubscribe: (() => void) | null = null;
+  private startRefCount = 0;
+  private isProcessing = false;
+  private listeners: Set<(status: SyncStatus, pendingCount: number) => void> = new Set();
 
-let _unsubscribe: (() => void) | null = null;
-let _startRefCount = 0;
+  start(): void {
+    this.startRefCount += 1;
+    if (this.intervalId) return;
 
-export function startSyncEngine(dispatch: AppDispatch) {
-    registerDispatch(dispatch);
-    _startRefCount += 1;
+    void initLocalDb();
 
-    // Prevent duplicate NetInfo subscriptions when React dev mode remounts roots.
-    if (_unsubscribe) {
-        if (__DEV__) {
-            console.log('[SyncEngine] Start requested while already running.');
-        }
-        return;
-    }
-
-    _unsubscribe = NetInfo.addEventListener((state) => {
-        const online = !!(state.isConnected && state.isInternetReachable);
-        if (online) {
-            drainQueue().catch((err) => captureError(err, { context: 'drainQueue' }));
-        }
+    this.unsubscribe = NetInfo.addEventListener((state) => {
+      const online = !!(state.isConnected && state.isInternetReachable);
+      if (online) {
+        void this.processQueue();
+      } else {
+        this.setStatus('offline');
+      }
     });
 
-    // Also drain immediately on startup (in case we were offline and came back)
-    NetInfo.fetch().then((state) => {
-        if (state.isConnected && state.isInternetReachable) {
-            drainQueue().catch((err) => captureError(err, { context: 'startup-drain' }));
-        }
+    this.intervalId = setInterval(() => {
+      void this.processQueue();
+    }, SYNC_INTERVAL_MS);
+
+    void this.processQueue();
+  }
+
+  stop(): void {
+    if (this.startRefCount > 0) this.startRefCount -= 1;
+    if (this.startRefCount > 0) return;
+
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.setStatus('idle');
+  }
+
+  onStatusChange(listener: (status: SyncStatus, pendingCount: number) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  async forceSync(): Promise<void> {
+    await this.processQueue();
+  }
+
+  async pullFromServer(): Promise<void> {
+    if (!isOnline()) return;
+    await this.pullOperations();
+    const cursor = await getSyncCursor();
+    if (cursor > 0) return;
+    await this.hydrateFallbackSnapshots();
+  }
+
+  // ─── Private ─────────────────────────────────────────────────────────────
+
+  private async processQueue(): Promise<void> {
+    if (this.isProcessing) return;
+    this.isProcessing = true;
+
+    try {
+      if (!isOnline()) {
+        this.setStatus('offline');
+        return;
+      }
+
+      const accessToken = getAccessTokenSync();
+      if (!accessToken) {
+        this.setStatus('idle');
+        return;
+      }
+
+      this.setStatus('syncing');
+      await this.pushPendingOperations();
+      await this.pullOperations();
+
+      const remaining = await syncQueue.count();
+      this.setStatus(remaining > 0 ? 'error' : 'idle');
+    } catch (error) {
+      captureError(error, { context: 'mobile_sync_cycle' });
+      this.setStatus('error');
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
+  private async pushPendingOperations(): Promise<void> {
+    const pending = await syncQueue.getPending();
+    if (pending.length === 0) return;
+
+    const supported = pending.filter((item) => item.entityType === 'task' || item.entityType === 'category');
+    if (supported.length === 0) return;
+
+    const clientId = await getSyncClientId();
+    const body = {
+      clientId,
+      operations: supported.map((item) => ({
+        opId: item.opId,
+        entityType: item.entityType,
+        entityId: item.entityId,
+        action: item.action === 'DELETE' ? 'DELETE' : 'UPSERT',
+        lamportTs: item.lamportTs,
+        vectorClock: item.vectorClock,
+        payload: item.payload,
+        tombstone: item.tombstone,
+      })),
+    };
+
+    const response = await fetchPlanner(`${PLANNER_SERVICE_URL}/api/sync/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
 
-    console.log('[SyncEngine] Started.');
-}
-
-export function stopSyncEngine() {
-    if (_startRefCount > 0) {
-        _startRefCount -= 1;
+    if (!response.ok) {
+      await this.handlePushFailure(supported, `push_failed_${response.status}`);
+      throw new Error(`Push sync failed: ${response.status}`);
     }
 
-    if (_startRefCount > 0) {
-        if (__DEV__) {
-            console.log('[SyncEngine] Stop deferred; active mounts remain.');
-        }
-        return;
+    const data = (await response.json()) as SyncPushResponse;
+
+    const processedOpIds = [
+      ...(Array.isArray(data.appliedOps) ? data.appliedOps : []),
+      ...((Array.isArray(data.rejectedOps) ? data.rejectedOps : []).map((entry) => entry.opId)),
+    ];
+
+    if (processedOpIds.length > 0) {
+      await syncQueue.removeByOpIds(processedOpIds);
     }
 
-    _unsubscribe?.();
-    _unsubscribe = null;
-    console.log('[SyncEngine] Stopped.');
+    if (typeof data.cursor === 'number' && Number.isFinite(data.cursor)) {
+      await setSyncCursor(data.cursor);
+    }
+  }
+
+  private async handlePushFailure(items: SyncQueueItem[], reason: string): Promise<void> {
+    for (const item of items) {
+      if (!item.id) continue;
+      if (item.retryCount + 1 >= MAX_RETRIES) {
+        // Drop exhausted items to avoid permanent queue blockage.
+        await syncQueue.removeByOpIds([item.opId]);
+      } else {
+        await syncQueue.markRetry(item.id, reason);
+      }
+    }
+  }
+
+  private async pullOperations(): Promise<void> {
+    const since = await getSyncCursor();
+
+    const response = await fetchPlanner(`${PLANNER_SERVICE_URL}/api/sync/pull?since=${since}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Pull sync failed: ${response.status}`);
+    }
+
+    const data = (await response.json()) as SyncPullResponse;
+    const operations = Array.isArray(data.operations) ? data.operations : [];
+
+    for (const operation of operations) {
+      await applyRemoteSyncOperation(operation);
+    }
+
+    if (typeof data.cursor === 'number' && Number.isFinite(data.cursor)) {
+      await setSyncCursor(data.cursor);
+    }
+  }
+
+  private async hydrateFallbackSnapshots(): Promise<void> {
+    try {
+      const [tasksResponse, categoriesResponse] = await Promise.all([
+        fetchPlanner(`${PLANNER_SERVICE_URL}/api/tasks?limit=500`, { method: 'GET' }),
+        fetchPlanner(`${PLANNER_SERVICE_URL}/api/categories`, { method: 'GET' }),
+      ]);
+
+      if (tasksResponse.ok) {
+        const tasks = await tasksResponse.json();
+        await localTasks.hydrate(Array.isArray(tasks) ? tasks : []);
+      }
+
+      if (categoriesResponse.ok) {
+        const categories = await categoriesResponse.json();
+        const list = Array.isArray(categories?.categories)
+          ? categories.categories
+          : Array.isArray(categories)
+            ? categories
+            : [];
+        await localCategories.hydrate(list);
+      }
+    } catch (error) {
+      captureError(error, { context: 'mobile_fallback_hydration' });
+    }
+  }
+
+  private setStatus(status: SyncStatus): void {
+    if (this.status !== status) {
+      this.status = status;
+      void syncQueue.count().then((count) => {
+        this.listeners.forEach((fn) => fn(status, count));
+      });
+    }
+  }
 }
+
+export const syncEngine = new MobileBackgroundSyncEngine();
+
+// Backwards-compatible exports used by App.tsx
+export function startSyncEngine(): void {
+  syncEngine.start();
+}
+
+export function stopSyncEngine(): void {
+  syncEngine.stop();
+}
+

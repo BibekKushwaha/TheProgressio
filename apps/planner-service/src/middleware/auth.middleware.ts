@@ -190,14 +190,33 @@ export const isAuth = async (
     }
 };
 
-export const enforceReadOnlyWrites = (
-    req: any,
-    res: Response,
-    next: NextFunction,
-): void => {
-    const isWriteMethod = !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase());
-    if (isWriteMethod && req.authContext?.mode === "share") {
-        throw new ErrorHandler(403, "Read-only access: write operations are not allowed");
+type EnforceOptions = { allowShareWritesFor?: string[] };
+
+const buildReadOnlyMiddleware = (options?: EnforceOptions) => {
+    const allow = new Set((options?.allowShareWritesFor ?? []).map((p) => p.trim().toUpperCase()).filter(Boolean));
+
+    return (req: any, _res: Response, next: NextFunction): void => {
+        const isWriteMethod = !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase());
+        if (isWriteMethod && req.authContext?.mode === "share") {
+            const permission = typeof req.authContext?.permissions === "string"
+                ? req.authContext.permissions.trim().toUpperCase()
+                : "";
+            if (!allow.has(permission)) {
+                throw new ErrorHandler(403, "Read-only access: write operations are not allowed");
+            }
+        }
+        next();
+    };
+};
+
+/**
+ * Backwards-compatible usage:
+ * - `enforceReadOnlyWrites(req, res, next)`  (legacy middleware signature)
+ * - `enforceReadOnlyWrites(options)` -> middleware
+ */
+export const enforceReadOnlyWrites: any = (arg1?: any, arg2?: any, arg3?: any) => {
+    if (typeof arg3 === "function") {
+        return buildReadOnlyMiddleware()(arg1, arg2, arg3);
     }
-    next();
+    return buildReadOnlyMiddleware(arg1 as EnforceOptions | undefined);
 };

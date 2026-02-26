@@ -72,6 +72,14 @@ export interface FamilyShareLink {
   lastUsedAt?: string | null;
 }
 
+export interface AccountExportPayload {
+  exportedAt: string;
+  version: number;
+  // Full export snapshot (user scalars + related domain records).
+  // Shape is controlled by auth-service and may evolve over time.
+  user: Record<string, unknown>;
+}
+
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
@@ -205,6 +213,28 @@ export const authApi = createApi({
         }
       },
     }),
+    exportAccountData: builder.query<{ message: string; export: AccountExportPayload }, void>({
+      query: () => ({
+        url: '/export',
+        method: 'GET',
+      }),
+    }),
+    deleteAccount: builder.mutation<{ message: string }, { confirm: string }>({
+      query: (body) => ({
+        url: '/account',
+        method: 'DELETE',
+        body,
+      }),
+      invalidatesTags: ['User'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(authApi.util.resetApiState());
+        } catch {
+          /* ignore */
+        }
+      },
+    }),
     forgotPassword: builder.mutation<{ message: string }, { email: string }>({
       query: (body) => ({
         url: '/forgot',
@@ -300,6 +330,9 @@ export const {
   useUnpairWhatsAppMutation,
   useLogoutMutation,
   useUpdateProfileMutation,
+  useExportAccountDataQuery,
+  useLazyExportAccountDataQuery,
+  useDeleteAccountMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useMobileLoginMutation,

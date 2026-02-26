@@ -9,7 +9,7 @@ vi.mock('../src/middleware/auth.middleware.js', () => ({
     req.user = { id: 'user-1', username: 'Tester', email: 'test@example.com', dailyGoalHours: 4 }
     next()
   },
-  enforceReadOnlyWrites: (_req: any, _res: any, next: any) => next(),
+  enforceReadOnlyWrites: () => (req: any, res: any, next: any) => next(),
 }))
 
 // Mock BullMQ producer (non-blocking)

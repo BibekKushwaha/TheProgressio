@@ -2,7 +2,15 @@
 'use client'
 import { Calendar, Clock, User } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useGetTaskByIdQuery } from '@repo/store';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import {
+    useGetTaskByIdQuery,
+    useGetSyllabusTopicsQuery,
+    useGetTaskSyllabusTopicsQuery,
+    useSetTaskSyllabusTopicsMutation,
+} from '@repo/store';
+import { Button } from '@/components/ui/button';
 
 function formatDueDate(dueDate?: string | null) {
     if (!dueDate) return "No due date";
@@ -56,6 +64,25 @@ function calculateTimeRemaining(dueDate?: string | null) {
 export function TaskInfoPanel() {
     const { id: taskId } = useParams()
     const { data: task } = useGetTaskByIdQuery(taskId as string)
+    const categoryId = task?.categoryId ?? null;
+
+    const { data: topicsData } = useGetSyllabusTopicsQuery(
+        categoryId ? { categoryId } : undefined
+    );
+    const { data: linksData } = useGetTaskSyllabusTopicsQuery(task?.id ?? '', { skip: !task?.id });
+    const [setLinks, { isLoading: isSavingLinks }] = useSetTaskSyllabusTopicsMutation();
+
+    const topics = (topicsData?.topics ?? []) as Array<{ id: string; chapter: string; title: string }>;
+    const existingTopicIds = useMemo(
+        () => new Set((linksData?.links ?? []).map((l: { topicId: string }) => l.topicId)),
+        [linksData]
+    );
+
+    const [selectedTopicIds, setSelectedTopicIds] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        setSelectedTopicIds(new Set(Array.from(existingTopicIds)));
+    }, [existingTopicIds]);
 
     const timeRemaining = calculateTimeRemaining(task?.dueDate);
     const isOverdue = timeRemaining === "Overdue";
@@ -98,6 +125,69 @@ export function TaskInfoPanel() {
                     </div>
                 </div>
             </div>
+
+            {categoryId && (
+                <div className="mt-6 pt-5 border-t border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-sm font-semibold text-white">Curriculum Links</div>
+                            <div className="text-xs text-slate-400">
+                                Link this task to syllabus topics for better AI breakdowns.
+                            </div>
+                        </div>
+                        <Link href="/syllabus" className="text-xs text-indigo-300 hover:text-indigo-200">
+                            Manage syllabus →
+                        </Link>
+                    </div>
+
+                    {topics.length === 0 ? (
+                        <div className="text-xs text-slate-500">
+                            No topics defined for this subject yet.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {topics.slice(0, 12).map((topic) => {
+                                const checked = selectedTopicIds.has(topic.id);
+                                return (
+                                    <label key={topic.id} className="flex items-center gap-2 text-sm text-slate-200">
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => {
+                                                setSelectedTopicIds((prev) => {
+                                                    const next = new Set(prev);
+                                                    if (next.has(topic.id)) next.delete(topic.id);
+                                                    else next.add(topic.id);
+                                                    return next;
+                                                });
+                                            }}
+                                        />
+                                        <span className="text-slate-400 text-xs">{topic.chapter}:</span>
+                                        <span>{topic.title}</span>
+                                    </label>
+                                );
+                            })}
+
+                            <div className="flex justify-end">
+                                <Button
+                                    size="sm"
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    disabled={isSavingLinks || !task?.id}
+                                    onClick={async () => {
+                                        if (!task?.id) return;
+                                        await setLinks({
+                                            taskId: task.id,
+                                            topicIds: Array.from(selectedTopicIds),
+                                        }).unwrap();
+                                    }}
+                                >
+                                    {isSavingLinks ? 'Saving…' : 'Save links'}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

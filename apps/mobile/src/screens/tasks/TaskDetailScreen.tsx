@@ -5,14 +5,13 @@ import {
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
-    useGetTaskByIdQuery,
-    useToggleTaskMutation,
-    useDeleteTaskMutation,
     useCreateSubTaskMutation,
     useUpdateSubTaskMutation,
     useDeleteSubTaskMutation,
     useGenerateSubtasksMutation,
     TaskStatus,
+    getAccessTokenSync,
+    useAppSelector,
 } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
 import {
@@ -21,6 +20,8 @@ import {
     normalizeTaskStatus,
     sanitizeTaskId,
 } from '../../utils/task';
+import { useLocalTask } from '../../hooks/useLocalTask';
+import { isOnline, localTasks } from '../../native/localDbAdapter';
 
 const PRIORITY_COLOR: Record<string, string> = {
     HIGH: Colors.error,
@@ -35,9 +36,8 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
     const rawTaskId = (route.params as { taskId?: string } | undefined)?.taskId;
     const taskId = sanitizeTaskId(rawTaskId) ?? '';
     const hasValidTaskId = Boolean(taskId);
-    const { data: task, isLoading, refetch } = useGetTaskByIdQuery(taskId, { skip: !hasValidTaskId });
-    const [toggleTask] = useToggleTaskMutation();
-    const [deleteTask] = useDeleteTaskMutation();
+    const userId = useAppSelector((state: any) => state.auth?.user?.id) as string | undefined;
+    const { task, isLoading, refresh } = useLocalTask(hasValidTaskId ? taskId : null);
     const [createSubTask, { isLoading: isCreatingSubTask }] = useCreateSubTaskMutation();
     const [updateSubTask] = useUpdateSubTaskMutation();
     const [deleteSubTask] = useDeleteSubTaskMutation();
@@ -48,13 +48,33 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
     const t = (task as any);
     const subtasks = getTaskSubtasks(t);
 
+    const refreshRemoteSnapshot = async () => {
+        if (!hasValidTaskId || !isOnline()) return;
+        const accessToken = getAccessTokenSync();
+        if (!accessToken) return;
+        try {
+            const res = await fetch(`${process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL || 'http://localhost:4001'}/api/tasks/${taskId}`, {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (!res.ok) return;
+            const body = await res.json();
+            if (body && typeof body === 'object' && (body as any).id) {
+                await localTasks.updateFromServerSnapshot(body as any);
+            }
+        } catch {
+            // non-blocking
+        }
+    };
+
     const handleDelete = () => {
         Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Delete', style: 'destructive', onPress: async () => {
                     try {
-                        await deleteTask(taskId).unwrap();
+                        if (!userId) return;
+                        await localTasks.delete(taskId, userId);
                         navigation.goBack();
                     } catch {
                         Alert.alert('Error', 'Failed to delete task. Please try again.');
@@ -67,7 +87,8 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
     const handleToggleSubtask = async (subtaskId: string, completed: boolean) => {
         try {
             await updateSubTask({ id: subtaskId, taskId, completed: !completed }).unwrap();
-            refetch();
+            await refresh();
+            await refreshRemoteSnapshot();
         } catch {
             Alert.alert('Error', 'Failed to update sub-task. Please try again.');
         }
@@ -82,7 +103,8 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
                 onPress: async () => {
                     try {
                         await deleteSubTask({ id: subtaskId, taskId }).unwrap();
-                        refetch();
+                        await refresh();
+                        await refreshRemoteSnapshot();
                     } catch {
                         Alert.alert('Error', 'Failed to delete sub-task. Please try again.');
                     }
@@ -97,7 +119,8 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
         try {
             await createSubTask({ taskId, title }).unwrap();
             setNewSubtaskTitle('');
-            refetch();
+            await refresh();
+            await refreshRemoteSnapshot();
         } catch {
             Alert.alert('Error', 'Failed to create sub-task. Please try again.');
         }
@@ -105,8 +128,9 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
 
     const handleToggleTaskStatus = async () => {
         try {
-            await toggleTask(taskId).unwrap();
-            refetch();
+            if (!userId) return;
+            await localTasks.toggle(taskId, userId);
+            await refresh();
         } catch {
             Alert.alert('Error', 'Failed to update task status. Please try again.');
         }
@@ -116,7 +140,8 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
         try {
             await generateSubtasks(taskId).unwrap();
             setExpandedSection('subtasks');
-            refetch();
+            await refresh();
+            await refreshRemoteSnapshot();
         } catch {
             Alert.alert('Error', 'Failed to generate AI subtasks. Please try again.');
         }
@@ -153,7 +178,7 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
                 <View style={styles.loading}>
                     <Text style={styles.errorText}>Task not found</Text>
                     <View style={styles.recoverRow}>
-                        <TouchableOpacity style={styles.recoverBtn} onPress={() => refetch()}>
+                        <TouchableOpacity style={styles.recoverBtn} onPress={() => void refresh()}>
                             <Text style={styles.recoverBtnText}>Retry</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.recoverBtn} onPress={goToTaskList}>

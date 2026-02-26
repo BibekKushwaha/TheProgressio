@@ -18,6 +18,7 @@ import {
     X,
     ChevronDown,
     Award,
+    Layers,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -60,6 +61,7 @@ const NAV_ITEMS: NavItem[] = [
         children: [
             { name: "Overview", href: "/analytics/overview" },
             { name: "Strategic", href: "/analytics/strategic" },
+            { name: "Weekly Review", href: "/analytics/weekly-review" },
         ],
     },
     {
@@ -74,6 +76,7 @@ const NAV_ITEMS: NavItem[] = [
         ],
     },
     { name: "Subject Library", icon: BookOpen, href: "/subjects" },
+    { name: "Syllabus Graph", icon: Layers, href: "/syllabus" },
     { name: "Achievements", icon: Award, href: "/achievement" },
     { name: "Family Connect", icon: Users, href: "/family-connect" },
 ];
@@ -314,4 +317,3 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
-

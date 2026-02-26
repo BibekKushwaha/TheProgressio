@@ -2,17 +2,18 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
-import { useGetCategoryByIdQuery, useGetTasksQuery, TaskStatus } from '@repo/store';
+import { TaskStatus } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
-import { toArray } from '../../utils/data';
 import { extractTaskId, formatTaskStatusLabel, normalizeTaskStatus } from '../../utils/task';
+import { useLocalCategories } from '../../hooks/useLocalCategories';
+import { useLocalTasks } from '../../hooks/useLocalTasks';
 
 export const SubjectDetailScreen: React.FC<TasksScreenProps<'SubjectDetail'>> = ({ route, navigation }) => {
     const { subjectId, subjectName } = route.params;
-    const { data: category } = useGetCategoryByIdQuery(subjectId);
-    const { data, isLoading, refetch } = useGetTasksQuery({ categoryId: subjectId, page: 1, limit: 100 } as any);
+    const { categories } = useLocalCategories();
+    const { tasks, isLoading, refresh } = useLocalTasks({ categoryId: subjectId });
 
-    const tasks = useMemo(() => toArray<any>(data, ['data', 'tasks']), [data]);
+    const category = useMemo(() => categories.find((c: any) => c.id === subjectId) ?? null, [categories, subjectId]);
     const completed = tasks.filter((t) => normalizeTaskStatus(t) === TaskStatus.COMPLETED).length;
     const inProgress = tasks.filter((t) => normalizeTaskStatus(t) === TaskStatus.IN_PROGRESS).length;
 
@@ -31,7 +32,7 @@ export const SubjectDetailScreen: React.FC<TasksScreenProps<'SubjectDetail'>> = 
                     <Text style={styles.back}>{'< Subjects'}</Text>
                 </TouchableOpacity>
                 <Text style={styles.title} numberOfLines={1}>{subjectName}</Text>
-                <TouchableOpacity onPress={refetch}>
+                <TouchableOpacity onPress={refresh}>
                     <Text style={styles.refresh}>↻</Text>
                 </TouchableOpacity>
             </View>
@@ -64,7 +65,7 @@ export const SubjectDetailScreen: React.FC<TasksScreenProps<'SubjectDetail'>> = 
                 data={tasks}
                 keyExtractor={(item: any, index: number) => extractTaskId(item) ?? `subject-task-${index}`}
                 refreshing={isLoading}
-                onRefresh={refetch}
+                onRefresh={refresh}
                 contentContainerStyle={styles.list}
                 ListEmptyComponent={
                     <GlassCard>

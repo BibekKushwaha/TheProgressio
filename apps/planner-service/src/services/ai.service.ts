@@ -32,6 +32,10 @@ export interface ParsedSyllabusItem {
     subject?: string;
 }
 
+export interface AIRequestOptions {
+    disableAI?: boolean;
+}
+
 export type WhatsAppIntent = "create_task" | "reschedule_task" | "complete_task" | "list_tasks" | "help";
 
 export interface WhatsAppTaskExtraction {
@@ -875,7 +879,11 @@ Message: "${text}"
     /**
      * Parses raw text to extract task metadata using Mistral.
      */
-    async parseTaskIntent(text: string): Promise<ParsedTaskIntent> {
+    async parseTaskIntent(text: string, options: AIRequestOptions = {}): Promise<ParsedTaskIntent> {
+        if (options.disableAI) {
+            return this.fallbackParse(text);
+        }
+
         if (!this.client) {
             console.warn("⚠️ AI Service not initialized (missing key). Using fallback.");
             return this.fallbackParse(text);
@@ -1129,10 +1137,50 @@ Message: "${text}"
     /**
      * Parses assignments/exams from a syllabus image using Pixtral vision model.
      */
-    async scanSyllabusImage(imageBase64: string, mimeType: string): Promise<ParsedSyllabusItem[]> {
-        if (!this.client) {
-            return [];
+    private extractSyllabusItemsFromTextFallback(text: string): ParsedSyllabusItem[] {
+        const lines = text
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length >= 6)
+            .slice(0, 200);
+
+        const candidates = lines.filter((line) => {
+            return (
+                /chapter|unit|module|topic|revise|revision|test|exam|quiz|assignment|worksheet|lab|mock|dpp|pyq/i.test(line) ||
+                /\b\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?\b/.test(line) ||
+                /\b(mon|tue|wed|thu|fri|sat|sun)\b/i.test(line) ||
+                line.startsWith("-") ||
+                line.startsWith("•")
+            );
+        });
+
+        const picked = (candidates.length > 0 ? candidates : lines).slice(0, 25);
+
+        const seen = new Set<string>();
+        const items: ParsedSyllabusItem[] = [];
+
+        for (const line of picked) {
+            const parsed = this.fallbackParse(line);
+            const title = (parsed.title || line).trim().slice(0, 200);
+            if (!title) continue;
+
+            const key = `${title.toLowerCase()}|${parsed.dueDate ? parsed.dueDate.toISOString().slice(0, 10) : ""}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            items.push({
+                title,
+                ...(parsed.description ? { description: parsed.description } : {}),
+                ...(parsed.priority ? { priority: parsed.priority } : {}),
+                ...(parsed.subject ? { subject: parsed.subject } : {}),
+                ...(parsed.dueDate ? { dueDate: parsed.dueDate } : {}),
+            });
         }
+
+        return items;
+    }
+
+    async scanSyllabusImage(imageBase64: string, mimeType: string, options: AIRequestOptions = {}): Promise<ParsedSyllabusItem[]> {
 
         const normalizedMimeType = (mimeType || "image/jpeg").toLowerCase();
         const normalizedBase64Payload = this.decodeBase64Payload(imageBase64);
@@ -1147,6 +1195,26 @@ Message: "${text}"
         }
 
         const isPdf = normalizedMimeType.includes("pdf");
+
+        if (options.disableAI) {
+            if (isPdf) {
+                const extractedText = await this.extractPdfTextFromBase64(imageBase64);
+                if (extractedText.length >= this.minPdfTextChars) {
+                    return this.extractSyllabusItemsFromTextFallback(extractedText);
+                }
+            }
+            return [];
+        }
+
+        if (!this.client) {
+            if (isPdf) {
+                const extractedText = await this.extractPdfTextFromBase64(imageBase64);
+                if (extractedText.length >= this.minPdfTextChars) {
+                    return this.extractSyllabusItemsFromTextFallback(extractedText);
+                }
+            }
+            return [];
+        }
 
         if (isPdf) {
             // 1. First, try specialized Mistral OCR (Best for all PDFs, including scanned ones)
@@ -1185,10 +1253,23 @@ Message: "${text}"
     /**
      * Generates subtasks for a given task description.
      */
-    async generateSubtasks(taskTitle: string, description?: string): Promise<string[]> {
+    async generateSubtasks(
+        taskTitle: string,
+        description?: string,
+        options: AIRequestOptions = {},
+        context?: { syllabusContext?: string | null },
+    ): Promise<string[]> {
+        if (options.disableAI) {
+            return this.fallbackSubtasks(taskTitle);
+        }
+
         if (!this.client) {
             return this.fallbackSubtasks(taskTitle);
         }
+
+        const syllabusBlock = context?.syllabusContext
+            ? `\nCurriculum context (use when relevant; don't invent topics outside this list):\n${context.syllabusContext}\n`
+            : '';
 
         const prompt = `
         Break down the following academic task into 3-5 distinct, actionable subtasks (approx 20 mins each).
@@ -1196,6 +1277,7 @@ Message: "${text}"
 
         Task: ${taskTitle}
         Details: ${description || "N/A"}
+        ${syllabusBlock}
         `;
 
         try {

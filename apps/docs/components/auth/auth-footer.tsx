@@ -60,8 +60,8 @@ export function AuthTermsConsent({
     id = "terms",
     required = true,
     className,
-    termsHref = "#",
-    privacyHref = "#",
+    termsHref = "/terms",
+    privacyHref = "/privacy",
 }: AuthTermsConsentProps) {
     return (
         <div className={cn("flex items-start", className)}>

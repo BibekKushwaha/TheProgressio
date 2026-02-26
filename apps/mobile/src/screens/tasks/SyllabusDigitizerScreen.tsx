@@ -4,13 +4,14 @@ import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
     useScanSyllabusMutation,
-    useCreateTaskMutation,
     PriorityEnum,
     TaskStatus,
+    useAppSelector,
 } from '@repo/store';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import type { TasksScreenProps } from '../../navigation/types';
+import { localTasks } from '../../native/localDbAdapter';
 
 type ParsedItem = {
     title: string;
@@ -21,9 +22,10 @@ type ParsedItem = {
 };
 
 export const SyllabusDigitizerScreen: React.FC<TasksScreenProps<'SyllabusDigitizer'>> = ({ navigation }) => {
+    const userId = useAppSelector((state: any) => state.auth?.user?.id) as string | undefined;
     const [pickedFile, setPickedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
     const [scanSyllabus, { isLoading: isScanning }] = useScanSyllabusMutation();
-    const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
+    const [isCreating, setIsCreating] = useState(false);
     const [items, setItems] = useState<ParsedItem[]>([]);
     const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -74,21 +76,24 @@ export const SyllabusDigitizerScreen: React.FC<TasksScreenProps<'SyllabusDigitiz
     };
 
     const createSelectedTasks = async () => {
+        if (!userId) return;
+        setIsCreating(true);
         const selectedItems = items.filter((_, idx) => selected.has(idx));
         for (const item of selectedItems) {
             try {
-                await createTask({
+                await localTasks.create({
+                    userId,
                     title: item.title,
-                    description: item.description,
-                    dueDate: item.dueDate,
+                    description: item.description ?? null,
+                    dueDate: item.dueDate ?? null,
                     priority: (item.priority as PriorityEnum) || PriorityEnum.MEDIUM,
-                    status: TaskStatus.PENDING,
                     isRecurring: false,
-                }).unwrap();
+                });
             } catch {
                 /* continue */
             }
         }
+        setIsCreating(false);
         navigation.goBack();
     };
 

@@ -2,13 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { ScreenWrapper } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
-import { useGetCategoriesQuery } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
-import { toArray } from '../../utils/data';
+import { useLocalCategories } from '../../hooks/useLocalCategories';
 
 export const SubjectLibraryScreen: React.FC<TasksScreenProps<'SubjectLibrary'>> = ({ navigation }) => {
-    const { data: categories, isLoading, refetch } = useGetCategoriesQuery(undefined);
-    const cats = toArray<any>(categories, ['data', 'categories']);
+    const { categories: cats, isLoading, refresh } = useLocalCategories();
 
     return (
         <ScreenWrapper edges={['top', 'left', 'right']}>
@@ -23,7 +21,7 @@ export const SubjectLibraryScreen: React.FC<TasksScreenProps<'SubjectLibrary'>> 
                 data={cats}
                 keyExtractor={(item: any) => item.id}
                 refreshing={isLoading}
-                onRefresh={refetch}
+                onRefresh={refresh}
                 contentContainerStyle={styles.list}
                 numColumns={2}
                 columnWrapperStyle={styles.row}

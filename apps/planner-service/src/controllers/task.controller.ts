@@ -29,6 +29,12 @@ const sideEffectNextLogAt: Record<"habit" | "analytics", number> = {
     analytics: 0,
 };
 
+const isAIDisabled = (req: AuthenticatedRequest): boolean => {
+    const raw = req.headers["x-ai-disabled"];
+    if (Array.isArray(raw)) return raw.some((v) => v === "1" || v === "true");
+    return raw === "1" || raw === "true";
+};
+
 const isTemporarilyUnavailable = (service: "habit" | "analytics"): boolean =>
     Date.now() < sideEffectOutageUntil[service];
 
@@ -561,7 +567,11 @@ export const scanSyllabusImage = TryCatch(async (req: AuthenticatedRequest, res:
     }
 
     const { imageBase64, mimeType } = parsed.data;
-    const items = await aiService.scanSyllabusImage(imageBase64, typeof mimeType === "string" ? mimeType : "image/jpeg");
+    const items = await aiService.scanSyllabusImage(
+        imageBase64,
+        typeof mimeType === "string" ? mimeType : "image/jpeg",
+        { disableAI: isAIDisabled(req) },
+    );
     return res.status(200).json({ items });
 });
 
@@ -599,6 +609,7 @@ interface CreateTaskFromTextParams {
     source: string;
     metadata?: Record<string, unknown>;
     parsedDataOverride?: Partial<ParsedTaskIntent>;
+    disableAI?: boolean;
 }
 
 export const createTaskFromText = async ({
@@ -607,6 +618,7 @@ export const createTaskFromText = async ({
     source,
     metadata = {},
     parsedDataOverride,
+    disableAI = false,
 }: CreateTaskFromTextParams) => {
     const parsedData = parsedDataOverride
         ? {
@@ -619,7 +631,7 @@ export const createTaskFromText = async ({
             isRecurring: parsedDataOverride.isRecurring,
             type: parsedDataOverride.type,
         }
-        : await aiService.parseTaskIntent(text);
+        : await aiService.parseTaskIntent(text, { disableAI });
 
     const task = await prisma.task.create({
         data: {
@@ -662,6 +674,7 @@ export const smartCreateTask = TryCatch(async (req: AuthenticatedRequest, res: R
         userId: userId,
         text,
         source: "nlp-smart-create",
+        disableAI: isAIDisabled(req),
     });
 
     return res.status(201).json({
@@ -682,8 +695,42 @@ export const generateSubtasks = TryCatch(async (req: AuthenticatedRequest, res: 
 
     if (task.userId !== userId) throw new ErrorHandler(403, "Forbidden");
 
-    // 1. Generate subtasks using Gemini
-    const subtaskTitles = await aiService.generateSubtasks(task.title, task.description || "");
+    let syllabusContext: string | null = null;
+    if (task.categoryId) {
+        const linked = await prisma.taskSyllabusTopic.findMany({
+            where: { userId, taskId: task.id },
+            include: { topic: { select: { chapter: true, title: true } } },
+            take: 12,
+        });
+
+        if (linked.length > 0) {
+            syllabusContext = [
+                "Linked topics:",
+                ...linked.map((l) => `- ${l.topic.chapter}: ${l.topic.title}`),
+            ].join("\n");
+        } else {
+            const topics = await prisma.syllabusTopic.findMany({
+                where: { userId, categoryId: task.categoryId },
+                select: { chapter: true, title: true },
+                orderBy: [{ chapter: "asc" }, { title: "asc" }],
+                take: 20,
+            });
+            if (topics.length > 0) {
+                syllabusContext = [
+                    "Subject topics:",
+                    ...topics.map((t) => `- ${t.chapter}: ${t.title}`),
+                ].join("\n");
+            }
+        }
+    }
+
+    // 1. Generate subtasks using AI (curriculum-grounded when possible)
+    const subtaskTitles = await aiService.generateSubtasks(
+        task.title,
+        task.description || "",
+        { disableAI: isAIDisabled(req) },
+        { syllabusContext },
+    );
 
     // 2. Save to DB
     if (subtaskTitles.length > 0) {
@@ -714,7 +761,7 @@ export const previewSubtasks = TryCatch(async (req: AuthenticatedRequest, res: R
 
     const { title, description } = parsed.data;
 
-    const subtaskTitles = await aiService.generateSubtasks(title, description || "");
+    const subtaskTitles = await aiService.generateSubtasks(title, description || "", { disableAI: isAIDisabled(req) });
 
     return res.status(200).json({ subtasks: subtaskTitles });
 });
@@ -729,7 +776,7 @@ export const parseTaskIntent = TryCatch(async (req: AuthenticatedRequest, res: R
 
     const { text } = parsed.data;
 
-    const parsedData = await aiService.parseTaskIntent(text);
+    const parsedData = await aiService.parseTaskIntent(text, { disableAI: isAIDisabled(req) });
 
     return res.status(200).json(parsedData);
 });

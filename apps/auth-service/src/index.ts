@@ -17,7 +17,7 @@ app.use(cors({
   origin: isProduction ? FRONTEND_ORIGIN : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-family-share-token'],
 }));
 
 app.use(express.json({ limit: "50mb" }));

@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { withAuthRefresh, withRetry } from '../baseQuery';
 import { calendarApi } from './calendarApi';
 import { analyticsApi } from './analyticsApi';
-import { getFamilyShareToken, isNativeRuntime, resolveServiceUrl } from '../runtime';
+import { getFamilyShareToken, isAIAssistanceDisabled, isNativeRuntime, resolveServiceUrl } from '../runtime';
 import { getAccessTokenSync } from '../mobile-token-store';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
@@ -184,6 +184,9 @@ const plannerBaseQuery = fetchBaseQuery({
         const shareToken = getFamilyShareToken();
         if (shareToken) {
             headers.set('x-family-share-token', shareToken);
+        }
+        if (isAIAssistanceDisabled()) {
+            headers.set('x-ai-disabled', '1');
         }
         return headers;
     },

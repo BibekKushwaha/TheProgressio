@@ -1,7 +1,9 @@
 import { prisma, Status } from '@repo/db';
+import crypto from 'crypto';
 import { sendWhatsAppText } from './meta-whatsapp.service.js';
 
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://localhost:4003';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 type ParentWatchMap = Record<string, string[]>;
 
@@ -53,50 +55,197 @@ const getOverdueCount = async (userId: string): Promise<number> => {
   });
 };
 
-export const runSilentWatchSweep = async (): Promise<{ alertsSent: number; usersChecked: number }> => {
-  const watchMap = readParentWatchMap();
+const hashToken = (value: string): string =>
+  crypto.createHash('sha256').update(value).digest('hex');
+
+const generateOpaqueToken = (): string =>
+  crypto.randomBytes(24).toString('base64url');
+
+const createEphemeralFeedbackLink = async (userId: string, label: string | null): Promise<{ shareToken: string; linkId: string }> => {
+  const shareToken = `fml_${generateOpaqueToken()}`;
+  const tokenHash = hashToken(shareToken);
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+  const link = await prisma.familyShareLink.create({
+    data: {
+      userId,
+      tokenHash,
+      label,
+      permissions: 'FEEDBACK',
+      expiresAt,
+    },
+    select: { id: true },
+  });
+
+  return { shareToken, linkId: link.id };
+};
+
+type WatchTarget = {
+  source: 'subscription' | 'env';
+  subscriptionId?: string;
+  userId: string;
+  label: string | null;
+  recipientPhone: string;
+  overdueThreshold: number;
+  consistencyThreshold: number;
+  cooldownMinutes: number;
+  lastAlertAt: Date | null;
+};
+
+const loadWatchTargets = async (): Promise<WatchTarget[]> => {
   const thresholdOverdue = Number(process.env.WHATSAPP_PARENT_OVERDUE_THRESHOLD || 5);
   const thresholdConsistency = Number(process.env.WHATSAPP_PARENT_CONSISTENCY_THRESHOLD || 50);
 
-  let alertsSent = 0;
-  const users = Object.keys(watchMap);
+  const targets: WatchTarget[] = [];
 
-  for (const userId of users) {
-    const parentNumbers = watchMap[userId] || [];
-    if (parentNumbers.length === 0) continue;
+  // DB-backed subscriptions (productized path)
+  const subscriptions = await prisma.mentorAlertSubscription.findMany({
+    where: {
+      enabled: true,
+      revokedAt: null,
+    },
+    select: {
+      id: true,
+      userId: true,
+      label: true,
+      recipientPhone: true,
+      overdueThreshold: true,
+      consistencyThreshold: true,
+      cooldownMinutes: true,
+      lastAlertAt: true,
+    },
+  });
+
+  for (const sub of subscriptions) {
+    targets.push({
+      source: 'subscription',
+      subscriptionId: sub.id,
+      userId: sub.userId,
+      label: sub.label ?? null,
+      recipientPhone: sub.recipientPhone,
+      overdueThreshold: sub.overdueThreshold ?? thresholdOverdue,
+      consistencyThreshold: sub.consistencyThreshold ?? thresholdConsistency,
+      cooldownMinutes: sub.cooldownMinutes ?? 360,
+      lastAlertAt: sub.lastAlertAt ?? null,
+    });
+  }
+
+  // Backward-compatible env mapping (legacy)
+  const watchMap = readParentWatchMap();
+  for (const [userId, phones] of Object.entries(watchMap)) {
+    for (const phone of phones) {
+      targets.push({
+        source: 'env',
+        userId,
+        label: null,
+        recipientPhone: phone,
+        overdueThreshold: thresholdOverdue,
+        consistencyThreshold: thresholdConsistency,
+        cooldownMinutes: 360,
+        lastAlertAt: null,
+      });
+    }
+  }
+
+  return targets;
+};
+
+const isCoolingDown = (lastAlertAt: Date | null, cooldownMinutes: number): boolean => {
+  if (!lastAlertAt) return false;
+  const elapsedMs = Date.now() - lastAlertAt.getTime();
+  return elapsedMs < Math.max(0, cooldownMinutes) * 60 * 1000;
+};
+
+export const runSilentWatchSweep = async (): Promise<{ alertsSent: number; usersChecked: number }> => {
+  const targets = await loadWatchTargets();
+  let alertsSent = 0;
+
+  const uniqueUsersChecked = new Set<string>();
+
+  for (const target of targets) {
+    uniqueUsersChecked.add(target.userId);
+
+    if (isCoolingDown(target.lastAlertAt, target.cooldownMinutes)) {
+      continue;
+    }
 
     const [overdueCount, consistencyScore] = await Promise.all([
-      getOverdueCount(userId),
-      getConsistencyScore(userId),
+      getOverdueCount(target.userId),
+      getConsistencyScore(target.userId),
     ]);
 
-    const shouldAlertOverdue = overdueCount > thresholdOverdue;
-    const shouldAlertConsistency = consistencyScore !== null && consistencyScore < thresholdConsistency;
+    const shouldAlertOverdue = overdueCount > target.overdueThreshold;
+    const shouldAlertConsistency = consistencyScore !== null && consistencyScore < target.consistencyThreshold;
 
     if (!shouldAlertOverdue && !shouldAlertConsistency) {
       continue;
     }
 
+    const { shareToken, linkId } = await createEphemeralFeedbackLink(
+      target.userId,
+      target.label ? `Mentor alert: ${target.label}` : 'Mentor alert',
+    );
+    const shareUrl = `${FRONTEND_URL.replace(/\/$/, '')}/family-connect/accept/${shareToken}`;
+
     const lines: string[] = ['Student progress alert:'];
+    const triggers: string[] = [];
     if (shouldAlertOverdue) {
-      lines.push(`• Overdue tasks: ${overdueCount} (threshold ${thresholdOverdue})`);
+      lines.push(`• Overdue tasks: ${overdueCount} (threshold ${target.overdueThreshold})`);
+      triggers.push('OVERDUE');
     }
     if (shouldAlertConsistency && consistencyScore !== null) {
-      lines.push(`• Consistency score: ${Math.round(consistencyScore)} (threshold ${thresholdConsistency})`);
+      lines.push(`• Consistency score: ${Math.round(consistencyScore)} (threshold ${target.consistencyThreshold})`);
+      triggers.push('CONSISTENCY');
     }
-    lines.push('This is an automated silent-watch notification.');
+    lines.push('');
+    lines.push(`Open dashboard: ${shareUrl}`);
+    lines.push('You can leave a note on the dashboard (Feedback).');
+    lines.push('Automated silent-watch notification.');
 
     const message = lines.join('\n');
 
-    for (const number of parentNumbers) {
+    try {
+      await sendWhatsAppText(target.recipientPhone, message);
+      alertsSent += 1;
+
+      await prisma.mentorAlert.create({
+        data: {
+          userId: target.userId,
+          subscriptionId: target.subscriptionId ?? null,
+          shareLinkId: linkId,
+          trigger: triggers.join(','),
+          message,
+          sentToPhone: target.recipientPhone,
+          status: 'SENT',
+        },
+      });
+
+      if (target.source === 'subscription' && target.subscriptionId) {
+        await prisma.mentorAlertSubscription.update({
+          where: { id: target.subscriptionId },
+          data: { lastAlertAt: new Date() },
+        });
+      }
+    } catch (error) {
+      console.warn(`[WhatsApp Silent Watch] Failed sending to ${target.recipientPhone}:`, error);
       try {
-        await sendWhatsAppText(number, message);
-        alertsSent += 1;
-      } catch (error) {
-        console.warn(`[WhatsApp Silent Watch] Failed sending to ${number}:`, error);
+        await prisma.mentorAlert.create({
+          data: {
+            userId: target.userId,
+            subscriptionId: target.subscriptionId ?? null,
+            shareLinkId: linkId,
+            trigger: 'SEND_FAILED',
+            message,
+            sentToPhone: target.recipientPhone,
+            status: 'FAILED',
+            error: error instanceof Error ? error.message : 'send_failed',
+          },
+        });
+      } catch {
+        // ignore
       }
     }
   }
 
-  return { alertsSent, usersChecked: users.length };
+  return { alertsSent, usersChecked: uniqueUsersChecked.size };
 };

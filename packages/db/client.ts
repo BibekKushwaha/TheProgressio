@@ -8,7 +8,9 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 const connectionString =
-  process.env.DATABASE_URL ?? "postgresql://localhost:5432/postgres";
+  process.env.DATABASE_URL ??
+  // Keep a sane dev default that matches `docker-compose.yaml`.
+  "postgresql://postgres:password@localhost:5432/transition";
 
 const pool = globalForPrisma.pgPool ?? new Pool({ connectionString });
 

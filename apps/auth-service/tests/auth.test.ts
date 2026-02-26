@@ -1,5 +1,6 @@
 import request from 'supertest'
 import { describe, it, beforeEach, expect, vi } from 'vitest'
+import jwt from 'jsonwebtoken'
 
 // Mock bcrypt to avoid native N-API/compile issues in test environment
 vi.mock('bcrypt', () => {
@@ -16,6 +17,7 @@ vi.mock('@repo/db/client', () => {
     create: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
+    delete: vi.fn(),
   }
   const familyShareLink = {
     create: vi.fn(),
@@ -54,6 +56,7 @@ describe('Auth endpoints', () => {
         create: vi.fn(),
         findUnique: vi.fn(),
         update: vi.fn(),
+        delete: vi.fn(),
       }
       ; (prisma as any).familyShareLink = {
         create: vi.fn(),
@@ -187,5 +190,71 @@ describe('Auth endpoints', () => {
       .send({ permissions: ['tasks', 'habits'] })
 
     expect(res.status).toBeGreaterThanOrEqual(400)
+  })
+
+  // ─── Account export/delete ─────────────────────────────────────────────
+
+  it('rejects export without auth', async () => {
+    const res = await request(app).get('/api/auth/export')
+    expect(res.status).toBe(401)
+  })
+
+  it('exports account data with auth cookie', async () => {
+    const token = jwt.sign({ id: 'u1' }, process.env.JWT_SEC as string, { expiresIn: '1h' })
+      ; (prisma as any).user.findUnique.mockResolvedValue({
+        id: 'u1',
+        username: 'Tester',
+        email: 'test@example.com',
+        createdAt: new Date(),
+        categories: [],
+        tasks: [],
+        habits: [],
+        nudges: [],
+        gradeEntries: [],
+        courseGrades: [],
+        paymentEvents: [],
+        syncOperations: [],
+        attendance: [],
+        subjects: [],
+        exams: [],
+        studyGoals: [],
+        timetable: [],
+        rotationPatterns: [],
+        holidays: [],
+        achievements: [],
+        notes: [],
+        auditLogs: [],
+        conversations: [],
+        familyShareLinks: [],
+        pushSubscriptions: [],
+        oauthAccounts: [],
+      })
+
+    const res = await request(app)
+      .get('/api/auth/export')
+      .set('Cookie', [`token=${token}`])
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty('export')
+    expect(res.body.export.user).toHaveProperty('id', 'u1')
+  })
+
+  it('deletes account only with confirmation', async () => {
+    const token = jwt.sign({ id: 'u1' }, process.env.JWT_SEC as string, { expiresIn: '1h' })
+      ; (prisma as any).user.delete.mockResolvedValue({ id: 'u1' })
+
+    const bad = await request(app)
+      .delete('/api/auth/account')
+      .set('Cookie', [`token=${token}`])
+      .send({ confirm: 'no' })
+    expect(bad.status).toBe(400)
+
+    const ok = await request(app)
+      .delete('/api/auth/account')
+      .set('Cookie', [`token=${token}`])
+      .send({ confirm: 'DELETE' })
+
+    expect(ok.status).toBe(200)
+    expect(ok.body).toHaveProperty('message')
   })
 })

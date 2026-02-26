@@ -8,6 +8,8 @@ import { timetableApi } from './services/timetableApi';
 import { calendarApi } from './services/calendarApi';
 import { rotationsApi } from './services/rotationsApi';
 import { paymentApi } from './services/paymentApi';
+import { mentorshipApi } from './services/mentorshipApi';
+import { syllabusApi } from './services/syllabusApi';
 import authReducer from './slices/authSlice';
 import tasksReducer from './slices/tasksSlice';
 import categoriesReducer from './slices/categoriesSlice';
@@ -33,6 +35,8 @@ export const makeStore = () => {
       [calendarApi.reducerPath]: calendarApi.reducer,
       [rotationsApi.reducerPath]: rotationsApi.reducer,
       [paymentApi.reducerPath]: paymentApi.reducer,
+      [mentorshipApi.reducerPath]: mentorshipApi.reducer,
+      [syllabusApi.reducerPath]: syllabusApi.reducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
@@ -47,7 +51,9 @@ export const makeStore = () => {
         timetableApi.middleware,
         calendarApi.middleware,
         rotationsApi.middleware,
-        paymentApi.middleware
+        paymentApi.middleware,
+        mentorshipApi.middleware,
+        syllabusApi.middleware
       ),
   });
 };

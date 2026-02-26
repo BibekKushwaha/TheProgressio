@@ -3,6 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { User, Bell, Lock, Palette, Loader2, Moon, Wifi, MessageSquare, Smartphone, CreditCard, Clock, QrCode, Languages } from "lucide-react";
 import {
+    isAIAssistanceDisabled,
+    setAIAssistanceDisabled,
+    useDeleteAccountMutation,
+    useLazyExportAccountDataQuery,
     useGetProfileQuery,
     useUpdateProfileMutation,
     useGetNudgeSettingsQuery,
@@ -29,9 +33,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 type BucketKey = keyof NotificationSettings['enabledBuckets'];
 
@@ -45,6 +51,7 @@ const NOTIFICATION_BUCKETS: Array<{ key: BucketKey; title: string; description: 
 
 export default function SettingsPage() {
     const { theme, setTheme } = useTheme();
+    const router = useRouter();
     const { data: profileData, isLoading: isProfileLoading } = useGetProfileQuery();
     const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation();
     const { data: nudgeSettingsData } = useGetNudgeSettingsQuery();
@@ -52,16 +59,35 @@ export default function SettingsPage() {
     const { data: intelligenceData } = useGetNotificationIntelligenceQuery();
     const { data: contextSignals } = useGetNotificationContextSignalsQuery({ locationTag: "CAMPUS", motionState: "WALKING", brightness: 0.7 });
     const [isPairingPolling, setIsPairingPolling] = useState(true);
+    const [isPageVisible, setIsPageVisible] = useState(true);
     const { data: pairingData, isLoading: isPairingLoading, refetch: refetchPairing } = useGetWhatsAppPairingCodeQuery(undefined, {
-        pollingInterval: isPairingPolling ? 5000 : 0,
+        // Avoid noisy background polling; check occasionally while the tab is visible.
+        pollingInterval: isPairingPolling && isPageVisible ? 30000 : 0,
         refetchOnMountOrArgChange: true,
     });
     const [unpairWhatsApp, { isLoading: isUnpairing }] = useUnpairWhatsAppMutation();
+    const [triggerExport, { isFetching: isExporting }] = useLazyExportAccountDataQuery();
+    const [deleteAccount, { isLoading: isDeleting }] = useDeleteAccountMutation();
+    const [aiDisabled, setAiDisabled] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
     // Stop polling once the WhatsApp number is verified
     useEffect(() => {
         if (pairingData?.verified) setIsPairingPolling(false);
     }, [pairingData?.verified]);
+
+    // Pause pairing polling when the tab is in the background.
+    useEffect(() => {
+        const onVisibilityChange = () => setIsPageVisible(!document.hidden);
+        onVisibilityChange();
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    }, []);
+
+    useEffect(() => {
+        setAiDisabled(isAIAssistanceDisabled());
+    }, []);
 
     const whatsAppBotNumber = process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER;
     const whatsAppBotNumberDigits = whatsAppBotNumber ? whatsAppBotNumber.replace(/[^\d]/g, "") : "";
@@ -112,6 +138,39 @@ export default function SettingsPage() {
         } catch (error) {
             console.error("Failed to update profile:", error);
             toast.error("Failed to update profile");
+        }
+    };
+
+    const handleExport = async () => {
+        try {
+            const result = await triggerExport().unwrap();
+            const exportedAt = result.export?.exportedAt || new Date().toISOString();
+            const filename = `account_export_${exportedAt.slice(0, 10)}.json`;
+
+            const blob = new Blob([JSON.stringify(result.export, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            toast.success("Export downloaded");
+        } catch (error) {
+            console.error("Export failed:", error);
+            toast.error("Failed to export data");
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        try {
+            await deleteAccount({ confirm: deleteConfirmText }).unwrap();
+            toast.success("Account deleted");
+            router.push("/login");
+        } catch (error) {
+            console.error("Delete account failed:", error);
+            toast.error("Failed to delete account");
         }
     };
 
@@ -640,6 +699,98 @@ export default function SettingsPage() {
                     </Button>
                 </CardContent>
             </Card>
+
+            {/* Data & Privacy */}
+            <Card variant="glass">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Lock className="w-5 h-5 text-emerald-400" />
+                        <CardTitle>Data & Privacy</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                        <div className="space-y-0.5">
+                            <Label className="text-base">AI assistance</Label>
+                            <p className="text-sm text-slate-400">Disable external AI calls and use fallback-only behavior</p>
+                        </div>
+                        <Switch
+                            checked={!aiDisabled}
+                            onCheckedChange={(checked) => {
+                                const nextDisabled = !checked;
+                                setAiDisabled(nextDisabled);
+                                setAIAssistanceDisabled(nextDisabled);
+                                toast.success(nextDisabled ? "AI assistance disabled" : "AI assistance enabled");
+                            }}
+                        />
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-3">
+                        <Button
+                            variant="outline"
+                            className="border-white/10 hover:bg-white/5"
+                            onClick={handleExport}
+                            disabled={isExporting}
+                        >
+                            {isExporting ? "Exporting..." : "Export My Data (JSON)"}
+                        </Button>
+
+                        <Button
+                            variant="destructive"
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => {
+                                setDeleteConfirmText("");
+                                setDeleteOpen(true);
+                            }}
+                        >
+                            Delete Account
+                        </Button>
+                    </div>
+
+                    <p className="text-xs text-slate-500">
+                        Deleting your account permanently removes your data from this deployment.
+                    </p>
+                </CardContent>
+            </Card>
+
+            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <DialogContent className="bg-slate-950 border-white/10 text-white max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Delete account</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <p className="text-sm text-slate-400">
+                            This action is irreversible. Type <span className="font-mono text-slate-200">DELETE</span> to confirm.
+                        </p>
+                        <Input
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            placeholder="Type DELETE"
+                            className="bg-black/30 border-white/10"
+                        />
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button
+                            variant="outline"
+                            className="border-white/10 hover:bg-white/5"
+                            onClick={() => setDeleteOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            className="bg-red-600 hover:bg-red-700"
+                            disabled={isDeleting || deleteConfirmText.trim() !== "DELETE"}
+                            onClick={async () => {
+                                await handleDeleteAccount();
+                                setDeleteOpen(false);
+                            }}
+                        >
+                            {isDeleting ? "Deleting..." : "Delete"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

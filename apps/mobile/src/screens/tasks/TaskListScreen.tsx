@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -11,14 +11,13 @@ import {
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
-    useGetTasksQuery,
-    useToggleTaskMutation,
     TaskStatus,
 } from '@repo/store';
 import { useDebounce } from '../../utils/performance';
 import type { TasksScreenProps } from '../../navigation/types';
-import { toArray } from '../../utils/data';
 import { extractTaskId, formatTaskStatusLabel, normalizeTaskStatus } from '../../utils/task';
+import { useLocalTasks } from '../../hooks/useLocalTasks';
+import { localTasks } from '../../native/localDbAdapter';
 
 type StatusFilter = 'all' | TaskStatus;
 
@@ -40,18 +39,10 @@ export const TaskListScreen: React.FC<TasksScreenProps<'TaskList'>> = ({ navigat
     const [searchRaw, setSearchRaw] = useState('');
     const search = useDebounce(searchRaw, 250);  // Only filter after 250ms idle
 
-    const queryArg = statusFilter === 'all' ? {} : { status: statusFilter };
-    const { data, isLoading, refetch } = useGetTasksQuery(queryArg as any);
-    const [toggleTask] = useToggleTaskMutation();
-
-    // Memoize filtered list — recomputes only when data or search changes
-    const tasks = useMemo(
-        () =>
-            toArray<any>(data, ['data', 'tasks']).filter((t: any) =>
-                String(t?.title ?? '').toLowerCase().includes(search.toLowerCase())
-            ),
-        [data, search]
-    );
+    const { tasks, isLoading, refresh, userId } = useLocalTasks({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search,
+    });
 
     const handleOpenTask = (taskId: string | null) => {
         if (!taskId) {
@@ -64,7 +55,8 @@ export const TaskListScreen: React.FC<TasksScreenProps<'TaskList'>> = ({ navigat
     const handleToggleTask = async (taskId: string | null) => {
         if (!taskId) return;
         try {
-            await toggleTask(taskId).unwrap();
+            if (!userId) return;
+            await localTasks.toggle(taskId, userId);
         } catch {
             Alert.alert('Update failed', 'Could not update task status. Please try again.');
         }
@@ -122,7 +114,7 @@ export const TaskListScreen: React.FC<TasksScreenProps<'TaskList'>> = ({ navigat
                 data={tasks}
                 keyExtractor={(item: any, index: number) => extractTaskId(item) ?? `task-${index}`}
                 refreshing={isLoading}
-                onRefresh={refetch}
+                onRefresh={refresh}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
