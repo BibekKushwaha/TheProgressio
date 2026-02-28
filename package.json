@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --filter=@repo/analytics-service --filter=@repo/auth-service --filter=@repo/habit-service --filter=@repo/planner-service --filter=docs",
-    "generate-db": "npm run generate -w @repo/db",
+    "dev": "npm run build -w packages/schemas && npm run build -w packages/cache && npm run build -w packages/db && turbo run dev --filter=@repo/analytics-service --filter=@repo/auth-service --filter=@repo/habit-service --filter=@repo/planner-service --filter=docs",
+    "generate-db": "npm run generate -w @repo/db && npm run build -w packages/db",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",

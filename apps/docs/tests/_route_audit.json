@@ -1,0 +1,1189 @@
+[
+  {
+    "file": "app/(auth)/forgot-password/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/card",
+      "@/components/auth/gradient-button",
+      "@/components/auth/input"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/api-error"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useForgotPasswordMutation"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(auth)/loading.tsx",
+    "kind": "loading.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/layout/PageLoader"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(auth)/login/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/card",
+      "@/components/auth/gradient-button",
+      "@/components/auth/input"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/api-error"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useLoginMutation"
+      ],
+      "storeHooks": [
+        "useAppDispatch"
+      ],
+      "routerUsage": true,
+      "localStorage": true,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(auth)/reset-password/[token]/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/card",
+      "@/components/auth/gradient-button",
+      "@/components/auth/input"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/api-error"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useResetPasswordMutation"
+      ],
+      "storeHooks": [],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(auth)/signup/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/auth/gradient-button",
+      "@/components/auth/input",
+      "@/components/ui/card"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/api-error"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useRegisterMutation"
+      ],
+      "storeHooks": [
+        "useAppDispatch"
+      ],
+      "routerUsage": true,
+      "localStorage": true,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/achievement/[id]/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/skeleton"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetAchievementsQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/achievement/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/achievements/AchievementsHeader",
+      "@/components/achievements/BadgesTabs",
+      "@/components/achievements/BadgesGrid"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/advanced/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/analytics/GPACalculator",
+      "@/components/analytics/SWOTAnalysis",
+      "@/components/analytics/ProductivityInsights",
+      "@/components/habit/NotificationCenter",
+      "@/components/planner/RotationManager",
+      "@/components/planner/ClassManager",
+      "@/components/ui/card",
+      "@/components/ui/tabs"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/analytics/error.tsx",
+    "kind": "error.tsx",
+    "isClient": true,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/analytics/loading.tsx",
+    "kind": "loading.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/ui/skeleton"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/analytics/overview/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/analytics/AnalyticHeader",
+      "@/components/analytics/FocusTrend",
+      "@/components/analytics/SessionBreakdown",
+      "@/components/analytics/StatCard",
+      "@/components/analytics/MetricCard",
+      "@/components/ui/skeleton",
+      "@/components/ui/card"
+    ],
+    "storeImports": [
+      "@repo/store",
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/mergeTasks",
+      "@/hooks/usePageVisibility",
+      "@/lib/exportUtils"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetDailySummaryQuery",
+        "useGetDashboardSummaryQuery",
+        "useGetFocusScoreQuery",
+        "useGetHabitsQuery",
+        "useGetTaskMetricsQuery",
+        "useGetTasksQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/analytics/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/analytics/strategic/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/analytics/DurationPredictionCard",
+      "@/components/analytics/PredictiveScoreCard",
+      "@/components/analytics/ProductivityInsights",
+      "@/components/analytics/WhatIfGPASimulator",
+      "@/components/analytics/SWOTReport",
+      "@/components/layout/GlassHero",
+      "@/components/ui/select",
+      "@/components/ui/skeleton"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetStrategicSummaryQuery",
+        "useGetTasksQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 1
+    }
+  },
+  {
+    "file": "app/(dashboard)/analytics/weekly-review/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/card",
+      "@/components/layout/PageHeader",
+      "@/components/ui/skeleton",
+      "@/components/ui/select"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetWeeklyReviewQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/calendar/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/calendar/CalendarHeader",
+      "@/components/calendar/MonthGrid",
+      "@/components/calendar/ScheduleDetailPanel",
+      "@/components/calendar/UpcomingTasksPanel",
+      "@/components/calendar/DayGrid"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/date"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useResolveRotationQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 1
+    }
+  },
+  {
+    "file": "app/(dashboard)/createtask/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/createtask/TaskInputCard",
+      "@/components/createtask/MetaChips",
+      "@/components/ui/input",
+      "@/components/ui/label",
+      "@/components/ui/time-picker-input"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useAddGradeEntryMutation",
+        "useCreateCategoryMutation",
+        "useCreateExamMutation",
+        "useCreateTaskMutation",
+        "useGetCategoriesQuery",
+        "useGetSubjectsQuery",
+        "useGetTaskByIdQuery",
+        "useParseTaskMutation",
+        "usePreviewSubtasksMutation",
+        "useSmartCreateTaskMutation",
+        "useUpdateTaskMutation"
+      ],
+      "storeHooks": [
+        "useAppDispatch"
+      ],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 2
+    }
+  },
+  {
+    "file": "app/(dashboard)/dashboard/error.tsx",
+    "kind": "error.tsx",
+    "isClient": true,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/dashboard/loading.tsx",
+    "kind": "loading.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/ui/skeleton"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/dashboard/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/dashboard/WelcomeHeader",
+      "@/components/dashboard/TopStats",
+      "@/components/dashboard/WeeklyActivity",
+      "@/components/dashboard/QuickActions",
+      "@/components/dashboard/TodaysTasks",
+      "@/components/dashboard/MorningBriefing",
+      "@/components/dashboard/LiveActivityWidget",
+      "@/components/dashboard/ActivityLedger",
+      "@/components/dashboard/NotesWidget",
+      "@/components/layout/DashboardGrid"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/exam-warroom/academic/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/analytics/GPACalculator",
+      "@/components/analytics/GradeEntryManager",
+      "@/components/analytics/PredictiveScoreCard"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/exam-warroom/overview/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/analytics/SWOTAnalysis",
+      "@/components/analytics/PredictiveScoreCard",
+      "@/components/ui/skeleton",
+      "@/components/layout/PageHeader"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetAllSubjectPerformanceQuery",
+        "useGetGradeEntriesQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/exam-warroom/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/exam-warroom/revision/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/skeleton",
+      "@/components/analytics/RevisionScheduler"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetAllSubjectPerformanceQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/family-connect/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/skeleton",
+      "@/components/ui/card",
+      "@/components/ui/button",
+      "@/components/ui/input",
+      "@/components/ui/dialog",
+      "@/components/layout/PageHeader",
+      "@/components/ui/stat-card",
+      "@/components/family-connect/TaskListItem",
+      "@/components/family-connect/HabitListItem"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/exportUtils"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useComposeNotificationMutation",
+        "useGetDailySummaryQuery",
+        "useGetHabitsQuery",
+        "useGetProfileQuery",
+        "useGetTasksQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/habits/error.tsx",
+    "kind": "error.tsx",
+    "isClient": true,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/habits/loading.tsx",
+    "kind": "loading.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/ui/skeleton"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/habits/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/habit/HabitCard",
+      "@/components/habit/HabitDialog",
+      "@/components/habit/ContributionHeatmap",
+      "@/components/habit/UserLevelCard",
+      "@/components/ui/skeleton",
+      "@/components/SearchBar",
+      "@/components/layout/PageHeader",
+      "@/components/ui/button"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetHabitsQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 2
+    }
+  },
+  {
+    "file": "app/(dashboard)/layout.tsx",
+    "kind": "layout.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/layout/Sidebar",
+      "@/components/layout/AuthGuard",
+      "@/components/ui/skeleton",
+      "@/components/PushNotificationManager"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/loading.tsx",
+    "kind": "loading.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/layout/PageLoader"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/planner/error.tsx",
+    "kind": "error.tsx",
+    "isClient": true,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/planner/loading.tsx",
+    "kind": "loading.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/ui/skeleton"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/planner/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/planner/RecoveryModePanel"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/mergeTasks"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetTasksQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/reports/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/skeleton"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/hooks/usePageVisibility"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetDailySummaryQuery",
+        "useGetDashboardSummaryQuery",
+        "useGetFocusScoreQuery",
+        "useGetUserStreakQuery",
+        "useGetWeeklyTrendsQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/settings/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/settings/QuietHoursPanel",
+      "@/components/settings/PricingSection",
+      "@/components/settings/LanguageSelector",
+      "@/components/settings/QRAttendance",
+      "@/components/settings/FamilyShareManagement",
+      "@/components/ui/skeleton",
+      "@/components/layout/PageHeader",
+      "@/components/ui/card",
+      "@/components/ui/input",
+      "@/components/ui/label",
+      "@/components/ui/button",
+      "@/components/ui/switch",
+      "@/components/ui/select",
+      "@/components/ui/separator",
+      "@/components/ui/dialog"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useDeleteAccountMutation",
+        "useGetNotificationContextSignalsQuery",
+        "useGetNotificationIntelligenceQuery",
+        "useGetNudgeSettingsQuery",
+        "useGetProfileQuery",
+        "useGetWhatsAppPairingCodeQuery",
+        "useLazyExportAccountDataQuery",
+        "useUnpairWhatsAppMutation",
+        "useUpdateNudgeSettingsMutation",
+        "useUpdateProfileMutation"
+      ],
+      "storeHooks": [],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 4
+    }
+  },
+  {
+    "file": "app/(dashboard)/subjects/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/analytics/GPACalculator",
+      "@/components/analytics/SubjectGradePredictor",
+      "@/components/ui/skeleton",
+      "@/components/ui/dialog"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetCategoriesQuery",
+        "useGetTasksQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/syllabus/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/card",
+      "@/components/ui/label",
+      "@/components/ui/input",
+      "@/components/ui/button",
+      "@/components/ui/select",
+      "@/components/ui/dialog"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useCreateSyllabusEdgeMutation",
+        "useCreateSyllabusTopicMutation",
+        "useDeleteSyllabusEdgeMutation",
+        "useDeleteSyllabusTopicMutation",
+        "useGetCategoriesQuery",
+        "useGetSyllabusEdgesQuery",
+        "useGetSyllabusTopicsQuery",
+        "useUpdateSyllabusTopicMutation"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/syllabus-digitizer/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/planner/NLPCommandBar",
+      "@/components/planner/SyllabusDigitizer"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/tasks/[id]/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/planner/SingleTaskHeader",
+      "@/components/planner/DescriptionCard",
+      "@/components/planner/TaskInfoPanel",
+      "@/components/planner/FocusHistory",
+      "@/components/planner/Attachment",
+      "@/components/planner/StartFocusButton",
+      "@/components/planner/TaskEfficiencyPanel"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/tasks/error.tsx",
+    "kind": "error.tsx",
+    "isClient": true,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/tasks/loading.tsx",
+    "kind": "loading.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/ui/skeleton"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(dashboard)/tasks/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/planner/KanbanBoard",
+      "@/components/planner/TaskList",
+      "@/components/planner/TimetableView",
+      "@/components/planner/TimelineView",
+      "@/components/ui/skeleton",
+      "@/components/SearchBar"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [
+      "@/lib/mergeTasks"
+    ],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetCategoriesQuery",
+        "useGetTasksQuery"
+      ],
+      "storeHooks": [],
+      "routerUsage": true,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 2
+    }
+  },
+  {
+    "file": "app/(pages)/focus-session/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/focus-session/ActiveFocusTimer",
+      "@/components/focus-session/SessionComplete"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(pages)/how-it-work/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/howitwork/HeroSection",
+      "@/components/howitwork/StepOne",
+      "@/components/howitwork/StepTwo",
+      "@/components/howitwork/StepThree",
+      "@/components/howitwork/StepFour",
+      "@/components/howitwork/FinalCTA",
+      "@/components/howitwork/HowItWorkFooter",
+      "@/components/landing/LandingNavbar"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(pages)/privacy/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/(pages)/terms/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/error.tsx",
+    "kind": "error.tsx",
+    "isClient": true,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/family-connect/accept/[token]/page.tsx",
+    "kind": "page.tsx",
+    "isClient": true,
+    "componentImports": [
+      "@/components/ui/skeleton",
+      "@/components/ui/card",
+      "@/components/layout/PageHeader",
+      "@/components/ui/stat-card",
+      "@/components/family-connect/TaskListItem",
+      "@/components/family-connect/HabitListItem",
+      "@/components/ui/button",
+      "@/components/ui/input",
+      "@/components/ui/label"
+    ],
+    "storeImports": [
+      "@repo/store"
+    ],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [
+        "useGetDailySummaryQuery",
+        "useGetHabitsQuery",
+        "useGetTasksQuery",
+        "useResolveFamilyLinkQuery",
+        "useSendMentorFeedbackMutation"
+      ],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": true,
+      "fetch": false,
+      "useEffect": 2
+    }
+  },
+  {
+    "file": "app/layout.tsx",
+    "kind": "layout.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/AppProviders"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/loading.tsx",
+    "kind": "loading.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/layout/PageLoader"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/not-found.tsx",
+    "kind": "not-found.tsx",
+    "isClient": false,
+    "componentImports": [],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  },
+  {
+    "file": "app/page.tsx",
+    "kind": "page.tsx",
+    "isClient": false,
+    "componentImports": [
+      "@/components/landing/LandingNavbar",
+      "@/components/landing/HeroSection",
+      "@/components/landing/WhatsAppAssistant",
+      "@/components/landing/InsightsSection",
+      "@/components/landing/LanguageSection",
+      "@/components/landing/BreakdownSection",
+      "@/components/landing/ProgressSection",
+      "@/components/landing/footer"
+    ],
+    "storeImports": [],
+    "otherAliasImports": [],
+    "effects": {
+      "queryMutationHooks": [],
+      "storeHooks": [],
+      "routerUsage": false,
+      "localStorage": false,
+      "fetch": false,
+      "useEffect": 0
+    }
+  }
+]

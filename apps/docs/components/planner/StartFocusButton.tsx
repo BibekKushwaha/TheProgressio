@@ -3,8 +3,9 @@
 import { Play, Target } from 'lucide-react';
 import { useState } from 'react';
 import DurationSelect from '@/components/ui/DurationSelect';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useGetTasksQuery, TaskStatus, Task } from '@repo/store';
+import { useTaskRouteId } from '@/hooks/useTaskRouteId';
 
 interface StartFocusButtonProps {
     taskId?: string;
@@ -12,10 +13,10 @@ interface StartFocusButtonProps {
 }
 
 export function StartFocusButton({ taskId: propTaskId, isInline = false }: StartFocusButtonProps) {
-    const params = useParams();
+    const routeTaskId = useTaskRouteId();
     const router = useRouter();
     const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-    const taskId = propTaskId || activeTaskId || params?.id as string;
+    const taskId = propTaskId || activeTaskId || routeTaskId;
     const [showTaskSelector, setShowTaskSelector] = useState(false);
 
     const { data: tasks } = useGetTasksQuery({ status: TaskStatus.PENDING });

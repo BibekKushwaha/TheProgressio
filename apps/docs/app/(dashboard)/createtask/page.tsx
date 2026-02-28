@@ -9,6 +9,7 @@ import { MetaChips } from '@/components/createtask/MetaChips';
 import { Edit, GraduationCap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TimePickerInput } from '@/components/ui/time-picker-input';
 import { toast } from 'sonner';
 import {
     useSmartCreateTaskMutation,
@@ -27,6 +28,19 @@ import {
     useGetSubjectsQuery,
     useAppDispatch
 } from '@repo/store';
+
+const EFFORT_OPTIONS = ['30m', '1h', '2h', '4h+'] as const;
+
+const normalizeEffortValue = (value?: string | null): string => {
+    if (!value) return '1h';
+    const normalized = value.trim().toLowerCase();
+    if (normalized === '15m') return '30m';
+    if (normalized === '30m') return '30m';
+    if (normalized === '1h') return '1h';
+    if (normalized === '2h' || normalized === '2h+') return '2h';
+    if (normalized === '3h' || normalized === '4h' || normalized === '4h+' || normalized === '5h+') return '4h+';
+    return '1h';
+};
 
 function CreateTaskPageContent() {
     const router = useRouter();
@@ -79,7 +93,7 @@ function CreateTaskPageContent() {
             else if (existingTask.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
 
             if (existingTask.categoryId) setSelectedSubjectId(existingTask.categoryId);
-            if (existingTask.effort) setSelectedEffort(existingTask.effort);
+            if (existingTask.effort) setSelectedEffort(normalizeEffortValue(existingTask.effort));
 
             if (existingTask.subtasks) {
                 setSubtasks(existingTask.subtasks.map(s => ({
@@ -93,6 +107,7 @@ function CreateTaskPageContent() {
                 const d = new Date(existingTask.dueDate);
                 const apparent = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
                 setParsedDueDate(apparent);
+                setHasExplicitDueDate(true);
             }
             setIsRecurring(Boolean(existingTask.isRecurring));
         }
@@ -101,6 +116,8 @@ function CreateTaskPageContent() {
     const [parseTask, { isLoading: isParsingTask }] = useParseTaskMutation();
     const [parsedMeta, setParsedMeta] = useState<{ subject?: string; date?: string; time?: string }>({});
     const [parsedDueDate, setParsedDueDate] = useState<string | null>(null);
+    const [hasExplicitDueDate, setHasExplicitDueDate] = useState(false);
+    const [isDueDateManuallyEdited, setIsDueDateManuallyEdited] = useState(false);
 
     // Debounced parsing
     useEffect(() => {
@@ -119,14 +136,17 @@ function CreateTaskPageContent() {
                             // Convert real UTC to apparent UTC
                             const d = new Date(result.dueDate);
                             const apparent = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
-                            setParsedDueDate(apparent);
+                            if (!isDueDateManuallyEdited) {
+                                setParsedDueDate(apparent);
+                                setHasExplicitDueDate(true);
+                            }
                         }
 
                         if (result.priority === PriorityEnum.LOW) setSelectedPriority('Routine');
                         else if (result.priority === PriorityEnum.MEDIUM) setSelectedPriority('Medium');
                         else if (result.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
 
-                        if (result.effort) setSelectedEffort(result.effort);
+                        if (result.effort) setSelectedEffort(normalizeEffortValue(result.effort));
                         if (result.isRecurring !== undefined) setIsRecurring(result.isRecurring);
 
                         if (result.subject && categories) {
@@ -145,7 +165,7 @@ function CreateTaskPageContent() {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [taskDescription, parseTask, categories]);
+    }, [taskDescription, parseTask, categories, isDueDateManuallyEdited]);
 
     const handleSaveTask = async () => {
         try {
@@ -190,7 +210,7 @@ function CreateTaskPageContent() {
                     router.push('/exam-warroom');
                 } else {
                     // Schedule Upcoming Exam
-                    if (!parsedDueDate) {
+                    if (!hasExplicitDueDate || !parsedDueDate) {
                         toast.error('Please specify an exam date');
                         return;
                     }
@@ -338,13 +358,19 @@ function CreateTaskPageContent() {
     const dueDateValue = localDateTimeValue ? localDateTimeValue.slice(0, 10) : '';
     const dueTimeValue = localDateTimeValue ? localDateTimeValue.slice(11, 16) : '';
 
-    const updateDueDateTime = (nextDate: string, nextTime: string) => {
-        if (!nextDate) {
+    const updateDueDateTime = (nextDate: string, nextTime: string, dateUpdated = false) => {
+        setIsDueDateManuallyEdited(true);
+        if (!nextDate && !nextTime) {
             setParsedDueDate(null);
+            setHasExplicitDueDate(false);
             return;
         }
-        // Use local system date if none provided, but formatted as YYYY-MM-DD
-        const safeDate = nextDate || new Date().toLocaleDateString('en-CA');
+        if (dateUpdated) {
+            setHasExplicitDueDate(Boolean(nextDate));
+        }
+        // Use local system date if none provided, but formatted as YYYY-MM-DD.
+        // This lets the time picker update immediately even before a date is chosen.
+        const safeDate = nextDate || new Date().toISOString().slice(0, 10);
         const safeTime = nextTime || '00:00';
 
         // Create a local Date object and shift it to "Apparent UTC"
@@ -498,7 +524,7 @@ function CreateTaskPageContent() {
                                         <div className="space-y-2">
                                             <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Effort</Label>
                                             <div className="grid grid-cols-3 gap-2">
-                                                {['30m', '1h', '2h+'].map((effort) => (
+                                                {EFFORT_OPTIONS.map((effort) => (
                                                     <button
                                                         key={effort}
                                                         type="button"
@@ -544,17 +570,16 @@ function CreateTaskPageContent() {
                                                             <Input
                                                                 type="date"
                                                                 value={dueDateValue}
-                                                                onChange={(e) => updateDueDateTime(e.target.value, dueTimeValue)}
+                                                                onChange={(e) => updateDueDateTime(e.target.value, dueTimeValue, true)}
                                                                 className="h-12 bg-white/5 border-white/10"
                                                             />
                                                         </div>
                                                         <div className="space-y-2">
                                                             <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Time</Label>
-                                                            <Input
-                                                                type="time"
+                                                            <TimePickerInput
                                                                 value={dueTimeValue}
-                                                                onChange={(e) => updateDueDateTime(dueDateValue, e.target.value)}
-                                                                className="h-12 bg-white/5 border-white/10"
+                                                                onChange={(nextTime) => updateDueDateTime(dueDateValue, nextTime)}
+                                                                className="h-12 bg-white/5 border-white/10 text-white"
                                                             />
                                                         </div>
                                                     </div>
@@ -692,17 +717,16 @@ function CreateTaskPageContent() {
                                                     <Input
                                                         type="date"
                                                         value={dueDateValue}
-                                                        onChange={(e) => updateDueDateTime(e.target.value, dueTimeValue)}
+                                                        onChange={(e) => updateDueDateTime(e.target.value, dueTimeValue, true)}
                                                         className="h-12 bg-white/5 border-white/10"
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
                                                     <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Time</Label>
-                                                    <Input
-                                                        type="time"
+                                                    <TimePickerInput
                                                         value={dueTimeValue}
-                                                        onChange={(e) => updateDueDateTime(dueDateValue, e.target.value)}
-                                                        className="h-12 bg-white/5 border-white/10"
+                                                        onChange={(nextTime) => updateDueDateTime(dueDateValue, nextTime)}
+                                                        className="h-12 bg-white/5 border-white/10 text-white"
                                                     />
                                                 </div>
                                             </div>

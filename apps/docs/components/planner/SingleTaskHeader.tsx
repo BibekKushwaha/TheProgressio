@@ -3,14 +3,29 @@
 import { ChevronRight, Edit, Flag, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { useGetTaskByIdQuery } from '@repo/store';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useTaskRouteId } from '@/hooks/useTaskRouteId';
 
 export function SingleTaskHeader() {
     const router = useRouter();
-    const { id } = useParams()
-    const taskId = typeof id === 'string' ? id : undefined
-    const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId })
-    if (!taskId) return null
+    const taskId = useTaskRouteId();
+    const { data: task, isLoading } = useGetTaskByIdQuery(taskId || '', { skip: !taskId });
+
+    if (!taskId) {
+        return (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                Invalid task URL. Please open this page from your task list.
+            </div>
+        );
+    }
+
+    if (!isLoading && !task) {
+        return (
+            <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                Task not found. It may have been deleted or is no longer accessible.
+            </div>
+        );
+    }
 
     return (
         <div>

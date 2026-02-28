@@ -1,7 +1,6 @@
 // components/task/TaskInfoPanel.tsx
 'use client'
 import { Calendar, Clock, User } from 'lucide-react';
-import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -11,6 +10,7 @@ import {
     useSetTaskSyllabusTopicsMutation,
 } from '@repo/store';
 import { Button } from '@/components/ui/button';
+import { useTaskRouteId } from '@/hooks/useTaskRouteId';
 
 function formatDueDate(dueDate?: string | null) {
     if (!dueDate) return "No due date";
@@ -62,8 +62,8 @@ function calculateTimeRemaining(dueDate?: string | null) {
 }
 
 export function TaskInfoPanel() {
-    const { id: taskId } = useParams()
-    const { data: task } = useGetTaskByIdQuery(taskId as string)
+    const taskId = useTaskRouteId();
+    const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId });
     const categoryId = task?.categoryId ?? null;
 
     const { data: topicsData } = useGetSyllabusTopicsQuery(

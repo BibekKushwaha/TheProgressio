@@ -39,12 +39,12 @@ export default function TasksPage() {
         const queryTaskId = searchParams.get('taskId');
 
         if (queryCategoryId) {
-            setSelectedCategory(queryCategoryId);
+            setSelectedCategory(String(queryCategoryId));
         } else if (queryCategoryName) {
             const matchedCategory = categories?.find(
                 category => category.name.toLowerCase() === queryCategoryName.toLowerCase()
             );
-            setSelectedCategory(matchedCategory?.id || queryCategoryName);
+            setSelectedCategory(matchedCategory?.id ? String(matchedCategory.id) : queryCategoryName);
         }
 
         if (
@@ -88,7 +88,7 @@ export default function TasksPage() {
             { label: 'Category', value: 'all', color: '#6B7280' },
             ...(categories || []).map((category) => ({
                 label: category.name,
-                value: category.id,
+                value: String(category.id),
                 color: category.colorCode,
             })),
         ],
@@ -119,10 +119,12 @@ export default function TasksPage() {
 
     return (
         <div className="space-y-4 pt-5 md:pt-15 lg:pt-0 ">
-            <div className='hidden md:flex'>
+            <div className='flex'>
             <SearchBar
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                status={status}
+                setStatus={setStatus}
                 priority={priority}
                 setPriority={setPriority}
                 selectedCategory={selectedCategory}

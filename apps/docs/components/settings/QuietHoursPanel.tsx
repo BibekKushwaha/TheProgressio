@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Bell, Moon, Clock, ChevronDown, Sparkles } from 'lucide-react';
 import { useGetNudgeSettingsQuery, useUpdateNudgeSettingsMutation } from '@repo/store';
 import { toast } from 'sonner';
+import { TimePickerInput } from '@/components/ui/time-picker-input';
 
 interface QuietHoursSettings {
     enabled: boolean;
@@ -123,11 +124,10 @@ export function QuietHoursPanel() {
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">From</label>
                                 <div className="relative">
                                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                    <input
-                                        type="time"
+                                    <TimePickerInput
                                         value={settings.startTime}
-                                        onChange={(e) => update('startTime', e.target.value)}
-                                        className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                                        onChange={(nextTime) => update('startTime', nextTime)}
+                                        className="w-full pl-10 bg-white/5 border border-white/10 rounded-xl text-sm text-white"
                                     />
                                 </div>
                             </div>
@@ -135,11 +135,10 @@ export function QuietHoursPanel() {
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">To</label>
                                 <div className="relative">
                                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                    <input
-                                        type="time"
+                                    <TimePickerInput
                                         value={settings.endTime}
-                                        onChange={(e) => update('endTime', e.target.value)}
-                                        className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                                        onChange={(nextTime) => update('endTime', nextTime)}
+                                        className="w-full pl-10 bg-white/5 border border-white/10 rounded-xl text-sm text-white"
                                     />
                                 </div>
                             </div>

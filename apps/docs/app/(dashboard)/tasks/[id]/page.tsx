@@ -36,7 +36,7 @@ export default function TaskDetailsPage() {
             </div>
 
             <div className="sticky bottom-6 z-30">
-                <StartFocusButton />
+                <StartFocusButton isInline />
             </div>
         </div>
     );
