@@ -54,11 +54,6 @@ export default function AnalyticsOverviewPage() {
   } = useGetTaskMetricsQuery(undefined);
 
   // Full task list only for the table render and CSV export.
-  const {
-    data: tasks = [],
-  } = useGetTasksQuery({ page: 1, limit: 50 });
-
-  // Also fetch a larger server task set for accurate merged metrics (keeps payload reasonable)
   const { data: allServerTasks = [] } = useGetTasksQuery({ page: 1, limit: 500 });
 
   // Local (IndexedDB) tasks used to merge with server data (offline / local-only items)
@@ -161,7 +156,7 @@ export default function AnalyticsOverviewPage() {
       [TaskStatus.IN_PROGRESS]: 1,
       [TaskStatus.COMPLETED]: 2,
     };
-    return [...tasks].sort((left, right) => {
+    return [...mergedTasks].sort((left, right) => {
       const leftRank = rank[left.status] ?? 99;
       const rightRank = rank[right.status] ?? 99;
       if (leftRank !== rightRank) return leftRank - rightRank;
@@ -170,7 +165,7 @@ export default function AnalyticsOverviewPage() {
       const rightDue = right.dueDate ? new Date(right.dueDate).getTime() : Number.POSITIVE_INFINITY;
       return leftDue - rightDue;
     });
-  }, [tasks]);
+  }, [mergedTasks]);
 
 
   const handleExportReport = () => {

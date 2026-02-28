@@ -12,7 +12,13 @@ import {
 import { toast } from 'sonner';
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const PUSH_DEBUG_PREFIX = '[PushDebug][Client]';
+
+// Debug logging is stripped in production builds.
+const isDev = process.env.NODE_ENV !== 'production';
+const debugLog = isDev
+    ? (msg: string, data?: Record<string, unknown>) =>
+          console.info(`[PushDebug][Client] ${msg}`, data ?? '')
+    : () => {};
 
 type BackendStatus = 'idle' | 'registering' | 'registered' | 'failed';
 
@@ -57,29 +63,29 @@ export function PushNotificationManager() {
     }, [isSupported, user?.id]);
 
     const ensureRegistration = async (): Promise<ServiceWorkerRegistration> => {
-        console.info(`${PUSH_DEBUG_PREFIX} registering service worker /sw.js`);
+        debugLog('registering service worker /sw.js');
         await navigator.serviceWorker.register('/sw.js', {
             scope: '/',
             updateViaCache: 'none',
         });
         const ready = await navigator.serviceWorker.ready;
-        console.info(`${PUSH_DEBUG_PREFIX} service worker ready`, {
+        debugLog('service worker ready', {
             scope: ready.scope,
-            activeState: ready.active?.state,
+            activeState: ready.active?.state as string | undefined,
         });
         return ready;
     };
 
     const syncSubscriptionToBackend = async (sub: PushSubscription): Promise<boolean> => {
         const subJson = sub.toJSON();
-        console.info(`${PUSH_DEBUG_PREFIX} syncSubscriptionToBackend start`, {
+        debugLog('syncSubscriptionToBackend start', {
             endpoint: maskEndpoint(subJson.endpoint),
-            hasP256dh: Boolean(subJson.keys?.p256dh),
-            hasAuth: Boolean(subJson.keys?.auth),
+            hasP256dh: String(Boolean(subJson.keys?.p256dh)),
+            hasAuth: String(Boolean(subJson.keys?.auth)),
         });
         if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) {
             toast.error('Push subscription is invalid. Please re-enable notifications.');
-            console.warn(`${PUSH_DEBUG_PREFIX} invalid subscription payload before backend sync`);
+            debugLog('invalid subscription payload before backend sync');
             return false;
         }
 
@@ -92,12 +98,12 @@ export function PushNotificationManager() {
             }).unwrap();
             setBackendStatus('registered');
             refetchPushStatus();
-            console.info(`${PUSH_DEBUG_PREFIX} backend subscription saved`, {
+            debugLog('backend subscription saved', {
                 endpoint: maskEndpoint(subJson.endpoint),
             });
             return true;
         } catch (err) {
-            console.error('Failed to register subscription with backend:', err);
+            if (isDev) console.error('Failed to register subscription with backend:', err);
             setBackendStatus('failed');
             return false;
         }
@@ -107,8 +113,8 @@ export function PushNotificationManager() {
         try {
             const registration = await ensureRegistration();
             const existing = await registration.pushManager.getSubscription();
-            console.info(`${PUSH_DEBUG_PREFIX} bootstrap existing subscription`, {
-                exists: Boolean(existing),
+            debugLog('bootstrap existing subscription', {
+                exists: String(Boolean(existing)),
                 endpoint: maskEndpoint(existing?.endpoint),
                 permission: Notification.permission,
             });
@@ -119,7 +125,7 @@ export function PushNotificationManager() {
                 if (ok) return;
             }
         } catch (err) {
-            console.error('Push bootstrap failed:', err);
+            if (isDev) console.error('Push bootstrap failed:', err);
         }
     };
 
@@ -131,11 +137,11 @@ export function PushNotificationManager() {
             }
 
             const initialPermission = Notification.permission;
-            console.info(`${PUSH_DEBUG_PREFIX} subscribe clicked`, { initialPermission });
+            debugLog('subscribe clicked', { initialPermission });
 
             if (initialPermission === 'denied') {
                 toast.error('Notifications blocked — enable in browser settings.');
-                console.warn(`${PUSH_DEBUG_PREFIX} permission denied before request`);
+                debugLog('permission denied before request');
                 return;
             }
 
@@ -143,7 +149,7 @@ export function PushNotificationManager() {
                 ? 'granted'
                 : await Notification.requestPermission();
 
-            console.info(`${PUSH_DEBUG_PREFIX} permission result`, { permission });
+            debugLog('permission result', { permission });
             if (permission !== 'granted') {
                 toast.error('Notifications blocked — enable in browser settings.');
                 return;
@@ -162,9 +168,9 @@ export function PushNotificationManager() {
             const trimmedVapidKey = VAPID_PUBLIC_KEY.trim();
             const isLikelyBase64Url = /^[A-Za-z0-9_-]+$/.test(trimmedVapidKey);
             if (!isLikelyBase64Url || trimmedVapidKey.length < 80) {
-                console.error(`${PUSH_DEBUG_PREFIX} invalid NEXT_PUBLIC_VAPID_PUBLIC_KEY format`, {
-                    length: trimmedVapidKey.length,
-                    base64UrlLike: isLikelyBase64Url,
+                debugLog('invalid NEXT_PUBLIC_VAPID_PUBLIC_KEY format', {
+                    length: String(trimmedVapidKey.length),
+                    base64UrlLike: String(isLikelyBase64Url),
                 });
                 toast.error('Push key is invalid. Contact support.');
                 return;
@@ -175,9 +181,9 @@ export function PushNotificationManager() {
                 applicationServerKey: urlBase64ToUint8Array(trimmedVapidKey),
             });
 
-            console.info(`${PUSH_DEBUG_PREFIX} browser subscription created`, {
+            debugLog('browser subscription created', {
                 endpoint: maskEndpoint(sub.endpoint),
-                expirationTime: sub.expirationTime,
+                expirationTime: String(sub.expirationTime),
             });
 
             setBrowserSubscription(sub);
@@ -185,7 +191,7 @@ export function PushNotificationManager() {
             if (ok) toast.success('Notifications enabled!');
             else toast.error('Subscribed in browser, but backend registration failed. Tap retry.');
         } catch (err) {
-            console.error('Failed to subscribe to push:', err);
+            if (isDev) console.error('Failed to subscribe to push:', err);
             toast.error('Failed to enable notifications');
         }
     }
@@ -200,7 +206,7 @@ export function PushNotificationManager() {
     async function disableNotifications() {
         if (!browserSubscription) return;
         const subJson = browserSubscription.toJSON();
-        console.info(`${PUSH_DEBUG_PREFIX} disable notifications`, {
+        debugLog('disable notifications', {
             endpoint: maskEndpoint(subJson.endpoint),
         });
         try {
@@ -208,13 +214,13 @@ export function PushNotificationManager() {
                 await unsubscribeFromPush({ endpoint: subJson.endpoint }).unwrap();
             }
         } catch (err) {
-            console.warn('Backend unsubscribe failed (continuing):', err);
+            if (isDev) console.warn('Backend unsubscribe failed (continuing):', err);
         }
 
         try {
             await browserSubscription.unsubscribe();
         } catch (err) {
-            console.warn('Browser unsubscribe failed:', err);
+            if (isDev) console.warn('Browser unsubscribe failed:', err);
         }
 
         setBrowserSubscription(null);
@@ -228,7 +234,7 @@ export function PushNotificationManager() {
             const res = await sendPushTest().unwrap();
             toast.success(res.message);
         } catch (err) {
-            console.error('Failed to send test push:', err);
+            if (isDev) console.error('Failed to send test push:', err);
             toast.error('Failed to send test notification');
         }
     }

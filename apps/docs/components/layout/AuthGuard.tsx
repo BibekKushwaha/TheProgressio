@@ -23,6 +23,10 @@ interface AuthGuardProps {
  * 2. Expired-token redirect — the middleware already blocks requests with no
  *    session cookie, so this guard only fires for the uncommon case where a
  *    cookie exists but the API returns 401 (e.g. token expired mid-session).
+ *
+ * When StoreProvider's AuthHydrator has already confirmed the session
+ * (isAuthenticated === true in Redux), the profile query is skipped entirely
+ * so we never fire a duplicate network request or render the loader flash.
  */
 export function AuthGuard({ children }: AuthGuardProps) {
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -30,10 +34,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const router = useRouter();
     const pathname = usePathname();
 
-    const { data, isLoading, isFetching, isSuccess, isError } = useGetProfileQuery();
+    // Skip the API call if AuthHydrator already confirmed the session.
+    const { data, isLoading, isFetching, isSuccess, isError } = useGetProfileQuery(
+        undefined,
+        { skip: isAuthenticated },
+    );
 
     useEffect(() => {
-        // Hydrate auth state when profile query succeeds
+        // Hydrate auth state when profile query succeeds (first load, before AuthHydrator)
         if (isSuccess && data?.user && !isAuthenticated) {
             dispatch(hydrateAuth({ user: data.user }));
             if (typeof window !== "undefined") {
@@ -42,9 +50,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
             return;
         }
 
-        // Redirect when auth fails — token present but invalid/expired
-        if (!isLoading && !isFetching) {
-            if (isError || (!isSuccess && !isAuthenticated)) {
+        // Redirect when auth fails — token present but invalid/expired.
+        // Guard: only act when the query actually ran (skip === false → isAuthenticated === false).
+        if (!isAuthenticated && !isLoading && !isFetching) {
+            if (isError || !isSuccess) {
                 dispatch(logout());
                 if (typeof window !== "undefined") {
                     localStorage.removeItem("auth:hasSession");
@@ -55,18 +64,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
         }
     }, [data, dispatch, isAuthenticated, isError, isFetching, isLoading, isSuccess, router, pathname]);
 
+    // Already confirmed by AuthHydrator — render immediately, no loader.
+    if (isAuthenticated) {
+        return <>{children}</>;
+    }
+
+    // Waiting for the profile query to come back.
     if (isLoading) {
         return <PageLoader title="Verifying session" subtitle="Checking account and permissions..." />;
     }
 
+    // Query returned a valid user — render.
     if (isSuccess && data?.user) {
         return <>{children}</>;
     }
 
-    // Fallback: stay on loader while redirect processes
-    if (!isAuthenticated || isError) {
-        return <PageLoader title="Redirecting to login" subtitle="Your session has expired or is unavailable." />;
-    }
-
-    return <>{children}</>;
+    // Stay on loader while the redirect processes.
+    return <PageLoader title="Redirecting to login" subtitle="Your session has expired or is unavailable." />;
 }

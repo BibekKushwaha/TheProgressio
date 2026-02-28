@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetWeeklyReviewQuery } from "@repo/store";
 import { AlertTriangle, CheckCircle2, Target } from "lucide-react";
+import { formatRelativeDate } from "@/lib/date";
 
 export default function WeeklyReviewPage() {
   const [days, setDays] = useState<string>("7");
@@ -103,7 +104,7 @@ export default function WeeklyReviewPage() {
                   <div className="flex-1">
                     <div className="text-sm text-slate-200 font-medium">{p.title}</div>
                     {p.dueDate && (
-                      <div className="text-xs text-slate-500">Due: {p.dueDate.slice(0, 10)}</div>
+                      <div className="text-xs text-slate-500">Due: {formatRelativeDate(p.dueDate.slice(0, 10))}</div>
                     )}
                   </div>
                 </div>

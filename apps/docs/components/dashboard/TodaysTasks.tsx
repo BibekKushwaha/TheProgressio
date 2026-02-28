@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from 'react';
 import { ChevronRight, Clock, CheckCircle2, Circle } from 'lucide-react';
 import { useGetTasksQuery, useToggleTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
 import Link from 'next/link';
@@ -8,7 +9,7 @@ import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { getApiErrorMessage } from '@/lib/api-error';
 
 export function TodaysTasks() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = useMemo(() => new Date().toISOString().split('T')[0], []);
     const isVisible = usePageVisibility();
     // Task list is kept fresh by tag invalidation on toggle/add mutations.
     // Background polling every 60s when visible covers cross-device updates;
@@ -149,8 +150,8 @@ export function TodaysTasks() {
                         {isLoading ? <Skeleton className="h-4 w-32 bg-white/5" /> : (tasks?.length ? `${tasks.filter(t => t.status === TaskStatus.COMPLETED).length}/${tasks.length} completed` : 'Get started with your goals')}
                     </div>
                 </div>
-                <Link href="/planner" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-all duration-300 font-semibold group">
-                    Planner
+                <Link href="/tasks" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-all duration-300 font-semibold group">
+                    Tasks
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
             </div>
@@ -176,7 +177,7 @@ export function TodaysTasks() {
                 ) : (
                     <div className="text-center py-10 bg-white/[0.02] rounded-xl border border-dashed border-white/10">
                         <p className="text-slate-400 text-sm italic font-medium">No tasks scheduled for today.</p>
-                        <Link href="/planner" className="mt-3 inline-block text-xs bg-purple-500/10 text-purple-400 px-4 py-2 rounded-full hover:bg-purple-500/20 transition-all">
+                        <Link href="/createtask" className="mt-3 inline-block text-xs bg-purple-500/10 text-purple-400 px-4 py-2 rounded-full hover:bg-purple-500/20 transition-all">
                             + Add a task
                         </Link>
                     </div>

@@ -27,15 +27,29 @@ export function MorningBriefing() {
         return 'Wind down with a short evening revision sprint before dinner.';
     })();
 
-    // Compute Top 3 Priority Tasks: overdue first, then by priority + due date
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+    const pendingTasks = (allTasks || []).filter(t => t.status !== 'COMPLETED');
+    const overdueTasks = pendingTasks.filter(t => {
+        if (!t.dueDate) return false;
+        return new Date(t.dueDate).getTime() < startOfToday.getTime();
+    });
+    const dueTodayTasks = pendingTasks.filter(t => {
+        if (!t.dueDate) return false;
+        const due = new Date(t.dueDate).getTime();
+        return due >= startOfToday.getTime() && due < endOfToday.getTime();
+    });
+    const upcomingTasks = pendingTasks.filter(t => {
+        if (!t.dueDate) return false;
+        return new Date(t.dueDate).getTime() >= endOfToday.getTime();
+    });
+
+    // Compute Top 3 Priority Tasks: due today first, then upcoming (never include overdue)
     const priorityOrder: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-    const top3Tasks = (allTasks || [])
-        .filter(t => t.status !== 'COMPLETED')
+    const top3Tasks = [...dueTodayTasks, ...upcomingTasks]
         .sort((a, b) => {
-            const now = Date.now();
-            const aOverdue = a.dueDate && new Date(a.dueDate).getTime() < now ? -1 : 0;
-            const bOverdue = b.dueDate && new Date(b.dueDate).getTime() < now ? -1 : 0;
-            if (aOverdue !== bOverdue) return aOverdue - bOverdue;
             const aPri = priorityOrder[a.priority] ?? 3;
             const bPri = priorityOrder[b.priority] ?? 3;
             if (aPri !== bPri) return aPri - bPri;
@@ -74,6 +88,13 @@ export function MorningBriefing() {
                         <ChevronRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                     </Link>
                 )}
+                {overdueTasks.length > 0 && (
+                    <Link href="/planner" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors group">
+                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                        <span><strong>{overdueTasks.length}</strong> overdue task{overdueTasks.length > 1 ? 's' : ''}</span>
+                        <ChevronRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                )}
                 {briefing.habitsToComplete > 0 && (
                     <Link href="/habits" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors group">
                         <Flame className="w-4 h-4 text-green-400 shrink-0" />
@@ -107,7 +128,7 @@ export function MorningBriefing() {
                 <div className="mt-4 pt-3 border-t border-white/10">
                     <div className="flex items-center gap-2 mb-2">
                         <Zap className="w-4 h-4 text-amber-400" />
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Today&apos;s Top 3</p>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Top 3 upcoming</p>
                     </div>
                     <div className="space-y-1.5">
                         {top3Tasks.map((task, i) => (

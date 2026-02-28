@@ -52,3 +52,33 @@ export function apiErrorMessageIncludes(error: unknown, pattern: string): boolea
     const message = getApiErrorMessage(error, '').toLowerCase();
     return message.includes(pattern.toLowerCase());
 }
+
+/**
+ * Convenience helper for mutation catch blocks.
+ *
+ * Shows a `sonner` toast with the extracted error message and, in development
+ * only, logs the raw error to the console.
+ *
+ * Usage:
+ *   ```ts
+ *   import { toast } from 'sonner';
+ *   import { handleMutationError } from '@/lib/api-error';
+ *
+ *   try {
+ *     await doSomething().unwrap();
+ *   } catch (err) {
+ *     handleMutationError(err, toast.error, 'Failed to save');
+ *   }
+ *   ```
+ */
+export function handleMutationError(
+    error: unknown,
+    toastError: (message: string) => void,
+    fallback = 'Something went wrong',
+): void {
+    if (process.env.NODE_ENV !== 'production') {
+        console.error('[mutation error]', error);
+    }
+    toastError(getApiErrorMessage(error, fallback));
+}
+

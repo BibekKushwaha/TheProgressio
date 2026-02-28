@@ -67,7 +67,7 @@ export function StatCard({
                         {description && <Skeleton className="h-3 w-24" />}
                     </div>
                 </div>
-                <Skeleton className={cn("w-full rounded-lg bg-white/5", loadingHeight)} />
+                <Skeleton className={cn("w-full rounded-lg bg-white/5", className?.includes('flex-col') ? "flex-1" : loadingHeight)} />
             </div>
         );
     }

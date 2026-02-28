@@ -730,41 +730,41 @@ export const analyticsApi = createApi({
                 const rawSwot = response.swot;
                 const normalizedSwot: FullSWOT | undefined = rawSwot
                     ? {
-                          examType: rawSwot.examType,
-                          overallReadiness: rawSwot.overallReadiness ?? 0,
-                          topPriorityChapters: (rawSwot.topPriorityChapters || []).map(
-                              (c: any) => (typeof c === 'string' ? c : c.chapter)
-                          ),
-                          subjects: (rawSwot.subjects || []).map((sub: any) => ({
-                              subject: sub.subject,
-                              strengths: (sub.strengths || []).map((item: any) => ({
-                                  chapter: item.chapter,
-                                  score: item.score ?? item.successRate ?? 0,
-                              })),
-                              weaknesses: (sub.weaknesses || []).map((item: any) => ({
-                                  chapter: item.chapter,
-                                  score: item.score ?? item.successRate ?? 0,
-                              })),
-                              opportunities: (sub.opportunities || []).map((item: any) => ({
-                                  chapter: item.chapter,
-                                  score: item.score ?? item.successRate ?? 0,
-                                  reason:
-                                      item.reason ??
-                                      (item.avgTimePerQuestion > 0
-                                          ? `Avg time/question: ${item.avgTimePerQuestion} mins`
-                                          : 'Moderate score with room for improvement'),
-                              })),
-                              threats: (sub.threats || []).map((item: any) => ({
-                                  chapter: item.chapter,
-                                  score: item.score ?? item.successRate ?? 0,
-                                  reason:
-                                      item.reason ??
-                                      (item.avgTimePerQuestion > 0
-                                          ? `Low score and avg time/question: ${item.avgTimePerQuestion} mins`
-                                          : 'Low score needs immediate attention'),
-                              })),
-                          })),
-                      }
+                        examType: rawSwot.examType,
+                        overallReadiness: rawSwot.overallReadiness ?? 0,
+                        topPriorityChapters: (rawSwot.topPriorityChapters || []).map(
+                            (c: any) => (typeof c === 'string' ? c : c.chapter)
+                        ),
+                        subjects: (rawSwot.subjects || []).map((sub: any) => ({
+                            subject: sub.subject,
+                            strengths: (sub.strengths || []).map((item: any) => ({
+                                chapter: item.chapter,
+                                score: item.score ?? item.successRate ?? 0,
+                            })),
+                            weaknesses: (sub.weaknesses || []).map((item: any) => ({
+                                chapter: item.chapter,
+                                score: item.score ?? item.successRate ?? 0,
+                            })),
+                            opportunities: (sub.opportunities || []).map((item: any) => ({
+                                chapter: item.chapter,
+                                score: item.score ?? item.successRate ?? 0,
+                                reason:
+                                    item.reason ??
+                                    (item.avgTimePerQuestion > 0
+                                        ? `Avg time/question: ${item.avgTimePerQuestion} mins`
+                                        : 'Moderate score with room for improvement'),
+                            })),
+                            threats: (sub.threats || []).map((item: any) => ({
+                                chapter: item.chapter,
+                                score: item.score ?? item.successRate ?? 0,
+                                reason:
+                                    item.reason ??
+                                    (item.avgTimePerQuestion > 0
+                                        ? `Low score and avg time/question: ${item.avgTimePerQuestion} mins`
+                                        : 'Low score needs immediate attention'),
+                            })),
+                        })),
+                    }
                     : rawSwot;
 
                 return {

@@ -1,20 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
 import { User, Bell, Lock, Palette, Loader2, Moon, Wifi, MessageSquare, Smartphone, CreditCard, Clock, QrCode, Languages } from "lucide-react";
 import {
-    isAIAssistanceDisabled,
-    setAIAssistanceDisabled,
-    useDeleteAccountMutation,
-    useLazyExportAccountDataQuery,
-    useGetProfileQuery,
-    useUpdateProfileMutation,
-    useGetNudgeSettingsQuery,
-    useUpdateNudgeSettingsMutation,
     useGetNotificationIntelligenceQuery,
     useGetNotificationContextSignalsQuery,
-    useGetWhatsAppPairingCodeQuery,
-    useUnpairWhatsAppMutation,
     NotificationSettings,
 } from "@repo/store";
 import { QuietHoursPanel } from "@/components/settings/QuietHoursPanel";
@@ -37,7 +26,11 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useWhatsAppPairingController } from '@/hooks/useWhatsAppPairingController';
+import { useNotificationSettingsController } from '@/hooks/useNotificationSettingsController';
+import { useAccountSettingsController } from '@/hooks/useAccountSettingsController';
+import { usePrivacySettingsController } from '@/hooks/usePrivacySettingsController';
+import { useDeleteAccountDialogController } from '@/hooks/useDeleteAccountDialogController';
 
 type BucketKey = keyof NotificationSettings['enabledBuckets'];
 
@@ -51,165 +44,54 @@ const NOTIFICATION_BUCKETS: Array<{ key: BucketKey; title: string; description: 
 
 export default function SettingsPage() {
     const { theme, setTheme } = useTheme();
-    const router = useRouter();
-    const { data: profileData, isLoading: isProfileLoading } = useGetProfileQuery();
-    const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation();
-    const { data: nudgeSettingsData } = useGetNudgeSettingsQuery();
-    const [updateNudgeSettings, { isLoading: isUpdatingNudgeSettings }] = useUpdateNudgeSettingsMutation();
+    const {
+        user,
+        dailyGoalHours,
+        isProfileLoading,
+        isUpdating,
+        isExporting,
+        isDeleting,
+        profileFields,
+        setProfileFields,
+        handleDailyGoalChange,
+        handleProfileUpdate,
+        handleExport,
+        handleDeleteAccount,
+    } = useAccountSettingsController();
+    const {
+        nudgeSettings,
+        isUpdatingNudgeSettings,
+        preDeadlineSelectValue,
+        streakReminderSelectValue,
+        toggleBucket,
+        toggleGroupedSummaries,
+        togglePositiveTone,
+        handlePreDeadlineChange,
+        handleStreakReminderChange,
+    } = useNotificationSettingsController();
     const { data: intelligenceData } = useGetNotificationIntelligenceQuery();
     const { data: contextSignals } = useGetNotificationContextSignalsQuery({ locationTag: "CAMPUS", motionState: "WALKING", brightness: 0.7 });
-    const [isPairingPolling, setIsPairingPolling] = useState(true);
-    const [isPageVisible, setIsPageVisible] = useState(true);
-    const { data: pairingData, isLoading: isPairingLoading, refetch: refetchPairing } = useGetWhatsAppPairingCodeQuery(undefined, {
-        // Avoid noisy background polling; check occasionally while the tab is visible.
-        pollingInterval: isPairingPolling && isPageVisible ? 30000 : 0,
-        refetchOnMountOrArgChange: true,
-    });
-    const [unpairWhatsApp, { isLoading: isUnpairing }] = useUnpairWhatsAppMutation();
-    const [triggerExport, { isFetching: isExporting }] = useLazyExportAccountDataQuery();
-    const [deleteAccount, { isLoading: isDeleting }] = useDeleteAccountMutation();
-    const [aiDisabled, setAiDisabled] = useState(false);
-    const [deleteOpen, setDeleteOpen] = useState(false);
-    const [deleteConfirmText, setDeleteConfirmText] = useState("");
-
-    // Stop polling once the WhatsApp number is verified
-    useEffect(() => {
-        if (pairingData?.verified) setIsPairingPolling(false);
-    }, [pairingData?.verified]);
-
-    // Pause pairing polling when the tab is in the background.
-    useEffect(() => {
-        const onVisibilityChange = () => setIsPageVisible(!document.hidden);
-        onVisibilityChange();
-        document.addEventListener("visibilitychange", onVisibilityChange);
-        return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-    }, []);
-
-    useEffect(() => {
-        setAiDisabled(isAIAssistanceDisabled());
-    }, []);
-
-    const whatsAppBotNumber = process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER;
-    const whatsAppBotNumberDigits = whatsAppBotNumber ? whatsAppBotNumber.replace(/[^\d]/g, "") : "";
-    const whatsAppPairingLink =
-        whatsAppBotNumberDigits && pairingData?.pairingCode
-            ? `https://wa.me/${whatsAppBotNumberDigits}?text=${encodeURIComponent(pairingData.pairingCode)}`
-            : null;
-
-    const user = profileData?.user;
-    const nudgeSettings = nudgeSettingsData?.settings;
-    const preDeadlineSelectValue = `${nudgeSettings?.preDeadlineDays ?? 2} ${((nudgeSettings?.preDeadlineDays ?? 2) === 1) ? "day" : "days"}`;
-    const streakReminderSelectValue = (() => {
-        const value = nudgeSettings?.streakReminderTime ?? "09:00";
-        if (value === "08:00") return "8:00 AM";
-        if (value === "18:00") return "6:00 PM";
-        return "9:00 AM";
-    })();
-
-    const handleDailyGoalChange = async (val: string) => {
-        const value = parseFloat(val.split(" ")[0] || "4");
-        try {
-            await updateProfile({ dailyGoalHours: value }).unwrap();
-            toast.success(`Daily goal updated to ${value} hours`);
-        } catch (error) {
-            console.error("Failed to update daily goal:", error);
-            toast.error("Failed to update daily goal");
-        }
-    };
-
-    const [profileFields, setProfileFields] = React.useState({
-        username: "",
-        email: ""
-    });
-
-    useEffect(() => {
-        if (user) {
-            setProfileFields({
-                username: user.username,
-                email: user.email
-            });
-        }
-    }, [user]);
-
-    const handleProfileUpdate = async () => {
-        try {
-            await updateProfile(profileFields).unwrap();
-            toast.success("Profile updated successfully");
-        } catch (error) {
-            console.error("Failed to update profile:", error);
-            toast.error("Failed to update profile");
-        }
-    };
-
-    const handleExport = async () => {
-        try {
-            const result = await triggerExport().unwrap();
-            const exportedAt = result.export?.exportedAt || new Date().toISOString();
-            const filename = `account_export_${exportedAt.slice(0, 10)}.json`;
-
-            const blob = new Blob([JSON.stringify(result.export, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-            toast.success("Export downloaded");
-        } catch (error) {
-            console.error("Export failed:", error);
-            toast.error("Failed to export data");
-        }
-    };
-
-    const handleDeleteAccount = async () => {
-        try {
-            await deleteAccount({ confirm: deleteConfirmText }).unwrap();
-            toast.success("Account deleted");
-            router.push("/login");
-        } catch (error) {
-            console.error("Delete account failed:", error);
-            toast.error("Failed to delete account");
-        }
-    };
-
-    const copyPairingCode = () => {
-        if (pairingData?.pairingCode) {
-            navigator.clipboard.writeText(pairingData.pairingCode);
-            toast.success("Pairing code copied to clipboard");
-        }
-    };
-
-    const handlePreDeadlineChange = async (value: string) => {
-        const match = value.match(/^([1-3])\sday(s)?$/);
-        const days = Number(match?.[1] ?? "2") as 1 | 2 | 3;
-        const timezoneOffsetMinutes = new Date().getTimezoneOffset();
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-        try {
-            await updateNudgeSettings({ preDeadlineDays: days, timezone, timezoneOffsetMinutes }).unwrap();
-            toast.success("Pre-deadline reminder updated");
-        } catch (_error) {
-            toast.error("Failed to update pre-deadline reminder");
-        }
-    };
-
-    const handleStreakReminderChange = async (value: string) => {
-        const mapping: Record<string, string> = {
-            "8:00 AM": "08:00",
-            "9:00 AM": "09:00",
-            "6:00 PM": "18:00",
-        };
-        const reminderTime = mapping[value] ?? "09:00";
-        const timezoneOffsetMinutes = new Date().getTimezoneOffset();
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-        try {
-            await updateNudgeSettings({ streakReminderTime: reminderTime, timezone, timezoneOffsetMinutes }).unwrap();
-            toast.success("Streak reminder time updated");
-        } catch (_error) {
-            toast.error("Failed to update streak reminder time");
-        }
-    };
+    const {
+        pairingData,
+        isPairingLoading,
+        isUnpairing,
+        whatsAppBotNumber,
+        whatsAppPairingLink,
+        copyPairingCode,
+        refreshPairing,
+        unpair,
+    } = useWhatsAppPairingController();
+    const { aiDisabled, toggleAiAssistance } = usePrivacySettingsController();
+    const {
+        deleteOpen,
+        setDeleteOpen,
+        deleteConfirmText,
+        setDeleteConfirmText,
+        canConfirmDelete,
+        openDeleteDialog,
+        closeDeleteDialog,
+        confirmDelete,
+    } = useDeleteAccountDialogController({ onDelete: handleDeleteAccount });
 
     if (isProfileLoading) {
         return (
@@ -322,7 +204,7 @@ export default function SettingsPage() {
                             {isUpdating && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />}
                             <div className="w-[140px]">
                                 <Select
-                                    value={`${user?.dailyGoalHours || 4} hours`}
+                                    value={`${dailyGoalHours} hours`}
                                     onValueChange={handleDailyGoalChange}
                                     disabled={isUpdating}
                                 >
@@ -384,26 +266,7 @@ export default function SettingsPage() {
                             </div>
                             <Switch
                                 checked={Boolean(nudgeSettings?.enabledBuckets?.[item.key])}
-                                onCheckedChange={async (checked) => {
-                                    try {
-                                        await updateNudgeSettings({
-                                            enabledBuckets: {
-                                                ...(nudgeSettings?.enabledBuckets ?? {
-                                                    URGENCY_DRIVEN: true,
-                                                    MORNING_BRIEFING: true,
-                                                    BEHAVIORAL_NUDGE: true,
-                                                    ADVANCE_ALERT_3WEEK: true,
-                                                    TRANSACTION_SYSTEM: true,
-                                                }),
-                                                [item.key]: checked,
-                                            },
-                                        }).unwrap();
-                                        toast.success("Notification setting updated");
-                                    } catch (error) {
-                                        console.error("Failed to update notification bucket setting:", error);
-                                        toast.error("Failed to update setting");
-                                    }
-                                }}
+                                onCheckedChange={(checked) => toggleBucket(item.key, checked)}
                             />
                         </div>
                     ))}
@@ -413,30 +276,14 @@ export default function SettingsPage() {
                             <Label className="text-sm text-slate-300">Grouped summaries / digests</Label>
                             <Switch
                                 checked={Boolean(nudgeSettings?.groupedSummaries)}
-                                onCheckedChange={async (checked) => {
-                                    try {
-                                        await updateNudgeSettings({ groupedSummaries: checked }).unwrap();
-                                        toast.success("Digest settings updated");
-                                    } catch (error) {
-                                        console.error("Failed to update grouped summaries:", error);
-                                        toast.error("Failed to update setting");
-                                    }
-                                }}
+                                onCheckedChange={toggleGroupedSummaries}
                             />
                         </div>
                         <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
                             <Label className="text-sm text-slate-300">Positive motivation tone</Label>
                             <Switch
                                 checked={Boolean(nudgeSettings?.positiveTone)}
-                                onCheckedChange={async (checked) => {
-                                    try {
-                                        await updateNudgeSettings({ positiveTone: checked }).unwrap();
-                                        toast.success("Motivation tone updated");
-                                    } catch (error) {
-                                        console.error("Failed to update positive tone setting:", error);
-                                        toast.error("Failed to update setting");
-                                    }
-                                }}
+                                onCheckedChange={togglePositiveTone}
                             />
                         </div>
                     </div>
@@ -562,7 +409,7 @@ export default function SettingsPage() {
                                 variant="outline"
                                 size="sm"
                                 className="w-full text-xs border-white/10 text-slate-400 hover:text-slate-200"
-                                onClick={() => refetchPairing()}
+                                onClick={refreshPairing}
                                 disabled={isPairingLoading}
                             >
                                 {isPairingLoading ? "Checking..." : "Refresh Pairing Status"}
@@ -578,16 +425,7 @@ export default function SettingsPage() {
                             <Button
                                 variant="ghost"
                                 className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-                                onClick={async () => {
-                                    try {
-                                        await unpairWhatsApp().unwrap();
-                                        setIsPairingPolling(true);  // resume polling so new pairing code is detected
-                                        await refetchPairing();
-                                        toast.success("WhatsApp account unpaired");
-                                    } catch (_err) {
-                                        toast.error("Failed to unpair WhatsApp");
-                                    }
-                                }}
+                                onClick={unpair}
                                 disabled={isUnpairing}
                             >
                                 {isUnpairing ? "Unpairing..." : "Unpair"}
@@ -716,12 +554,7 @@ export default function SettingsPage() {
                         </div>
                         <Switch
                             checked={!aiDisabled}
-                            onCheckedChange={(checked) => {
-                                const nextDisabled = !checked;
-                                setAiDisabled(nextDisabled);
-                                setAIAssistanceDisabled(nextDisabled);
-                                toast.success(nextDisabled ? "AI assistance disabled" : "AI assistance enabled");
-                            }}
+                            onCheckedChange={toggleAiAssistance}
                         />
                     </div>
 
@@ -738,10 +571,7 @@ export default function SettingsPage() {
                         <Button
                             variant="destructive"
                             className="bg-red-600 hover:bg-red-700"
-                            onClick={() => {
-                                setDeleteConfirmText("");
-                                setDeleteOpen(true);
-                            }}
+                            onClick={openDeleteDialog}
                         >
                             Delete Account
                         </Button>
@@ -773,18 +603,15 @@ export default function SettingsPage() {
                         <Button
                             variant="outline"
                             className="border-white/10 hover:bg-white/5"
-                            onClick={() => setDeleteOpen(false)}
+                            onClick={closeDeleteDialog}
                         >
                             Cancel
                         </Button>
                         <Button
                             variant="destructive"
                             className="bg-red-600 hover:bg-red-700"
-                            disabled={isDeleting || deleteConfirmText.trim() !== "DELETE"}
-                            onClick={async () => {
-                                await handleDeleteAccount();
-                                setDeleteOpen(false);
-                            }}
+                            disabled={isDeleting || !canConfirmDelete}
+                            onClick={confirmDelete}
                         >
                             {isDeleting ? "Deleting..." : "Delete"}
                         </Button>

@@ -28,9 +28,9 @@ export function GPACalculator() {
         semester: '',
     });
     const [components, setComponents] = useState([
-        { name: 'Assignment', weight: '30', obtainedMarks: '0', totalMarks: '100' },
-        { name: 'Midterm', weight: '30', obtainedMarks: '0', totalMarks: '100' },
-        { name: 'Final', weight: '40', obtainedMarks: '0', totalMarks: '100' },
+        { name: 'Assignment', weight: '', obtainedMarks: '', totalMarks: '' },
+        { name: 'Midterm', weight: '', obtainedMarks: '', totalMarks: '' },
+        { name: 'Final', weight: '', obtainedMarks: '', totalMarks: '' },
     ]);
     const [componentScale, setComponentScale] = useState<'INDIA_10' | 'US_4' | 'PERCENTAGE'>('INDIA_10');
 

@@ -4,7 +4,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { NotificationCenter } from '@/components/habit/NotificationCenter';
 import { useAppSelector, useGetNudgesQuery, Nudge, useGetUserXPQuery } from '@repo/store';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { TimetableView } from '../planner/TimetableView';
@@ -20,12 +20,12 @@ export function WelcomeHeader() {
     const { data: xpData } = useGetUserXPQuery();
     const xp = xpData?.xp;
 
-    const today = new Date().toLocaleDateString('en-US', {
+    const today = useMemo(() => new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-    });
+    }), []);
 
     return (
         <PageHeader

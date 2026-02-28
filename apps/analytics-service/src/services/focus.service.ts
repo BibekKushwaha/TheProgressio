@@ -128,10 +128,10 @@ export async function computeFocusScore(
           AND  al."startTime" <  ${end}
     `;
 
-    const totalSessions   = Number(agg?.total_sessions   ?? 0);
-    const totalMinutes    = Number(agg?.total_minutes     ?? 0);
-    const activeDaysCount = Number(agg?.active_days       ?? 0);
-    const deepWorkCount   = Number(agg?.deep_work_count   ?? 0);
+    const totalSessions = Number(agg?.total_sessions ?? 0);
+    const totalMinutes = Number(agg?.total_minutes ?? 0);
+    const activeDaysCount = Number(agg?.active_days ?? 0);
+    const deepWorkCount = Number(agg?.deep_work_count ?? 0);
 
     if (totalSessions === 0) {
         const empty: FocusScoreResult = {
@@ -144,10 +144,10 @@ export async function computeFocusScore(
     }
 
     const consistencyScore = (activeDaysCount / 7) * 40;
-    const avgHoursPerDay   = (totalMinutes / 60) / 7;
-    const intensityScore   = Math.min(30, (avgHoursPerDay / dailyGoalHours) * 30);
-    const depthScore       = (deepWorkCount / totalSessions) * 30;
-    const score            = Math.min(100, Math.round(consistencyScore + intensityScore + depthScore));
+    const avgHoursPerDay = (totalMinutes / 60) / 7;
+    const intensityScore = Math.min(30, (avgHoursPerDay / dailyGoalHours) * 30);
+    const depthScore = (deepWorkCount / totalSessions) * 30;
+    const score = Math.min(100, Math.round(consistencyScore + intensityScore + depthScore));
 
     const result: FocusScoreResult = {
         score,
@@ -298,8 +298,8 @@ export async function detectPeakProductivity(userId: string, days: number = 30):
     for (const row of hourRows) {
         const h = row.hour;
         if (h >= 0 && h < 24) {
-            hourBuckets[h]!.totalMins    = Number(row.total_mins);
-            hourBuckets[h]!.count        = Number(row.session_count);
+            hourBuckets[h]!.totalMins = Number(row.total_mins);
+            hourBuckets[h]!.count = Number(row.session_count);
             hourBuckets[h]!.deepWorkCount = Number(row.deep_work_count);
         }
     }
@@ -379,10 +379,11 @@ export async function getPredictivePerformance(
     // Group by subject
     const subjectMap = new Map<string, typeof entries>();
     for (const entry of entries) {
-        if (!subjectMap.has(entry.subjectName)) {
-            subjectMap.set(entry.subjectName, []);
+        const name = entry.subjectName.trim();
+        if (!subjectMap.has(name)) {
+            subjectMap.set(name, []);
         }
-        subjectMap.get(entry.subjectName)!.push(entry);
+        subjectMap.get(name)!.push(entry);
     }
 
     // Build the per-subject input arrays and hand off to the simulation service.

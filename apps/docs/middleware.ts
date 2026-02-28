@@ -3,9 +3,9 @@ import type { NextRequest } from 'next/server';
 
 /**
  * Routes that require an authenticated session.
- * The proxy does a fast cookie-presence check so unauthenticated
- * users are redirected before any page bundle is sent to the browser,
- * eliminating the "Verifying session" flash.
+ * Fast cookie-presence check at the edge so unauthenticated users are
+ * redirected before any page bundle is sent to the browser, eliminating
+ * the "Verifying session" flash.
  *
  * AuthGuard still runs inside these pages and performs the real API-level
  * validity check (handles token expiry, account suspension, etc.).
@@ -33,7 +33,7 @@ const PROTECTED_PREFIXES = [
  */
 const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password'];
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const token = request.cookies.get('token')?.value;
 

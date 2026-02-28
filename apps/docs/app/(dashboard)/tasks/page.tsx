@@ -1,14 +1,15 @@
 "use client"
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { KanbanBoard } from '@/components/planner/KanbanBoard';
 import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
 import { TimelineView } from '@/components/planner/TimelineView';
-import { TaskStatus, useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
+import { useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mergeTaskSources } from '@/lib/mergeTasks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SearchBar } from '@/components/SearchBar';
+import { useHighlightedTaskScroll, useTaskQuerySyncFromUrl } from '@/hooks/useTasksPageRouting';
 
 export default function TasksPage() {
     const router = useRouter();
@@ -32,56 +33,24 @@ export default function TasksPage() {
         [allTasks, cachedTasks]
     );
 
-    useEffect(() => {
-        const queryCategoryId = searchParams.get('categoryId');
-        const queryCategoryName = searchParams.get('category');
-        const queryStatus = searchParams.get('status');
-        const queryTaskId = searchParams.get('taskId');
+    useTaskQuerySyncFromUrl({
+        searchParams,
+        categories,
+        setSelectedCategory,
+        setStatus,
+        setFocusedTaskId,
+        setView,
+    });
 
-        if (queryCategoryId) {
-            setSelectedCategory(String(queryCategoryId));
-        } else if (queryCategoryName) {
-            const matchedCategory = categories?.find(
-                category => category.name.toLowerCase() === queryCategoryName.toLowerCase()
-            );
-            setSelectedCategory(matchedCategory?.id ? String(matchedCategory.id) : queryCategoryName);
-        }
-
-        if (
-            queryStatus &&
-            (queryStatus === TaskStatus.PENDING ||
-                queryStatus === TaskStatus.IN_PROGRESS ||
-                queryStatus === TaskStatus.COMPLETED ||
-                queryStatus === 'all')
-        ) {
-            setStatus(queryStatus);
-        }
-
-        if (queryTaskId) {
-            setFocusedTaskId(queryTaskId);
-            setView('list');
-        }
-    }, [searchParams, categories]);
-
-    useEffect(() => {
-        if (!focusedTaskId || view !== 'list') return;
-
-        const scrollToTarget = () => {
-            const element = document.getElementById(`task-card-${focusedTaskId}`);
-            if (!element) return;
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            if (highlightedTaskId) {
-                const params = new URLSearchParams(searchParams.toString());
-                params.delete('taskId');
-                const next = params.toString();
-                router.replace(next ? `${pathname}?${next}` : pathname);
-            }
-        };
-
-        const timeoutId = window.setTimeout(scrollToTarget, 120);
-        return () => window.clearTimeout(timeoutId);
-    }, [focusedTaskId, highlightedTaskId, view, tasks.length, pathname, router, searchParams]);
+    useHighlightedTaskScroll({
+        focusedTaskId,
+        highlightedTaskId,
+        view,
+        tasksLength: tasks.length,
+        pathname,
+        router,
+        searchParams,
+    });
 
     const categoryOptions = useMemo(
         () => [

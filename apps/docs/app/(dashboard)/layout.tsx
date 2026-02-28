@@ -26,9 +26,14 @@ export default function DashboardLayout({
     return (
         <AuthGuard>
             <div className="min-h-screen bg-slate-950 text-white selection:bg-indigo-500/30 overflow-x-hidden">
-                <div className="fixed inset-0 z-0 pointer-events-none">
-                    <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[100px]" />
-                    <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-violet-500/5 rounded-full blur-[120px]" />
+                {/*
+                  * Decorative ambient orbs.
+                  * `will-change-transform` promotes each to its own GPU compositing layer
+                  * so their blur does not trigger a full-page repaint on scroll.
+                  */}
+                <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true">
+                    <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[100px] will-change-transform" />
+                    <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-violet-500/5 rounded-full blur-[120px] will-change-transform" />
                 </div>
 
                 <Sidebar />
