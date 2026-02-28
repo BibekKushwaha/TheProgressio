@@ -61,7 +61,7 @@ async function safeDeleteUserCache(userId: string): Promise<void> {
 // import { publishToTopic } from "../producer.js";
 // import { redisClient } from "../index.js";
 
-const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "1h";
+const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "15s";
 const MOBILE_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.MOBILE_REFRESH_TOKEN_DAYS ?? "30", 10);
 
 const COOKIE_OPTIONS = {

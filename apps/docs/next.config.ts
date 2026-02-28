@@ -49,6 +49,17 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  experimental: {
+    // Tree-shake icon / component libraries that use barrel-file exports
+    // so only the symbols actually imported end up in the JS bundle.
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+      "framer-motion",
+      "date-fns",
+      "radix-ui",
+    ],
+  },
   async headers() {
     return [
       {

@@ -20,13 +20,22 @@ export function PredictiveScoreCard({ initialData, examType }: PredictiveScoreCa
         skip: !shouldInferExamType,
     });
     const inferredExamType = useMemo(() => entriesData?.entries?.[0]?.examType?.trim(), [entriesData?.entries]);
-    const activeExamType = normalizedExamType || inferredExamType;
+    const activeExamType = normalizedExamType || inferredExamType || 'JEE';
 
-    const { data, isLoading } = useGetPredictivePerformanceQuery(activeExamType ?? 'JEE', {
-        skip: !!initialData || !activeExamType,
+    const { data, isLoading } = useGetPredictivePerformanceQuery(activeExamType, {
+        skip: !!initialData,
     });
-    const subjects = initialData ?? data?.data ?? [];
-
+    const subjects = useMemo(() => {
+        const rawSubjects = initialData ?? data?.data ?? [];
+        const unique = new Map<string, LearningPace>();
+        rawSubjects.forEach(s => {
+            const name = s.subjectName.trim();
+            if (!unique.has(name)) {
+                unique.set(name, s);
+            }
+        });
+        return Array.from(unique.values());
+    }, [initialData, data?.data]);
     if (isLoading || (shouldInferExamType && isLoadingEntries)) {
         return (
             <StatCard
@@ -36,8 +45,8 @@ export function PredictiveScoreCard({ initialData, examType }: PredictiveScoreCa
                 iconColor="text-white"
                 iconBgColor="bg-gradient-to-br from-emerald-500 to-teal-500"
                 isLoading={true}
-                loadingHeight="h-64"
                 variant="default"
+                className="h-[500px] flex flex-col"
             />
         );
     }
@@ -56,6 +65,7 @@ export function PredictiveScoreCard({ initialData, examType }: PredictiveScoreCa
                         : "Add grade entries to see predictive scores based on your learning pace."
                 }
                 variant="default"
+                className="h-[500px] flex flex-col items-center justify-center"
             />
         );
     }
@@ -68,12 +78,15 @@ export function PredictiveScoreCard({ initialData, examType }: PredictiveScoreCa
             iconColor="text-white"
             iconBgColor="bg-gradient-to-br from-emerald-500 to-teal-500"
             variant="default"
+            className="h-[500px] flex flex-col"
         >
-            <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                Model {data?.modelVersion ?? 'unknown'} • subject confidence labels are shown per row
-            </div>
+            {!initialData && (
+                <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                    Model {data?.modelVersion ?? 'unknown'} • subject confidence labels are shown per row
+                </div>
+            )}
 
-            <div className="space-y-3">
+            <div className="space-y-2 flex-1 overflow-y-auto pr-1 min-h-0">
                 {subjects.map((subject) => {
                     const predicted = subject.estimatedExamScore ?? 0;
                     const trend = subject.pace ?? 'steady';

@@ -1,7 +1,7 @@
 // app/create-task/page.tsx
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TaskInputCard } from '@/components/createtask/TaskInputCard';
@@ -68,6 +68,11 @@ function CreateTaskPageContent() {
     const [examDuration, setExamDuration] = useState('120');
     const [showManualDetails, setShowManualDetails] = useState(true);
     const [aiSubtaskEnabled, setAiSubtaskEnabled] = useState(false);
+    const [isSubmittingNow, setIsSubmittingNow] = useState(false);
+
+    const hasHydratedFromExistingTask = useRef(false);
+    const parseRequestSeq = useRef(0);
+    const isMountedRef = useRef(true);
 
     const [addGradeEntry, { isLoading: isAddingGrade }] = useAddGradeEntryMutation();
     const [createExam, { isLoading: isCreatingExam }] = useCreateExamMutation();
@@ -84,33 +89,44 @@ function CreateTaskPageContent() {
 
     const { data: categories } = useGetCategoriesQuery();
     const { data: subjects } = useGetSubjectsQuery();
+
     useEffect(() => {
-        if (existingTask) {
-            setTaskDescription(existingTask.title);
-            setDescription(existingTask.description || '');
-            if (existingTask.priority === PriorityEnum.LOW) setSelectedPriority('Routine');
-            else if (existingTask.priority === PriorityEnum.MEDIUM) setSelectedPriority('Medium');
-            else if (existingTask.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
-            if (existingTask.categoryId) setSelectedSubjectId(existingTask.categoryId);
-            if (existingTask.effort) setSelectedEffort(normalizeEffortValue(existingTask.effort));
+    useEffect(() => {
+        hasHydratedFromExistingTask.current = false;
+    }, [taskId]);
 
-            if (existingTask.subtasks) {
-                setSubtasks(existingTask.subtasks.map(s => ({
-                    id: s.id,
-                    text: s.title,
-                    completed: s.completed
-                })));
-            }
-            if (existingTask.dueDate) {
-                // Convert real UTC to apparent UTC for stable UI
-                const d = new Date(existingTask.dueDate);
-                const apparent = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
-                setParsedDueDate(apparent);
-                setHasExplicitDueDate(true);
-            }
-            setIsRecurring(Boolean(existingTask.isRecurring));
+    useEffect(() => {
+        if (!existingTask || hasHydratedFromExistingTask.current) return;
+
+        hasHydratedFromExistingTask.current = true;
+        setTaskDescription(existingTask.title);
+        setDescription(existingTask.description || '');
+        if (existingTask.priority === PriorityEnum.LOW) setSelectedPriority('Routine');
+        else if (existingTask.priority === PriorityEnum.MEDIUM) setSelectedPriority('Medium');
+        else if (existingTask.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
+
+        if (existingTask.categoryId) setSelectedSubjectId(existingTask.categoryId);
+        if (existingTask.effort) setSelectedEffort(normalizeEffortValue(existingTask.effort));
+
+        if (existingTask.subtasks) {
+            setSubtasks(existingTask.subtasks.map(s => ({
+                id: s.id,
+                text: s.title,
+                completed: s.completed
+            })));
         }
+        if (existingTask.dueDate) {
+            const d = new Date(existingTask.dueDate);
+            const apparent = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
+            setParsedDueDate(apparent);
+            setHasExplicitDueDate(true);
+        }
+        setIsRecurring(Boolean(existingTask.isRecurring));
     }, [existingTask]);
 
     const [parseTask, { isLoading: isParsingTask }] = useParseTaskMutation();
@@ -123,8 +139,10 @@ function CreateTaskPageContent() {
     useEffect(() => {
         const timer = setTimeout(async () => {
             if (taskDescription.trim().length > 5) {
+                const requestId = ++parseRequestSeq.current;
                 try {
                     const result = await parseTask({ text: taskDescription }).unwrap();
+                    if (requestId !== parseRequestSeq.current || !isMountedRef.current) return;
                     if (result) {
                         setParsedMeta({
                             subject: result.subject,
@@ -157,9 +175,11 @@ function CreateTaskPageContent() {
                         }
                     }
                 } catch (error) {
+                    if (requestId !== parseRequestSeq.current || !isMountedRef.current) return;
                     console.error('Failed to parse task description:', error);
                 }
             } else {
+                parseRequestSeq.current += 1;
                 setParsedMeta({});
             }
         }, 500);
@@ -168,6 +188,8 @@ function CreateTaskPageContent() {
     }, [taskDescription, parseTask, categories, isDueDateManuallyEdited]);
 
     const handleSaveTask = async () => {
+        if (isSubmittingNow) return;
+        setIsSubmittingNow(true);
         try {
             const shouldUseSmartCreate =
                 !taskId && entryType === 'task' && taskDescription.trim().length > 80 && description.trim().length === 0;
@@ -329,6 +351,10 @@ function CreateTaskPageContent() {
 
             const errorMsg = dataMessage || info.message || 'Failed to save task';
             toast.error(errorMsg);
+        } finally {
+            if (isMountedRef.current) {
+                setIsSubmittingNow(false);
+            }
         }
     };
     const handleGenerateSubtasks = async () => {
@@ -381,7 +407,7 @@ function CreateTaskPageContent() {
         }
     };
 
-    const isSubmitting = isCreating || isSmartCreating || isUpdating || isAddingGrade || isCreatingExam;
+    const isSubmitting = isSubmittingNow || isCreating || isSmartCreating || isUpdating || isAddingGrade || isCreatingExam;
 
     return (
         <div className="min-h-screen bg-slate-950 text-white relative overflow-x-hidden selection:bg-purple-500/30 md:pt-3">

@@ -60,7 +60,7 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
     };
 
     return (
-        <div className="bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-6 h-[500px] flex flex-col">
             <div className="flex items-center gap-2 mb-5">
                 <GraduationCap className="w-5 h-5 text-purple-400" />
                 <h3 className="font-bold text-white text-lg">Grade Entries</h3>
@@ -71,62 +71,68 @@ export function GradeEntryManager({ examType: controlledExamType, allowExamTypeE
                 </p>
             )}
 
-            <form onSubmit={handleAdd} className={`grid gap-3 mb-5 ${allowExamTypeEdit && !controlledExamType ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
-                {allowExamTypeEdit && !controlledExamType && (
+            <form onSubmit={handleAdd} className="space-y-3 mb-5">
+                <div className={`grid gap-3 ${allowExamTypeEdit && !controlledExamType ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                    {allowExamTypeEdit && !controlledExamType && (
+                        <Input
+                            value={examType}
+                            onChange={e => setExamType(e.target.value)}
+                            placeholder="Exam type"
+                            className="bg-white/5 border-white/10"
+                        />
+                    )}
                     <Input
-                        value={examType}
-                        onChange={e => setExamType(e.target.value)}
-                        placeholder="Exam type"
-                        className="bg-white/5 border-white/10"
-                    />
-                )}
-                <Input
-                    value={subjectName}
-                    onChange={e => setSubjectName(e.target.value)}
-                    placeholder="Subject Name"
-                    className="bg-white/5 border-white/10"
-                />
-                <Input
-                    value={chapter}
-                    onChange={e => setChapter(e.target.value)}
-                    placeholder="Chapter (Optional)"
-                    className="bg-white/5 border-white/10"
-                />
-                    <Input
-                        value={obtainedMarks}
-                        onChange={e => setObtainedMarks(e.target.value)}
-                        placeholder="Score"
-                        type="number"
-                        step="any"
-                        min="0"
+                        value={subjectName}
+                        onChange={e => setSubjectName(e.target.value)}
+                        placeholder="Subject Name"
                         className="bg-white/5 border-white/10"
                     />
                     <Input
-                        value={totalMarks}
-                        onChange={e => setTotalMarks(e.target.value)}
-                        placeholder="Max"
-                        type="number"
-                        step="any"
-                        min="1"
-                        className="bg-white/5 border-white/10 w-24"
+                        value={chapter}
+                        onChange={e => setChapter(e.target.value)}
+                        placeholder="Chapter (Optional)"
+                        className="bg-white/5 border-white/10"
                     />
-                <Button
-                    type="submit"
-                    disabled={isAdding || !subjectName || !obtainedMarks || !activeExamType || invalidInput}
-                    className="bg-purple-600 hover:bg-purple-500 text-white"
-                >
-                    <Plus className="w-4 h-4 mr-1.5" /> Add Score
-                </Button>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex gap-3 flex-1">
+                        <Input
+                            value={obtainedMarks}
+                            onChange={e => setObtainedMarks(e.target.value)}
+                            placeholder="Score"
+                            type="number"
+                            step="any"
+                            min="0"
+                            className="bg-white/5 border-white/10 flex-1"
+                        />
+                        <Input
+                            value={totalMarks}
+                            onChange={e => setTotalMarks(e.target.value)}
+                            placeholder="Max"
+                            type="number"
+                            step="any"
+                            min="1"
+                            className="bg-white/5 border-white/10 w-24"
+                        />
+                    </div>
+                    <Button
+                        type="submit"
+                        disabled={isAdding || !subjectName || !obtainedMarks || !activeExamType || invalidInput}
+                        className="bg-purple-600 hover:bg-purple-500 text-white w-full sm:w-auto"
+                    >
+                        <Plus className="w-4 h-4 mr-1.5" /> Add Score
+                    </Button>
+                </div>
             </form>
 
             {isLoading ? (
-                <div className="text-sm text-slate-500 text-center py-4">Loading entries...</div>
+                <div className="flex-1 flex items-center justify-center text-sm text-slate-500 py-4">Loading entries...</div>
             ) : entries.length === 0 ? (
-                <div className="text-sm text-slate-500 text-center py-6">
+                <div className="flex-1 flex items-center justify-center text-sm text-slate-500 text-center py-6">
                     No grade entries yet. Add your exam scores to get SWOT analysis.
                 </div>
             ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 flex-1 overflow-y-auto min-h-0 pr-1">
                     {entries.map((entry) => (
                         <div key={entry.id} className="flex items-center justify-between bg-white/5 rounded-lg px-4 py-2.5">
                             <div className="flex items-center gap-3">

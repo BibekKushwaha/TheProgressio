@@ -101,10 +101,6 @@ export function TopStats() {
         },
     ];
 
-    // 3. Streak and History Logic — sourced from BFF (no separate round-trip)
-    const currentStreak = Math.max(0, Math.floor(toSafeNumber(dashboardData?.streak)));
-    const hasCardError = isSummaryError || isDashboardError;
-
     const activeDateSet = useMemo(() => {
         const dates = dashboardData?.activeDates || [];
         const set = new Set<string>();
@@ -127,6 +123,32 @@ export function TopStats() {
         });
         return set;
     }, [dashboardData?.activeDates]);
+
+    // 3. Streak and History Logic — sourced from BFF, with a local fallback
+    // derived from activeDates for resilience when streak is missing/stale.
+    const fallbackStreakFromDates = useMemo(() => {
+        if (activeDateSet.size === 0) return 0;
+
+        const current = new Date();
+        const todayKey = toLocalDateKey(current);
+
+        if (!activeDateSet.has(todayKey)) {
+            current.setDate(current.getDate() - 1);
+            if (!activeDateSet.has(toLocalDateKey(current))) return 0;
+        }
+
+        let streak = 0;
+        while (activeDateSet.has(toLocalDateKey(current))) {
+            streak += 1;
+            current.setDate(current.getDate() - 1);
+        }
+
+        return streak;
+    }, [activeDateSet]);
+
+    const apiStreak = Math.max(0, Math.floor(toSafeNumber(dashboardData?.streak)));
+    const currentStreak = Math.max(apiStreak, fallbackStreakFromDates);
+    const hasCardError = isSummaryError || isDashboardError;
 
     const historyDots = useMemo(() => {
         return Array.from({ length: 14 }).map((_, i) => {

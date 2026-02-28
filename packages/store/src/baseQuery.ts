@@ -1,7 +1,7 @@
-import { retry } from '@reduxjs/toolkit/query/react';
+import { fetchBaseQuery, retry } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn } from '@reduxjs/toolkit/query';
-import { isNativeRuntime, resolveServiceUrl } from './runtime';
-import { clearTokens, getRefreshTokenSync, setTokens } from './mobile-token-store';
+import { isNativeRuntime, resolveServiceUrl, getFamilyShareToken } from './runtime';
+import { clearTokens, getRefreshTokenSync, setTokens, getAccessTokenSync } from './mobile-token-store';
 import { hydrateAuth, logout } from './slices/authSlice';
 
 const AUTH_SERVICE_URL = resolveServiceUrl(
@@ -73,6 +73,39 @@ async function ensureFreshMobileSession(api: any): Promise<boolean> {
   })();
 
   return refreshInFlightMobile;
+}
+
+/**
+ * Creates a fully-configured RTK Query base query for an internal micro-service.
+ *
+ * Encapsulates the standard `prepareHeaders` logic (Bearer token for native clients,
+ * family-share-token forwarding, credentials: 'include' for web) and wraps the
+ * result with `withAuthRefresh` + `withRetry` so every consumer gets refresh /
+ * retry behaviour for free.
+ *
+ * Usage:
+ *   baseQuery: createServiceBaseQuery(PLANNER_SERVICE_URL)
+ *
+ * @param serviceBaseUrl - root URL of the service (e.g. `http://localhost:4001`)
+ */
+export function createServiceBaseQuery(serviceBaseUrl: string) {
+  const base = fetchBaseQuery({
+    baseUrl: `${serviceBaseUrl}/api`,
+    credentials: 'include',
+    prepareHeaders: (headers) => {
+      headers.set('Content-Type', 'application/json');
+      const accessToken = isNativeRuntime() ? getAccessTokenSync() : null;
+      if (accessToken) {
+        headers.set('Authorization', `Bearer ${accessToken}`);
+      }
+      const shareToken = getFamilyShareToken();
+      if (shareToken) {
+        headers.set('x-family-share-token', shareToken);
+      }
+      return headers;
+    },
+  });
+  return withAuthRefresh(withRetry(base));
 }
 
 /**

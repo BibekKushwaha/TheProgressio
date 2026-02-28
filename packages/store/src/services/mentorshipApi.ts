@@ -1,7 +1,6 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { withAuthRefresh, withRetry } from '../baseQuery';
-import { getFamilyShareToken, isNativeRuntime, resolveServiceUrl } from '../runtime';
-import { getAccessTokenSync } from '../mobile-token-store';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { createServiceBaseQuery } from '../baseQuery';
+import { resolveServiceUrl } from '../runtime';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
   process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL ?? process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL,
@@ -34,26 +33,9 @@ export type MentorFeedback = {
   createdAt: string;
 };
 
-const baseQuery = fetchBaseQuery({
-  baseUrl: `${PLANNER_SERVICE_URL}/api`,
-  credentials: 'include',
-  prepareHeaders: (headers) => {
-    headers.set('Content-Type', 'application/json');
-    const accessToken = isNativeRuntime() ? getAccessTokenSync() : null;
-    if (accessToken) {
-      headers.set('Authorization', `Bearer ${accessToken}`);
-    }
-    const shareToken = getFamilyShareToken();
-    if (shareToken) {
-      headers.set('x-family-share-token', shareToken);
-    }
-    return headers;
-  },
-});
-
 export const mentorshipApi = createApi({
   reducerPath: 'mentorshipApi',
-  baseQuery: withAuthRefresh(withRetry(baseQuery)),
+  baseQuery: createServiceBaseQuery(PLANNER_SERVICE_URL),
   tagTypes: ['Mentorship'],
   endpoints: (builder) => ({
     getMentorAlertSubscriptions: builder.query<{ message: string; subscriptions: MentorAlertSubscription[] }, void>({
