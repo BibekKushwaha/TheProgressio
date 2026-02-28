@@ -51,7 +51,7 @@ export function HeroSection() {
                     transition={{ duration: 0.5, ease: 'easeOut', delay: 0.3 }}
                     className="max-w-2xl mx-auto text-lg text-slate-400 leading-relaxed"
                 >
-                    A subtle glowing blue aura surrounds your productivity path. Experience the evolution of high-stakes exam preparation.
+                    A subtle glowing blue TheProgressio surrounds your productivity path. Experience the evolution of high-stakes exam preparation.
                 </motion.p>
 
                 {/* Decorative divider */}

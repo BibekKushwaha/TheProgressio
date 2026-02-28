@@ -1,13 +1,12 @@
 'use client';
 
-import { useParams } from 'next/navigation';
 import { useGetTaskEfficiencyQuery } from '@repo/store';
 import { Clock, TrendingUp, Zap, BarChart3 } from 'lucide-react';
+import { useTaskRouteId } from '@/hooks/useTaskRouteId';
 
 export function TaskEfficiencyPanel() {
-    const params = useParams();
-    const taskId = params?.id as string;
-    const { data, isLoading } = useGetTaskEfficiencyQuery(taskId, { skip: !taskId });
+    const taskId = useTaskRouteId();
+    const { data, isLoading } = useGetTaskEfficiencyQuery(taskId || '', { skip: !taskId });
     const stats = data?.stats;
 
     if (isLoading) {

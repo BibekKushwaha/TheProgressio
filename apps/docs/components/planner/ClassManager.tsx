@@ -14,6 +14,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimePickerInput } from '@/components/ui/time-picker-input';
 import { toast } from 'sonner';
 import { Plus, Trash2, BookOpen, Clock, Calendar, X } from 'lucide-react';
 
@@ -239,20 +240,18 @@ export function ClassManager() {
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-slate-400">Start Time</label>
-                                <Input
-                                    type="time"
+                                <TimePickerInput
                                     value={newEntry.startTime}
-                                    onChange={(e) => setNewEntry({ ...newEntry, startTime: e.target.value })}
-                                    className="bg-black/20 border-white/10"
+                                    onChange={(nextTime) => setNewEntry({ ...newEntry, startTime: nextTime })}
+                                    className="bg-black/20 border-white/10 text-white"
                                 />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-slate-400">End Time</label>
-                                <Input
-                                    type="time"
+                                <TimePickerInput
                                     value={newEntry.endTime}
-                                    onChange={(e) => setNewEntry({ ...newEntry, endTime: e.target.value })}
-                                    className="bg-black/20 border-white/10"
+                                    onChange={(nextTime) => setNewEntry({ ...newEntry, endTime: nextTime })}
+                                    className="bg-black/20 border-white/10 text-white"
                                 />
                             </div>
                             <div className="space-y-1.5">

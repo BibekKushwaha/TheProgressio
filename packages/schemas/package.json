@@ -17,6 +17,9 @@
   "dependencies": {
     "zod": "^4.3.6"
   },
+  "devDependencies": {
+    "@repo/typescript-config": "*"
+  },
   "exports": {
     ".": "./dist/index.js",
     "./auth": {

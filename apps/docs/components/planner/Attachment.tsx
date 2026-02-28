@@ -1,17 +1,17 @@
 'use client';
 
 import { Download, Trash2, Plus, Link as LinkIcon } from 'lucide-react';
-import { useParams } from 'next/navigation';
 import { useGetTaskByIdQuery, useCreateAttachmentMutation, useDeleteAttachmentMutation } from '@repo/store';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useTaskRouteId } from '@/hooks/useTaskRouteId';
 
 export function AttachmentsList() {
-    const { id: taskId } = useParams();
-    const { data: task } = useGetTaskByIdQuery(taskId as string);
+    const taskId = useTaskRouteId();
+    const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId });
     const [createAttachment] = useCreateAttachmentMutation();
     const [deleteAttachment] = useDeleteAttachmentMutation();
 
@@ -23,7 +23,7 @@ export function AttachmentsList() {
     const handleAdd = async () => {
         if (!name || !url || !taskId) return;
         try {
-            await createAttachment({ taskId: taskId as string, name, url }).unwrap();
+            await createAttachment({ taskId, name, url }).unwrap();
             setName('');
             setUrl('');
             setIsAddOpen(false);
@@ -38,7 +38,8 @@ export function AttachmentsList() {
 
     const performDelete = async () => {
         if (!pendingDeleteId) return;
-        await deleteAttachment({ id: pendingDeleteId, taskId: taskId as string });
+        if (!taskId) return;
+        await deleteAttachment({ id: pendingDeleteId, taskId });
         setPendingDeleteId(null);
     };
 

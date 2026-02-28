@@ -39,6 +39,8 @@ services:
     build:
       context: .
       dockerfile: apps/analytics-service/Dockerfile
+      provenance: false
+      sbom: false
     ports:
       - "4003:4003"
     env_file: ./apps/analytics-service/.env
@@ -61,6 +63,8 @@ services:
     build:
       context: .
       dockerfile: apps/auth-service/Dockerfile
+      provenance: false
+      sbom: false
     ports:
       - "4000:4000"
     env_file: ./apps/auth-service/.env
@@ -81,6 +85,8 @@ services:
     build:
       context: .
       dockerfile: apps/habit-service/Dockerfile
+      provenance: false
+      sbom: false
     ports:
       - "4002:4002"
     env_file: ./apps/habit-service/.env
@@ -101,6 +107,8 @@ services:
     build:
       context: .
       dockerfile: apps/planner-service/Dockerfile
+      provenance: false
+      sbom: false
     ports:
       - "4001:4001"
     env_file: ./apps/planner-service/.env

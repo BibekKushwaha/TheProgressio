@@ -10,17 +10,22 @@
     "build": "tsc && mkdir -p ./dist/generated && cp -r ./generated/* ./dist/generated/ && find ./dist -name '*.ts' ! -name '*.d.ts' -delete",
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
-    "generate": "prisma generate --schema=./prisma/schema.prisma"
+    "generate": "prisma generate --schema=./prisma/schema.prisma",
+    "db:push": "prisma db push --schema=./prisma/schema.prisma"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/adapter-pg": "^7.3.0",
-    "@prisma/client": "^7.3.0",
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
+    "pg": "^8.19.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
     "@types/pg": "^8.16.0",
-    "pg": "^8.18.0",
-    "prisma": "^7.3.0"
+    "dotenv": "^17.2.3",
+    "prisma": "^7.4.1"
   },
   "exports": {
     ".": {

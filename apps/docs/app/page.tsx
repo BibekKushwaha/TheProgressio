@@ -1,6 +1,5 @@
 import { Navbar } from "@/components/landing/LandingNavbar";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { ComparisonSection } from "@/components/landing/ComparisonSection";
 import { WhatsAppAssistant } from "@/components/landing/WhatsAppAssistant";
 import { InsightsSection } from "@/components/landing/InsightsSection";
 import { LanguageSection } from "@/components/landing/LanguageSection";
@@ -55,7 +54,7 @@ export default function HomePage() {
                 </section>
 
                 <HeroSection />
-                <ComparisonSection />
+                {/* <ComparisonSection /> */}
                 <WhatsAppAssistant />
                 <InsightsSection />
                 <LanguageSection />

@@ -1,13 +1,13 @@
 // components/task/DescriptionCard.tsx
 'use client';
 
-import { useParams } from 'next/navigation';
 import { SubTaskList } from './SubTaskList';
 import { useGetTaskByIdQuery } from '@repo/store';
+import { useTaskRouteId } from '@/hooks/useTaskRouteId';
 
 export function DescriptionCard() {
-    const { id: taskId } = useParams()
-    const { data: task } = useGetTaskByIdQuery(taskId as string)
+    const taskId = useTaskRouteId();
+    const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId });
 
     return (
         <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6">

@@ -41,7 +41,7 @@ export function WhatsAppAssistant() {
             </h2>
 
             <p className="text-xl text-slate-400 mb-8">
-              No new apps to learn. Just text Aura for AI-driven summaries,
+              No new apps to learn. Just text TheProgressio for AI-driven summaries,
               quizzes, and progress updates—all in your favorite messaging app.
             </p>
           </motion.div>
@@ -55,7 +55,7 @@ export function WhatsAppAssistant() {
                 <MessageCircle className="w-6 h-6" />
               </div>
               <div>
-                <div className="font-semibold">Aura AI</div>
+                <div className="font-semibold">TheProgressio</div>
                 <div className="text-xs text-green-400 flex items-center gap-1">
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                   Online

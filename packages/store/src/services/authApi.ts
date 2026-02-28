@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { getFamilyShareToken, isNativeRuntime, resolveServiceUrl } from '../runtime';
 import { withAuthRefresh, withRetry } from '../baseQuery';
 import { getAccessTokenSync } from '../mobile-token-store';
+import { logout as logoutAction } from '../slices/authSlice';
 
 export const AUTH_SERVICE_URL = resolveServiceUrl(
   process.env.EXPO_PUBLIC_AUTH_SERVICE_URL ?? process.env.NEXT_PUBLIC_AUTH_SERVICE_URL,
@@ -187,9 +188,21 @@ export const authApi = createApi({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;
+          // Clear the auth slice state
+          dispatch(logoutAction());
+          // Reset all API states
           dispatch(authApi.util.resetApiState());
+          // Clear session flag
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem('auth:hasSession');
+          }
         } catch {
-          /* ignore */
+          // Even if the server call fails, we should logout locally for better UX
+          dispatch(logoutAction());
+          dispatch(authApi.util.resetApiState());
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem('auth:hasSession');
+          }
         }
       },
     }),

@@ -1,7 +1,13 @@
 'use client';
 import { useIsMounted } from '@/hooks/useIsMounted';
 
-import { selectCurrentUser, useAppSelector, useLogoutMutation } from '@repo/store';
+import {
+  logout as logoutAction,
+  selectCurrentUser,
+  useAppDispatch,
+  useAppSelector,
+  useLogoutMutation,
+} from '@repo/store';
 import { motion } from 'framer-motion';
 import { LogOut, Settings, User } from 'lucide-react';
 import Link from 'next/link';
@@ -23,14 +29,23 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const user = useAppSelector(selectCurrentUser);
+  const dispatch = useAppDispatch();
   const mounted = useIsMounted();
   const [logout] = useLogoutMutation();
   const router = useRouter();
 
   const goTo = (path: string) => () => router.push(path);
   const handleLogout = async () => {
-    await logout();
-    router.push('/');
+    try {
+      await logout().unwrap();
+    } catch {
+      // Ignore errors but continue with local logout
+    } finally {
+      // Force local logout to ensure UI updates immediately
+      dispatch(logoutAction());
+      localStorage.removeItem('auth:hasSession');
+      router.push('/');
+    }
   };
 
   return (
@@ -67,7 +82,7 @@ export function Navbar() {
             ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button className="text-slate-300 hover:bg-slate-700 transition-colors">
+                  <Button className="text-slate-300 text-black  hover:bg-slate-700 hover:text-white transition-colors">
                     {user.username?.charAt(0).toUpperCase()}
                   </Button>
                 </DropdownMenuTrigger>

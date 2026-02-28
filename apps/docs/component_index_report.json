@@ -1,0 +1,3021 @@
+[
+  {
+    "file": "components/AppProviders.tsx",
+    "exports": [
+      {
+        "name": "AppProviders",
+        "params": "{ children }: { children: React.ReactNode }",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/layout.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/NotificationBell.tsx",
+    "exports": [
+      {
+        "name": "NotificationBell",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "notification-api",
+      "react-effect",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/PushNotificationManager.tsx",
+    "exports": [
+      {
+        "name": "PushNotificationManager",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/layout.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "notification-api",
+      "react-effect",
+      "rtk-query-read",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/SearchBar.tsx",
+    "exports": [
+      {
+        "name": "SearchBar",
+        "params": "{ searchQuery, setSearchQuery, status, setStatus, priority, setPriority, selectedCategory, setSelectedCategory, view, setView, statusOptions = DEFAULT_STATUS_OPTIONS, priorityOptions = DEFAULT_PRIORITY_OPTIONS, categoryO",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/habits/page.tsx",
+      "app/(dashboard)/tasks/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/achievements/AchievementsHeader.tsx",
+    "exports": [
+      {
+        "name": "AchievementsHeader",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/achievement/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/achievements/BadgeCard.tsx",
+    "exports": [
+      {
+        "name": "BadgeCard",
+        "params": "{ badge }: BadgeCardProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/achievements/BadgesGrid.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/achievements/BadgesGrid.tsx",
+    "exports": [
+      {
+        "name": "BadgesGrid",
+        "params": "{ filter }: BadgesGridProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/achievement/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/achievements/BadgesTabs.tsx",
+    "exports": [
+      {
+        "name": "BadgesTabs",
+        "params": "{ activeTab, onTabChange }: BadgesTabsProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/achievement/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/achievements/ProgressCard.tsx",
+    "exports": [
+      {
+        "name": "ProgressCard",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/achievements/AchievementsHeader.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/ActivityHeatMap.tsx",
+    "exports": [
+      {
+        "name": "ActivityHeatmap",
+        "params": "{ _pastDays }: { _pastDays: string }",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/AnalyticHeader.tsx",
+    "exports": [
+      {
+        "name": "AnalyticsHeader",
+        "params": "{ pastDays, setPastDays, onExport }: AnalyticsHeaderProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/overview/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/analytics/CycleTimeScatterPlot.tsx",
+    "exports": [
+      {
+        "name": "CycleTimeScatterPlot",
+        "params": "{ initialData }: CycleTimeScatterPlotProps = {}",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/DurationPredictionCard.tsx",
+    "exports": [
+      {
+        "name": "DurationPredictionCard",
+        "params": "{ taskId }: { taskId?: string }",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/strategic/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/FocusTrend.tsx",
+    "exports": [
+      {
+        "name": "FocusTrends",
+        "params": "{ pastDays }: { pastDays: string }",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/overview/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/GPACalculator.tsx",
+    "exports": [
+      {
+        "name": "GPACalculator",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 3,
+    "importedBy": [
+      "app/(dashboard)/advanced/page.tsx",
+      "app/(dashboard)/exam-warroom/academic/page.tsx",
+      "app/(dashboard)/subjects/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/GenericHeatmap.tsx",
+    "exports": [
+      {
+        "name": "GenericHeatmap",
+        "params": "{ title, data, isLoading, colorTheme = 'emerald', summary, emptyMessage = 'No activity data available.', reverseOrder = false, className, height }: GenericHeatmapProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "components/analytics/ActivityHeatMap.tsx",
+      "components/habit/ContributionHeatmap.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/analytics/GradeEntryManager.tsx",
+    "exports": [
+      {
+        "name": "GradeEntryManager",
+        "params": "{ examType: controlledExamType, allowExamTypeEdit = true }: GradeEntryManagerProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/exam-warroom/academic/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "react-effect",
+      "rtk-query-read",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/MetricCard.tsx",
+    "exports": [
+      {
+        "name": "MetricCard",
+        "params": "{ label, value, colorClass, colSpan = 1, }: MetricCardProps",
+        "kind": "function"
+      },
+      {
+        "name": "MetricGrid",
+        "params": "{ metrics, className = '' }: MetricGridProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/overview/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/analytics/PeakProductivityCard.tsx",
+    "exports": [
+      {
+        "name": "PeakProductivityCard",
+        "params": "{ initialData }: PeakProductivityCardProps = {}",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/PredictiveScoreCard.tsx",
+    "exports": [
+      {
+        "name": "PredictiveScoreCard",
+        "params": "{ initialData, examType }: PredictiveScoreCardProps = {}",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 3,
+    "importedBy": [
+      "app/(dashboard)/analytics/strategic/page.tsx",
+      "app/(dashboard)/exam-warroom/academic/page.tsx",
+      "app/(dashboard)/exam-warroom/overview/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/ProductivityInsights.tsx",
+    "exports": [
+      {
+        "name": "ProductivityInsights",
+        "params": "{ initialLeakage, initialPeak, initialPredictive, }: ProductivityInsightsProps = {}",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/advanced/page.tsx",
+      "app/(dashboard)/analytics/strategic/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/RevisionScheduler.tsx",
+    "exports": [
+      {
+        "name": "RevisionScheduler",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/exam-warroom/revision/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "fetch",
+      "react-effect",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/SWOTAnalysis.tsx",
+    "exports": [
+      {
+        "name": "SWOTAnalysis",
+        "params": "{ examType: controlledExamType, allowExamTypeChange = true, initialData }: SWOTAnalysisProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/advanced/page.tsx",
+      "app/(dashboard)/exam-warroom/overview/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "react-effect",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/SWOTReport.tsx",
+    "exports": [
+      {
+        "name": "SWOTReport",
+        "params": "{ initialData }: SWOTReportProps = {}",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/strategic/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/SessionBreakdown.tsx",
+    "exports": [
+      {
+        "name": "SessionBreakdown",
+        "params": "{ pastDays }: { pastDays: string }",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/overview/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/StatCard.tsx",
+    "exports": [
+      {
+        "name": "StatCards",
+        "params": "{ items }: StatCardsProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/overview/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/analytics/SubjectGradePredictor.tsx",
+    "exports": [
+      {
+        "name": "SubjectGradePredictor",
+        "params": "{ subjectId, subjectName }: SubjectGradePredictorProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/subjects/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/TimeLeakageCard.tsx",
+    "exports": [
+      {
+        "name": "TimeLeakageCard",
+        "params": "{ initialData }: TimeLeakageCardProps = {}",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/analytics/WhatIfGPASimulator.tsx",
+    "exports": [
+      {
+        "name": "WhatIfGPASimulator",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/strategic/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/auth/auth-footer.tsx",
+    "exports": [
+      {
+        "name": "AuthSwitchLink",
+        "params": "{ prompt, href, label, className, }: AuthSwitchLinkProps",
+        "kind": "function"
+      },
+      {
+        "name": "AuthBackLink",
+        "params": "{ href, label = \"Back\", icon, className, }: AuthBackLinkProps",
+        "kind": "function"
+      },
+      {
+        "name": "AuthTermsConsent",
+        "params": "{ id = \"terms\", required = true, className, termsHref = \"/terms\", privacyHref = \"/privacy\", }: AuthTermsConsentProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/auth/auth-header.tsx",
+    "exports": [],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/auth/auth-layout.tsx",
+    "exports": [
+      {
+        "name": "AuthSplitLayout",
+        "params": "{ formPane, visualPane, reverseDesktop = false, }: AuthSplitLayoutProps",
+        "kind": "function"
+      },
+      {
+        "name": "AuthVisualPane",
+        "params": "{ children, className }: AuthVisualPaneProps",
+        "kind": "function"
+      },
+      {
+        "name": "AuthFormPane",
+        "params": "{ children, className, cardClassName, mobileBackgroundClassName, }: AuthFormPaneProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/auth/gradient-button.tsx",
+    "exports": [],
+    "importedByCount": 4,
+    "importedBy": [
+      "app/(auth)/forgot-password/page.tsx",
+      "app/(auth)/login/page.tsx",
+      "app/(auth)/reset-password/[token]/page.tsx",
+      "app/(auth)/signup/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/auth/input.tsx",
+    "exports": [],
+    "importedByCount": 4,
+    "importedBy": [
+      "app/(auth)/forgot-password/page.tsx",
+      "app/(auth)/login/page.tsx",
+      "app/(auth)/reset-password/[token]/page.tsx",
+      "app/(auth)/signup/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/AiSuggestedDialog.tsx",
+    "exports": [
+      {
+        "name": "AiSuggestedDialog",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/calendar/ScheduleDetailPanel.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [
+      "navigation",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/calendar/BreakBlock.tsx",
+    "exports": [
+      {
+        "name": "BreakBlock",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/CalendarHeader.tsx",
+    "exports": [
+      {
+        "name": "CalendarHeader",
+        "params": "{ selectedView, setSelectedView, currentDate, onDateChange }: CalendarHeaderProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/calendar/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/CreateHolidayForm.tsx",
+    "exports": [
+      {
+        "name": "CreateHolidayForm",
+        "params": "{ defaultDate, onCreated }: CreateHolidayFormProps",
+        "kind": "default-function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/calendar/CalendarHeader.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "notification-api",
+      "rtk-query-write",
+      "timer",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/calendar/DatePickerForm.tsx",
+    "exports": [
+      {
+        "name": "DatePickerForm",
+        "params": "{ onSelect }: DatePickerFormProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/DayGrid.tsx",
+    "exports": [
+      {
+        "name": "DayGrid",
+        "params": "{ date, rotationFilter = false, rotation }: DayGridProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/calendar/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [
+      "notification-api",
+      "react-effect",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/calendar/Daycell.tsx",
+    "exports": [
+      {
+        "name": "DayCell",
+        "params": "{ date, events, isCurrentMonth, isToday, isHoliday, isExam, isSelected, onClick }: DayCellProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/calendar/MonthGrid.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/DeadlineChip.tsx",
+    "exports": [
+      {
+        "name": "DeadlineChip",
+        "params": "{ label, title, checkbox }: DeadlineChipProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/EventCard.tsx",
+    "exports": [
+      {
+        "name": "EventCard",
+        "params": "{ event }: EventCardProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/calendar/DayGrid.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/MiniCalendar.tsx",
+    "exports": [
+      {
+        "name": "MiniCalendar",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/MonthGrid.tsx",
+    "exports": [
+      {
+        "name": "MonthGrid",
+        "params": "{ selectedDate, onDateSelect, currentMonth, currentYear }: MonthGridProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/calendar/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/calendar/ScheduleDetailPanel.tsx",
+    "exports": [
+      {
+        "name": "ScheduleDetailPanel",
+        "params": "{ date }: ScheduleDetailPanelProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/calendar/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/calendar/ScheduleItemCard.tsx",
+    "exports": [
+      {
+        "name": "ScheduleItemCard",
+        "params": "{ item }: ScheduleItemCardProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/calendar/ScheduleDetailPanel.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [
+      "navigation"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/SessionLengthSelector.tsx",
+    "exports": [
+      {
+        "name": "SessionLengthSelector",
+        "params": "{ value, onChange, className }: SessionLengthSelectorProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/SmartConstraints.tsx",
+    "exports": [
+      {
+        "name": "SmartConstraints",
+        "params": "{ value, onChange, className }: SmartConstraintsProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/SuggestedFocus.tsx",
+    "exports": [
+      {
+        "name": "SuggestedFocus",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/TimeSlot.tsx",
+    "exports": [
+      {
+        "name": "TimeSlot",
+        "params": "{ time }: TimeSlotProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/calendar/DayGrid.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/calendar/UpcomingTasksPanel.tsx",
+    "exports": [
+      {
+        "name": "UpcomingTasksPanel",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/calendar/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/createtask/AiSubTaskPanel.tsx",
+    "exports": [
+      {
+        "name": "AISubtaskPanel",
+        "params": "{ subtasks, onSubtaskToggle, isLoading, onGenerate }: AISubtaskPanelProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/createtask/EffortSelector.tsx",
+    "exports": [
+      {
+        "name": "EffortSelector",
+        "params": "{ selectedEffort, onSelect }: EffortSelectorProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/createtask/MetaChips.tsx",
+    "exports": [
+      {
+        "name": "MetaChips",
+        "params": "{ subject, date, time, subjectColor }: MetaChipsProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/createtask/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/createtask/PageAction.tsx",
+    "exports": [
+      {
+        "name": "PageActions",
+        "params": "{ onSubmit, onCancel, isSubmitting, submitLabel = \"Add to My Gateway\", SubmitIcon = Plus }: PageActionsProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/createtask/PrioritySelector.tsx",
+    "exports": [
+      {
+        "name": "PrioritySelector",
+        "params": "{ selectedPriority, onSelect }: PrioritySelectorProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/createtask/TaskInputCard.tsx",
+    "exports": [
+      {
+        "name": "TaskInputCard",
+        "params": "{ value, onChange, isParsing, highlights = [] }: TaskInputCardProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/createtask/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/createtask/VoiceInput.tsx",
+    "exports": [
+      {
+        "name": "VoiceInput",
+        "params": "{ onResult, isCompact }: VoiceInputProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/createtask/TaskInputCard.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "react-effect",
+      "toast"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/dashboard/ActivityLedger.tsx",
+    "exports": [
+      {
+        "name": "ActivityLedger",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/dashboard/LiveActivityWidget.tsx",
+    "exports": [
+      {
+        "name": "LiveActivityWidget",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "fetch",
+      "localStorage",
+      "navigation",
+      "react-effect",
+      "rtk-query-read",
+      "timer"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/dashboard/MorningBriefing.tsx",
+    "exports": [
+      {
+        "name": "MorningBriefing",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/dashboard/NotesWidget.tsx",
+    "exports": [
+      {
+        "name": "NotesWidget",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read",
+      "rtk-query-write"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/dashboard/QuickActions.tsx",
+    "exports": [
+      {
+        "name": "QuickActions",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation",
+      "rtk-query-write"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/dashboard/TodaysTasks.tsx",
+    "exports": [
+      {
+        "name": "TodaysTasks",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read",
+      "rtk-query-write"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/dashboard/TopStats.tsx",
+    "exports": [
+      {
+        "name": "TopStats",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx",
+      "tests/TopStats.test.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/dashboard/WeeklyActivity.tsx",
+    "exports": [
+      {
+        "name": "WeeklyActivity",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/dashboard/WelcomeHeader.tsx",
+    "exports": [
+      {
+        "name": "WelcomeHeader",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "notification-api",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/family-connect/HabitListItem.tsx",
+    "exports": [
+      {
+        "name": "HabitListItem",
+        "params": "{ habit }: { habit: Habit }",
+        "kind": "const-fn"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/family-connect/TaskListItem.tsx",
+    "exports": [
+      {
+        "name": "TaskListItem",
+        "params": "{ task, now }: { task: Task, now: Date }",
+        "kind": "const-fn"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/focus-session/ActiveFocusTimer.tsx",
+    "exports": [
+      {
+        "name": "ActiveFocusTimer",
+        "params": "{ onComplete }: ActiveFocusTimerProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/focus-session/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "localStorage",
+      "notification-api",
+      "react-effect",
+      "timer"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/focus-session/AmbiencePanel.tsx",
+    "exports": [
+      {
+        "name": "AmbiencePanel",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/focus-session/ActiveFocusTimer.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "react-effect"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/focus-session/CircularProgress.tsx",
+    "exports": [
+      {
+        "name": "CircularProgress",
+        "params": "{ progress, children }: CircularProgressProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/focus-session/ActiveFocusTimer.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/focus-session/RewardCard.tsx",
+    "exports": [
+      {
+        "name": "RewardCard",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/focus-session/SessionComplete.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/focus-session/SessionComplete.tsx",
+    "exports": [
+      {
+        "name": "SessionComplete",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/focus-session/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [
+      "navigation",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/focus-session/StatsGrid.tsx",
+    "exports": [
+      {
+        "name": "StatsGrid",
+        "params": "{ taskTitle }: StatsGridProps = {}",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/focus-session/SessionComplete.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/focus-session/StrictModeToggle.tsx",
+    "exports": [
+      {
+        "name": "StrictModeToggle",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/focus-session/ActiveFocusTimer.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "notification-api"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/habit/ContributionHeatmap.tsx",
+    "exports": [
+      {
+        "name": "ContributionHeatmap",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/habits/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/habit/HabitActionMenu.tsx",
+    "exports": [
+      {
+        "name": "HabitActionMenu",
+        "params": "{ habit }: HabitActionMenuProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/habit/HabitCard.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-write"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/habit/HabitCard.tsx",
+    "exports": [
+      {
+        "name": "HabitCard",
+        "params": "{ habit, highlighted = false }: { habit: Habit; highlighted?: boolean }",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/habits/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [
+      "react-effect",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/habit/HabitDialog.tsx",
+    "exports": [],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/habits/page.tsx",
+      "components/habit/HabitActionMenu.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [
+      "react-effect",
+      "rtk-query-read",
+      "rtk-query-write"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/habit/HabitStatsModal.tsx",
+    "exports": [
+      {
+        "name": "HabitStatsModal",
+        "params": "{ open, onOpenChange, habitId }: HabitStatsModalProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/habit/HabitActionMenu.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/habit/NotificationCenter.tsx",
+    "exports": [
+      {
+        "name": "NotificationCenter",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/advanced/page.tsx",
+      "components/dashboard/WelcomeHeader.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "fetch",
+      "navigation",
+      "notification-api",
+      "rtk-query-read",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/habit/UserLevelCard.tsx",
+    "exports": [
+      {
+        "name": "UserLevelCard",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/habits/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "fetch",
+      "react-effect",
+      "rtk-query-read",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/howitwork/FinalCTA.tsx",
+    "exports": [
+      {
+        "name": "FinalCTA",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/how-it-work/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/howitwork/HeroSection.tsx",
+    "exports": [
+      {
+        "name": "HeroSection",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/how-it-work/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/howitwork/HowItWorkFooter.tsx",
+    "exports": [
+      {
+        "name": "HowItWorkFooter",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/how-it-work/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/howitwork/StepFour.tsx",
+    "exports": [
+      {
+        "name": "StepFour",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/how-it-work/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "react-effect"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/howitwork/StepOne.tsx",
+    "exports": [
+      {
+        "name": "StepOne",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/how-it-work/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "react-effect",
+      "timer"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/howitwork/StepThree.tsx",
+    "exports": [
+      {
+        "name": "StepThree",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/how-it-work/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/howitwork/StepTwo.tsx",
+    "exports": [
+      {
+        "name": "StepTwo",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(pages)/how-it-work/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "timer"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/landing/BreakdownSection.tsx",
+    "exports": [
+      {
+        "name": "BreakdownSection",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/landing/ComparisonSection.tsx",
+    "exports": [
+      {
+        "name": "ComparisonSection",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/landing/HeroSection.tsx",
+    "exports": [
+      {
+        "name": "HeroSection",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/landing/InsightsSection.tsx",
+    "exports": [
+      {
+        "name": "InsightsSection",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/landing/LandingNavbar.tsx",
+    "exports": [
+      {
+        "name": "Navbar",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(pages)/how-it-work/page.tsx",
+      "app/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "localStorage",
+      "navigation"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/landing/LanguageSection.tsx",
+    "exports": [
+      {
+        "name": "LanguageSection",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/landing/ProgressSection.tsx",
+    "exports": [
+      {
+        "name": "ProgressSection",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/landing/WhatsAppAssistant.tsx",
+    "exports": [
+      {
+        "name": "WhatsAppAssistant",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/landing/footer.tsx",
+    "exports": [
+      {
+        "name": "Footer",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/layout/AuthGuard.tsx",
+    "exports": [
+      {
+        "name": "AuthGuard",
+        "params": "{ children }: AuthGuardProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/layout.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "localStorage",
+      "navigation",
+      "react-effect",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/layout/DashboardGrid.tsx",
+    "exports": [
+      {
+        "name": "DashboardGrid",
+        "params": "{ children, sidebar }: DashboardGridProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/dashboard/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/layout/GlassHero.tsx",
+    "exports": [
+      {
+        "name": "GlassHero",
+        "params": "{ children, className, topGlowClassName, bottomGlowClassName, }: GlassHeroProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/analytics/strategic/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/layout/PageHeader.tsx",
+    "exports": [
+      {
+        "name": "PageHeader",
+        "params": "{ title, subtitle, className, children }: PageHeaderProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 8,
+    "importedBy": [
+      "app/(dashboard)/analytics/weekly-review/page.tsx",
+      "app/(dashboard)/exam-warroom/overview/page.tsx",
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/(dashboard)/habits/page.tsx",
+      "app/(dashboard)/settings/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx",
+      "components/analytics/AnalyticHeader.tsx",
+      "components/dashboard/WelcomeHeader.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/layout/PageLoader.tsx",
+    "exports": [
+      {
+        "name": "PageLoader",
+        "params": "{ title = \"Preparing your workspace\", subtitle = \"Syncing profile and loading latest data...\", fullScreen = true, }: PageLoaderProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 4,
+    "importedBy": [
+      "app/(auth)/loading.tsx",
+      "app/(dashboard)/loading.tsx",
+      "app/loading.tsx",
+      "components/layout/AuthGuard.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/layout/Sidebar.tsx",
+    "exports": [],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/layout.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "localStorage",
+      "navigation",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/modals/achievement-detail-modal.tsx",
+    "exports": [
+      {
+        "name": "AchievementDetailModal",
+        "params": "{ isOpen, onClose, achievement }: AchievementDetailModalProps",
+        "kind": "default-function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/achievement/[id]/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "react-effect"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/planner/Attachment.tsx",
+    "exports": [
+      {
+        "name": "AttachmentsList",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/[id]/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read",
+      "rtk-query-write"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/AttachmentList.tsx",
+    "exports": [
+      {
+        "name": "AttachmentList",
+        "params": "{ attachments, taskId, editable = false }: AttachmentListProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-write"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/BoardColumn.tsx",
+    "exports": [
+      {
+        "name": "BoardColumn",
+        "params": "{ title, color, tasks }: BoardColumnProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/planner/KanbanBoard.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/ClassManager.tsx",
+    "exports": [
+      {
+        "name": "ClassManager",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/advanced/page.tsx",
+      "components/planner/TimetableView.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "react-effect",
+      "rtk-query-read",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/DescriptionCard.tsx",
+    "exports": [
+      {
+        "name": "DescriptionCard",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/[id]/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/FilterDropdown.tsx",
+    "exports": [],
+    "importedByCount": 2,
+    "importedBy": [
+      "components/SearchBar.tsx",
+      "components/analytics/AnalyticHeader.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/planner/FocusHistory.tsx",
+    "exports": [
+      {
+        "name": "FocusHistory",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/[id]/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/KanbanBoard.tsx",
+    "exports": [
+      {
+        "name": "KanbanBoard",
+        "params": "{ searchQuery, status, priority, category, tasks }: KanbanBoardProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/NLPCommandBar.tsx",
+    "exports": [
+      {
+        "name": "NLPCommandBar",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/syllabus-digitizer/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-write",
+      "timer",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/RecoveryModePanel.tsx",
+    "exports": [
+      {
+        "name": "RecoveryModePanel",
+        "params": "{ tasks }: RecoveryModePanelProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/planner/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/RotationManager.tsx",
+    "exports": [
+      {
+        "name": "RotationManager",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/advanced/page.tsx",
+      "components/planner/TimetableView.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/SingleTaskHeader.tsx",
+    "exports": [
+      {
+        "name": "SingleTaskHeader",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/[id]/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/StartFocusButton.tsx",
+    "exports": [
+      {
+        "name": "StartFocusButton",
+        "params": "{ taskId: propTaskId, isInline = false }: StartFocusButtonProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/tasks/[id]/page.tsx",
+      "components/dashboard/QuickActions.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/SubTaskList.tsx",
+    "exports": [
+      {
+        "name": "SubTaskList",
+        "params": "{ taskId, subtasks }: SubTaskListProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/planner/DescriptionCard.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-write"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/SubjectCardsSidebar.tsx",
+    "exports": [
+      {
+        "name": "SubjectCardsSidebar",
+        "params": "{ selectedCategoryId, onSelectCategory }: SubjectCardsSidebarProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/SyllabusDigitizer.tsx",
+    "exports": [
+      {
+        "name": "SyllabusDigitizer",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/syllabus-digitizer/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/TaskCard.tsx",
+    "exports": [
+      {
+        "name": "TaskCard",
+        "params": "{ task, completed }: TaskCardProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/planner/BoardColumn.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "localStorage",
+      "navigation",
+      "notification-api",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/TaskEfficiencyPanel.tsx",
+    "exports": [
+      {
+        "name": "TaskEfficiencyPanel",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/[id]/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/TaskInfoPanel.tsx",
+    "exports": [
+      {
+        "name": "TaskInfoPanel",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/[id]/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "react-effect",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/TaskList.tsx",
+    "exports": [
+      {
+        "name": "TaskList",
+        "params": "{ searchQuery, status, priority, category, tasks, highlightedTaskId }: TaskListProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/page.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/TaskListCard.tsx",
+    "exports": [
+      {
+        "name": "TaskListCard",
+        "params": "{ task, completed }: TaskListCardProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/planner/TaskList.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/TimelineView.tsx",
+    "exports": [
+      {
+        "name": "TimelineView",
+        "params": "{ searchQuery, status, priority, category, tasks }: TimelineViewProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/tasks/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "navigation"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/planner/TimetableView.tsx",
+    "exports": [
+      {
+        "name": "TimetableView",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 2,
+    "importedBy": [
+      "app/(dashboard)/tasks/page.tsx",
+      "components/dashboard/WelcomeHeader.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "notification-api",
+      "rtk-query-read"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/settings/FamilyShareManagement.tsx",
+    "exports": [
+      {
+        "name": "FamilyShareManagement",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/settings/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global",
+      "rtk-query-read",
+      "rtk-query-write",
+      "timer",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/settings/LanguageSelector.tsx",
+    "exports": [
+      {
+        "name": "LanguageSelector",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/settings/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "localStorage",
+      "react-effect",
+      "toast"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/settings/PricingSection.tsx",
+    "exports": [
+      {
+        "name": "PricingSection",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/settings/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "rtk-query-read",
+      "rtk-query-write",
+      "timer"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/settings/QRAttendance.tsx",
+    "exports": [
+      {
+        "name": "QRAttendance",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/settings/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "react-effect",
+      "rtk-query-read",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/settings/QuietHoursPanel.tsx",
+    "exports": [
+      {
+        "name": "QuietHoursPanel",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/settings/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "localStorage",
+      "react-effect",
+      "rtk-query-read",
+      "rtk-query-write",
+      "toast"
+    ],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/theme-provider.tsx",
+    "exports": [
+      {
+        "name": "ThemeProvider",
+        "params": "{ children, ...props }: React.ComponentProps<typeof NextThemesProvider>",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/AppProviders.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/ConfirmDialog.tsx",
+    "exports": [
+      {
+        "name": "ConfirmDialog",
+        "params": "{ open, onOpenChange, title, description, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm, variant = 'destructive', }: ConfirmDialogProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 9,
+    "importedBy": [
+      "components/analytics/GPACalculator.tsx",
+      "components/habit/HabitActionMenu.tsx",
+      "components/planner/Attachment.tsx",
+      "components/planner/AttachmentList.tsx",
+      "components/planner/RotationManager.tsx",
+      "components/planner/SubTaskList.tsx",
+      "components/planner/TaskCard.tsx",
+      "components/planner/TaskListCard.tsx",
+      "components/settings/FamilyShareManagement.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "browser-global"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/DurationSelect.tsx",
+    "exports": [],
+    "importedByCount": 4,
+    "importedBy": [
+      "components/calendar/AiSuggestedDialog.tsx",
+      "components/calendar/ScheduleItemCard.tsx",
+      "components/focus-session/ActiveFocusTimer.tsx",
+      "components/planner/StartFocusButton.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/OptionSelector.tsx",
+    "exports": [],
+    "importedByCount": 2,
+    "importedBy": [
+      "components/createtask/EffortSelector.tsx",
+      "components/createtask/PrioritySelector.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/SyncStatusIndicator.tsx",
+    "exports": [
+      {
+        "name": "SyncStatusIndicator",
+        "params": "",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": true
+  },
+  {
+    "file": "components/ui/badge.tsx",
+    "exports": [],
+    "importedByCount": 3,
+    "importedBy": [
+      "components/analytics/MetricCard.tsx",
+      "components/analytics/SWOTReport.tsx",
+      "components/settings/FamilyShareManagement.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/button.tsx",
+    "exports": [],
+    "importedByCount": 27,
+    "importedBy": [
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/(dashboard)/habits/page.tsx",
+      "app/(dashboard)/settings/page.tsx",
+      "app/(dashboard)/syllabus/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx",
+      "components/analytics/AnalyticHeader.tsx",
+      "components/analytics/GPACalculator.tsx",
+      "components/analytics/GradeEntryManager.tsx",
+      "components/analytics/SubjectGradePredictor.tsx",
+      "components/analytics/WhatIfGPASimulator.tsx",
+      "components/calendar/AiSuggestedDialog.tsx",
+      "components/dashboard/QuickActions.tsx",
+      "components/dashboard/WelcomeHeader.tsx",
+      "components/habit/HabitDialog.tsx",
+      "components/habit/NotificationCenter.tsx",
+      "components/landing/LandingNavbar.tsx",
+      "components/planner/Attachment.tsx",
+      "components/planner/ClassManager.tsx",
+      "components/planner/RotationManager.tsx",
+      "components/planner/TaskCard.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/calendar.tsx",
+    "exports": [],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/planner/RecoveryModePanel.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [
+      "react-effect"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/card.tsx",
+    "exports": [],
+    "importedByCount": 28,
+    "importedBy": [
+      "app/(auth)/forgot-password/page.tsx",
+      "app/(auth)/login/page.tsx",
+      "app/(auth)/reset-password/[token]/page.tsx",
+      "app/(auth)/signup/page.tsx",
+      "app/(dashboard)/advanced/page.tsx",
+      "app/(dashboard)/analytics/overview/page.tsx",
+      "app/(dashboard)/analytics/weekly-review/page.tsx",
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/(dashboard)/settings/page.tsx",
+      "app/(dashboard)/syllabus/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx",
+      "components/analytics/CycleTimeScatterPlot.tsx",
+      "components/analytics/GPACalculator.tsx",
+      "components/analytics/PeakProductivityCard.tsx",
+      "components/analytics/ProductivityInsights.tsx",
+      "components/analytics/SWOTAnalysis.tsx",
+      "components/analytics/SWOTReport.tsx",
+      "components/analytics/SubjectGradePredictor.tsx",
+      "components/analytics/TimeLeakageCard.tsx",
+      "components/analytics/WhatIfGPASimulator.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/dialog.tsx",
+    "exports": [],
+    "importedByCount": 16,
+    "importedBy": [
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/(dashboard)/settings/page.tsx",
+      "app/(dashboard)/subjects/page.tsx",
+      "app/(dashboard)/syllabus/page.tsx",
+      "components/analytics/GPACalculator.tsx",
+      "components/calendar/AiSuggestedDialog.tsx",
+      "components/calendar/CalendarHeader.tsx",
+      "components/dashboard/QuickActions.tsx",
+      "components/dashboard/WelcomeHeader.tsx",
+      "components/habit/HabitDialog.tsx",
+      "components/habit/HabitStatsModal.tsx",
+      "components/planner/Attachment.tsx",
+      "components/planner/RotationManager.tsx",
+      "components/planner/TaskCard.tsx",
+      "components/planner/TimetableView.tsx",
+      "components/ui/ConfirmDialog.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/dropdown-menu.tsx",
+    "exports": [],
+    "importedByCount": 5,
+    "importedBy": [
+      "components/habit/HabitActionMenu.tsx",
+      "components/landing/LandingNavbar.tsx",
+      "components/planner/FilterDropdown.tsx",
+      "components/planner/TaskCard.tsx",
+      "components/planner/TaskListCard.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/empty.tsx",
+    "exports": [],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/field.tsx",
+    "exports": [],
+    "importedByCount": 2,
+    "importedBy": [
+      "components/calendar/AiSuggestedDialog.tsx",
+      "components/habit/HabitDialog.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/input.tsx",
+    "exports": [],
+    "importedByCount": 14,
+    "importedBy": [
+      "app/(dashboard)/createtask/page.tsx",
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/(dashboard)/settings/page.tsx",
+      "app/(dashboard)/syllabus/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx",
+      "components/analytics/GPACalculator.tsx",
+      "components/analytics/GradeEntryManager.tsx",
+      "components/analytics/SWOTAnalysis.tsx",
+      "components/habit/HabitDialog.tsx",
+      "components/planner/Attachment.tsx",
+      "components/planner/ClassManager.tsx",
+      "components/planner/RotationManager.tsx",
+      "components/planner/TaskCard.tsx",
+      "components/settings/FamilyShareManagement.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/label.tsx",
+    "exports": [],
+    "importedByCount": 10,
+    "importedBy": [
+      "app/(dashboard)/createtask/page.tsx",
+      "app/(dashboard)/settings/page.tsx",
+      "app/(dashboard)/syllabus/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx",
+      "components/analytics/SubjectGradePredictor.tsx",
+      "components/analytics/WhatIfGPASimulator.tsx",
+      "components/calendar/AiSuggestedDialog.tsx",
+      "components/habit/HabitDialog.tsx",
+      "components/settings/FamilyShareManagement.tsx",
+      "components/ui/field.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/popover.tsx",
+    "exports": [],
+    "importedByCount": 4,
+    "importedBy": [
+      "components/dashboard/WelcomeHeader.tsx",
+      "components/habit/HabitDialog.tsx",
+      "components/planner/RecoveryModePanel.tsx",
+      "components/ui/time-picker-input.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/select.tsx",
+    "exports": [],
+    "importedByCount": 7,
+    "importedBy": [
+      "app/(dashboard)/analytics/strategic/page.tsx",
+      "app/(dashboard)/analytics/weekly-review/page.tsx",
+      "app/(dashboard)/settings/page.tsx",
+      "app/(dashboard)/syllabus/page.tsx",
+      "components/calendar/AiSuggestedDialog.tsx",
+      "components/settings/FamilyShareManagement.tsx",
+      "components/ui/time-picker-input.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/separator.tsx",
+    "exports": [],
+    "importedByCount": 3,
+    "importedBy": [
+      "app/(dashboard)/settings/page.tsx",
+      "components/settings/QRAttendance.tsx",
+      "components/ui/field.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/skeleton.tsx",
+    "exports": [],
+    "importedByCount": 37,
+    "importedBy": [
+      "app/(dashboard)/achievement/[id]/page.tsx",
+      "app/(dashboard)/analytics/loading.tsx",
+      "app/(dashboard)/analytics/overview/page.tsx",
+      "app/(dashboard)/analytics/strategic/page.tsx",
+      "app/(dashboard)/analytics/weekly-review/page.tsx",
+      "app/(dashboard)/dashboard/loading.tsx",
+      "app/(dashboard)/exam-warroom/overview/page.tsx",
+      "app/(dashboard)/exam-warroom/revision/page.tsx",
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/(dashboard)/habits/loading.tsx",
+      "app/(dashboard)/habits/page.tsx",
+      "app/(dashboard)/layout.tsx",
+      "app/(dashboard)/planner/loading.tsx",
+      "app/(dashboard)/reports/page.tsx",
+      "app/(dashboard)/settings/page.tsx",
+      "app/(dashboard)/subjects/page.tsx",
+      "app/(dashboard)/tasks/loading.tsx",
+      "app/(dashboard)/tasks/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx",
+      "components/achievements/BadgesGrid.tsx"
+    ],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/slider.tsx",
+    "exports": [],
+    "importedByCount": 3,
+    "importedBy": [
+      "components/analytics/SubjectGradePredictor.tsx",
+      "components/analytics/WhatIfGPASimulator.tsx",
+      "components/calendar/AiSuggestedDialog.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/sonner.tsx",
+    "exports": [],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "toast"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/stat-card.tsx",
+    "exports": [
+      {
+        "name": "StatCard",
+        "params": "{ title, description, subDescription, icon: Icon, iconColor = \"text-white\", iconBgColor = \"bg-white/10\", trend, trendDirection = 'neutral', isLoading = false, error = false, emptyMessage = \"No data available\", loadingHei",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 5,
+    "importedBy": [
+      "app/(dashboard)/family-connect/page.tsx",
+      "app/family-connect/accept/[token]/page.tsx",
+      "components/analytics/DurationPredictionCard.tsx",
+      "components/analytics/PredictiveScoreCard.tsx",
+      "components/analytics/StatCard.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/switch.tsx",
+    "exports": [],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/settings/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/table.tsx",
+    "exports": [],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": false,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/tabs.tsx",
+    "exports": [],
+    "importedByCount": 1,
+    "importedBy": [
+      "app/(dashboard)/advanced/page.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/time-picker-input.tsx",
+    "exports": [
+      {
+        "name": "TimePickerInput",
+        "params": "{ value, onChange, className, disabled = false, minuteStep = 5, }: TimePickerInputProps",
+        "kind": "function"
+      }
+    ],
+    "importedByCount": 3,
+    "importedBy": [
+      "app/(dashboard)/createtask/page.tsx",
+      "components/planner/ClassManager.tsx",
+      "components/settings/QuietHoursPanel.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/toast-provider.tsx",
+    "exports": [
+      {
+        "name": "ToastProvider",
+        "params": "{ children }: { children: React.ReactNode }",
+        "kind": "function"
+      },
+      {
+        "name": "useToast",
+        "params": "",
+        "kind": "const-fn"
+      }
+    ],
+    "importedByCount": 0,
+    "importedBy": [],
+    "hasUseClient": true,
+    "sideEffects": [
+      "timer",
+      "toast"
+    ],
+    "usesStoreHooks": false
+  },
+  {
+    "file": "components/ui/tooltip.tsx",
+    "exports": [],
+    "importedByCount": 1,
+    "importedBy": [
+      "components/AppProviders.tsx"
+    ],
+    "hasUseClient": true,
+    "sideEffects": [],
+    "usesStoreHooks": false
+  }
+]
