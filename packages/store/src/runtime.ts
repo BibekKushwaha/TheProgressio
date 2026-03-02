@@ -1,3 +1,6 @@
+/** Key used across web & store packages to signal an active server session. */
+export const AUTH_SESSION_KEY = 'auth:hasSession' as const;
+
 type StorageLike = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;

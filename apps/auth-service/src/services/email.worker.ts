@@ -23,9 +23,14 @@ const FROM_EMAIL = process.env.FROM_EMAIL || "no-reply@transition.com";
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
+  // port 465 = SSL (secure:true), port 587/25 = STARTTLS (secure:false)
+  secure: SMTP_PORT === 465,
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASS,
+  },
+  tls: {
+    rejectUnauthorized: process.env.NODE_ENV === "production",
   },
 });
 
@@ -35,12 +40,6 @@ export const emailWorker = QUEUE_ENABLED
       async (job: Job<EmailJobData>) => {
         const { to, subject, body, html } = job.data;
         console.log(`[EmailWorker] Processing email to ${to} (Subject: ${subject})`);
-
-        // In DEV, if no real SMTP credentials provided, log the email and finish
-        if (!process.env.SMTP_USER || process.env.SMTP_USER === "user") {
-          console.log(`[EmailWorker][DEV] Logging email content to ${to}: ${body}`);
-          return;
-        }
 
         await transporter.sendMail({
           from: FROM_EMAIL,

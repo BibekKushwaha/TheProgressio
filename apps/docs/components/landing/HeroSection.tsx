@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, Focus, LayoutDashboard } from 'lucide-react';
 import { selectCurrentUser, useAppSelector, useGetActiveLiveSessionQuery } from '@repo/store';
 import { useRouter } from 'next/navigation';
+import { getDebugPollingOptions } from '@/lib/refetchDebug';
 
 const FADE_UP = (delay = 0) => ({
   initial: { opacity: 0, y: 20 },
@@ -34,7 +35,7 @@ export function HeroSection() {
   const router = useRouter();
   const { data: activeLive } = useGetActiveLiveSessionQuery(undefined, {
     skip: !user,
-    pollingInterval: user ? 10000 : 0, // only poll when a user is logged in
+    ...getDebugPollingOptions('hero.activeLive', 10000),
   });
 
   const isLive = !!activeLive?.session;

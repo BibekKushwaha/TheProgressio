@@ -2,7 +2,7 @@
 
 import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
+import { getDebugPollingOptions } from '@/lib/refetchDebug';
 
 const DEFAULT_TRENDS = [
     { date: 'Mon', hours: 0 },
@@ -15,12 +15,11 @@ const DEFAULT_TRENDS = [
 ];
 
 export function FocusTrends({ pastDays }: { pastDays: string }) {
-    const isVisible = usePageVisibility();
-    // Weekly trend data changes at most once per session-log; 5-minute polling
-    // when the tab is visible, paused entirely when hidden.
-    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
-        pollingInterval: isVisible ? 300000 : 0,
-    });
+    // Weekly trend data changes at most once per session-log.
+    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(
+        undefined,
+        getDebugPollingOptions('focusTrends.weekly', 300000)
+    );
     const chartWidth = 600;
     const chartHeight = 256;
 

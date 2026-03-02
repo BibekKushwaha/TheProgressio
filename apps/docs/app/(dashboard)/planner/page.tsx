@@ -1,19 +1,15 @@
 "use client"
 
 import { RecoveryModePanel } from '@/components/planner/RecoveryModePanel'
-import { useGetTasksQuery, useLocalTasks } from '@repo/store';
+import { useGetTasksQuery } from '@repo/store';
 import React, { useMemo } from 'react'
 import { AlertCircle, Zap, Clock } from 'lucide-react';
-import { mergeTaskSources } from '@/lib/mergeTasks';
 
 const PlannerPage = () => {
-    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 50 });
-    const { tasks: cachedTasks } = useLocalTasks();
-    
-    const tasks = useMemo(
-        () => mergeTaskSources(allTasks || [], cachedTasks),
-        [allTasks, cachedTasks]
-    );
+    const tasksQueryArgs = useMemo(() => ({ page: 1, limit: 50 }), []);
+    const { data: allTasks } = useGetTasksQuery(tasksQueryArgs);
+
+    const tasks = useMemo(() => allTasks ?? [], [allTasks]);
 
     // Calculate task metrics
     const metrics = useMemo(() => {

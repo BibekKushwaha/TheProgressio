@@ -5,7 +5,9 @@ import { Provider } from 'react-redux';
 import { makeStore, AppStore } from './store';
 import { useGetProfileQuery } from './services/authApi';
 import { useAppDispatch, useAppSelector } from './hooks';
-import { hydrateAuth, logout, selectIsAuthenticated } from './slices/authSlice';
+import { setAuthLoading, hydrateAuth, logout, selectIsAuthenticated } from './slices/authSlice';
+import { AUTH_SESSION_KEY } from './runtime';
+import { clearRtkCache } from './cache-persist';
 import { syncEngine } from './sync-engine';
 import {
   getLocalStorageItem,
@@ -36,13 +38,16 @@ function AuthHydrator() {
   });
 
   useEffect(() => {
-    const hasSession = getLocalStorageItem('auth:hasSession') === '1';
-    setShouldFetch(!isAuthenticated && hasSession && !isAuthRoute());
+    const hasSession = getLocalStorageItem(AUTH_SESSION_KEY) === '1';
+    if (!isAuthenticated && hasSession && !isAuthRoute()) {
+      dispatch(setAuthLoading());
+      setShouldFetch(true);
+    }
   }, [isAuthenticated]);
 
   useEffect(() => {
     if (isSuccess && data?.user) {
-      setLocalStorageItem('auth:hasSession', '1');
+      setLocalStorageItem(AUTH_SESSION_KEY, '1');
       dispatch(hydrateAuth({ user: data.user }));
     }
   }, [isSuccess, data, dispatch]);
@@ -51,7 +56,8 @@ function AuthHydrator() {
     if (!error) return;
     const status = 'status' in error ? error.status : undefined;
     if (status === 401 || status === 404) {
-      removeLocalStorageItem('auth:hasSession');
+      removeLocalStorageItem(AUTH_SESSION_KEY);
+      clearRtkCache();
       dispatch(logout());
       setShouldFetch(false);
     }

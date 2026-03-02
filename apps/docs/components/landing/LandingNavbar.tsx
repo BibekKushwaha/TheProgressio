@@ -1,5 +1,6 @@
 'use client';
 import { useIsMounted } from '@/hooks/useIsMounted';
+import { AUTH_SESSION_KEY } from '@/constant';
 
 import {
   logout as logoutAction,
@@ -43,7 +44,7 @@ export function Navbar() {
     } finally {
       // Force local logout to ensure UI updates immediately
       dispatch(logoutAction());
-      localStorage.removeItem('auth:hasSession');
+      localStorage.removeItem(AUTH_SESSION_KEY);
       router.push('/');
     }
   };

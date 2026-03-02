@@ -1,7 +1,7 @@
 'use client';
 
 import { Play, Target } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import DurationSelect from '@/components/ui/DurationSelect';
 import { useRouter } from 'next/navigation';
 import { useGetTasksQuery, TaskStatus, Task } from '@repo/store';
@@ -19,7 +19,11 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
     const taskId = propTaskId || activeTaskId || routeTaskId;
     const [showTaskSelector, setShowTaskSelector] = useState(false);
 
-    const { data: tasks } = useGetTasksQuery({ status: TaskStatus.PENDING });
+    // Use the same cache key as MorningBriefing ({page:1, limit:10, status:PENDING})
+    // so RTK Query serves this from the already-populated cache instead of
+    // making a separate unbounded tasks?status=PENDING network request.
+    const pendingTasksQueryArgs = useMemo(() => ({ page: 1, limit: 10, status: TaskStatus.PENDING }), []);
+    const { data: tasks } = useGetTasksQuery(pendingTasksQueryArgs);
     const [selectedDuration, setSelectedDuration] = useState<number>(25);
 
     const handleStart = () => {

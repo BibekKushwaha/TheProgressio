@@ -174,7 +174,13 @@ export function withAuthRefresh<BaseQuery extends BaseQueryFn<any, any, any, any
     }
 
     const refreshed = await ensureFreshWebSession();
-    if (!refreshed) return result;
+    if (!refreshed) {
+      // Refresh failed — no valid session remains. Clear Redux auth state so
+      // the UI reacts (AuthGuard will redirect to /login) rather than staying
+      // in a broken "authenticated" limbo.
+      api?.dispatch?.(logout());
+      return result;
+    }
 
     return (baseQuery as any)(args, api, extraOptions);
   };

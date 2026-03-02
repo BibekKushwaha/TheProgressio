@@ -2,21 +2,17 @@
 
 import React, { useState } from 'react';
 import { useGetWeeklyTrendsQuery, useGetProfileQuery } from '@repo/store';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getDebugRefetchOptions } from '@/lib/refetchDebug';
 
 export function WeeklyActivity() {
     const [viewType, setViewType] = useState<'week' | 'month'>('week');
-    const isVisible = usePageVisibility();
     const { data: profileData } = useGetProfileQuery();
-    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined, {
-        // Weekly trends change at most once per study session — 5-min poll is
-        // far more than sufficient and cuts backend load by 5×.
-        pollingInterval: isVisible ? 300000 : 0,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
+    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(
+        undefined,
+        getDebugRefetchOptions('weeklyActivity.trends', 300000)
+    );
     const periodOptions = [
         { value: 'week' as const, label: 'Week' },
         { value: 'month' as const, label: 'Month' },

@@ -5,20 +5,16 @@ import { ChevronRight, Clock, CheckCircle2, Circle } from 'lucide-react';
 import { useGetTasksQuery, useToggleTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { getDebugRefetchOptions } from '@/lib/refetchDebug';
 
 export function TodaysTasks() {
     const today = useMemo(() => new Date().toISOString().split('T')[0], []);
-    const isVisible = usePageVisibility();
-    // Task list is kept fresh by tag invalidation on toggle/add mutations.
-    // Background polling every 60s when visible covers cross-device updates;
-    // pause entirely when the tab is hidden.
-    const { data: tasks, isLoading } = useGetTasksQuery({ date: today }, {
-        pollingInterval: isVisible ? 60000 : 0,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
+    const todaysTasksQueryArgs = useMemo(() => ({ date: today }), [today]);
+    const { data: tasks, isLoading } = useGetTasksQuery(
+        todaysTasksQueryArgs,
+        getDebugRefetchOptions('todaysTasks.list', 60000)
+    );
     const [toggleTask] = useToggleTaskMutation();
 
     const PRIORITY_RANK: Record<string, number> = {

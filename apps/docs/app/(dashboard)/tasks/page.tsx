@@ -6,10 +6,10 @@ import { TimetableView } from '@/components/planner/TimetableView';
 import { TimelineView } from '@/components/planner/TimelineView';
 import { useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { mergeTaskSources } from '@/lib/mergeTasks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SearchBar } from '@/components/SearchBar';
 import { useHighlightedTaskScroll, useTaskQuerySyncFromUrl } from '@/hooks/useTasksPageRouting';
+import { mergeTaskSources } from '@/lib/mergeTasks';
 
 export default function TasksPage() {
     const router = useRouter();
@@ -25,11 +25,12 @@ export default function TasksPage() {
 
     const localHydrated = useLocalDbHydration();
     const { data: categories } = useGetCategoriesQuery();
-    const { data: allTasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
-
+    const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
+    const { data: allTasks, isLoading } = useGetTasksQuery(allTasksQueryArgs);
     const { tasks: cachedTasks } = useLocalTasks();
+
     const tasks = useMemo(
-        () => mergeTaskSources(allTasks || [], cachedTasks),
+        () => mergeTaskSources(allTasks ?? [], cachedTasks ?? []),
         [allTasks, cachedTasks]
     );
 
@@ -89,19 +90,19 @@ export default function TasksPage() {
     return (
         <div className="space-y-4 pt-5 md:pt-15 lg:pt-0 ">
             <div className='flex'>
-            <SearchBar
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                status={status}
-                setStatus={setStatus}
-                priority={priority}
-                setPriority={setPriority}
-                selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
-                view={view}
-                setView={handleViewChange}
-                categoryOptions={categoryOptions}
-            />
+                <SearchBar
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    status={status}
+                    setStatus={setStatus}
+                    priority={priority}
+                    setPriority={setPriority}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
+                    view={view}
+                    setView={handleViewChange}
+                    categoryOptions={categoryOptions}
+                />
             </div>
             {view === 'kanban' ? (
                 <KanbanBoard

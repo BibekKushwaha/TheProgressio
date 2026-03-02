@@ -2,15 +2,14 @@
 
 import { useGetDailySummaryQuery, SessionType } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
+import { getDebugPollingOptions } from '@/lib/refetchDebug';
 
 export function SessionBreakdown({ pastDays }: { pastDays: string }) {
-    const isVisible = usePageVisibility();
-    // Daily summary updates via tag invalidation on session log. Poll every
-    // 2 minutes when the tab is visible; pause when it is hidden.
-    const { data: summaryData, isLoading } = useGetDailySummaryQuery(pastDays, {
-        pollingInterval: isVisible ? 120000 : 0,
-    });
+    // Daily summary updates via tag invalidation on session log.
+    const { data: summaryData, isLoading } = useGetDailySummaryQuery(
+        pastDays,
+        getDebugPollingOptions('sessionBreakdown.dailySummary', 120000)
+    );
 
     const colors: Record<SessionType, string> = {
         [SessionType.DEEP_WORK]: 'rgb(6, 182, 212)', // Cyan

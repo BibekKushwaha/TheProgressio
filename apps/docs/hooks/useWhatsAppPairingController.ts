@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useGetWhatsAppPairingCodeQuery, useUnpairWhatsAppMutation } from '@repo/store';
 import { toast } from 'sonner';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
+import { getDebugMountRefetchOptions, getDebugPollingOptions } from '@/lib/refetchDebug';
 
 interface WhatsAppPairingController {
     pairingData: ReturnType<typeof useGetWhatsAppPairingCodeQuery>['data'];
@@ -17,16 +16,13 @@ interface WhatsAppPairingController {
 }
 
 export function useWhatsAppPairingController(): WhatsAppPairingController {
-    const [isPairingPolling, setIsPairingPolling] = useState(true);
-    const isPageVisible = usePageVisibility();
-
     const {
         data: pairingData,
         isLoading: isPairingLoading,
         refetch: refetchPairing,
     } = useGetWhatsAppPairingCodeQuery(undefined, {
-        pollingInterval: isPairingPolling && isPageVisible ? 30000 : 0,
-        refetchOnMountOrArgChange: true,
+        ...getDebugPollingOptions('whatsAppPairing.code', 30000),
+        ...getDebugMountRefetchOptions('whatsAppPairing.mountRefetch'),
     });
 
     const [unpairWhatsApp, { isLoading: isUnpairing }] = useUnpairWhatsAppMutation();
@@ -37,12 +33,6 @@ export function useWhatsAppPairingController(): WhatsAppPairingController {
         whatsAppBotNumberDigits && pairingData?.pairingCode
             ? `https://wa.me/${whatsAppBotNumberDigits}?text=${encodeURIComponent(pairingData.pairingCode)}`
             : null;
-
-    useEffect(() => {
-        if (pairingData?.verified) {
-            setIsPairingPolling(false);
-        }
-    }, [pairingData?.verified]);
 
     const copyPairingCode = () => {
         if (!pairingData?.pairingCode) return;
@@ -55,7 +45,6 @@ export function useWhatsAppPairingController(): WhatsAppPairingController {
     const unpair = async () => {
         try {
             await unpairWhatsApp().unwrap();
-            setIsPairingPolling(true);
             await refetchPairing();
             toast.success('WhatsApp account unpaired');
             return true;

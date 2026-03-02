@@ -5,8 +5,8 @@ import dynamic from "next/dynamic";
 import { TrendingUp, Clock, Target, Award } from "lucide-react";
 
 import { useGetWeeklyTrendsQuery, useGetDashboardSummaryQuery } from "@repo/store";
-import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getDebugRefetchOptions } from "@/lib/refetchDebug";
 
 // Lazily load recharts — splits the heavy chart bundle into its own chunk
 // so it doesn't block the initial route paint.
@@ -22,20 +22,16 @@ const ReportsCharts = dynamic(() => import("./ReportsCharts"), {
 });
 
 export default function ReportsPage() {
-    const isVisible = usePageVisibility();
-    const pollingMs = isVisible ? 60000 : 0;
-
     // Single BFF call — replaces useGetDailySummaryQuery + useGetFocusScoreQuery
     // + useGetUserStreakQuery. All three data sets are inside dashboardData.
     const { data: dashboardData, isLoading: isDashLoading } = useGetDashboardSummaryQuery(
         { leakageDays: 7, peakDays: 30 },
-        { pollingInterval: pollingMs, refetchOnFocus: true, refetchOnReconnect: true }
+        getDebugRefetchOptions('reports.dashboardSummary', 60000)
     );
-    const { data: trendsData, isLoading: isTrendsLoading } = useGetWeeklyTrendsQuery(undefined, {
-        pollingInterval: pollingMs,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
+    const { data: trendsData, isLoading: isTrendsLoading } = useGetWeeklyTrendsQuery(
+        undefined,
+        getDebugRefetchOptions('reports.weeklyTrends', 60000)
+    );
 
     const weeklyData = trendsData?.data || [];
 

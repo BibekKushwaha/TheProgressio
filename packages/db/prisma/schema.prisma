@@ -22,6 +22,10 @@ model User {
   whatsappVerified Boolean    @default(false)
   whatsappPairingCode String? @unique
   lastActiveAt     DateTime?
+  // Account lockout: incremented on each failed login, reset on success.
+  // lockedUntil is set when failedLoginAttempts reaches the threshold.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
   dailyGoalHours   Float      @default(4.0)
   plan             BillingPlan   @default(FREE)
   planStatus       BillingStatus @default(INACTIVE)
@@ -55,8 +59,10 @@ model User {
   rotationPatterns RotationPattern[]
   holidays         SchoolHoliday[]
   
-  mobileRefreshTokens MobileRefreshToken[]
-  oauthAccounts       OAuthAccount[]
+  mobileRefreshTokens  MobileRefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
+  securityEvents       SecurityEvent[]
+  oauthAccounts        OAuthAccount[]
   familyShareLinks    FamilyShareLink[]
   mentorAlertSubscriptions MentorAlertSubscription[]
   mentorAlerts           MentorAlert[]
@@ -111,17 +117,61 @@ model UserConversation {
 }
 
 model MobileRefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
-  deviceId  String?
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime @default(now())
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash         String    @unique
+  deviceId          String?
+  expiresAt         DateTime
+  // Hard cap: no matter how many times the token is rotated, this session
+  // must end by absoluteExpiresAt. Prevents infinite sliding sessions.
+  // Nullable for backwards compat with existing rows (treated as uncapped).
+  absoluteExpiresAt DateTime?
+  revokedAt         DateTime?
+  // Device fingerprint fields (stored as short hashes, not raw values)
+  deviceName        String?   // Human-readable: "Chrome on macOS"
+  ipHash            String?   // SHA-256 prefix of client IP
+  uaHash            String?   // SHA-256 prefix of user-agent
+  lastSeenAt        DateTime? // Updated on each successful refresh
+  createdAt         DateTime  @default(now())
 
   @@index([userId])
   @@index([tokenHash])
+}
+
+// Tracks issued password-reset tokens so they can be single-use and revocable.
+// Storing the hash (not the raw token) so a DB breach doesn't expose live tokens.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+// Immutable security event log. Used for auditing, attack investigation,
+// and triggering security alerts. Never updated — only inserted.
+model SecurityEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  eventType String   // LOGIN_SUCCESS | LOGIN_FAILED | ACCOUNT_LOCKED |
+                     // REFRESH_TOKEN_REUSE | SUSPICIOUS_SESSION |
+                     // PASSWORD_RESET_REQUESTED | PASSWORD_CHANGED |
+                     // SESSION_REVOKED | LOGOUT_ALL_DEVICES
+  ipHash    String?  // SHA-256 prefix of client IP
+  uaHash    String?  // SHA-256 prefix of user-agent
+  details   String?  // JSON string for extra context
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([createdAt])
 }
 
 model FamilyShareLink {

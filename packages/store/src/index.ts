@@ -17,6 +17,7 @@ export {
 
 // Runtime helpers (web-safe localStorage access)
 export {
+  AUTH_SESSION_KEY,
   getFamilyShareToken,
   getLocalStorageItem,
   setLocalStorageItem,
@@ -31,13 +32,15 @@ export {
 export { useAppDispatch, useAppSelector, useAppStore } from './hooks';
 
 // Auth slice
-export type { AuthState } from './slices/authSlice';
+export type { AuthState, AuthStatus } from './slices/authSlice';
 export {
+  setAuthLoading,
   setCredentials,
   logout,
   hydrateAuth,
   selectCurrentUser,
   selectIsAuthenticated,
+  selectAuthStatus,
 } from './slices/authSlice';
 export type { User } from './slices/authSlice';
 
@@ -79,6 +82,9 @@ export {
   useExportAccountDataQuery,
   useLazyExportAccountDataQuery,
   useDeleteAccountMutation,
+  useListSessionsQuery,
+  useRevokeSessionMutation,
+  useLogoutAllDevicesMutation,
 } from './services/authApi';
 export type {
   RegisterRequest,
@@ -87,6 +93,7 @@ export type {
   MobileAuthResponse,
   FamilyShareLink,
   AccountExportPayload,
+  SessionInfo,
 } from './services/authApi';
 
 // Tasks API

@@ -7,7 +7,8 @@ import { useGetTasksQuery, Task } from "@repo/store";
 import { getTodayDateKey, toLocalDateKey, formatRelativeDate } from "@/lib/date";
 
 export function UpcomingTasksPanel() {
-    const { data: tasks, isLoading } = useGetTasksQuery({ page: 1, limit: 500 });
+    const tasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
+    const { data: tasks, isLoading } = useGetTasksQuery(tasksQueryArgs);
     const formatTaskTitle = (title: string) => title.charAt(0).toUpperCase() + title.slice(1);
 
     const upcomingTasks = useMemo(() => {

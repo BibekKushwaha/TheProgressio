@@ -38,7 +38,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@upstash/redis": "^1.36.2"
+    "@upstash/redis": "^1.36.2",
+    "ioredis": "^5.9.3"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",

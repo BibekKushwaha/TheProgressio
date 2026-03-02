@@ -15,26 +15,27 @@ import {
   useGetHabitsQuery,
   useGetTasksQuery,
   useGetTaskMetricsQuery,
+  useLocalTasks,
 } from "@repo/store";
-import { useLocalTasks } from "@repo/store";
-import { mergeTaskSources } from "@/lib/mergeTasks";
-import { usePageVisibility } from "@/hooks/usePageVisibility";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { exportTasksToCSV, downloadCSV } from "@/lib/exportUtils";
+import { mergeTaskSources } from "@/lib/mergeTasks";
+import { getDebugPollingOptions } from "@/lib/refetchDebug";
 import { toast } from "sonner";
 
 export default function AnalyticsOverviewPage() {
   const [pastDays, setPastDays] = useState("1");
-  const isVisible = usePageVisibility();
-  const pollMs = isVisible ? 60000 : 0;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const {
     data: summaryData,
     isLoading: isSummaryLoading,
     isFetching: isSummaryFetching
-  } = useGetDailySummaryQuery(pastDays, {
-    pollingInterval: pollMs,
-  });
+  } = useGetDailySummaryQuery(pastDays, getDebugPollingOptions('analyticsOverview.dailySummary', 60000));
 
   // BFF replaces useGetFocusScoreQuery — gets score+breakdown in the same
   // request as leakage/peak, so no extra round-trip on page load.
@@ -44,7 +45,7 @@ export default function AnalyticsOverviewPage() {
     isFetching: isDashFetching
   } = useGetDashboardSummaryQuery(
     { leakageDays: parseInt(pastDays) || 7, peakDays: 30 },
-    { pollingInterval: pollMs }
+    getDebugPollingOptions('analyticsOverview.dashboardSummary', 60000)
   );
 
   // Lightweight count-only endpoint — no full task rows transferred.
@@ -54,12 +55,14 @@ export default function AnalyticsOverviewPage() {
   } = useGetTaskMetricsQuery(undefined);
 
   // Full task list only for the table render and CSV export.
-  const { data: allServerTasks = [] } = useGetTasksQuery({ page: 1, limit: 500 });
-
-  // Local (IndexedDB) tasks used to merge with server data (offline / local-only items)
+  const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
+  const { data: allServerTasks = [] } = useGetTasksQuery(allTasksQueryArgs);
   const { tasks: cachedTasks } = useLocalTasks();
 
-  const mergedTasks = useMemo(() => mergeTaskSources(allServerTasks || [], cachedTasks || []), [allServerTasks, cachedTasks]);
+  const mergedTasks = useMemo(
+    () => mergeTaskSources(allServerTasks ?? [], cachedTasks ?? []),
+    [allServerTasks, cachedTasks]
+  );
 
   const {
     data: habitsResponse,
@@ -229,6 +232,11 @@ export default function AnalyticsOverviewPage() {
 
   return (
     <div className="space-y-8">
+      {!mounted && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
+          <Skeleton className="h-12 w-12 rounded-full" />
+        </div>
+      )}
       <AnalyticsHeader
         pastDays={pastDays}
         setPastDays={setPastDays}
@@ -310,4 +318,3 @@ export default function AnalyticsOverviewPage() {
     </div>
   );
 }
-

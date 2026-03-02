@@ -1,22 +1,24 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useGetMorningBriefingQuery, useGetTasksQuery, TaskStatus } from '@repo/store';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { Sun, BookOpen, Flame, AlertTriangle, ChevronRight, Clock, Zap, MapPin } from 'lucide-react';
 import Link from 'next/link';
+import { getDebugRefetchOptions } from '@/lib/refetchDebug';
 
 export function MorningBriefing() {
-    const isVisible = usePageVisibility();
-    const { data, isLoading } = useGetMorningBriefingQuery(undefined, {
-        pollingInterval: isVisible ? 300000 : 0,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
-    const { data: allTasks } = useGetTasksQuery({ page: 1, limit: 10, status: TaskStatus.PENDING }, {
-        pollingInterval: isVisible ? 120000 : 0,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
+    const { data, isLoading } = useGetMorningBriefingQuery(
+        undefined,
+        getDebugRefetchOptions('morningBriefing.summary', 300000)
+    );
+    const pendingTasksQueryArgs = useMemo(
+        () => ({ page: 1, limit: 10, status: TaskStatus.PENDING }),
+        []
+    );
+    const { data: allTasks } = useGetTasksQuery(
+        pendingTasksQueryArgs,
+        getDebugRefetchOptions('morningBriefing.tasks', 120000)
+    );
     const briefing = data?.briefing;
     type UpcomingExam = { title: string; daysUntil: number };
     const upcomingExams = (briefing?.upcomingExams ?? []) as UpcomingExam[];

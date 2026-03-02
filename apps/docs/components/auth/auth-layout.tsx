@@ -20,6 +20,11 @@ interface AuthFormPaneProps {
     mobileBackgroundClassName?: string;
 }
 
+interface AuthCenteredLayoutProps {
+    children: React.ReactNode;
+    className?: string;
+}
+
 export function AuthSplitLayout({
     formPane,
     visualPane,
@@ -85,6 +90,31 @@ export function AuthFormPane({
             >
                 {children}
             </Card>
+        </div>
+    );
+}
+
+/**
+ * Full-screen centered layout used by focused single-card auth pages
+ * (forgot-password, reset-password). Provides the shared background mesh so
+ * individual pages don't duplicate this decoration.
+ */
+export function AuthCenteredLayout({ children, className }: AuthCenteredLayoutProps) {
+    return (
+        <div
+            className={cn(
+                "min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden",
+                className,
+            )}
+        >
+            {/* Decorative ambient orbs — GPU-promoted via will-change-transform */}
+            <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+                <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-[#6366f1]/10 rounded-full blur-[100px] will-change-transform" />
+                <div className="absolute top-[40%] right-[10%] w-[40%] h-[40%] bg-[#a855f7]/10 rounded-full blur-[100px] will-change-transform" />
+            </div>
+            <div className="w-full max-w-md relative z-10">
+                {children}
+            </div>
         </div>
     );
 }
