@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useState } from "react";
+import React, { memo, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -24,6 +24,7 @@ import {
 import { cn } from "../../lib/utils";
 import { Card } from "../ui/card";
 import { logout as logoutAction, useAppDispatch, useLogoutMutation } from "@repo/store";
+import { AUTH_SESSION_KEY } from "@/constant";
 import { toast } from "sonner";
 import { trackFeatureOpened } from "@/lib/navigationTelemetry";
 
@@ -273,7 +274,7 @@ const Sidebar = () => {
             await logoutApi().unwrap();
             dispatch(logoutAction());
             if (typeof window !== "undefined") {
-                localStorage.removeItem("auth:hasSession");
+                localStorage.removeItem(AUTH_SESSION_KEY);
             }
             toast.success("Logged out successfully");
             router.push("/login");
@@ -287,7 +288,7 @@ const Sidebar = () => {
         setMobileMenuOpen(true);
     };
 
-    const closeMobileMenu = () => setMobileMenuOpen(false);
+    const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
     return (
         <>

@@ -4,17 +4,15 @@ import { useState, useRef, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import { useGetNudgesQuery, useMarkNudgeAsReadMutation, useMarkAllNudgesAsReadMutation } from '@repo/store';
 import type { Nudge } from '@repo/store';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
-import { NUDGE_POLL_INTERVAL_MS } from '@/constant';
+import { getDebugRefetchOptions } from '@/lib/refetchDebug';
 
 export function NotificationBell() {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const isVisible = usePageVisibility();
-    const { data } = useGetNudgesQuery(undefined, {
-        pollingInterval: isVisible ? NUDGE_POLL_INTERVAL_MS : 0,
-        refetchOnFocus: true,
-    });
+    const { data } = useGetNudgesQuery(
+        undefined,
+        getDebugRefetchOptions('notificationBell.nudges', 30000)
+    );
     const [markAsRead] = useMarkNudgeAsReadMutation();
     const [markAllAsRead] = useMarkAllNudgesAsReadMutation();
 

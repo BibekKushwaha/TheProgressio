@@ -4,17 +4,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, Pause, Play, Loader2 } from 'lucide-react';
 import { useGetActiveLiveSessionQuery } from '@repo/store';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
+import { getDebugRefetchOptions, isRefetchDebugEnabled } from '@/lib/refetchDebug';
 
 // This widget checks remote DB (primary) then fallback to localStorage for an active focus session
 export function LiveActivityWidget() {
     const router = useRouter();
-    const isVisible = usePageVisibility();
-    const { data: remoteData, isLoading: isRemoteLoading, refetch, isUninitialized } = useGetActiveLiveSessionQuery(undefined, {
-        pollingInterval: isVisible ? 10000 : 0,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
+    const { data: remoteData, isLoading: isRemoteLoading, refetch, isUninitialized } = useGetActiveLiveSessionQuery(
+        undefined,
+        { ...getDebugRefetchOptions('liveWidget.activeLive', 10000), refetchOnMountOrArgChange: true },
+    );
 
     const [session, setSession] = useState<{
         taskTitle: string;
@@ -62,7 +60,9 @@ export function LiveActivityWidget() {
 
     // Handle visibility and storage changes
     useEffect(() => {
+        const enableManualRefetch = isRefetchDebugEnabled('liveWidget.activeLive');
         const onSync = () => {
+            if (!enableManualRefetch) return;
             // Guard against refetching before the query has started to avoid "Cannot refetch a query that has not been started yet"
             if (!isUninitialized && typeof refetch === 'function') {
                 try {
@@ -179,4 +179,3 @@ export function LiveActivityWidget() {
         </div>
     );
 }
-

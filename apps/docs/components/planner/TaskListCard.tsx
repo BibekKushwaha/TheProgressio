@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Clock, MoreVertical, Trash2, CheckCircle, XCircle, Calendar, Edit } from 'lucide-react';
-import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation } from '@repo/store';
+import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation, localTasks, localDb } from '@repo/store';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -41,6 +41,7 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
 
     const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[PriorityEnum.LOW];
     const categoryName = task.category?.name || 'No Category';
+    const isFamilyView = typeof window !== 'undefined' ? !!localStorage.getItem('family_share_token') : false;
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     const isOverdue = !completed && task.dueDate && new Date(task.dueDate) < new Date() && formatDueDate(task.dueDate).includes('overdue');
@@ -52,11 +53,24 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
 
     const performDelete = async () => {
         try {
+            if ((task as Task & { _localOnly?: boolean })._localOnly) {
+                await localTasks.delete(task.id);
+                toast.success('Task deleted');
+                return;
+            }
             await deleteTask(task.id).unwrap();
+            await localDb.tasks.delete(task.id);
             toast.success('Task deleted');
         } catch (err) {
-            toast.error('Failed to delete task');
-            console.error('Failed to delete task:', err);
+            const message = getApiErrorMessage(err, 'Failed to delete task');
+            const isNotFound = message.toLowerCase().includes('not found');
+            if (isNotFound) {
+                await localDb.tasks.delete(task.id);
+                toast.success('Removed stale task from this device');
+                return;
+            }
+            toast.error(message);
+            console.warn('Failed to delete task:', message);
         }
     };
 
@@ -168,10 +182,12 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                                 </>
                             )}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleDelete} className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer">
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                        </DropdownMenuItem>
+                        {!isFamilyView && (
+                            <DropdownMenuItem onClick={handleDelete} className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                            </DropdownMenuItem>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { Clock, Flag, MoreVertical, Trash2, CheckCircle, XCircle, Edit, Paperclip, Sparkles, Loader2, BellRing, MessageSquare } from 'lucide-react';
-import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation, useGenerateSubtasksMutation, useCreateRevisionDripCampaignMutation, useComposeNotificationMutation } from '@repo/store';
+import { Task, PriorityEnum, TaskStatus, useDeleteTaskMutation, useToggleTaskMutation, useGenerateSubtasksMutation, useCreateRevisionDripCampaignMutation, useComposeNotificationMutation, localTasks, localDb } from '@repo/store';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -56,11 +56,24 @@ export function TaskCard({ task, completed }: TaskCardProps) {
 
     const performDelete = async () => {
         try {
+            if ((task as Task & { _localOnly?: boolean })._localOnly) {
+                await localTasks.delete(task.id);
+                toast.success('Task deleted');
+                return;
+            }
             await deleteTask(task.id).unwrap();
+            await localDb.tasks.delete(task.id);
             toast.success('Task deleted');
         } catch (err) {
-            toast.error('Failed to delete task');
-            console.error('Failed to delete task:', err);
+            const message = getApiErrorMessage(err, 'Failed to delete task');
+            const isNotFound = message.toLowerCase().includes('not found');
+            if (isNotFound) {
+                await localDb.tasks.delete(task.id);
+                toast.success('Removed stale task from this device');
+                return;
+            }
+            toast.error(message);
+            console.warn('Failed to delete task:', message);
         }
     };
 

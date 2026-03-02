@@ -18,135 +18,135 @@ services:
           memory: 128m
           cpus: '0.25'
 
-  postgres:
-    image: postgres:15-alpine
-    ports:
-      - "127.0.0.1:5432:5432"
-    environment:
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: transition
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-          cpus: '0.50'
+  # postgres:
+  #   image: postgres:15-alpine
+  #   ports:
+  #     - "127.0.0.1:5432:5432"
+  #   environment:
+  #     POSTGRES_PASSWORD: password
+  #     POSTGRES_DB: transition
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512m
+  #         cpus: '0.50'
 
-  # ── Microservices ─────────────────────────────────────────────────────
-  analytics-service:
-    build:
-      context: .
-      dockerfile: apps/analytics-service/Dockerfile
-      provenance: false
-      sbom: false
-    ports:
-      - "4003:4003"
-    env_file: ./apps/analytics-service/.env
-    environment:
-      - NODE_ENV=development
-      - PORT=4003
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
-      - REDIS_HOST=redis
-    depends_on: [postgres, redis]
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          # Monte Carlo simulation is CPU-heavy; cap at 1 core to prevent
-          # runaway usage when QUEUE_ENABLED=false (synchronous fallback).
-          memory: 512m
-          cpus: '1.00'
+  # # ── Microservices ─────────────────────────────────────────────────────
+  # analytics-service:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/analytics-service/Dockerfile
+  #     provenance: false
+  #     sbom: false
+  #   ports:
+  #     - "4003:4003"
+  #   env_file: ./apps/analytics-service/.env
+  #   environment:
+  #     - NODE_ENV=development
+  #     - PORT=4003
+  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+  #     - REDIS_HOST=redis
+  #   depends_on: [postgres, redis]
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         # Monte Carlo simulation is CPU-heavy; cap at 1 core to prevent
+  #         # runaway usage when QUEUE_ENABLED=false (synchronous fallback).
+  #         memory: 512m
+  #         cpus: '1.00'
 
-  auth-service:
-    build:
-      context: .
-      dockerfile: apps/auth-service/Dockerfile
-      provenance: false
-      sbom: false
-    ports:
-      - "4000:4000"
-    env_file: ./apps/auth-service/.env
-    environment:
-      - NODE_ENV=development
-      - PORT=4000
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
-      - REDIS_HOST=redis
-    depends_on: [postgres, redis]
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-          cpus: '0.50'
+  # auth-service:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/auth-service/Dockerfile
+  #     provenance: false
+  #     sbom: false
+  #   ports:
+  #     - "4000:4000"
+  #   env_file: ./apps/auth-service/.env
+  #   environment:
+  #     - NODE_ENV=development
+  #     - PORT=4000
+  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+  #     - REDIS_HOST=redis
+  #   depends_on: [postgres, redis]
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256m
+  #         cpus: '0.50'
 
-  habit-service:
-    build:
-      context: .
-      dockerfile: apps/habit-service/Dockerfile
-      provenance: false
-      sbom: false
-    ports:
-      - "4002:4002"
-    env_file: ./apps/habit-service/.env
-    environment:
-      - NODE_ENV=development
-      - PORT=4002
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
-      - REDIS_HOST=redis
-    depends_on: [postgres, redis]
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-          cpus: '0.50'
+  # habit-service:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/habit-service/Dockerfile
+  #     provenance: false
+  #     sbom: false
+  #   ports:
+  #     - "4002:4002"
+  #   env_file: ./apps/habit-service/.env
+  #   environment:
+  #     - NODE_ENV=development
+  #     - PORT=4002
+  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+  #     - REDIS_HOST=redis
+  #   depends_on: [postgres, redis]
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256m
+  #         cpus: '0.50'
 
-  planner-service:
-    build:
-      context: .
-      dockerfile: apps/planner-service/Dockerfile
-      provenance: false
-      sbom: false
-    ports:
-      - "4001:4001"
-    env_file: ./apps/planner-service/.env
-    environment:
-      - NODE_ENV=development
-      - PORT=4001
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
-      - REDIS_HOST=redis
-    depends_on: [postgres, redis]
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-          cpus: '0.50'
+  # planner-service:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/planner-service/Dockerfile
+  #     provenance: false
+  #     sbom: false
+  #   ports:
+  #     - "4001:4001"
+  #   env_file: ./apps/planner-service/.env
+  #   environment:
+  #     - NODE_ENV=development
+  #     - PORT=4001
+  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+  #     - REDIS_HOST=redis
+  #   depends_on: [postgres, redis]
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256m
+  #         cpus: '0.50'
 
-  # ── Database Backup ───────────────────────────────────────────────────
-  pgbackup:
-    profiles: ["backup"]
-    image: prodrigestivill/postgres-backup-local:15
-    restart: unless-stopped
-    environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=transition
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - SCHEDULE=@daily
-      - BACKUP_KEEP_DAYS=7
-      - BACKUP_KEEP_WEEKS=4
-      - BACKUP_KEEP_MONTHS=6
-    volumes:
-      - pgbackups:/backups
-    depends_on: [postgres]
-    deploy:
-      resources:
-        limits:
-          memory: 64m
-          cpus: '0.10'
+  # # ── Database Backup ───────────────────────────────────────────────────
+  # pgbackup:
+  #   profiles: ["backup"]
+  #   image: prodrigestivill/postgres-backup-local:15
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_HOST=postgres
+  #     - POSTGRES_DB=transition
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=password
+  #     - SCHEDULE=@daily
+  #     - BACKUP_KEEP_DAYS=7
+  #     - BACKUP_KEEP_WEEKS=4
+  #     - BACKUP_KEEP_MONTHS=6
+  #   volumes:
+  #     - pgbackups:/backups
+  #   depends_on: [postgres]
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 64m
+  #         cpus: '0.10'
 
 volumes:
   pgdata:

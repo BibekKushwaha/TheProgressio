@@ -35,7 +35,8 @@ type SubjectTaskStatusFilter = 'all' | TaskStatus.PENDING | TaskStatus.IN_PROGRE
 
 export default function SubjectLibraryPage() {
     const { data: categories, isLoading: catLoading } = useGetCategoriesQuery();
-    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery({ page: 1, limit: 100 });
+    const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 100 }), []);
+    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery(allTasksQueryArgs);
     const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
     const [showGPA, setShowGPA] = useState(false);
     const [subjectSearch, setSubjectSearch] = useState('');
@@ -43,9 +44,10 @@ export default function SubjectLibraryPage() {
     const [selectedTaskSearch, setSelectedTaskSearch] = useState('');
     const [selectedTaskStatus, setSelectedTaskStatus] = useState<SubjectTaskStatusFilter>('all');
 
-    const selectedSubjectTasksQueryArgs = selectedSubject
-        ? { page: 1, limit: 300, categoryId: selectedSubject }
-        : skipToken;
+    const selectedSubjectTasksQueryArgs = useMemo(
+        () => (selectedSubject ? { page: 1, limit: 300, categoryId: selectedSubject } : skipToken),
+        [selectedSubject]
+    );
     const { data: selectedSubjectTasks, isFetching: selectedTasksLoading } = useGetTasksQuery(selectedSubjectTasksQueryArgs);
 
     const subjects = useMemo(() => categories || [], [categories]);

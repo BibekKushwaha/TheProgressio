@@ -16,6 +16,7 @@ import {
 
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import crypto from "crypto";
+import { addEmailToQueue } from "../services/email.queue.js";
 // Lightweight local cache type (keeps auth-service independent from cache build artifacts)
 export interface LocalUserCacheValue {
   id: string;
@@ -61,21 +62,32 @@ async function safeDeleteUserCache(userId: string): Promise<void> {
 // import { publishToTopic } from "../producer.js";
 // import { redisClient } from "../index.js";
 
-const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "15s";
-const MOBILE_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.MOBILE_REFRESH_TOKEN_DAYS ?? "30", 10);
+// "15m" is the safe default for mobile access tokens — "15s" would cause
+// near-constant forced refreshes in any real usage
+const ACCESS_TOKEN_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL ?? "15m";
+const WEB_ACCESS_TOKEN_TTL = process.env.WEB_ACCESS_TOKEN_TTL ?? "1h";
+const WEB_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.WEB_REFRESH_TOKEN_DAYS ?? "7", 10);
+const MOBILE_REFRESH_TOKEN_DAYS = Number.parseInt(process.env.MOBILE_REFRESH_TOKEN_DAYS ?? "7", 10);
+// Absolute session cap: even with continuous refresh token rotation a session
+// must end after this many days. Prevents infinite persistent sessions.
+const ABSOLUTE_SESSION_DAYS = Number.parseInt(process.env.ABSOLUTE_SESSION_DAYS ?? "30", 10);
+// Password reset tokens expire after this many minutes
+const RESET_TOKEN_EXPIRY_MS = Number.parseInt(process.env.RESET_TOKEN_EXPIRY_MINUTES ?? "15", 10) * 60 * 1000;
 
+// 'lax' instead of 'strict' so cookies are sent on top-level navigations
+// (OAuth redirects, password-reset email links, etc.) without being blocked.
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  sameSite: 'lax' as const,
   maxAge: 60 * 60 * 1000, // 1 hour
 };
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
-  maxAge: Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000,
+  sameSite: 'lax' as const,
+  maxAge: Math.max(1, WEB_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000,
 };
 
 const GOOGLE_CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs";
@@ -92,9 +104,26 @@ const ensureJwtSecret = (): string => {
   return secret;
 };
 
-const issueAccessToken = (userId: string, options?: { expiresIn?: string }) => {
-  const expiresIn = (options?.expiresIn ?? "1h") as NonNullable<SignOptions["expiresIn"]>;
-  const signOptions: SignOptions = { expiresIn };
+const JWT_ISSUER = "transition-auth";
+const JWT_WEB_AUDIENCE = "transition-web";
+const JWT_MOBILE_AUDIENCE = "transition-mobile";
+
+/**
+ * Issues a short-lived access token with explicit issuer + audience claims.
+ * Setting iss/aud prevents token confusion attacks where a token issued for
+ * one service/client is replayed against another.
+ */
+const issueAccessToken = (
+  userId: string,
+  options?: { expiresIn?: string; audience?: string },
+) => {
+  const expiresIn = (options?.expiresIn ?? "15m") as NonNullable<SignOptions["expiresIn"]>;
+  const audience = options?.audience ?? JWT_WEB_AUDIENCE;
+  const signOptions: SignOptions = {
+    expiresIn,
+    issuer: JWT_ISSUER,
+    audience,
+  };
   return jwt.sign({ id: userId }, ensureJwtSecret(), signOptions);
 };
 
@@ -273,12 +302,102 @@ const resolveOrCreateGoogleUser = async (google: GoogleIdPayload): Promise<{ id:
   return { id: user.id };
 };
 
-async function issueWebSessionCookies(res: any, userId: string): Promise<void> {
-  const token = issueAccessToken(userId, { expiresIn: "1h" });
+// ── Device/Session fingerprinting helpers ─────────────────────────────────────
+
+/** Extract real client IP, honouring X-Forwarded-For (set by reverse proxies). */
+const getClientIp = (req: any): string => {
+  if (!req) return '0.0.0.0';
+  const xff = req.headers?.['x-forwarded-for'];
+  if (typeof xff === 'string') return (xff.split(',')[0] ?? xff).trim();
+  return req.ip ?? req.socket?.remoteAddress ?? '0.0.0.0';
+};
+
+/** Store only a short prefix of the SHA-256 hash (not the full raw IP). */
+const hashIpForStorage = (ip: string): string =>
+  crypto.createHash('sha256').update(`ip:${ip}`).digest('hex').slice(0, 16);
+
+/** Store only a short prefix of the SHA-256 hash of the UA string. */
+const hashUaForStorage = (ua: string): string =>
+  crypto.createHash('sha256').update(`ua:${ua}`).digest('hex').slice(0, 16);
+
+/**
+ * Derive a human-readable device label from the User-Agent header.
+ * Used for the session list UI ("Chrome on macOS", "Mobile App", etc.).
+ */
+const parseDeviceName = (ua: string): string => {
+  if (!ua) return 'Unknown Device';
+  const u = ua.toLowerCase();
+  let os = 'Unknown OS';
+  if (u.includes('windows')) os = 'Windows';
+  else if (u.includes('macintosh') || u.includes('mac os x')) os = 'macOS';
+  else if (u.includes('android')) os = 'Android';
+  else if (u.includes('iphone') || u.includes('ipad')) os = 'iOS';
+  else if (u.includes('linux')) os = 'Linux';
+
+  let browser = 'Unknown Browser';
+  if (u.includes('okhttp') || u.includes('expo') || u.includes('dart')) browser = 'Mobile App';
+  else if (u.includes('postmanruntime')) browser = 'Postman';
+  else if (u.includes('edg/') || u.includes('edge/')) browser = 'Edge';
+  else if (u.includes('firefox/')) browser = 'Firefox';
+  else if (u.includes('safari/') && !u.includes('chrome/')) browser = 'Safari';
+  else if (u.includes('chrome/')) browser = 'Chrome';
+
+  return `${browser} on ${os}`;
+};
+
+/** Fire-and-forget security alert email — never throws. */
+async function sendSecurityAlert(email: string, eventType: string, details: string): Promise<void> {
+  try {
+    await addEmailToQueue({
+      to: email,
+      subject: `Security Alert: ${eventType} – Transition`,
+      body: details,
+      html: `<p><strong>Security Alert — ${eventType}</strong></p><p>${details}</p>` +
+        `<p>If this wasn't you, please change your password and revoke all active sessions immediately.</p>`,
+    });
+  } catch (err) {
+    console.error(`[SecurityAlert] Failed to send ${eventType} alert to ${email}:`, err);
+  }
+}
+
+/**
+ * Append an immutable row to the SecurityEvent table.
+ * Fire-and-forget — a DB write failure here must never block the request.
+ */
+async function logSecurityEvent(opts: {
+  userId?: string | null;
+  eventType: string;
+  req?: any;
+  details?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await prisma.securityEvent.create({
+      data: {
+        userId: opts.userId ?? null,
+        eventType: opts.eventType,
+        ipHash: opts.req ? hashIpForStorage(getClientIp(opts.req)) : null,
+        uaHash: opts.req?.headers?.['user-agent']
+          ? hashUaForStorage(opts.req.headers['user-agent'])
+          : null,
+        details: opts.details ? JSON.stringify(opts.details) : null,
+      },
+    });
+  } catch (err) {
+    console.error(`[SecurityEvent] Failed to log ${opts.eventType}:`, err);
+  }
+}
+
+async function issueWebSessionCookies(res: any, userId: string, req?: any): Promise<void> {
+  const token = issueAccessToken(userId, { expiresIn: WEB_ACCESS_TOKEN_TTL });
   res.cookie('token', token, COOKIE_OPTIONS);
 
   const rawRefreshToken = generateOpaqueToken();
-  const expiresAt = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+  const now = Date.now();
+  const expiresAt = new Date(now + Math.max(1, WEB_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+  const absoluteExpiresAt = new Date(now + Math.max(1, ABSOLUTE_SESSION_DAYS) * 24 * 60 * 60 * 1000);
+
+  const ip = getClientIp(req);
+  const ua = req?.headers?.['user-agent'] ?? '';
 
   await prisma.$transaction([
     prisma.mobileRefreshToken.updateMany({
@@ -291,6 +410,11 @@ async function issueWebSessionCookies(res: any, userId: string): Promise<void> {
         deviceId: null,
         tokenHash: hashOpaqueToken(rawRefreshToken),
         expiresAt,
+        absoluteExpiresAt,
+        deviceName: parseDeviceName(ua),
+        ipHash: hashIpForStorage(ip),
+        uaHash: hashUaForStorage(ua),
+        lastSeenAt: new Date(),
       },
     }),
   ]);
@@ -298,10 +422,16 @@ async function issueWebSessionCookies(res: any, userId: string): Promise<void> {
   res.cookie('refreshToken', rawRefreshToken, REFRESH_COOKIE_OPTIONS);
 }
 
-const issueMobileSession = async (userId: string, deviceId?: string | null) => {
-  const accessToken = issueAccessToken(userId, { expiresIn: ACCESS_TOKEN_TTL });
+const issueMobileSession = async (
+  userId: string,
+  deviceId?: string | null,
+  meta?: { deviceName?: string; ipHash?: string; uaHash?: string },
+) => {
+  const accessToken = issueAccessToken(userId, { expiresIn: ACCESS_TOKEN_TTL, audience: JWT_MOBILE_AUDIENCE });
   const rawRefreshToken = generateOpaqueToken();
-  const expiresAt = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+  const now = Date.now();
+  const expiresAt = new Date(now + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+  const absoluteExpiresAt = new Date(now + Math.max(1, ABSOLUTE_SESSION_DAYS) * 24 * 60 * 60 * 1000);
 
   await prisma.mobileRefreshToken.create({
     data: {
@@ -309,6 +439,11 @@ const issueMobileSession = async (userId: string, deviceId?: string | null) => {
       deviceId: deviceId?.trim() || "unknown-device",
       tokenHash: hashOpaqueToken(rawRefreshToken),
       expiresAt,
+      absoluteExpiresAt,
+      deviceName: meta?.deviceName ?? 'Mobile App',
+      ipHash: meta?.ipHash ?? null,
+      uaHash: meta?.uaHash ?? null,
+      lastSeenAt: new Date(),
     },
   });
 
@@ -382,9 +517,14 @@ export const googleLoginCallback = TryCatch(async (req, res) => {
 
   const googlePayload = await verifyGoogleIdToken(idToken, [clientId]);
   const user = await resolveOrCreateGoogleUser(googlePayload);
-  await issueWebSessionCookies(res, user.id);
+  await issueWebSessionCookies(res, user.id, req);
 
-  return res.redirect(`${FRONTEND_BASE_URL}${next}`);
+  // Redirect to the OAuth callback bridge page instead of jumping directly to
+  // the destination.  That page stamps `auth:hasSession=1` into localStorage
+  // before forwarding — without it, AuthGuard never sees a session hint and
+  // immediately bounces the user back to /login.
+  const callbackUrl = `${FRONTEND_BASE_URL}/auth/callback?next=${encodeURIComponent(next)}`;
+  return res.redirect(callbackUrl);
 });
 
 export const mobileGoogleLogin = TryCatch(async (req, res) => {
@@ -403,7 +543,12 @@ export const mobileGoogleLogin = TryCatch(async (req, res) => {
 
   const googlePayload = await verifyGoogleIdToken(idToken, audiences);
   const user = await resolveOrCreateGoogleUser(googlePayload);
-  const tokens = await issueMobileSession(user.id, deviceId);
+  const mobileUa = req.headers?.['user-agent'] ?? '';
+  const tokens = await issueMobileSession(user.id, deviceId, {
+    deviceName: parseDeviceName(mobileUa),
+    ipHash: hashIpForStorage(getClientIp(req)),
+    uaHash: hashUaForStorage(mobileUa),
+  });
 
   const userRow = await prisma.user.findUnique({
     where: { id: user.id },
@@ -429,7 +574,13 @@ const getBearerToken = (req: any): string | null => {
 
 const decodeAccessToken = (token: string): { id: string } => {
   try {
-    const decoded = jwt.verify(token, ensureJwtSecret()) as jwt.JwtPayload;
+    // Validate issuer + audience to prevent token confusion attacks.
+    // Accept both web and mobile audiences so a single validate function
+    // works across all routes (mobile clients still hit the web /me endpoint).
+    const decoded = jwt.verify(token, ensureJwtSecret(), {
+      issuer: JWT_ISSUER,
+      audience: [JWT_WEB_AUDIENCE, JWT_MOBILE_AUDIENCE],
+    }) as jwt.JwtPayload;
     if (!decoded?.id || typeof decoded.id !== "string") {
       throw new ErrorHandler(401, "Invalid token payload");
     }
@@ -487,7 +638,7 @@ export const registerUser = TryCatch(async (req, res) => {
     },
   });
 
-  await issueWebSessionCookies(res, response.id);
+  await issueWebSessionCookies(res, response.id, req);
 
   // best-effort cache
   await safeSetUserCache(response.id, buildUserCachePayload(response));
@@ -510,43 +661,67 @@ export const loginUser = TryCatch(async (req, res) => {
   }
   const { email, password } = result.data;
 
-  // Brute-force protection: block IPs/emails with > 5 failed attempts in 15 min
-  const failKey = `login_fail:${email.toLowerCase()}`;
-  const MAX_FAILURES = 5;
-  const WINDOW_SECONDS = 15 * 60;
-  try {
-    const mod = (await import('@repo/cache').catch(() => null)) as any;
-    if (mod?.getCache) {
-      const failures = (await mod.getCache(failKey) as number | null) ?? 0;
-      if (failures >= MAX_FAILURES) {
-        return res.status(429).json({ message: 'Too many failed login attempts. Please try again later.' });
-      }
-    }
-  } catch { /* non-blocking */ }
+  // ── DB-backed account lockout (survives server restarts) ──────────────────
+  const LOCKOUT_THRESHOLD = parseInt(process.env.LOGIN_LOCKOUT_THRESHOLD ?? '10', 10);
+  const LOCKOUT_DURATION_MS = parseInt(process.env.LOGIN_LOCKOUT_DURATION_MINUTES ?? '15', 10) * 60 * 1000;
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-  });
+  const user = await prisma.user.findUnique({ where: { email } });
 
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    // Increment failure counter
-    try {
-      const mod = (await import('@repo/cache').catch(() => null)) as any;
-      if (mod?.getCache && mod?.setCache) {
-        const prev = (await mod.getCache(failKey) as number | null) ?? 0;
-        await mod.setCache(failKey, prev + 1, { ex: WINDOW_SECONDS });
-      }
-    } catch { /* non-blocking */ }
-    throw new ErrorHandler(400, "Invalid credentials");
+  if (!user) {
+    // Constant-time dummy compare to prevent email-enumeration via timing
+    await bcrypt.compare(password, '$2b$10$invalidhashpaddingtomakethisconstanttime0000000000000');
+    void logSecurityEvent({ eventType: 'LOGIN_FAILED', req, details: { reason: 'user_not_found' } });
+    return res.status(400).json({ message: 'Invalid credentials' });
   }
 
-  // Clear failure counter on success
-  try {
-    const mod = (await import('@repo/cache').catch(() => null)) as any;
-    if (mod?.deleteCache) await mod.deleteCache(failKey);
-  } catch { /* non-blocking */ }
+  // Check if account is locked
+  const now = new Date();
+  if (user.lockedUntil && user.lockedUntil > now) {
+    const retryAfterSecs = Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 1000);
+    void logSecurityEvent({ userId: user.id, eventType: 'LOGIN_FAILED', req, details: { reason: 'account_locked' } });
+    return res.status(423).json({
+      message: `Account temporarily locked. Try again in ${Math.ceil(retryAfterSecs / 60)} minute(s).`,
+      retryAfter: retryAfterSecs,
+    });
+  }
 
-  await issueWebSessionCookies(res, user.id);
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) {
+    const newCount = (user.failedLoginAttempts ?? 0) + 1;
+    const shouldLock = newCount >= LOCKOUT_THRESHOLD;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: newCount,
+        ...(shouldLock ? { lockedUntil: new Date(now.getTime() + LOCKOUT_DURATION_MS) } : {}),
+      },
+    });
+    void logSecurityEvent({ userId: user.id, eventType: shouldLock ? 'ACCOUNT_LOCKED' : 'LOGIN_FAILED', req,
+      details: { failedAttempts: newCount, locked: shouldLock } });
+    if (shouldLock) {
+      await sendSecurityAlert(
+        user.email,
+        'ACCOUNT_LOCKED',
+        `Your account was temporarily locked after ${newCount} failed login attempts from IP: ${getClientIp(req)}.`,
+      );
+      return res.status(423).json({
+        message: 'Account temporarily locked due to too many failed attempts. Please try again in 15 minutes.',
+        retryAfter: LOCKOUT_DURATION_MS / 1000,
+      });
+    }
+    return res.status(400).json({ message: 'Invalid credentials' });
+  }
+
+  // Successful login — reset lockout state
+  if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
+    });
+  }
+
+  void logSecurityEvent({ userId: user.id, eventType: 'LOGIN_SUCCESS', req });
+  await issueWebSessionCookies(res, user.id, req);
 
   const { password: _, ...userWithoutPassword } = user;
 
@@ -596,22 +771,72 @@ export const refreshUser = TryCatch(async (req, res) => {
   }
 
   const tokenHash = hashOpaqueToken(refreshToken);
-  const existing = await prisma.mobileRefreshToken.findFirst({
-    where: {
-      tokenHash,
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-      deviceId: null,
-    },
-    select: { id: true, userId: true },
+
+  // Look up the token WITHOUT the revokedAt filter so we can detect reuse.
+  const candidate = await prisma.mobileRefreshToken.findFirst({
+    where: { tokenHash, deviceId: null },
+    select: { id: true, userId: true, revokedAt: true, expiresAt: true, absoluteExpiresAt: true, uaHash: true, ipHash: true, deviceName: true },
   });
 
-  if (!existing) {
-    return res.status(401).json({ message: 'Invalid or expired refresh token' });
+  if (!candidate) {
+    return res.status(401).json({ message: 'Invalid refresh token' });
   }
 
+  // ── Refresh Token Reuse Detection ─────────────────────────────────────────
+  if (candidate.revokedAt !== null) {
+    console.warn(`[Security] Refresh token reuse detected for user ${candidate.userId}. Revoking all sessions.`);
+    await prisma.mobileRefreshToken.updateMany({
+      where: { userId: candidate.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    const reuseUser = await prisma.user.findUnique({ where: { id: candidate.userId }, select: { email: true } });
+    if (reuseUser?.email) {
+      await sendSecurityAlert(reuseUser.email, 'REFRESH_TOKEN_REUSE',
+        `A session refresh was attempted with a token that had already been rotated. ` +
+        `All your sessions have been invalidated as a precaution. IP: ${getClientIp(req)}.`);
+    }
+    void logSecurityEvent({ userId: candidate.userId, eventType: 'REFRESH_TOKEN_REUSE', req });
+    res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
+    res.clearCookie('refreshToken', { ...REFRESH_COOKIE_OPTIONS, maxAge: 0 });
+    return res.status(401).json({ message: 'Session invalidated. Please log in again.' });
+  }
+
+  if (candidate.expiresAt <= new Date()) {
+    return res.status(401).json({ message: 'Refresh token expired' });
+  }
+
+  // ── Absolute Session Lifetime Cap ─────────────────────────────────────────
+  // Prevent indefinite session renewal even with rolling refresh tokens.
+  const nowWeb = new Date();
+  if (candidate.absoluteExpiresAt && candidate.absoluteExpiresAt <= nowWeb) {
+    res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
+    res.clearCookie('refreshToken', { ...REFRESH_COOKIE_OPTIONS, maxAge: 0 });
+    return res.status(401).json({ message: 'Session lifetime exceeded. Please log in again.' });
+  }
+  // Carry forward, never reset the session clock on rotation
+  const inheritedWebAbsoluteExpiry = candidate.absoluteExpiresAt
+    ?? new Date(Date.now() + ABSOLUTE_SESSION_DAYS * 24 * 60 * 60 * 1000);
+
+  // ── Suspicious activity: User-Agent change detection ─────────────────────
+  const currentWebUa = req?.headers?.['user-agent'] ?? '';
+  const currentWebIp = getClientIp(req);
+  const currentWebUaHash = hashUaForStorage(currentWebUa);
+  const currentWebIpHash = hashIpForStorage(currentWebIp);
+
+  if (candidate.uaHash && candidate.uaHash !== currentWebUaHash) {
+    console.warn(`[Security] Web session UA change detected for user ${candidate.userId}`);
+    const uaUser = await prisma.user.findUnique({ where: { id: candidate.userId }, select: { email: true } });
+    if (uaUser?.email) {
+      await sendSecurityAlert(uaUser.email, 'SUSPICIOUS_SESSION',
+        `A session refresh was detected from a different browser or device than when the session was created. ` +
+        `IP: ${currentWebIp}. If this was not you, revoke all sessions immediately.`);
+    }
+  }
+
+  const existing = candidate;
+
   const rotatedRefresh = generateOpaqueToken();
-  const nextExpiry = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+  const nextExpiry = new Date(Date.now() + Math.max(1, WEB_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
 
   await prisma.$transaction([
     prisma.mobileRefreshToken.update({
@@ -624,11 +849,16 @@ export const refreshUser = TryCatch(async (req, res) => {
         deviceId: null,
         tokenHash: hashOpaqueToken(rotatedRefresh),
         expiresAt: nextExpiry,
+        absoluteExpiresAt: inheritedWebAbsoluteExpiry,
+        deviceName: candidate.deviceName ?? parseDeviceName(currentWebUa),
+        ipHash: currentWebIpHash,
+        uaHash: currentWebUaHash,
+        lastSeenAt: new Date(),
       },
     }),
   ]);
 
-  const token = issueAccessToken(existing.userId, { expiresIn: "1h" });
+  const token = issueAccessToken(existing.userId, { expiresIn: WEB_ACCESS_TOKEN_TTL });
   res.cookie('token', token, COOKIE_OPTIONS);
   res.cookie('refreshToken', rotatedRefresh, REFRESH_COOKIE_OPTIONS);
 
@@ -932,9 +1162,7 @@ export const deleteAccount = TryCatch(async (req, res) => {
   return res.status(200).json({ message: "Account deleted" });
 });
 
-// ── Forgot Password (JWT-based, uses BullMQ/Redis for email worker) ────────
-
-import { addEmailToQueue } from "../services/email.queue.js";
+// ── Forgot Password (DB-backed opaque token, delivers via email queue) ──────────
 
 export const forgotPassword = TryCatch(async (req, res) => {
   const parsed = forgotPasswordSchema.safeParse(req.body);
@@ -954,21 +1182,40 @@ export const forgotPassword = TryCatch(async (req, res) => {
     return res.json({ message: "If that email exists, we have sent a reset link" });
   }
 
-  const resetToken = jwt.sign(
-    { email: user.email, userId: user.id, type: "reset" },
-    process.env.JWT_SEC as string,
-    { expiresIn: "15m" }
-  );
+  // ── Opaque, single-use, DB-backed reset token ───────────────────────────
+  const rawResetToken = generateOpaqueToken();
+  const resetExpiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
 
-  const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset/${resetToken}`;
-
-  // Integrate with email service via BullMQ
-  await addEmailToQueue({
-    to: email,
-    subject: "Reset your password - Transition",
-    body: `Follow this link to reset your password: ${resetLink}`,
-    html: `<p>Please follow this link to reset your password: <a href="${resetLink}">${resetLink}</a></p>`,
+  // Invalidate any existing unused tokens for this user (one active link at a time)
+  await prisma.passwordResetToken.updateMany({
+    where: { userId: user.id, usedAt: null },
+    data: { usedAt: new Date() },
   });
+
+  await prisma.passwordResetToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashOpaqueToken(rawResetToken),
+      expiresAt: resetExpiresAt,
+    },
+  });
+
+  void logSecurityEvent({ userId: user.id, eventType: 'PASSWORD_RESET_REQUESTED', req });
+
+  const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${rawResetToken}`;
+
+  // Fire-and-forget: never let email delivery failure surface as a 500
+  try {
+    await addEmailToQueue({
+      to: email,
+      subject: "Reset your password - Transition",
+      body: `Follow this link to reset your password: ${resetLink}`,
+      html: `<p>Please follow this link to reset your password: <a href="${resetLink}">${resetLink}</a></p>`,
+    });
+  } catch (emailErr) {
+    // Log but do NOT expose SMTP errors to the client
+    console.error(`[ForgotPassword] Failed to send reset email to ${email}:`, emailErr);
+  }
 
   return res.json({ message: "If that email exists, we have sent a reset link" });
 });
@@ -990,29 +1237,43 @@ export const resetPassword = TryCatch(async (req, res) => {
 
   const { password } = parsed.data;
 
-  let decoded: any;
-  try {
-    decoded = jwt.verify(token as string, process.env.JWT_SEC as string);
-  } catch {
-    return res.status(400).json({ message: "Invalid or expired reset token" });
+  // ── DB-backed opaque token lookup ────────────────────────────────────────
+  const tokenHash = hashOpaqueToken(token as string);
+  const resetRecord = await prisma.passwordResetToken.findFirst({
+    where: { tokenHash },
+    include: { user: { select: { id: true, email: true } } },
+  });
+
+  if (!resetRecord) {
+    return res.status(400).json({ message: 'Invalid or expired reset token' });
+  }
+  if (resetRecord.usedAt !== null) {
+    return res.status(400).json({ message: 'Reset token has already been used' });
+  }
+  if (resetRecord.expiresAt <= new Date()) {
+    return res.status(400).json({ message: 'Reset token has expired' });
   }
 
-  if (decoded.type !== "reset" || !decoded.email) {
-    return res.status(400).json({ message: "Invalid token type" });
-  }
-
-  const user = await prisma.user.findUnique({ where: { email: decoded.email } });
-
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
+  const { user } = resetRecord;
 
   const hashPassword = await bcrypt.hash(password, 10);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { password: hashPassword },
-  });
+  // Mark token as used and update password atomically
+  await prisma.$transaction([
+    prisma.passwordResetToken.update({
+      where: { id: resetRecord.id },
+      data: { usedAt: new Date() },
+    }),
+    prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashPassword },
+    }),
+    // Revoke all active web/mobile sessions so stolen-password sessions are killed
+    prisma.mobileRefreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
 
   // invalidate cache for this user (best-effort)
   try {
@@ -1021,7 +1282,9 @@ export const resetPassword = TryCatch(async (req, res) => {
     // ignore
   }
 
-  return res.json({ message: "Password changed successfully" });
+  void logSecurityEvent({ userId: user.id, eventType: 'PASSWORD_CHANGED', req });
+
+  return res.json({ message: 'Password changed successfully' });
 });
 
 // ── Mobile Auth (refresh-token flow) ──────────────────────────────────
@@ -1038,14 +1301,66 @@ export const mobileLogin = TryCatch(async (req, res) => {
   const { email, password, deviceId } = result.data;
   const resolvedDeviceId = deviceId?.trim() || "unknown-device";
 
+  // ── DB-backed account lockout ─────────────────────────────────────────────
+  const LOCKOUT_THRESHOLD = parseInt(process.env.LOGIN_LOCKOUT_THRESHOLD ?? '10', 10);
+  const LOCKOUT_DURATION_MS = parseInt(process.env.LOGIN_LOCKOUT_DURATION_MINUTES ?? '15', 10) * 60 * 1000;
+
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.password))) {
+  if (!user) {
+    await bcrypt.compare(password, '$2b$10$invalidhashpaddingtomakethisconstanttime0000000000000');
+    void logSecurityEvent({ eventType: 'LOGIN_FAILED', req, details: { reason: 'user_not_found', platform: 'mobile' } });
     throw new ErrorHandler(400, "Invalid credentials");
   }
 
-  const accessToken = issueAccessToken(user.id, { expiresIn: ACCESS_TOKEN_TTL });
+  const now = new Date();
+  if (user.lockedUntil && user.lockedUntil > now) {
+    const retryAfterSecs = Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 1000);
+    void logSecurityEvent({ userId: user.id, eventType: 'LOGIN_FAILED', req, details: { reason: 'account_locked', platform: 'mobile' } });
+    return res.status(423).json({
+      message: `Account temporarily locked. Try again in ${Math.ceil(retryAfterSecs / 60)} minute(s).`,
+      retryAfter: retryAfterSecs,
+    });
+  }
+
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) {
+    const newCount = (user.failedLoginAttempts ?? 0) + 1;
+    const shouldLock = newCount >= LOCKOUT_THRESHOLD;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: newCount,
+        ...(shouldLock ? { lockedUntil: new Date(now.getTime() + LOCKOUT_DURATION_MS) } : {}),
+      },
+    });
+    void logSecurityEvent({ userId: user.id, eventType: shouldLock ? 'ACCOUNT_LOCKED' : 'LOGIN_FAILED', req,
+      details: { failedAttempts: newCount, locked: shouldLock, platform: 'mobile' } });
+    if (shouldLock) {
+      await sendSecurityAlert(user.email, 'ACCOUNT_LOCKED',
+        `Your account was temporarily locked after ${newCount} failed login attempts. IP: ${getClientIp(req)}.`);
+      return res.status(423).json({
+        message: 'Account temporarily locked. Please try again in 15 minutes.',
+        retryAfter: LOCKOUT_DURATION_MS / 1000,
+      });
+    }
+    throw new ErrorHandler(400, "Invalid credentials");
+  }
+
+  // Successful login — reset lockout state
+  if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
+    });
+  }
+
+  void logSecurityEvent({ userId: user.id, eventType: 'LOGIN_SUCCESS', req, details: { platform: 'mobile' } });
+
+  const mobileLoginUa = req.headers?.['user-agent'] ?? '';
+  const accessToken = issueAccessToken(user.id, { expiresIn: ACCESS_TOKEN_TTL, audience: JWT_MOBILE_AUDIENCE });
   const rawRefreshToken = generateOpaqueToken();
   const expiresAt = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
+  const mobileAbsoluteExpiresAt = new Date(Date.now() + ABSOLUTE_SESSION_DAYS * 24 * 60 * 60 * 1000);
 
   await prisma.mobileRefreshToken.create({
     data: {
@@ -1053,6 +1368,11 @@ export const mobileLogin = TryCatch(async (req, res) => {
       deviceId: resolvedDeviceId,
       tokenHash: hashOpaqueToken(rawRefreshToken),
       expiresAt,
+      absoluteExpiresAt: mobileAbsoluteExpiresAt,
+      deviceName: parseDeviceName(mobileLoginUa),
+      ipHash: hashIpForStorage(getClientIp(req)),
+      uaHash: hashUaForStorage(mobileLoginUa),
+      lastSeenAt: new Date(),
     },
   });
 
@@ -1080,11 +1400,11 @@ export const mobileRefresh = TryCatch(async (req, res) => {
   const requestedDeviceId = deviceId?.trim() || null;
 
   const tokenHash = hashOpaqueToken(refreshToken);
-  const existing = await prisma.mobileRefreshToken.findFirst({
+
+  // Look up WITHOUT revokedAt filter to enable reuse detection
+  const candidate = await prisma.mobileRefreshToken.findFirst({
     where: {
       tokenHash,
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
       ...(requestedDeviceId ? { deviceId: requestedDeviceId } : {}),
     },
     include: {
@@ -1094,9 +1414,48 @@ export const mobileRefresh = TryCatch(async (req, res) => {
     },
   });
 
-  if (!existing) {
-    return res.status(401).json({ message: "Invalid or expired refresh token" });
+  if (!candidate) {
+    return res.status(401).json({ message: "Invalid refresh token" });
   }
+
+  // ── Refresh Token Reuse Detection ────────────────────────────────────────
+  if (candidate.revokedAt !== null) {
+    console.warn(`[Security] Mobile refresh token reuse for user ${candidate.userId} / device ${candidate.deviceId}. Revoking all sessions.`);
+    await prisma.mobileRefreshToken.updateMany({
+      where: { userId: candidate.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return res.status(401).json({ message: "Session invalidated. Please log in again." });
+  }
+
+  if (candidate.expiresAt <= new Date()) {
+    return res.status(401).json({ message: "Refresh token expired" });
+  }
+
+  // ── Absolute Session Lifetime Cap ─────────────────────────────────────────
+  const nowMobile = new Date();
+  if (candidate.absoluteExpiresAt && candidate.absoluteExpiresAt <= nowMobile) {
+    return res.status(401).json({ message: 'Session lifetime exceeded. Please log in again.' });
+  }
+  const inheritedMobileAbsoluteExpiry = candidate.absoluteExpiresAt
+    ?? new Date(Date.now() + ABSOLUTE_SESSION_DAYS * 24 * 60 * 60 * 1000);
+
+  // ── Suspicious activity: User-Agent / IP change detection ─────────────────
+  const currentMobUa = req?.headers?.['user-agent'] ?? '';
+  const currentMobIp = getClientIp(req);
+  const currentMobUaHash = hashUaForStorage(currentMobUa);
+  const currentMobIpHash = hashIpForStorage(currentMobIp);
+
+  if (candidate.uaHash && candidate.uaHash !== currentMobUaHash) {
+    console.warn(`[Security] Mobile session UA change for user ${candidate.userId} / device ${candidate.deviceId}`);
+    if (candidate.user?.email) {
+      await sendSecurityAlert(candidate.user.email, 'SUSPICIOUS_SESSION',
+        `A mobile refresh was detected from a different device/app than the original session. ` +
+        `Device: ${candidate.deviceId ?? 'unknown'}. IP: ${currentMobIp}.`);
+    }
+  }
+
+  const existing = candidate;
 
   const rotatedRefresh = generateOpaqueToken();
   const nextExpiry = new Date(Date.now() + Math.max(1, MOBILE_REFRESH_TOKEN_DAYS) * 24 * 60 * 60 * 1000);
@@ -1112,11 +1471,16 @@ export const mobileRefresh = TryCatch(async (req, res) => {
         deviceId: existing.deviceId,
         tokenHash: hashOpaqueToken(rotatedRefresh),
         expiresAt: nextExpiry,
+        absoluteExpiresAt: inheritedMobileAbsoluteExpiry,
+        deviceName: candidate.deviceName ?? parseDeviceName(currentMobUa),
+        ipHash: currentMobIpHash,
+        uaHash: currentMobUaHash,
+        lastSeenAt: new Date(),
       },
     }),
   ]);
 
-  const accessToken = issueAccessToken(existing.userId, { expiresIn: ACCESS_TOKEN_TTL });
+  const accessToken = issueAccessToken(existing.userId, { expiresIn: ACCESS_TOKEN_TTL, audience: JWT_MOBILE_AUDIENCE });
 
   return res.status(200).json({
     message: "Token refreshed",
@@ -1337,4 +1701,108 @@ export const resolveFamilyShareLink = TryCatch(async (req, res) => {
     message: "Share token resolved",
     link,
   });
+});
+
+// ── Device-Aware Session Management ──────────────────────────────────────────
+
+/**
+ * GET /api/auth/sessions
+ * Returns all active (non-revoked, non-expired) sessions for the authenticated
+ * user. Used to display the "active sessions" list in account settings.
+ */
+export const listSessions = TryCatch(async (req, res) => {
+  const token = req.cookies?.token ?? getBearerToken(req);
+  if (!token) return res.status(401).json({ message: 'Not authenticated' });
+
+  const { id: userId } = decodeAccessToken(token);
+  const currentRefreshToken = req.cookies?.refreshToken;
+  const currentHash = currentRefreshToken ? hashOpaqueToken(currentRefreshToken) : null;
+
+  const now = new Date();
+  const sessions = await prisma.mobileRefreshToken.findMany({
+    where: { userId, revokedAt: null, expiresAt: { gt: now } },
+    select: {
+      id: true,
+      deviceId: true,
+      deviceName: true,
+      ipHash: true,
+      tokenHash: true,
+      createdAt: true,
+      lastSeenAt: true,
+      expiresAt: true,
+      absoluteExpiresAt: true,
+    },
+    orderBy: [{ lastSeenAt: 'desc' }, { createdAt: 'desc' }],
+  });
+
+  return res.json({
+    success: true,
+    sessions: sessions.map(s => ({
+      id: s.id,
+      deviceId: s.deviceId,
+      deviceName: s.deviceName ?? 'Unknown Device',
+      ipHint: s.ipHash ? `\u2022\u2022\u2022\u2022${s.ipHash.slice(-4)}` : null,
+      isCurrentSession: Boolean(currentHash && s.tokenHash === currentHash),
+      createdAt: s.createdAt.toISOString(),
+      lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
+      expiresAt: s.expiresAt.toISOString(),
+      absoluteExpiresAt: s.absoluteExpiresAt?.toISOString() ?? null,
+    })),
+  });
+});
+
+/**
+ * DELETE /api/auth/sessions/:id
+ * Revokes a specific session by its MobileRefreshToken ID.
+ * Users can only revoke their own sessions.
+ */
+export const revokeSession = TryCatch(async (req, res) => {
+  const token = req.cookies?.token ?? getBearerToken(req);
+  if (!token) return res.status(401).json({ message: 'Not authenticated' });
+
+  const { id: userId } = decodeAccessToken(token);
+  const sessionId = typeof req.params?.id === 'string' ? req.params.id : null;
+  if (!sessionId) return res.status(400).json({ message: 'Session ID is required' });
+
+  const session = await prisma.mobileRefreshToken.findFirst({
+    where: { id: sessionId, userId },
+  });
+
+  if (!session) return res.status(404).json({ message: 'Session not found' });
+  if (session.revokedAt !== null) return res.status(410).json({ message: 'Session already revoked' });
+
+  await prisma.mobileRefreshToken.update({
+    where: { id: sessionId },
+    data: { revokedAt: new Date() },
+  });
+
+  void logSecurityEvent({ userId, eventType: 'SESSION_REVOKED', req, details: { sessionId, deviceName: session.deviceName ?? null } });
+
+  return res.json({ success: true, message: 'Session revoked successfully' });
+});
+
+/**
+ * DELETE /api/auth/sessions
+ * Revokes ALL active sessions for the current user (web + mobile).
+ * Clears web cookies as well so the current browser session ends.
+ */
+export const logoutAllDevices = TryCatch(async (req, res) => {
+  const token = req.cookies?.token ?? getBearerToken(req);
+  if (!token) return res.status(401).json({ message: 'Not authenticated' });
+
+  const { id: userId } = decodeAccessToken(token);
+
+  const result = await prisma.mobileRefreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
+  res.clearCookie('refreshToken', { ...REFRESH_COOKIE_OPTIONS, maxAge: 0 });
+
+  void logSecurityEvent({ userId, eventType: 'LOGOUT_ALL_DEVICES', req, details: { sessionsRevoked: result.count } });
+
+  await safeDeleteUserCache(userId);
+
+  return res.json({ success: true, message: `${result.count} session(s) revoked`, count: result.count });
 });

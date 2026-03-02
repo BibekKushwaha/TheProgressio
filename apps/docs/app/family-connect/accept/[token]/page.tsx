@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui/stat-card';
 import { TaskListItem } from '@/components/family-connect/TaskListItem';
 import { HabitListItem } from '@/components/family-connect/HabitListItem';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,8 @@ export default function FamilyLinkAcceptPage() {
     }, [linkData, linkError]);
 
     // Fetch data using the token (which is now in localStorage)
-    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery({ page: 1, limit: 500 }, { skip: !isTokenValid });
+    const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
+    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery(allTasksQueryArgs, { skip: !isTokenValid });
     const { data: habitsData, isLoading: habitsLoading } = useGetHabitsQuery(undefined, { skip: !isTokenValid });
     const { data: summaryData, isLoading: summaryLoading } = useGetDailySummaryQuery('7', { skip: !isTokenValid });
     const [sendFeedback, { isLoading: isSendingFeedback }] = useSendMentorFeedbackMutation();

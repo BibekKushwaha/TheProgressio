@@ -40,6 +40,10 @@ const securityHeaders = [
       connectSrc,
       "worker-src 'self' blob:",
       "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      ...(isDev ? [] : ["upgrade-insecure-requests"]),
     ].join("; "),
   },
 ];

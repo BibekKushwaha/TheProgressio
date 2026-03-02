@@ -11,6 +11,7 @@ import { PricingSection } from "@/components/settings/PricingSection";
 import { LanguageSelector } from "@/components/settings/LanguageSelector";
 import { QRAttendance } from "@/components/settings/QRAttendance";
 import { FamilyShareManagement } from "@/components/settings/FamilyShareManagement";
+import { ActiveSessions } from "@/components/settings/ActiveSessions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 
@@ -537,6 +538,9 @@ export default function SettingsPage() {
                     </Button>
                 </CardContent>
             </Card>
+
+            {/* Security — Active Sessions */}
+            <ActiveSessions />
 
             {/* Data & Privacy */}
             <Card variant="glass">

@@ -53,9 +53,13 @@ interface SyncPullResponse {
 class BackgroundSyncEngine {
     private status: SyncStatus = 'idle';
     private intervalId: ReturnType<typeof setInterval> | null = null;
+    private pullInFlight: Promise<void> | null = null;
+    private lastPullStartedAt = 0;
+    private fallbackHydrated = false;
     private listeners: Set<(status: SyncStatus, pendingCount: number) => void> = new Set();
     private readonly onlineListener = () => this.onOnline();
     private readonly offlineListener = () => this.onOffline();
+    private static readonly MIN_PULL_INTERVAL_MS = 1500;
 
     start(): void {
         if (this.intervalId) return;
@@ -81,6 +85,9 @@ class BackgroundSyncEngine {
             clearInterval(this.intervalId);
             this.intervalId = null;
         }
+        this.pullInFlight = null;
+        this.lastPullStartedAt = 0;
+        this.fallbackHydrated = false;
         if (supportsWindowNetworkEvents()) {
             window.removeEventListener('online', this.onlineListener);
             window.removeEventListener('offline', this.offlineListener);
@@ -103,15 +110,21 @@ class BackgroundSyncEngine {
     async pullFromServer(): Promise<void> {
         if (!isOnline()) return;
 
-        await this.pullOperations();
+        await this.pullOperationsDebounced();
 
         const cursor = await getSyncCursor();
         if (cursor > 0) {
+            this.fallbackHydrated = true;
+            return;
+        }
+
+        if (this.fallbackHydrated) {
             return;
         }
 
         // Backward-compatible bootstrap for accounts with no sync op history yet.
         await this.hydrateFallbackSnapshots();
+        this.fallbackHydrated = true;
     }
 
     // ─── Private ────────────────────────────────────────────────────────────────
@@ -126,7 +139,7 @@ class BackgroundSyncEngine {
 
         try {
             await this.pushPendingOperations();
-            await this.pullOperations();
+            await this.pullOperationsDebounced();
 
             const remaining = await syncQueue.count();
             this.setStatus(remaining > 0 ? 'error' : 'idle');
@@ -226,6 +239,30 @@ class BackgroundSyncEngine {
 
         if (typeof data.cursor === 'number' && Number.isFinite(data.cursor)) {
             await setSyncCursor(data.cursor);
+        }
+    }
+
+    private async pullOperationsDebounced(): Promise<void> {
+        if (this.pullInFlight) {
+            await this.pullInFlight;
+            return;
+        }
+
+        const now = Date.now();
+        if (now - this.lastPullStartedAt < BackgroundSyncEngine.MIN_PULL_INTERVAL_MS) {
+            return;
+        }
+
+        this.lastPullStartedAt = now;
+        const pullPromise = this.pullOperations();
+        this.pullInFlight = pullPromise;
+
+        try {
+            await pullPromise;
+        } finally {
+            if (this.pullInFlight === pullPromise) {
+                this.pullInFlight = null;
+            }
         }
     }
 

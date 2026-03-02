@@ -4,6 +4,7 @@ import { EventCard } from './EventCard';
 import { useGetCalendarDailyScheduleQuery, ResolvedRotation } from '@repo/store';
 import { toLocalDateKey } from '@/lib/date';
 import { matchesRotationFilter } from '@/lib/rotation';
+import { getDebugMountRefetchOptions } from '@/lib/refetchDebug';
 
 interface DayGridProps {
     date: Date;
@@ -16,7 +17,7 @@ export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps
     const dateString = toLocalDateKey(date);
     const { data: schedule } = useGetCalendarDailyScheduleQuery(
         { date: dateString },
-        { refetchOnMountOrArgChange: true }
+        getDebugMountRefetchOptions('dayGrid.mountRefetch')
     );
 
     useEffect(() => {

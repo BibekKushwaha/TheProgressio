@@ -7,9 +7,9 @@ import {
     useGetDashboardSummaryQuery,
     useGetActiveLiveSessionQuery
 } from '@repo/store';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toLocalDateKey, normalizeDateInput } from '@/lib/date';
+import { getDebugRefetchOptions } from '@/lib/refetchDebug';
 
 export function TopStats() {
     const toSafeNumber = (value: unknown, fallback = 0) => {
@@ -17,20 +17,13 @@ export function TopStats() {
         return Number.isFinite(n) ? n : fallback;
     };
 
-    const isVisible = usePageVisibility();
     const gradientId = useId().replace(/:/g, '');
-    const pollMs = isVisible ? 60000 : 0;
 
-    // Enable polling and refetch-on-focus to keep stats fresh
     const {
         data: summaryData,
         isLoading: isSummaryLoading,
         isError: isSummaryError,
-    } = useGetDailySummaryQuery("1", {
-        pollingInterval: pollMs,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
+    } = useGetDailySummaryQuery("1", getDebugRefetchOptions('topStats.dailySummary', 60000));
 
     // BFF replaces useGetFocusScoreQuery: delivers score+breakdown in one call
     // that the dashboard-summary cache (2-min TTL) already has warm.
@@ -41,17 +34,13 @@ export function TopStats() {
         isError: isDashboardError,
     } = useGetDashboardSummaryQuery(
         { leakageDays: 1, peakDays: 7 },
-        {
-            pollingInterval: pollMs,
-            refetchOnFocus: true,
-            refetchOnReconnect: true,
-        }
+        getDebugRefetchOptions('topStats.dashboardSummary', 60000)
     );
 
-    const { data: activeLive } = useGetActiveLiveSessionQuery(undefined, {
-        pollingInterval: isVisible ? 10000 : 0, // fast when visible, pause in background
-        refetchOnFocus: true,
-    });
+    const { data: activeLive } = useGetActiveLiveSessionQuery(
+        undefined,
+        { ...getDebugRefetchOptions('topStats.activeLive', 10000), refetchOnMountOrArgChange: true }
+    );
 
     // 1. Calculate Daily Progress
     const stats = summaryData?.stats;

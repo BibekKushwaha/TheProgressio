@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { getFamilyShareToken, isNativeRuntime, resolveServiceUrl } from '../runtime';
+import { getFamilyShareToken, isNativeRuntime, resolveServiceUrl, AUTH_SESSION_KEY } from '../runtime';
+import { clearRtkCache } from '../cache-persist';
 import { withAuthRefresh, withRetry } from '../baseQuery';
 import { getAccessTokenSync } from '../mobile-token-store';
 import { logout as logoutAction } from '../slices/authSlice';
@@ -81,6 +82,18 @@ export interface AccountExportPayload {
   user: Record<string, unknown>;
 }
 
+export interface SessionInfo {
+  id: string;
+  deviceId: string | null;
+  deviceName: string;
+  ipHint: string | null;
+  isCurrentSession: boolean;
+  createdAt: string;
+  lastSeenAt: string | null;
+  expiresAt: string;
+  absoluteExpiresAt: string | null;
+}
+
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
@@ -120,7 +133,7 @@ export const authApi = createApi({
       return headers;
     },
   }))),
-  tagTypes: ['User', 'WhatsAppPairing'],
+  tagTypes: ['User', 'WhatsAppPairing', 'Session'],
   endpoints: (builder) => ({
     register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (credentials) => ({
@@ -192,16 +205,18 @@ export const authApi = createApi({
           dispatch(logoutAction());
           // Reset all API states
           dispatch(authApi.util.resetApiState());
-          // Clear session flag
+          // Clear session flag and persisted cache
           if (typeof window !== 'undefined') {
-            window.localStorage.removeItem('auth:hasSession');
+            window.localStorage.removeItem(AUTH_SESSION_KEY);
+            clearRtkCache();
           }
         } catch {
           // Even if the server call fails, we should logout locally for better UX
           dispatch(logoutAction());
           dispatch(authApi.util.resetApiState());
           if (typeof window !== 'undefined') {
-            window.localStorage.removeItem('auth:hasSession');
+            window.localStorage.removeItem(AUTH_SESSION_KEY);
+            clearRtkCache();
           }
         }
       },
@@ -332,6 +347,29 @@ export const authApi = createApi({
         method: 'GET',
       }),
     }),
+    listSessions: builder.query<{ success: boolean; sessions: SessionInfo[] }, void>({
+      query: () => ({ url: '/sessions', method: 'GET' }),
+      providesTags: ['Session'],
+    }),
+    revokeSession: builder.mutation<{ success: boolean; message: string }, string>({
+      query: (id) => ({ url: `/sessions/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Session'],
+    }),
+    logoutAllDevices: builder.mutation<{ success: boolean; message: string; count: number }, void>({
+      query: () => ({ url: '/sessions', method: 'DELETE' }),
+      invalidatesTags: ['Session', 'User'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(logoutAction());
+          dispatch(authApi.util.resetApiState());
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(AUTH_SESSION_KEY);
+            clearRtkCache();
+          }
+        } catch { /* best-effort */ }
+      },
+    }),
   }),
 });
 
@@ -357,4 +395,7 @@ export const {
   useGetFamilyLinksQuery,
   useRevokeFamilyLinkMutation,
   useResolveFamilyLinkQuery,
+  useListSessionsQuery,
+  useRevokeSessionMutation,
+  useLogoutAllDevicesMutation,
 } = authApi;

@@ -11,7 +11,9 @@ import {
     unpairWhatsApp,
     verifyWhatsAppWebhook,
     listFamilyShareLinks,
+    listSessions,
     loginUser,
+    logoutAllDevices,
     logoutUser,
     refreshUser,
     mobileLogin,
@@ -23,6 +25,7 @@ import {
     resetPassword,
     resolveFamilyShareLink,
     revokeFamilyShareLink,
+    revokeSession,
     updateProfile,
 } from '../controllers/auth.controller.js';
 
@@ -58,6 +61,11 @@ router.post("/family-links", createFamilyShareLink);
 router.get("/family-links", listFamilyShareLinks);
 router.delete("/family-links/:id", revokeFamilyShareLink);
 router.get("/family-links/resolve/:token", resolveFamilyShareLink);
+
+// Device-aware session management
+router.get("/sessions", listSessions);
+router.delete("/sessions", logoutAllDevices);   // revoke all sessions
+router.delete("/sessions/:id", revokeSession);   // revoke one session
 
 
 

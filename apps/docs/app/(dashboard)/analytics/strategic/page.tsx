@@ -29,7 +29,8 @@ const TimeLeakageCard = dynamic(
 
 export default function AnalyticsStrategicPage() {
   const [selectedPredictionTaskId, setSelectedPredictionTaskId] = useState("");
-  const { data: allTasks } = useGetTasksQuery({ limit: 50 });
+  const tasksQueryArgs = useMemo(() => ({ limit: 50 }), []);
+  const { data: allTasks } = useGetTasksQuery(tasksQueryArgs);
 
   // Single BFF call pre-warms all 5 expensive analytics in parallel.
   // Each child component receives the result as initialData and skips its own query.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useMemo } from 'react';
 import { useGetTasksQuery, useGetHabitsQuery, useGetDailySummaryQuery, useGetProfileQuery, useComposeNotificationMutation, Task, Habit } from '@repo/store';
 import { Eye, Shield, TrendingUp, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, Share2, MessageSquare, Download } from 'lucide-react';
 import { exportTasksToCSV, downloadCSV } from '@/lib/exportUtils';
@@ -24,7 +25,8 @@ export default function FamilyConnectPage() {
     };
 
     const { data: profileData } = useGetProfileQuery();
-    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery({ page: 1, limit: 500 });
+    const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
+    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery(allTasksQueryArgs);
     const { data: habitsData, isLoading: habitsLoading } = useGetHabitsQuery();
     const { data: summaryData, isLoading: summaryLoading } = useGetDailySummaryQuery('7');
     const [composeNotification] = useComposeNotificationMutation();

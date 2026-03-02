@@ -18,12 +18,13 @@ import { Slider } from "../ui/slider"
 import { useRouter } from 'next/navigation';
 import { useGetTasksQuery, TaskStatus } from '@repo/store';
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import DurationSelect from '@/components/ui/DurationSelect';
 
 export function AiSuggestedDialog() {
     const router = useRouter();
-    const { data: tasks, isLoading } = useGetTasksQuery({ status: TaskStatus.PENDING });
+    const pendingTasksQueryArgs = useMemo(() => ({ status: TaskStatus.PENDING }), []);
+    const { data: tasks, isLoading } = useGetTasksQuery(pendingTasksQueryArgs);
     const [selectedFocusGoal, setSelectedFocusGoal] = useState("");
 
     const [selectedDuration, setSelectedDuration] = useState<number>(45);

@@ -200,7 +200,11 @@ describe('Auth endpoints', () => {
   })
 
   it('exports account data with auth cookie', async () => {
-    const token = jwt.sign({ id: 'u1' }, process.env.JWT_SEC as string, { expiresIn: '1h' })
+    const token = jwt.sign(
+      { id: 'u1' },
+      process.env.JWT_SEC as string,
+      { expiresIn: '1h', issuer: 'transition-auth', audience: 'transition-web' },
+    )
       ; (prisma as any).user.findUnique.mockResolvedValue({
         id: 'u1',
         username: 'Tester',
@@ -240,7 +244,11 @@ describe('Auth endpoints', () => {
   })
 
   it('deletes account only with confirmation', async () => {
-    const token = jwt.sign({ id: 'u1' }, process.env.JWT_SEC as string, { expiresIn: '1h' })
+    const token = jwt.sign(
+      { id: 'u1' },
+      process.env.JWT_SEC as string,
+      { expiresIn: '1h', issuer: 'transition-auth', audience: 'transition-web' },
+    )
       ; (prisma as any).user.delete.mockResolvedValue({ id: 'u1' })
 
     const bad = await request(app)
