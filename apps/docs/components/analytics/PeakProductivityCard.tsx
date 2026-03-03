@@ -1,11 +1,10 @@
 'use client';
 
-import React from 'react';
 import { useGetPeakWindowQuery, PeakProductivityResult } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Zap, Target } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from '@/lib/recharts';
 
 interface PeakProductivityCardProps {
     /** Pre-fetched data from a BFF call. When provided the query is skipped. */

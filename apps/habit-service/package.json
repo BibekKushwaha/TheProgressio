@@ -10,7 +10,12 @@
     "dev": "tsx watch --ignore './node_modules/**' --ignore '../**/node_modules/**' --ignore '../**/dist/**' --ignore '../../packages/db/generated/**' src/index.ts",
     "build": "tsc",
     "lint": "eslint . --max-warnings 0",
-    "check-types": "tsc --noEmit -p tsconfig.json"
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "load:smoke": "k6 run --env SCENARIO=smoke  tests/load/bootstrap.k6.js",
+    "load:soak":  "k6 run --env SCENARIO=soak   tests/load/bootstrap.k6.js",
+    "load:spike": "k6 run --env SCENARIO=spike  tests/load/bootstrap.k6.js",
+    "load:split": "k6 run --env SCENARIO=split  tests/load/bootstrap.k6.js",
+    "load:all":   "k6 run tests/load/bootstrap.k6.js"
   },
   "keywords": [],
   "author": "",

@@ -35,7 +35,7 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
 
     const [createHabit, { isLoading: isCreating }] = useCreateHabitMutation()
     const [updateHabit, { isLoading: isUpdating }] = useUpdateHabitMutation()
-    const { data: categories = [] } = useGetCategoriesQuery();
+    const { data: categories = [] } = useGetCategoriesQuery(undefined, { skip: !open });
 
     const isLoading = isCreating || isUpdating
 
@@ -76,7 +76,7 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                     id: habit.id,
                     name: habitName,
                     frequency: habitFrequency,
-                    targetValue: parseInt(targetValue) || 1,
+                    targetValue: Math.max(1, parseInt(targetValue, 10)) || 1,
                     icon: selectedEmoji,
                     color: selectedColor.value,
                     linkedCategoryId: linkedCategoryId === 'none' ? null : linkedCategoryId,
@@ -85,7 +85,7 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                 await createHabit({
                     name: habitName,
                     frequency: habitFrequency,
-                    targetValue: parseInt(targetValue) || 1,
+                    targetValue: Math.max(1, parseInt(targetValue, 10)) || 1,
                     icon: selectedEmoji,
                     color: selectedColor.value,
                     linkedCategoryId: linkedCategoryId === 'none' ? null : linkedCategoryId,

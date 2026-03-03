@@ -1,16 +1,15 @@
-// components/task/TaskInfoPanel.tsx
+// components/planner/TaskInfoPanel.tsx
 'use client'
 import { Calendar, Clock, User } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-    useGetTaskByIdQuery,
     useGetSyllabusTopicsQuery,
     useGetTaskSyllabusTopicsQuery,
     useSetTaskSyllabusTopicsMutation,
 } from '@repo/store';
 import { Button } from '@/components/ui/button';
-import { useTaskRouteId } from '@/hooks/useTaskRouteId';
+import { useTaskDetail } from './TaskDetailContext';
 
 function formatDueDate(dueDate?: string | null) {
     if (!dueDate) return "No due date";
@@ -62,8 +61,7 @@ function calculateTimeRemaining(dueDate?: string | null) {
 }
 
 export function TaskInfoPanel() {
-    const taskId = useTaskRouteId();
-    const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId });
+    const { task } = useTaskDetail();
     const categoryId = task?.categoryId ?? null;
 
     const { data: topicsData } = useGetSyllabusTopicsQuery(
@@ -78,14 +76,22 @@ export function TaskInfoPanel() {
         [linksData]
     );
 
-    const [selectedTopicIds, setSelectedTopicIds] = useState<Set<string>>(new Set());
+    // Track user's checkbox changes locally as a Map<topicId, wantsChecked>.
+    // The final selected set is derived from server state + local overrides,
+    // eliminating the useState+useEffect double-render pattern.
+    const [localToggles, setLocalToggles] = useState<Map<string, boolean>>(new Map());
 
-    useEffect(() => {
-        setSelectedTopicIds(new Set(Array.from(existingTopicIds)));
-    }, [existingTopicIds]);
+    const selectedTopicIds = useMemo(() => {
+        const result = new Set(existingTopicIds);
+        for (const [id, on] of localToggles) {
+            if (on) result.add(id);
+            else result.delete(id);
+        }
+        return result;
+    }, [existingTopicIds, localToggles]);
 
-    const timeRemaining = calculateTimeRemaining(task?.dueDate);
-    const isOverdue = timeRemaining === "Overdue";
+    const timeRemaining = useMemo(() => calculateTimeRemaining(task?.dueDate), [task?.dueDate]);
+    const isOverdue = timeRemaining === 'Overdue';
 
     return (
         <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6">
@@ -154,10 +160,18 @@ export function TaskInfoPanel() {
                                             type="checkbox"
                                             checked={checked}
                                             onChange={() => {
-                                                setSelectedTopicIds((prev) => {
-                                                    const next = new Set(prev);
-                                                    if (next.has(topic.id)) next.delete(topic.id);
-                                                    else next.add(topic.id);
+                                                setLocalToggles((prev) => {
+                                                    const next = new Map(prev);
+                                                    // Toggle relative to the server-side baseline
+                                                    const serverHas = existingTopicIds.has(topic.id);
+                                                    const currentlyChecked = checked;
+                                                    if (currentlyChecked === serverHas) {
+                                                        // Toggling away from server state — record override
+                                                        next.set(topic.id, !currentlyChecked);
+                                                    } else {
+                                                        // Toggling back to server state — clear override
+                                                        next.delete(topic.id);
+                                                    }
                                                     return next;
                                                 });
                                             }}

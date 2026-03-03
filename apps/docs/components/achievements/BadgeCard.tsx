@@ -1,20 +1,8 @@
 'use client';
 
-import { Lock, Award, Target, Zap, Flame, Star, Trophy, Crown, Medal, Shield, Sword, LucideIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-
-const iconMap: Record<string, LucideIcon> = {
-    'Target': Target,
-    'Zap': Zap,
-    'Flame': Flame,
-    'Star': Star,
-    'Trophy': Trophy,
-    'Award': Award,
-    'Crown': Crown,
-    'Medal': Medal,
-    'Shield': Shield,
-    'Sword': Sword,
-};
+import Link from 'next/link';
+import { Lock, Award } from 'lucide-react';
+import { achievementIconMap } from '@/lib/achievementIcons';
 
 interface Badge {
     id: string | number;
@@ -31,17 +19,12 @@ interface BadgeCardProps {
 }
 
 export function BadgeCard({ badge }: BadgeCardProps) {
-    const router = useRouter();
-    const IconComponent = iconMap[badge.icon];
-
-    const handleClick = () => {
-        router.push(`/achievement/${badge.id}`);
-    };
+    const IconComponent = achievementIconMap[badge.icon];
 
     return (
-        <div
-            onClick={handleClick}
-            className={`group relative bg-gradient-to-br backdrop-blur-md border rounded-2xl p-6 transition-all duration-300 cursor-pointer ${badge.unlocked
+        <Link
+            href={`/achievement/${badge.id}`}
+            className={`group relative block bg-gradient-to-br backdrop-blur-md border rounded-2xl p-6 transition-all duration-300 ${badge.unlocked
                 ? 'from-white/10 to-white/5 border-white/20 hover:shadow-xl hover:shadow-purple-500/20 hover:-translate-y-1'
                 : 'from-white/5 to-white/2 border-white/10 opacity-70 hover:opacity-100 hover:border-white/20'
                 }`}
@@ -65,7 +48,7 @@ export function BadgeCard({ badge }: BadgeCardProps) {
                         </div>
                     )}
 
-                    {achievementUnlockedAt(badge) && (
+                    {badge.unlocked && (
                         <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 border-2 border-slate-950 rounded-full flex items-center justify-center">
                             <Award className="w-4 h-4 text-white" />
                         </div>
@@ -107,11 +90,6 @@ export function BadgeCard({ badge }: BadgeCardProps) {
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <span className="text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-1 rounded-full uppercase">Details</span>
             </div>
-        </div>
+        </Link>
     );
-}
-
-// Helper to determine award visibility
-function achievementUnlockedAt(badge: Badge) {
-    return badge.unlocked;
 }

@@ -9,6 +9,14 @@ services:
   # ── Infrastructure ────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
+    # Enforce allkeys-lru so all keys (including habit XP / heatmap cache keys)
+    # are eligible for LRU eviction once the memory limit is reached.
+    # 128 MB is chosen to hold ~500 k concurrent user caches comfortably.
+    command: >
+      redis-server
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --save ""
     ports:
       - "127.0.0.1:${REDIS_HOST_PORT:-6380}:6379"
     restart: unless-stopped

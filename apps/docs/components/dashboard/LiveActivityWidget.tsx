@@ -4,14 +4,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, Pause, Play, Loader2 } from 'lucide-react';
 import { useGetActiveLiveSessionQuery } from '@repo/store';
-import { getDebugRefetchOptions, isRefetchDebugEnabled } from '@/lib/refetchDebug';
 
 // This widget checks remote DB (primary) then fallback to localStorage for an active focus session
 export function LiveActivityWidget() {
     const router = useRouter();
     const { data: remoteData, isLoading: isRemoteLoading, refetch, isUninitialized } = useGetActiveLiveSessionQuery(
         undefined,
-        { ...getDebugRefetchOptions('liveWidget.activeLive', 10000), refetchOnMountOrArgChange: true },
+        { refetchOnMountOrArgChange: true },
     );
 
     const [session, setSession] = useState<{
@@ -58,12 +57,11 @@ export function LiveActivityWidget() {
         }
     }, [remoteData, checkLocalSession]);
 
-    // Handle visibility and storage changes
+    // Handle visibility and storage changes — always sync for the live session widget
+    // since focus session state can change at any time from another tab or device.
     useEffect(() => {
-        const enableManualRefetch = isRefetchDebugEnabled('liveWidget.activeLive');
         const onSync = () => {
-            if (!enableManualRefetch) return;
-            // Guard against refetching before the query has started to avoid "Cannot refetch a query that has not been started yet"
+            // Guard against refetching before the query has started
             if (!isUninitialized && typeof refetch === 'function') {
                 try {
                     refetch();

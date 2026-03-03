@@ -23,6 +23,16 @@ vi.mock('@repo/db', () => ({
     Frequency: { DAILY: 'DAILY', WEEKLY: 'WEEKLY' },
 }));
 
+// ─── Mock Cache ─────────────────────────────────────────────────────────────────
+// Prevent the L1 in-process LRU cache (module-level state) from leaking
+// stale heatmap results between test cases.
+
+vi.mock('@repo/cache', () => ({
+    getCache: vi.fn().mockResolvedValue(null),
+    setCache: vi.fn().mockResolvedValue(undefined),
+    deleteCache: vi.fn().mockResolvedValue(undefined),
+}));
+
 import {
     calculateGentleStreak,
     awardXP,

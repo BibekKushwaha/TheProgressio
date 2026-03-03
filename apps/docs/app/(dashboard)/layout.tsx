@@ -27,19 +27,24 @@ export default function DashboardLayout({
         <AuthGuard>
             <div className="min-h-screen bg-slate-950 text-white selection:bg-indigo-500/30 overflow-x-hidden">
                 {/*
-                  * Decorative ambient orbs.
-                  * `will-change-transform` promotes each to its own GPU compositing layer
-                  * so their blur does not trigger a full-page repaint on scroll.
+                  * Decorative ambient background — implemented as CSS radial-gradients
+                  * instead of blur-filtered divs. Identical visual result with zero
+                  * GPU compositing cost (no filter layer, no paint on scroll).
                   */}
-                <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true">
-                    <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[100px] will-change-transform" />
-                    <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-violet-500/5 rounded-full blur-[120px] will-change-transform" />
-                </div>
+                <div
+                    className="fixed inset-0 z-0 pointer-events-none"
+                    aria-hidden="true"
+                    style={{
+                        background:
+                            'radial-gradient(ellipse 500px 500px at -10% -20%, rgba(99,102,241,0.05) 0%, transparent 70%), ' +
+                            'radial-gradient(ellipse 600px 600px at 105% 110%, rgba(139,92,246,0.05) 0%, transparent 70%)',
+                    }}
+                />
 
                 <Sidebar />
                 <LazyPushManager />
 
-                <main className="lg:pl-72 pt-16 lg:pt-8 pb-10 min-h-screen relative z-10 transition-all duration-300">
+                <main className="lg:pl-72 pt-16 lg:pt-8 pb-10 min-h-screen relative z-10 transition-[padding-left] duration-300">
                     <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8 ">
                         <Suspense fallback={<DashboardPageSkeleton />}>
                             {children}

@@ -4,6 +4,7 @@ import { PageHeader } from '../layout/PageHeader';
 import { Button } from '../ui/button';
 
 interface AnalyticsHeaderProps {
+    title?: string;
     pastDays: string;
     setPastDays: (value: string) => void;
     onExport?: () => void;
@@ -12,13 +13,15 @@ interface AnalyticsHeaderProps {
 const PAST_DAYS_OPTIONS = [
     { label: "Daily", value: "1" },
     { label: "Weekly", value: "7" },
+    { label: "14 Days", value: "14" },
+    { label: "Monthly", value: "30" },
 ] as const;
 
-export function AnalyticsHeader({ pastDays, setPastDays, onExport }: AnalyticsHeaderProps) {
+export function AnalyticsHeader({ title = "Analytics Overview", pastDays, setPastDays, onExport }: AnalyticsHeaderProps) {
     return (
         <header className="mb-8">
             <PageHeader
-                title="Analytics Overview"
+                title={title}
                 subtitle="Track your productivity trends and study habits."
             >
                     <div className="flex flex-wrap items-center justify-start md:justify-end gap-3 w-full md:w-auto min-w-0">

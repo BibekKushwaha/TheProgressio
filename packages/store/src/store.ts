@@ -1,4 +1,5 @@
-import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import { configureStore, combineReducers, isRejectedWithValue } from '@reduxjs/toolkit';
+import type { Middleware } from '@reduxjs/toolkit';
 import { authApi } from './services/authApi';
 import { tasksApi } from './services/tasksApi';
 import { categoriesApi } from './services/categoriesApi';
@@ -16,6 +17,31 @@ import categoriesReducer from './slices/categoriesSlice';
 import habitsReducer from './slices/habitsSlice';
 import analyticsReducer from './slices/analyticsSlice';
 import { loadRtkCache, scheduleSaveRtkCache } from './cache-persist';
+
+/**
+ * Logs RTK Query rejected queries to console.error so log aggregators and
+ * Sentry (if installed) capture API failures in production.
+ *
+ * Skips 401 (handled by withAuthRefresh) and 404 (expected not-found).
+ * 429 is logged as a warning only — the UI layer handles the user message.
+ */
+const rtkErrorLogger: Middleware = () => (next) => (action: unknown) => {
+  if (isRejectedWithValue(action)) {
+    const a = action as {
+      payload?: { status?: number | string; data?: unknown };
+      meta?: { arg?: { endpointName?: string } };
+    };
+    const status = a.payload?.status;
+    const endpoint = a.meta?.arg?.endpointName ?? 'unknown';
+
+    if (status === 429) {
+      console.warn('[SAT:rate-limit]', endpoint, a.payload?.data);
+    } else if (status !== 401 && status !== 404) {
+      console.error(`[SAT:api-error] ${endpoint} → ${status ?? 'network'}`, a.payload);
+    }
+  }
+  return next(action);
+};
 
 // Define the root reducer once so we can derive the state type for
 // typed preloadedState — required for correct generic inference in configureStore.
@@ -57,6 +83,7 @@ export const makeStore = () => {
         immutableCheck: isDevelopment ? { warnAfter: 96 } : false,
         serializableCheck: isDevelopment ? { warnAfter: 96 } : false,
       }).concat(
+        rtkErrorLogger,
         authApi.middleware,
         tasksApi.middleware,
         categoriesApi.middleware,

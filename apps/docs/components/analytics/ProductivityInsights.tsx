@@ -18,12 +18,15 @@ interface ProductivityInsightsProps {
     initialPeak?: PeakProductivityResult;
     /** Predictive performance from strategic BFF — skips useGetPredictivePerformanceQuery when supplied */
     initialPredictive?: LearningPace[];
+    /** Exam type for predictive query — must match what PredictiveScoreCard uses to share the RTK cache entry */
+    examType?: string;
 }
 
 export function ProductivityInsights({
     initialLeakage,
     initialPeak,
     initialPredictive,
+    examType,
 }: ProductivityInsightsProps = {}) {
     // Skip BFF if parent already provided both leakage + peak
     const hasDashboard = !!(initialLeakage && initialPeak);
@@ -32,11 +35,10 @@ export function ProductivityInsights({
         { skip: hasDashboard }
     );
 
-    // Skip predictive query if parent already provided it.
-    // Use 'JEE' explicitly so this shares the same RTK cache entry as
-    // PredictiveScoreCard — eliminates the duplicate Monte Carlo request.
+    // When parent provides examType, use it so the RTK cache entry matches
+    // PredictiveScoreCard's query — avoids a duplicate Monte Carlo request.
     const { data: performanceData, isLoading: performanceLoading } = useGetPredictivePerformanceQuery(
-        'JEE',
+        examType ?? 'JEE',
         { skip: !!initialPredictive }
     );
 

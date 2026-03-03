@@ -1,6 +1,7 @@
 'use client';
 
 import { useGetAchievementsQuery } from '@repo/store';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function ProgressCard() {
     const { data: achievementsData, isLoading } = useGetAchievementsQuery();
@@ -20,10 +21,13 @@ export function ProgressCard() {
 
     if (isLoading) {
         return (
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6 min-w-[320px] animate-pulse">
-                <div className="h-6 w-32 bg-white/10 rounded mb-4"></div>
-                <div className="h-3 w-full bg-white/10 rounded mb-4"></div>
-                <div className="h-4 w-48 bg-white/10 rounded"></div>
+            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6 min-w-[320px] space-y-4">
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-28 bg-white/10" />
+                    <Skeleton className="h-6 w-16 bg-white/10" />
+                </div>
+                <Skeleton className="h-3 w-full rounded-full bg-white/10" />
+                <Skeleton className="h-4 w-48 bg-white/10" />
             </div>
         );
     }

@@ -70,6 +70,9 @@ export const sendPushNotification = async (
             title: payload.title,
             body: payload.body,
             icon: payload.icon || "/favicon.ico",
+            badge: "/favicon.ico",
+            tag: payload.category ? `push-${payload.category}` : "push-general",
+            requireInteraction: false,
             data: {
                 url: payload.deepLink || "/dashboard",
             },

@@ -1,10 +1,10 @@
 "use client"
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { KanbanBoard } from '@/components/planner/KanbanBoard';
 import { TaskList } from '@/components/planner/TaskList';
 import { TimetableView } from '@/components/planner/TimetableView';
 import { TimelineView } from '@/components/planner/TimelineView';
-import { useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks } from '@repo/store';
+import { useGetCategoriesQuery, useGetTasksQuery, useLocalDbHydration, useLocalTasks, useAppSelector, selectCurrentUser, selectAuthStatus } from '@repo/store';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SearchBar } from '@/components/SearchBar';
@@ -15,6 +15,16 @@ export default function TasksPage() {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
+
+    // Auth guard — redirect to login when session expires rather than flashing the board
+    const authStatus = useAppSelector(selectAuthStatus);
+    const currentUser = useAppSelector(selectCurrentUser);
+    useEffect(() => {
+        if (authStatus === 'unauthenticated') {
+            router.replace('/login');
+        }
+    }, [authStatus, router]);
+
     const highlightedTaskId = searchParams.get('taskId') || '';
     const [focusedTaskId, setFocusedTaskId] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -25,7 +35,7 @@ export default function TasksPage() {
 
     const localHydrated = useLocalDbHydration();
     const { data: categories } = useGetCategoriesQuery();
-    const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
+    const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 100 }), []);
     const { data: allTasks, isLoading } = useGetTasksQuery(allTasksQueryArgs);
     const { tasks: cachedTasks } = useLocalTasks();
 
@@ -33,6 +43,19 @@ export default function TasksPage() {
         () => mergeTaskSources(allTasks ?? [], cachedTasks ?? []),
         [allTasks, cachedTasks]
     );
+
+    // Persist selected view to URL so navigation preserves it
+    const isFirstViewRender = useRef(true);
+    useEffect(() => {
+        if (isFirstViewRender.current) {
+            isFirstViewRender.current = false;
+            return;
+        }
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('view', view);
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false } as Parameters<typeof router.replace>[1]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [view]);
 
     useTaskQuerySyncFromUrl({
         searchParams,
@@ -65,10 +88,10 @@ export default function TasksPage() {
         [categories]
     );
 
-    const handleViewChange = (nextView: 'kanban' | 'list' | 'timetable' | 'timeline') => {
-        setView(nextView);
-    };
-
+    // All hooks called above — safe to short-circuit now
+    if (authStatus === 'unauthenticated' || (!currentUser && authStatus !== 'idle' && authStatus !== 'loading')) {
+        return null;
+    }
 
     if (isLoading && tasks.length === 0 && !localHydrated) {
         return (
@@ -100,7 +123,7 @@ export default function TasksPage() {
                     selectedCategory={selectedCategory}
                     setSelectedCategory={setSelectedCategory}
                     view={view}
-                    setView={handleViewChange}
+                    setView={setView}
                     categoryOptions={categoryOptions}
                 />
             </div>

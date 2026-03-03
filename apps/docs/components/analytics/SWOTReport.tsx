@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
 import { useGetSWOTReportQuery, FullSWOT } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useExamType } from '@/hooks/useExamType';
 import {
     ShieldCheck,
     ShieldAlert,
@@ -22,7 +22,8 @@ interface SWOTReportProps {
 }
 
 export function SWOTReport({ initialData }: SWOTReportProps = {}) {
-    const { data, isLoading } = useGetSWOTReportQuery('JEE', { skip: !!initialData });
+    const examType = useExamType();
+    const { data, isLoading } = useGetSWOTReportQuery(examType, { skip: !!initialData });
     const swot = initialData ?? data?.data;
 
     if (isLoading) {
@@ -84,8 +85,8 @@ export function SWOTReport({ initialData }: SWOTReportProps = {}) {
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {swot.topPriorityChapters.length > 0 ? (
-                            swot.topPriorityChapters.map((chapter, i) => (
-                                <div key={i} className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-lg group hover:bg-red-500/20 transition-all">
+                            swot.topPriorityChapters.map((chapter) => (
+                                <div key={chapter} className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-lg group hover:bg-red-500/20 transition-all">
                                     <span className="text-sm text-red-100 font-medium truncate max-w-[200px]">{chapter}</span>
                                     <ArrowRight className="w-4 h-4 text-red-400 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
                                 </div>
@@ -116,8 +117,8 @@ export function SWOTReport({ initialData }: SWOTReportProps = {}) {
                                         Strengths
                                     </div>
                                     <div className="space-y-1">
-                                        {sub.strengths.slice(0, 2).map((s, i) => (
-                                            <div key={i} className="text-[10px] text-slate-400 leading-tight">
+                                        {sub.strengths.slice(0, 2).map((s) => (
+                                            <div key={s.chapter} className="text-[10px] text-slate-400 leading-tight">
                                                 {s.chapter} ({s.score}%)
                                             </div>
                                         ))}
@@ -130,8 +131,8 @@ export function SWOTReport({ initialData }: SWOTReportProps = {}) {
                                         Weaknesses
                                     </div>
                                     <div className="space-y-1">
-                                        {sub.weaknesses.slice(0, 2).map((w, i) => (
-                                            <div key={i} className="text-[10px] text-slate-400 leading-tight">
+                                        {sub.weaknesses.slice(0, 2).map((w) => (
+                                            <div key={w.chapter} className="text-[10px] text-slate-400 leading-tight">
                                                 {w.chapter} ({w.score}%)
                                             </div>
                                         ))}
@@ -144,8 +145,8 @@ export function SWOTReport({ initialData }: SWOTReportProps = {}) {
                                         Opportunities
                                     </div>
                                     <div className="space-y-1">
-                                        {sub.opportunities.slice(0, 1).map((o, i) => (
-                                            <div key={i} className="text-[10px] text-slate-400 leading-tight">
+                                        {sub.opportunities.slice(0, 1).map((o) => (
+                                            <div key={o.chapter} className="text-[10px] text-slate-400 leading-tight">
                                                 {o.chapter}
                                                 <div className="text-[8px] text-orange-500/60 font-medium italic">{o.reason}</div>
                                             </div>
@@ -159,8 +160,8 @@ export function SWOTReport({ initialData }: SWOTReportProps = {}) {
                                         Threats
                                     </div>
                                     <div className="space-y-1">
-                                        {sub.threats.slice(0, 1).map((t, i) => (
-                                            <div key={i} className="text-[10px] text-slate-400 leading-tight">
+                                        {sub.threats.slice(0, 1).map((t) => (
+                                            <div key={t.chapter} className="text-[10px] text-slate-400 leading-tight">
                                                 {t.chapter}
                                                 <div className="text-[8px] text-amber-500/60 font-medium italic">{t.reason}</div>
                                             </div>

@@ -4,21 +4,17 @@ import { useMemo } from 'react';
 import { useGetMorningBriefingQuery, useGetTasksQuery, TaskStatus } from '@repo/store';
 import { Sun, BookOpen, Flame, AlertTriangle, ChevronRight, Clock, Zap, MapPin } from 'lucide-react';
 import Link from 'next/link';
-import { getDebugRefetchOptions } from '@/lib/refetchDebug';
+
+// Module-scope constant — never recreated
+const PRIORITY_ORDER: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
 export function MorningBriefing() {
-    const { data, isLoading } = useGetMorningBriefingQuery(
-        undefined,
-        getDebugRefetchOptions('morningBriefing.summary', 300000)
-    );
+    const { data, isLoading } = useGetMorningBriefingQuery();
     const pendingTasksQueryArgs = useMemo(
         () => ({ page: 1, limit: 10, status: TaskStatus.PENDING }),
         []
     );
-    const { data: allTasks } = useGetTasksQuery(
-        pendingTasksQueryArgs,
-        getDebugRefetchOptions('morningBriefing.tasks', 120000)
-    );
+    const { data: allTasks } = useGetTasksQuery(pendingTasksQueryArgs);
     const briefing = data?.briefing;
     type UpcomingExam = { title: string; daysUntil: number };
     const upcomingExams = (briefing?.upcomingExams ?? []) as UpcomingExam[];
@@ -29,38 +25,46 @@ export function MorningBriefing() {
         return 'Wind down with a short evening revision sprint before dinner.';
     })();
 
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const pendingTasks = useMemo(
+        () => (allTasks || []).filter(t => t.status !== 'COMPLETED'),
+        [allTasks]
+    );
 
-    const pendingTasks = (allTasks || []).filter(t => t.status !== 'COMPLETED');
-    const overdueTasks = pendingTasks.filter(t => {
+    const now = new Date();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const startOfToday = useMemo(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()), []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const endOfToday = useMemo(() => new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), []);
+
+    const overdueTasks = useMemo(() => pendingTasks.filter(t => {
         if (!t.dueDate) return false;
         return new Date(t.dueDate).getTime() < startOfToday.getTime();
-    });
-    const dueTodayTasks = pendingTasks.filter(t => {
+    }), [pendingTasks, startOfToday]);
+
+    const dueTodayTasks = useMemo(() => pendingTasks.filter(t => {
         if (!t.dueDate) return false;
         const due = new Date(t.dueDate).getTime();
         return due >= startOfToday.getTime() && due < endOfToday.getTime();
-    });
-    const upcomingTasks = pendingTasks.filter(t => {
+    }), [pendingTasks, startOfToday, endOfToday]);
+
+    const upcomingTasks = useMemo(() => pendingTasks.filter(t => {
         if (!t.dueDate) return false;
         return new Date(t.dueDate).getTime() >= endOfToday.getTime();
-    });
+    }), [pendingTasks, endOfToday]);
 
     // Compute Top 3 Priority Tasks: due today first, then upcoming (never include overdue)
-    const priorityOrder: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-    const top3Tasks = [...dueTodayTasks, ...upcomingTasks]
+    const top3Tasks = useMemo(() => [...dueTodayTasks, ...upcomingTasks]
         .sort((a, b) => {
-            const aPri = priorityOrder[a.priority] ?? 3;
-            const bPri = priorityOrder[b.priority] ?? 3;
+            const aPri = PRIORITY_ORDER[a.priority] ?? 3;
+            const bPri = PRIORITY_ORDER[b.priority] ?? 3;
             if (aPri !== bPri) return aPri - bPri;
             if (a.dueDate && b.dueDate) return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
             if (a.dueDate && !b.dueDate) return -1;
             if (!a.dueDate && b.dueDate) return 1;
             return 0;
         })
-        .slice(0, 3);
+        .slice(0, 3),
+    [dueTodayTasks, upcomingTasks]);
 
     if (isLoading) {
         return (
@@ -167,8 +171,8 @@ export function MorningBriefing() {
             {upcomingExams.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-white/10">
                     <p className="text-xs text-slate-500 uppercase tracking-wider mb-1.5">Upcoming Exams</p>
-                    {upcomingExams.slice(0, 3).map((exam, i) => (
-                        <Link key={i} href="/exam-warroom" className="flex justify-between text-xs text-slate-400 py-0.5 hover:text-slate-300 transition-colors">
+                    {upcomingExams.slice(0, 3).map((exam) => (
+                        <Link key={`${exam.title}-${exam.daysUntil}`} href="/exam-warroom" className="flex justify-between text-xs text-slate-400 py-0.5 hover:text-slate-300 transition-colors">
                             <span>{exam.title}</span>
                             <span className={exam.daysUntil <= 3 ? 'text-red-400 font-bold' : ''}>
                                 {exam.daysUntil}d away

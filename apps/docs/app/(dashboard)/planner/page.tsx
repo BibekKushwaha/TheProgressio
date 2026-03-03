@@ -2,13 +2,16 @@
 
 import { RecoveryModePanel } from '@/components/planner/RecoveryModePanel'
 import { useGetTasksQuery } from '@repo/store';
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import { AlertCircle, Zap, Clock } from 'lucide-react';
+import { toLocalDateKey, getTodayDateKey } from '@/lib/date';
+
+// Static — declared outside the component so RTK Query receives a stable reference
+// and useMemo overhead is avoided entirely.
+const PLANNER_TASKS_ARGS = { page: 1, limit: 500 } as const;
 
 const PlannerPage = () => {
-    const tasksQueryArgs = useMemo(() => ({ page: 1, limit: 50 }), []);
-    const { data: allTasks } = useGetTasksQuery(tasksQueryArgs);
-
+    const { data: allTasks } = useGetTasksQuery(PLANNER_TASKS_ARGS);
     const tasks = useMemo(() => allTasks ?? [], [allTasks]);
 
     // Calculate task metrics
@@ -19,7 +22,7 @@ const PlannerPage = () => {
         let pending = 0;
         let completed = 0;
 
-        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const todayKey = getTodayDateKey();
 
         tasks.forEach((task) => {
             if (task.status === 'COMPLETED') {
@@ -32,7 +35,7 @@ const PlannerPage = () => {
             }
 
             const dueDate = new Date(task.dueDate);
-            const dueKey = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}`;
+            const dueKey = toLocalDateKey(dueDate);
 
             if (dueDate < now && dueKey !== todayKey) {
                 overdue++;

@@ -1,14 +1,29 @@
 'use client';
 
-import React from 'react';
 import { useGetCycleTimeQuery, CycleTimeData } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { TrendingUp, AlertTriangle, CheckCircle2, Loader2, Info } from 'lucide-react';
-import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, Cell, ReferenceLine, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, Cell, ReferenceLine, CartesianGrid } from '@/lib/recharts';
 
 interface CycleTimeScatterPlotProps {
     /** Pre-fetched data from a BFF call. When provided the query is skipped. */
     initialData?: CycleTimeData;
+}
+
+// Defined at module scope so recharts does not unmount/remount the tooltip
+// on every parent re-render (component reference must be stable).
+function CustomTooltip({ active, payload }: { active?: boolean; payload?: unknown[] }) {
+    if (active && payload && payload.length) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const task = (payload[0] as any).payload;
+        return (
+            <div className="bg-slate-900/95 border border-white/10 p-3 rounded-lg shadow-xl backdrop-blur-md">
+                <p className="text-xs font-bold text-white mb-1">{task.title}</p>
+                <p className="text-xs text-indigo-300">Cycle Time: {task.cycleTimeHours.toFixed(1)} hrs</p>
+            </div>
+        );
+    }
+    return null;
 }
 
 export function CycleTimeScatterPlot({ initialData }: CycleTimeScatterPlotProps = {}) {
@@ -48,20 +63,6 @@ export function CycleTimeScatterPlot({ initialData }: CycleTimeScatterPlotProps 
         x: index + 1,
         y: task.cycleTimeHours,
     })).reverse(); // Show oldest to newest
-
-    const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: unknown[] }) => {
-        if (active && payload && payload.length) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const task = (payload[0] as any).payload;
-            return (
-                <div className="bg-slate-900/95 border border-white/10 p-3 rounded-lg shadow-xl backdrop-blur-md">
-                    <p className="text-xs font-bold text-white mb-1">{task.title}</p>
-                    <p className="text-xs text-indigo-300">Cycle Time: {task.cycleTimeHours.toFixed(1)} hrs</p>
-                </div>
-            );
-        }
-        return null;
-    };
 
     return (
         <Card variant="glass" className="overflow-hidden border-indigo-500/20 shadow-lg shadow-indigo-500/5">

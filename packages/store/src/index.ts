@@ -3,7 +3,7 @@ export { makeStore } from './store';
 export type { AppStore, RootState, AppDispatch } from './store';
 
 // Base query utility
-export { withRetry } from './baseQuery';
+export { withRetry, withRateLimit } from './baseQuery';
 export { StoreProvider } from './StoreProvider';
 
 // Mobile token store (React Native)
@@ -188,6 +188,10 @@ export {
   useGetHabitsQuery,
   useGetHabitStatsQuery,
   useGetUserXPQuery,
+  // Bootstrap — single round-trip for habits + XP + heatmap
+  useGetDashboardBootstrapQuery,
+  // Critical-only bootstrap for React streaming (habits + XP, no heatmap)
+  useGetDashboardBootstrapCriticalQuery,
   useCreateHabitMutation,
   useUpdateHabitMutation,
   useDeleteHabitMutation,
@@ -209,6 +213,9 @@ export type {
   HabitStats,
   UserXP,
   HeatmapDay,
+  HeatmapSummary,
+  DashboardBootstrap,
+  BootstrapCritical,
   Nudge,
   NotificationSettings,
   MorningBriefing,

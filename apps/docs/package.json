@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
+    "analyze": "ANALYZE=true next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "lint:quiet": "eslint --quiet",
@@ -15,6 +16,7 @@
   "dependencies": {
     "@repo/schemas": "*",
     "@repo/store": "*",
+    "@tanstack/react-virtual": "^3.13.19",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -34,6 +36,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.1.6",
     "@next/eslint-plugin-next": "^15.4.6",
     "@repo/eslint-config": "*",
     "@repo/tailwind-config": "*",

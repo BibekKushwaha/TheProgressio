@@ -2,14 +2,10 @@
 
 import type { ComponentType } from 'react';
 import { useState } from 'react';
-import { GPACalculator } from '@/components/analytics/GPACalculator';
-import { SWOTAnalysis } from '@/components/analytics/SWOTAnalysis';
-import { ProductivityInsights } from '@/components/analytics/ProductivityInsights';
-import { NotificationCenter } from '@/components/habit/NotificationCenter';
-import { RotationManager } from '@/components/planner/RotationManager';
-import { ClassManager } from '@/components/planner/ClassManager';
+import dynamic from 'next/dynamic';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
     Bell,
     Calendar,
@@ -20,6 +16,17 @@ import {
     TrendingUp,
 } from 'lucide-react';
 
+// Lazy-load each tab panel — they are large, chart-heavy components that should
+// not inflate the initial JS bundle when the user may never visit their tab.
+const TabFallback = () => <Skeleton className="h-64 w-full rounded-2xl bg-white/5" />;
+
+const GPACalculator       = dynamic(() => import('@/components/analytics/GPACalculator').then(m => ({ default: m.GPACalculator })),             { ssr: false, loading: TabFallback });
+const SWOTAnalysis        = dynamic(() => import('@/components/analytics/SWOTAnalysis').then(m => ({ default: m.SWOTAnalysis })),               { ssr: false, loading: TabFallback });
+const ProductivityInsights = dynamic(() => import('@/components/analytics/ProductivityInsights').then(m => ({ default: m.ProductivityInsights })), { ssr: false, loading: TabFallback });
+const NotificationCenter  = dynamic(() => import('@/components/habit/NotificationCenter').then(m => ({ default: m.NotificationCenter })),       { ssr: false, loading: TabFallback });
+const RotationManager     = dynamic(() => import('@/components/planner/RotationManager').then(m => ({ default: m.RotationManager })),           { ssr: false, loading: TabFallback });
+const ClassManager        = dynamic(() => import('@/components/planner/ClassManager').then(m => ({ default: m.ClassManager })),                 { ssr: false, loading: TabFallback });
+
 type TabId = 'gpa' | 'swot' | 'insights' | 'notifications' | 'rotations' | 'timetable';
 
 const TAB_ITEMS: Array<{
@@ -28,12 +35,12 @@ const TAB_ITEMS: Array<{
     icon: ComponentType<{ className?: string }>;
     tone: string;
 }> = [
-        { id: 'gpa', label: 'GPA Lab', icon: GraduationCap, tone: 'from-indigo-500/20 to-violet-500/10 border-indigo-400/20' },
-        { id: 'swot', label: 'SWOT Matrix', icon: Target, tone: 'from-blue-500/20 to-cyan-500/10 border-blue-400/20' },
-        { id: 'insights', label: 'Productivity AI', icon: TrendingUp, tone: 'from-fuchsia-500/20 to-purple-500/10 border-fuchsia-400/20' },
-        { id: 'notifications', label: 'Nudge Center', icon: Bell, tone: 'from-pink-500/20 to-rose-500/10 border-pink-400/20' },
-        { id: 'rotations', label: 'Rotation Ops', icon: RotateCw, tone: 'from-cyan-500/20 to-sky-500/10 border-cyan-400/20' },
-        { id: 'timetable', label: 'Class Master', icon: Calendar, tone: 'from-emerald-500/20 to-teal-500/10 border-emerald-400/20' },
+        { id: 'gpa',           label: 'GPA Lab',         icon: GraduationCap, tone: 'from-indigo-500/20 to-violet-500/10 border-indigo-400/20' },
+        { id: 'swot',          label: 'SWOT Matrix',     icon: Target,        tone: 'from-blue-500/20 to-cyan-500/10 border-blue-400/20' },
+        { id: 'insights',      label: 'Productivity AI', icon: TrendingUp,    tone: 'from-fuchsia-500/20 to-purple-500/10 border-fuchsia-400/20' },
+        { id: 'notifications', label: 'Nudge Center',    icon: Bell,          tone: 'from-pink-500/20 to-rose-500/10 border-pink-400/20' },
+        { id: 'rotations',     label: 'Rotation Ops',    icon: RotateCw,      tone: 'from-cyan-500/20 to-sky-500/10 border-cyan-400/20' },
+        { id: 'timetable',     label: 'Class Master',    icon: Calendar,      tone: 'from-emerald-500/20 to-teal-500/10 border-emerald-400/20' },
     ];
 
 export default function AdvancedFeaturesPage() {
@@ -44,10 +51,14 @@ export default function AdvancedFeaturesPage() {
 
     return (
         <div className="space-y-7">
-            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/[0.10] via-indigo-500/[0.08] to-fuchsia-500/[0.10] p-6 md:p-8">
-                <div className="absolute -top-16 -right-10 h-60 w-60 rounded-full bg-cyan-500/20 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-16 -left-10 h-60 w-60 rounded-full bg-violet-500/15 blur-3xl pointer-events-none" />
-
+            <div
+                className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/[0.10] via-indigo-500/[0.08] to-fuchsia-500/[0.10] p-6 md:p-8"
+                style={{
+                    backgroundImage:
+                        'radial-gradient(ellipse 450px 450px at -5% -15%, rgba(34,211,238,0.06) 0%, transparent 70%), ' +
+                        'radial-gradient(ellipse 450px 450px at 105% 110%, rgba(139,92,246,0.06) 0%, transparent 70%)',
+                }}
+            >
                 <div className="relative grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-6">
                     <div>
                         <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-xs text-cyan-100 mb-4">
@@ -94,29 +105,14 @@ export default function AdvancedFeaturesPage() {
                     ))}
                 </TabsList>
 
-                <TabsContent value="gpa" className="space-y-6">
-                    <GPACalculator />
-                </TabsContent>
-
-                <TabsContent value="swot" className="space-y-6">
-                    <SWOTAnalysis />
-                </TabsContent>
-
-                <TabsContent value="insights" className="space-y-6">
-                    <ProductivityInsights />
-                </TabsContent>
-
-                <TabsContent value="notifications" className="space-y-6">
-                    <NotificationCenter />
-                </TabsContent>
-
-                <TabsContent value="rotations" className="space-y-6">
-                    <RotationManager />
-                </TabsContent>
-
-                <TabsContent value="timetable" className="space-y-6">
-                    <ClassManager />
-                </TabsContent>
+                {/* Conditionally render only the active tab to avoid mounting all
+                    6 components (and their queries) on page load. */}
+                <TabsContent value="gpa"          className="space-y-6">{activeTab === 'gpa'           && <GPACalculator />}</TabsContent>
+                <TabsContent value="swot"         className="space-y-6">{activeTab === 'swot'          && <SWOTAnalysis />}</TabsContent>
+                <TabsContent value="insights"     className="space-y-6">{activeTab === 'insights'      && <ProductivityInsights />}</TabsContent>
+                <TabsContent value="notifications" className="space-y-6">{activeTab === 'notifications' && <NotificationCenter />}</TabsContent>
+                <TabsContent value="rotations"    className="space-y-6">{activeTab === 'rotations'     && <RotationManager />}</TabsContent>
+                <TabsContent value="timetable"    className="space-y-6">{activeTab === 'timetable'     && <ClassManager />}</TabsContent>
             </Tabs>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

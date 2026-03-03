@@ -1,13 +1,12 @@
 import { useGetContributionHeatmapQuery } from '@repo/store';
 import { useMemo } from 'react';
 import { GenericHeatmap } from './GenericHeatmap';
-import { getDebugRefetchOptions } from '@/lib/refetchDebug';
 
-export function ActivityHeatmap({ _pastDays }: { _pastDays: string }) {
+export function ActivityHeatmap() {
     // Heatmap spans 90 days — it changes only when new sessions are logged.
     const { data: heatmapResponse, isLoading } = useGetContributionHeatmapQuery(
         undefined,
-        getDebugRefetchOptions('activityHeatmap.contribution', 300000)
+        { refetchOnFocus: false }
     );
 
     const heatmapData = useMemo(() => {

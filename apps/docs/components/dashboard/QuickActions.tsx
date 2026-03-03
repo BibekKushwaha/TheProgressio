@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useCreateNoteMutation } from '@repo/store';
+import { toast } from 'sonner';
 
 export function QuickActions() {
     const router = useRouter();
@@ -21,8 +22,9 @@ export function QuickActions() {
             await createNote({ content: noteText }).unwrap();
             setIsNoteDialogOpen(false);
             setNoteText('');
+            toast.success('Note saved!');
         } catch (_e) {
-            console.error('Failed to create note:', _e);
+            toast.error('Failed to save note. Please try again.');
         }
     };
 

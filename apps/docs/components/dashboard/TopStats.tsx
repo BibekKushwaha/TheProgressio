@@ -9,21 +9,20 @@ import {
 } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toLocalDateKey, normalizeDateInput } from '@/lib/date';
-import { getDebugRefetchOptions } from '@/lib/refetchDebug';
+
+function toSafeNumber(value: unknown, fallback = 0): number {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
 
 export function TopStats() {
-    const toSafeNumber = (value: unknown, fallback = 0) => {
-        const n = Number(value);
-        return Number.isFinite(n) ? n : fallback;
-    };
-
     const gradientId = useId().replace(/:/g, '');
 
     const {
         data: summaryData,
         isLoading: isSummaryLoading,
         isError: isSummaryError,
-    } = useGetDailySummaryQuery("1", getDebugRefetchOptions('topStats.dailySummary', 60000));
+    } = useGetDailySummaryQuery("1");
 
     // BFF replaces useGetFocusScoreQuery: delivers score+breakdown in one call
     // that the dashboard-summary cache (2-min TTL) already has warm.
@@ -32,14 +31,11 @@ export function TopStats() {
         data: dashboardData,
         isLoading: isFocusLoading,
         isError: isDashboardError,
-    } = useGetDashboardSummaryQuery(
-        { leakageDays: 1, peakDays: 7 },
-        getDebugRefetchOptions('topStats.dashboardSummary', 60000)
-    );
+    } = useGetDashboardSummaryQuery({ leakageDays: 1, peakDays: 7 });
 
     const { data: activeLive } = useGetActiveLiveSessionQuery(
         undefined,
-        { ...getDebugRefetchOptions('topStats.activeLive', 10000), refetchOnMountOrArgChange: true }
+        { refetchOnMountOrArgChange: true }
     );
 
     // 1. Calculate Daily Progress
@@ -170,7 +166,12 @@ export function TopStats() {
                         </div>
                     </div>
                     <div className="relative w-16 h-16">
-                        <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
+                        <svg
+                            className="w-full h-full -rotate-90"
+                            viewBox="0 0 64 64"
+                            role="img"
+                            aria-label={`Daily goal progress: ${progress}% complete`}
+                        >
                             <circle
                                 cx="32"
                                 cy="32"

@@ -254,13 +254,15 @@ export const tasksApi = createApi({
             }),
             invalidatesTags: (_result, _error, { id }) => [{ type: 'Tasks', id }],
             async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
-                const patchResult = dispatch(
-                    tasksApi.util.updateQueryData('getTasks', undefined, (draft) => {
-                        const task = draft.find((t) => t.id === id);
-                        if (task) {
-                            Object.assign(task, patch);
-                        }
-                    })
+                const applyUpdate = (draft: Task[]) => {
+                    const task = draft.find((t) => t.id === id);
+                    if (task) Object.assign(task, patch);
+                };
+                const patchUndefined = dispatch(
+                    tasksApi.util.updateQueryData('getTasks', undefined, applyUpdate)
+                );
+                const patchPaged = dispatch(
+                    tasksApi.util.updateQueryData('getTasks', { page: 1, limit: 100 }, applyUpdate)
                 );
                 dispatch(
                     tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
@@ -274,7 +276,8 @@ export const tasksApi = createApi({
                     // Ensure analytics reflect task updates immediately
                     dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
                 } catch {
-                    patchResult.undo();
+                    patchUndefined.undo();
+                    patchPaged.undo();
                 }
             },
         }),
@@ -285,10 +288,12 @@ export const tasksApi = createApi({
             }),
             invalidatesTags: (_result, _error, id) => [{ type: 'Tasks', id }, { type: 'Tasks', id: 'LIST' }],
             async onQueryStarted(id, { dispatch, queryFulfilled }) {
-                const patchResult = dispatch(
-                    tasksApi.util.updateQueryData('getTasks', undefined, (draft) => {
-                        return draft.filter((t) => t.id !== id);
-                    })
+                const applyFilter = (draft: Task[]) => draft.filter((t) => t.id !== id);
+                const patchUndefined = dispatch(
+                    tasksApi.util.updateQueryData('getTasks', undefined, applyFilter)
+                );
+                const patchPaged = dispatch(
+                    tasksApi.util.updateQueryData('getTasks', { page: 1, limit: 100 }, applyFilter)
                 );
                 try {
                     await queryFulfilled;
@@ -297,7 +302,8 @@ export const tasksApi = createApi({
                     // Ensure analytics reflect task deletions immediately
                     dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
                 } catch {
-                    patchResult.undo();
+                    patchUndefined.undo();
+                    patchPaged.undo();
                 }
             },
         }),
@@ -310,13 +316,15 @@ export const tasksApi = createApi({
             async onQueryStarted(id, { dispatch, queryFulfilled }) {
                 try {
                     const { data: updatedTask } = await queryFulfilled;
+                    const applyToggle = (draft: Task[]) => {
+                        const index = draft.findIndex((t) => t.id === id);
+                        if (index !== -1) draft[index] = updatedTask;
+                    };
                     dispatch(
-                        tasksApi.util.updateQueryData('getTasks', undefined, (draft) => {
-                            const index = draft.findIndex((t) => t.id === id);
-                            if (index !== -1) {
-                                draft[index] = updatedTask;
-                            }
-                        })
+                        tasksApi.util.updateQueryData('getTasks', undefined, applyToggle)
+                    );
+                    dispatch(
+                        tasksApi.util.updateQueryData('getTasks', { page: 1, limit: 100 }, applyToggle)
                     );
                     dispatch(
                         tasksApi.util.updateQueryData('getTaskById', id, (draft) => {

@@ -2,28 +2,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PlannerLoading() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-9 w-28 rounded-xl" />
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-24 rounded-xl" />
-          <Skeleton className="h-10 w-24 rounded-xl" />
+    <div className="flex-1 flex flex-col py-4">
+      {/* Header — title + stats row */}
+      <div className="pb-4 border-b border-white/10 space-y-4">
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-64 rounded-xl" />
+          <Skeleton className="h-5 w-80 rounded-lg" />
+        </div>
+        {/* Quick stats grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
         </div>
       </div>
 
-      {/* NLP command bar */}
-      <Skeleton className="h-14 rounded-2xl" />
-
-      {/* Planner columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="space-y-3">
-            <Skeleton className="h-8 rounded-xl" />
-            {Array.from({ length: 4 }).map((_, j) => (
-              <Skeleton key={j} className="h-24 rounded-xl" />
-            ))}
-          </div>
-        ))}
+      {/* Recovery panel */}
+      <div className="flex-1 mt-6">
+        <Skeleton className="h-[480px] rounded-xl" />
       </div>
     </div>
   );

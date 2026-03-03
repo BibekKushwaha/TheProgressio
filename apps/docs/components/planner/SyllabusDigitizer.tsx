@@ -36,24 +36,24 @@ export function SyllabusDigitizer() {
         setIsParsing(true);
         setScanNotice('');
         try {
-            // Split multiline input and parse each line
-            const lines = textInput.split('\n').filter(l => l.trim());
-            const results: ParsedItem[] = [];
-            for (const line of lines.slice(0, 20)) { // Cap at 20 lines
-                try {
-                    const result = await parseTask({ text: line }).unwrap();
-                    results.push({
-                        title: result.title || line.trim(),
-                        description: result.description,
-                        dueDate: result.dueDate,
-                        priority: result.priority,
-                        subject: result.subject,
+            // Split multiline input — cap at 20 lines, parse all in parallel.
+            const lines = textInput.split('\n').filter(l => l.trim()).slice(0, 20);
+            const settled = await Promise.allSettled(
+                lines.map(line => parseTask({ text: line }).unwrap()),
+            );
+            const results: ParsedItem[] = settled.map((result, i) => {
+                if (result.status === 'fulfilled') {
+                    return {
+                        title: result.value.title || lines[i]!.trim(),
+                        description: result.value.description,
+                        dueDate: result.value.dueDate,
+                        priority: result.value.priority,
+                        subject: result.value.subject,
                         selected: true,
-                    });
-                } catch {
-                    results.push({ title: line.trim(), selected: true });
+                    };
                 }
-            }
+                return { title: lines[i]!.trim(), selected: true };
+            });
             setParsedItems(results);
 
             // Auto-select category if subject matches
@@ -90,6 +90,13 @@ export function SyllabusDigitizer() {
         }
 
         if (file.type.startsWith('image/') || file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+            const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB
+            if (file.size > MAX_FILE_BYTES) {
+                toast.error(
+                    `File too large (max 4 MB). Got ${(file.size / 1_048_576).toFixed(1)} MB — use a text-based PDF or paste text instead.`
+                );
+                return;
+            }
             const reader = new FileReader();
             reader.onload = async (ev) => {
                 const imageBase64 = typeof ev.target?.result === 'string' ? ev.target.result : '';
@@ -179,24 +186,34 @@ export function SyllabusDigitizer() {
         setIsCreating(true);
         toast.loading(`Creating ${selected.length} tasks...`, { id: 'bulk-create' });
         try {
-            for (const item of selected) {
-                const payload: CreateTaskInput = {
-                    title: item.title,
-                    description: item.description,
-                    dueDate: item.dueDate,
-                    priority: item.priority ?? PriorityEnum.MEDIUM,
-                    status: TaskStatus.PENDING,
-                    isRecurring: bulkIsRecurring,
-                    categoryId: selectedCategoryId || undefined,
-                };
-                await createTask(payload).unwrap();
+            // Fan out in parallel — collect all settled results so partial
+            // failures are reported without blocking successful creations.
+            const results = await Promise.allSettled(
+                selected.map((item) => {
+                    const payload: CreateTaskInput = {
+                        title: item.title,
+                        description: item.description,
+                        dueDate: item.dueDate,
+                        priority: item.priority ?? PriorityEnum.MEDIUM,
+                        status: TaskStatus.PENDING,
+                        isRecurring: bulkIsRecurring,
+                        categoryId: selectedCategoryId || undefined,
+                    };
+                    return createTask(payload).unwrap();
+                }),
+            );
+            const failed = results.filter(r => r.status === 'rejected').length;
+            const succeeded = results.length - failed;
+            if (failed > 0) {
+                toast.error(`${succeeded} task${succeeded !== 1 ? 's' : ''} created, ${failed} failed`, { id: 'bulk-create' });
+            } else {
+                toast.success(`Successfully created ${succeeded} tasks`, { id: 'bulk-create' });
             }
-            toast.success(`Successfully created ${selected.length} tasks`, { id: 'bulk-create' });
             setParsedItems([]);
             setTextInput('');
         } catch (error) {
             console.error('Bulk create failed:', error);
-            toast.error('Failed to create some tasks', { id: 'bulk-create' });
+            toast.error('Failed to create tasks', { id: 'bulk-create' });
         } finally {
             setIsCreating(false);
         }

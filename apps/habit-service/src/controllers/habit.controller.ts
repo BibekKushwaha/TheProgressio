@@ -14,6 +14,8 @@ import {
     autoLogHabitFromCategory,
     calculateLevel,
     xpToNextLevel,
+    getXPForUser,
+    invalidateHeatmapCache,
 } from "../services/streak.service.js";
 import {
     detectStreakRisks,
@@ -30,7 +32,7 @@ import {
 } from "../services/nudge.service.js";
 import { dispatchWhatsAppNudges } from "../services/whatsapp-outbound.service.js";
 import { enqueueDueNudgeDispatchJobs, cancelPendingWhatsAppFallbackJobsForUser } from "../services/nudge-dispatch.queue.js";
-import { getMetricsSnapshot, incrementMetric, logMetricEvent } from "../services/metrics.service.js";
+import { getLatencySnapshot, getMetricsSnapshot, incrementMetric, logMetricEvent } from "../services/metrics.service.js";
 
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
@@ -107,7 +109,7 @@ export const cancelInternalWhatsAppFallback = TryCatch(async (req: Request, res:
     });
 });
 
-// Internal helper for lightweight nudge/dispatch counters
+// Internal helper for lightweight nudge/dispatch counters + per-endpoint latency
 // GET /api/habits/internal/metrics
 export const getInternalMetrics = TryCatch(async (req: Request, res: Response): Promise<void> => {
     const keysQuery = Array.isArray(req.query.keys) ? req.query.keys[0] : req.query.keys;
@@ -138,6 +140,7 @@ export const getInternalMetrics = TryCatch(async (req: Request, res: Response): 
             }
             return filtered;
         })(),
+        latency: getLatencySnapshot(),
     });
 });
 
@@ -243,6 +246,9 @@ const logHabitCompletionInternal = async (params: {
     try {
         const bonusXP = getStreakBonusXP(streakResult.currentStreak);
         await awardXP(habit.userId, XP_REWARDS.HABIT_LOG + bonusXP);
+        // awardXP performs a write-through XP cache update.
+        // Also invalidate heatmap — this log adds a new data point.
+        void invalidateHeatmapCache(habit.userId).catch(() => { /* non-blocking */ });
     } catch (_e) { /* XP is non-critical */ }
 
     return { status: "logged" as const, habit: updatedHabit, log, streakResult };
@@ -726,6 +732,125 @@ export const getUserXP = TryCatch(async (
             currentLevelXP: progress.current,
             nextLevelXP: progress.next,
         },
+    });
+});
+
+// ── Dashboard Bootstrap ───────────────────────────────────────────────
+
+/**
+ * GET /habits/bootstrap/critical — habits + XP only.
+ *
+ * This is the "first paint" payload used by React streaming.  It skips
+ * the heatmap (3 DB queries + 365-day aggregation) and nudges so the
+ * critical content (habit cards + level card) can stream to the browser
+ * as quickly as possible.  The secondary bootstrap fills in the rest.
+ */
+export const getBootstrapCritical = TryCatch(async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    const userId = req.user?.id;
+    if (!userId) throw new ErrorHandler(401, "Unauthorized");
+
+    const habitsRaw = await prisma.habit.findMany({
+        where: { userId },
+        include: { logs: { orderBy: { loggedAt: 'desc' }, take: 30 } },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    const [habitsWithStreaks, xp] = await Promise.all([
+        Promise.all(
+            habitsRaw.map(async (habit) => {
+                const sr = await calculateGentleStreak(habit.id);
+                return {
+                    ...habit,
+                    currentStreak: sr.currentStreak,
+                    streakStatus: getStreakStatus(habit.lastLogDate, habit.frequency),
+                    streakHealth: sr.streakHealth,
+                    mercyDaysUsed: sr.mercyDaysUsed,
+                    isMercyActive: sr.isMercyActive,
+                };
+            })
+        ),
+        getXPForUser(userId),
+    ]);
+
+    res.status(200).json({ message: "Critical bootstrap loaded", habits: habitsWithStreaks, xp });
+});
+
+/**
+ * GET /habits/bootstrap — full payload: habits + XP + heatmap + nudges.
+ *
+ * Nudge side-effects (detectStreakRisks, detectExamWarnings) are fired
+ * as fire-and-forget so they never block the response.  Only the read
+ * path (getUserNudges) is awaited.
+ *
+ * Used by:
+ *  • The RSC prefetch (server-side) for immediate first paint (revalidate 30 s).
+ *  • useGetDashboardBootstrapQuery (client-side fallback + post-mutation refetch).
+ */
+export const getBootstrap = TryCatch(async (
+    req: AuthenticatedRequest,
+    res: Response
+): Promise<void> => {
+    const userId = req.user?.id;
+    if (!userId) throw new ErrorHandler(401, "Unauthorized");
+
+    const habitsRaw = await prisma.habit.findMany({
+        where: { userId },
+        include: { logs: { orderBy: { loggedAt: 'desc' }, take: 30 } },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    if (!habitsRaw) throw new ErrorHandler(404, "User not found");
+
+    // Fire risk-detection in the background — these write nudge rows to the DB
+    // but we’ll read whatever exists regardless of whether they’ve finished.
+    // After both detectors settle, enqueue any newly-created due nudges for push dispatch.
+    void Promise.allSettled([
+        detectStreakRisks(userId),
+        detectExamWarnings(userId),
+    ]).then(() =>
+        enqueueDueNudgeDispatchJobs(20).catch(() => { /* non-blocking */ })
+    ).catch(() => { /* non-blocking */ });
+
+    // All reads run in parallel — heatmap and nudges are now both cached.
+    const [habitsWithStreaks, xp, heatmap, nudges] = await Promise.all([
+        Promise.all(
+            habitsRaw.map(async (habit) => {
+                const sr = await calculateGentleStreak(habit.id);
+                return {
+                    ...habit,
+                    currentStreak: sr.currentStreak,
+                    streakStatus: getStreakStatus(habit.lastLogDate, habit.frequency),
+                    streakHealth: sr.streakHealth,
+                    mercyDaysUsed: sr.mercyDaysUsed,
+                    isMercyActive: sr.isMercyActive,
+                };
+            })
+        ),
+        getXPForUser(userId),
+        getYearlyHeatmap(userId),
+        getUserNudges(userId, false),
+    ]);
+
+    const totalContributions = heatmap.reduce((s, d) => s + d.count, 0);
+    const activeDays = heatmap.filter((d) => d.count > 0).length;
+    // Use the heatmap window itself as the "total days" baseline.
+    const relevantTotalDays = Math.max(1, heatmap.length);
+
+    res.status(200).json({
+        message: "Bootstrap loaded successfully",
+        habits: habitsWithStreaks,
+        xp,
+        heatmap,
+        heatmapSummary: {
+            totalContributions,
+            activeDays,
+            totalDays: relevantTotalDays,
+            consistencyRate: Math.round((activeDays / relevantTotalDays) * 100),
+        },
+        nudges,
     });
 });
 
