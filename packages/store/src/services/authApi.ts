@@ -28,6 +28,7 @@ export interface User {
   createdAt: string;
   xp?: number;
   level?: number;
+  role?: string; // "USER" | "ADMIN"
 }
 
 export interface WhatsAppPairingResponse {

@@ -19,11 +19,12 @@ import {
     ChevronDown,
     Award,
     Layers,
+    Shield,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Card } from "../ui/card";
-import { logout as logoutAction, useAppDispatch, useLogoutMutation } from "@repo/store";
+import { logout as logoutAction, useAppDispatch, useAppSelector, useLogoutMutation, selectIsAdmin } from "@repo/store";
 import { AUTH_SESSION_KEY } from "@/constant";
 import { toast } from "sonner";
 import { trackFeatureOpened } from "@/lib/navigationTelemetry";
@@ -93,9 +94,11 @@ interface NavListProps {
     pathname: string;
     /** Called after a nav item is clicked. Mobile passes the menu-close fn. */
     onNavigate?: () => void;
+    /** Show admin-only links when the current user has the ADMIN role. */
+    isAdmin?: boolean;
 }
 
-const NavList = memo(function NavList({ pathname, onNavigate }: NavListProps) {
+const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavListProps) {
     const [openMenus, setOpenMenus] = useState<Record<MenuKey, boolean>>({
         planner:
             pathname.startsWith("/planner") ||
@@ -215,8 +218,38 @@ const NavList = memo(function NavList({ pathname, onNavigate }: NavListProps) {
                         </Link>
                     )}
                 </div>
-            ))}
-        </nav>
+            ))}            {/* Admin-only panel link */}
+            {isAdmin && (
+                <Link
+                    href="/admin"
+                    onClick={() => {
+                        trackFeatureOpened("/admin", pathname);
+                        onNavigate?.();
+                    }}
+                >
+                    <div
+                        className={cn(
+                            "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative",
+                            pathname === "/admin" || pathname.startsWith("/admin/")
+                                ? "bg-red-500/20 text-red-300 shadow-lg shadow-red-500/10"
+                                : "text-gray-400 hover:bg-red-500/10 hover:text-red-300"
+                        )}
+                    >
+                        {(pathname === "/admin" || pathname.startsWith("/admin/")) && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-red-500 rounded-r-full" />
+                        )}
+                        <Shield
+                            className={cn(
+                                "w-5 h-5 transition-colors",
+                                pathname === "/admin" || pathname.startsWith("/admin/")
+                                    ? "text-red-400"
+                                    : "group-hover:text-red-400"
+                            )}
+                        />
+                        <span className="font-medium">Admin Panel</span>
+                    </div>
+                </Link>
+            )}        </nav>
     );
 });
 
@@ -283,6 +316,7 @@ const Sidebar = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     // Track whether the mobile drawer has ever been opened so we can lazy-mount it.
     const [mobileEverOpened, setMobileEverOpened] = useState(false);
+    const isUserAdmin = useAppSelector(selectIsAdmin);
 
     const handleLogout = async () => {
         try {
@@ -319,7 +353,7 @@ const Sidebar = () => {
                         </Link>
                     </div>
 
-                    <NavList pathname={pathname} />
+                    <NavList pathname={pathname} isAdmin={isUserAdmin} />
 
                     <BottomActions
                         pathname={pathname}
@@ -363,7 +397,7 @@ const Sidebar = () => {
                     )}
                 >
                     <Card variant="glass" className="h-full flex flex-col p-4 m-4 rounded-2xl">
-                        <NavList pathname={pathname} onNavigate={closeMobileMenu} />
+                        <NavList pathname={pathname} onNavigate={closeMobileMenu} isAdmin={isUserAdmin} />
                         <BottomActions
                             pathname={pathname}
                             isLoggingOut={isLoggingOut}

@@ -11,7 +11,7 @@ import { AUTH_SESSION_KEY } from "@/constant";
 import { PageLoader } from "@/components/layout/PageLoader";
 
 /** Max ms to wait for the profile fetch before forcing a redirect to login. */
-const AUTH_TIMEOUT_MS = 8_000;
+const AUTH_TIMEOUT_MS = 15_000;
 
 interface AuthGuardProps {
     children: React.ReactNode;

@@ -60,6 +60,7 @@ export type ProfileStackParamList = {
     Subscription: undefined;
     QRAttendance: undefined;
     Advanced: undefined;
+    AdminDashboard: undefined;
 };
 
 // ─── Tab Navigator ────────────────────────────────────────────────────────────

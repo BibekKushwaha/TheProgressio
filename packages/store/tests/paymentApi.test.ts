@@ -12,8 +12,24 @@ describe('paymentApi — Endpoint Configuration', () => {
     expect(endpoints).toHaveProperty('createPaymentIntent');
   });
 
-  it('has createUpiCollect mutation endpoint', () => {
-    expect(endpoints).toHaveProperty('createUpiCollect');
+  it('has createOrder mutation endpoint', () => {
+    expect(endpoints).toHaveProperty('createOrder');
+  });
+
+  it('has verifyPayment mutation endpoint', () => {
+    expect(endpoints).toHaveProperty('verifyPayment');
+  });
+
+  it('has getSubscriptionStatus query endpoint', () => {
+    expect(endpoints).toHaveProperty('getSubscriptionStatus');
+  });
+
+  it('has cancelSubscription mutation endpoint', () => {
+    expect(endpoints).toHaveProperty('cancelSubscription');
+  });
+
+  it('has getPaymentHistory query endpoint', () => {
+    expect(endpoints).toHaveProperty('getPaymentHistory');
   });
 });
 

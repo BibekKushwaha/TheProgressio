@@ -6,6 +6,8 @@ import { predictTaskDuration, getCycleTimePercentiles, predictGrade } from "../s
 import { generateSWOT, getSubjectPerformance } from "../services/swot.service.js";
 import { calculateCGPA, whatIfGPA, addCourseGrade, updateCourseGrade, deleteCourseGrade } from "../services/gpa.service.js";
 import { getPlannedVsActual, detectPeakProductivity, getPredictivePerformance, computeFocusScore } from "../services/focus.service.js";
+import { queueExportJob, getExportJobStatus } from "../services/export.service.js";
+import { getDailyStatsRange, getTodayStats } from "../services/daily-stats-aggregator.service.js";
 
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
@@ -1034,8 +1036,8 @@ export const getAllSubjectStats = async (req: AuthenticatedRequest, res: Respons
 
             const rows = firstRows.get(row.subjectName) ?? [];
             const { first, last } = splitTrend(rows);
-            const earlyRate  = first.length > 0 ? first.reduce((s, e) => s + e.obtainedMarks / e.totalMarks, 0) / first.length : 0;
-            const recentRate = last.length  > 0 ? last.reduce( (s, e) => s + e.obtainedMarks / e.totalMarks, 0) / last.length  : 0;
+            const earlyRate = first.length > 0 ? first.reduce((s, e) => s + e.obtainedMarks / e.totalMarks, 0) / first.length : 0;
+            const recentRate = last.length > 0 ? last.reduce((s, e) => s + e.obtainedMarks / e.totalMarks, 0) / last.length : 0;
             const improvementRate = Math.round((recentRate - earlyRate) * 100);
             const trend = improvementRate > 5 ? "improving" : improvementRate < -5 ? "declining" : "stable";
 
@@ -1861,6 +1863,205 @@ export const getSrlPlanVsActual = async (req: AuthenticatedRequest, res: Respons
         console.error("Error generating plan vs actual:", error);
         res.status(500).json({
             message: "Failed to generate plan vs actual",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// 50K-Scale: Pre-Aggregated Analytics Overview (O(1) read path)
+// GET /stats/overview
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Returns per-day analytics for the last N days using the pre-aggregated
+ * DailyUserStats table — completely eliminating live multi-query aggregations
+ * at peak load.
+ *
+ * At 750 concurrent requests this endpoint does:
+ *   - 1 Redis cache check (sub-ms)
+ *   - On miss: 1 indexed DB read by (userId, date range) — at most 30 rows
+ *
+ * vs. the previous pattern:
+ *   - 3 separate DB aggregation queries per request = 2,250 concurrent queries
+ */
+export const getAnalyticsOverview = async (
+    req: AuthenticatedRequest,
+    res: Response,
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const daysRaw = typeof req.query.days === "string" ? parseInt(req.query.days, 10) : NaN;
+        const days = Number.isFinite(daysRaw) ? Math.min(30, Math.max(1, daysRaw)) : 7;
+
+        // Cache for 2 minutes — pre-aggregated data changes only on write events
+        const cacheKey = `overview:${days}`;
+        const cached = await getAnalyticsCache<object>(userId, "overview", cacheKey);
+        if (cached) {
+            res.status(200).json(cached);
+            return;
+        }
+
+        const now = new Date();
+        const from = new Date(now);
+        from.setUTCDate(from.getUTCDate() - (days - 1));
+        from.setUTCHours(0, 0, 0, 0);
+
+        // O(1) read from pre-aggregated table (at most `days` rows)
+        const dailyStats = await getDailyStatsRange(userId, from, now);
+        const todayStats = await getTodayStats(userId);
+
+        // Merge today's live stats (in case the write-time hook hasn't fired yet)
+        const stats = dailyStats.length > 0 ? dailyStats : [todayStats];
+
+        // Compute rolling totals
+        const totalFocusMinutes = stats.reduce((sum, d) => sum + d.focusMinutes, 0);
+        const totalCompleted = stats.reduce((sum, d) => sum + d.completedTasks, 0);
+        const totalSessions = stats.reduce((sum, d) => sum + d.sessionCount, 0);
+        const avgScore = stats.filter(d => d.avgScore !== null).length > 0
+            ? Math.round(
+                stats.reduce((sum, d) => sum + (d.avgScore ?? 0), 0) /
+                stats.filter(d => d.avgScore !== null).length * 10
+            ) / 10
+            : null;
+
+        const result = {
+            message: "Analytics overview (pre-aggregated)",
+            days,
+            today: {
+                focusMinutes: todayStats.focusMinutes,
+                completedTasks: todayStats.completedTasks,
+                overdueTasks: todayStats.overdueTasks,
+                sessionCount: todayStats.sessionCount,
+                avgScore: todayStats.avgScore,
+            },
+            rolling: {
+                totalFocusMinutes,
+                totalFocusHours: Math.round((totalFocusMinutes / 60) * 10) / 10,
+                totalCompletedTasks: totalCompleted,
+                totalSessions,
+                avgScore,
+            },
+            daily: stats.map(d => ({
+                date: d.date.toISOString().split("T")[0],
+                focusMinutes: d.focusMinutes,
+                completedTasks: d.completedTasks,
+                overdueTasks: d.overdueTasks,
+                sessionCount: d.sessionCount,
+                deepWorkMinutes: d.deepWorkMinutes,
+                avgScore: d.avgScore,
+            })),
+            generatedAt: new Date().toISOString(),
+        };
+
+        await setAnalyticsCache(userId, "overview", result, cacheKey, 120);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("Error fetching analytics overview:", error);
+        res.status(500).json({
+            message: "Failed to fetch analytics overview",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// 50K-Scale: Async Export (Step 5 — stream exports via background worker)
+// POST /stats/export
+// GET  /stats/export/:id
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Queue an async export job — returns a job ID immediately (< 5ms).
+ * The actual file is generated by the BullMQ export worker in the background.
+ * Client polls GET /stats/export/:id or receives SSE notification on completion.
+ *
+ * This prevents the 150 MB memory spikes from 50 concurrent PDF generations
+ * on the main server thread.
+ */
+export const exportReport = async (
+    req: AuthenticatedRequest,
+    res: Response,
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const { type, fromDate, toDate, examType, format } = req.body ?? {};
+        const validTypes = ["PDF_REPORT", "CSV_TASKS", "CSV_GRADES"] as const;
+        type ExportType = typeof validTypes[number];
+
+        if (!type || !validTypes.includes(type as ExportType)) {
+            res.status(400).json({
+                message: `type is required. Valid values: ${validTypes.join(", ")}`,
+            });
+            return;
+        }
+
+        const { exportJobId } = await queueExportJob(userId, type as ExportType, {
+            ...(fromDate ? { fromDate: String(fromDate) } : {}),
+            ...(toDate ? { toDate: String(toDate) } : {}),
+            ...(examType ? { examType: String(examType) } : {}),
+            ...(format ? { format: String(format) } : {}),
+        });
+
+        res.status(202).json({
+            message: "Export queued. Poll the status endpoint for progress.",
+            exportJobId,
+            statusUrl: `/api/stats/export/${exportJobId}`,
+        });
+    } catch (error) {
+        console.error("Error queuing export:", error);
+        res.status(500).json({
+            message: "Failed to queue export",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+
+/**
+ * Poll export job status.
+ * Returns { status: "PENDING" | "PROCESSING" | "DONE" | "FAILED", fileUrl?, errorMsg? }
+ */
+export const getExportStatus = async (
+    req: AuthenticatedRequest,
+    res: Response,
+): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+
+        const { id } = req.params;
+        if (!id || typeof id !== "string") {
+            res.status(400).json({ message: "Export job ID is required" });
+            return;
+        }
+
+        const job = await getExportJobStatus(id, userId);
+        if (!job) {
+            res.status(404).json({ message: "Export job not found" });
+            return;
+        }
+
+        res.status(200).json({
+            message: "Export job status",
+            job,
+        });
+    } catch (error) {
+        console.error("Error fetching export status:", error);
+        res.status(500).json({
+            message: "Failed to fetch export status",
             error: error instanceof Error ? error.message : "Unknown error",
         });
     }

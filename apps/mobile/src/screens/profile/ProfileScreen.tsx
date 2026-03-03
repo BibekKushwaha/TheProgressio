@@ -15,6 +15,7 @@ import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
     logout as logoutAction,
     useAppDispatch,
+    useAppSelector,
     useGetNotificationContextSignalsQuery,
     useGetNotificationIntelligenceQuery,
     useGetNudgeSettingsQuery,
@@ -24,6 +25,7 @@ import {
     useUnpairWhatsAppMutation,
     useUpdateNudgeSettingsMutation,
     useUpdateProfileMutation,
+    selectIsAdmin,
 } from '@repo/store';
 import type { ProfileScreenProps } from '../../navigation/types';
 
@@ -73,6 +75,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps<'Profile'>> = ({ navigat
     const pairingCode = (pairingData as any)?.pairingCode;
     const whatsappVerified = Boolean((pairingData as any)?.verified);
     const whatsappNumber = (pairingData as any)?.whatsappNumber;
+    const isUserAdmin = useAppSelector(selectIsAdmin);
 
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
@@ -419,6 +422,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps<'Profile'>> = ({ navigat
                     <Text style={styles.settingLabel}>⚙️ Advanced</Text>
                     <Text style={styles.chevron}>›</Text>
                 </TouchableOpacity>
+                {isUserAdmin && (
+                    <TouchableOpacity style={[styles.settingRow, styles.adminRow]} onPress={() => navigation.navigate('AdminDashboard')}>
+                        <Text style={[styles.settingLabel, styles.adminLabel]}>🛡️ Admin Panel</Text>
+                        <Text style={styles.chevron}>›</Text>
+                    </TouchableOpacity>
+                )}
             </GlassCard>
 
             <TouchableOpacity
@@ -497,6 +506,8 @@ const styles = StyleSheet.create({
     settingHint: { color: Colors.textMuted, fontSize: Typography.fontSize.xs, marginTop: 2 },
     metaLine: { color: Colors.textMuted, fontSize: Typography.fontSize.xs, marginTop: 4 },
     chevron: { color: Colors.textMuted, fontSize: 18 },
+    adminRow: { backgroundColor: 'rgba(248,113,113,0.08)', borderRadius: 8 },
+    adminLabel: { color: '#f87171' },
     langGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing['2'] },
     langCard: {
         width: '48%',

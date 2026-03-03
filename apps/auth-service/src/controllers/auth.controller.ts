@@ -27,6 +27,7 @@ export interface LocalUserCacheValue {
   updatedAt?: string | null;
   xp?: number;
   level?: number;
+  role?: string;
 }
 
 async function safeGetUserCache(userId: string): Promise<LocalUserCacheValue | null> {
@@ -552,7 +553,7 @@ export const mobileGoogleLogin = TryCatch(async (req, res) => {
 
   const userRow = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { id: true, username: true, email: true, dailyGoalHours: true, createdAt: true, xp: true, level: true },
+    select: { id: true, username: true, email: true, dailyGoalHours: true, createdAt: true, xp: true, level: true, role: true },
   });
 
   return res.status(200).json({
@@ -600,6 +601,7 @@ const buildUserCachePayload = (user: any): LocalUserCacheValue => ({
   updatedAt: user.updatedAt ? (user.updatedAt instanceof Date ? user.updatedAt.toISOString() : user.updatedAt) : null,
   xp: user.xp ?? 0,
   level: user.level ?? 1,
+  role: user.role ?? 'USER',
 });
 
 
@@ -635,6 +637,7 @@ export const registerUser = TryCatch(async (req, res) => {
       createdAt: true,
       xp: true,
       level: true,
+      role: true,
     },
   });
 
@@ -889,7 +892,8 @@ export const getCurrentUser = TryCatch(async (req, res) => {
       whatsappVerified: true,
       createdAt: true,
       xp: true,
-      level: true
+      level: true,
+      role: true,
     },
   });
 
@@ -1409,7 +1413,7 @@ export const mobileRefresh = TryCatch(async (req, res) => {
     },
     include: {
       user: {
-        select: { id: true, username: true, email: true, dailyGoalHours: true, createdAt: true },
+        select: { id: true, username: true, email: true, dailyGoalHours: true, createdAt: true, role: true },
       },
     },
   });

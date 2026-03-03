@@ -1,12 +1,42 @@
 'use client';
 
 import { useState } from 'react';
-import { useCreatePaymentIntentMutation, useCreateUpiCollectMutation, useGetBillingProfileQuery } from '@repo/store';
-import { CreditCard, Check, Star, Zap, Shield, Crown, Smartphone, Building2, ArrowRight } from 'lucide-react';
+import {
+    useCreatePaymentIntentMutation,
+    useVerifyPaymentMutation,
+    useGetBillingProfileQuery,
+} from '@repo/store';
+import { CreditCard, Check, Crown, Shield, ArrowRight, Zap } from 'lucide-react';
+
+// ---------------------------------------------------------------------------
+// Razorpay Checkout.js global type
+// ---------------------------------------------------------------------------
+declare global {
+    interface Window {
+        Razorpay: new (options: Record<string, unknown>) => { open(): void; on(event: string, cb: () => void): void };
+    }
+}
+
+function loadRazorpayScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (typeof window !== 'undefined' && window.Razorpay) { resolve(); return; }
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
+        document.head.appendChild(script);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Plans
+// ---------------------------------------------------------------------------
 
 interface Plan {
+    id: 'PRO' | 'INSTITUTION';
     name: string;
     price: string;
+    amountPaise: number;
     period: string;
     features: string[];
     highlighted: boolean;
@@ -15,21 +45,10 @@ interface Plan {
 
 const PLANS: Plan[] = [
     {
-        name: 'Free',
-        price: '₹0',
-        period: 'forever',
-        features: [
-            'Up to 20 tasks',
-            'Basic analytics',
-            'Single device sync',
-            '2 habit trackers',
-            'Community support',
-        ],
-        highlighted: false,
-    },
-    {
+        id: 'PRO',
         name: 'Pro',
-        price: '₹99',
+        price: '₹149',
+        amountPaise: 14900,
         period: '/month',
         features: [
             'Unlimited tasks & habits',
@@ -45,8 +64,10 @@ const PLANS: Plan[] = [
         badge: 'Most Popular',
     },
     {
-        name: 'Plus',
+        id: 'INSTITUTION',
+        name: 'Institution',
         price: '₹999',
+        amountPaise: 99900,
         period: '/year',
         features: [
             'Everything in Pro',
@@ -62,94 +83,142 @@ const PLANS: Plan[] = [
     },
 ];
 
-const PAYMENT_METHODS = [
-    { id: 'upi', label: 'UPI', icon: Smartphone, desc: 'Google Pay, PhonePe, Paytm', color: 'from-indigo-500 to-blue-500' },
-    { id: 'netbanking', label: 'Net Banking', icon: Building2, desc: 'All major banks supported', color: 'from-green-500 to-emerald-500' },
-    { id: 'card', label: 'Card', icon: CreditCard, desc: 'Visa, Mastercard, RuPay', color: 'from-purple-500 to-pink-500' },
-];
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function PricingSection() {
-    const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-    const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
-    const [upiId, setUpiId] = useState('');
-    const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
-    const [createIntent, { isLoading: creatingIntent }] = useCreatePaymentIntentMutation();
-    const [createUpiCollect, { isLoading: creatingCollect }] = useCreateUpiCollectMutation();
-    const { data: billingData } = useGetBillingProfileQuery();
+    const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+    const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
-    const isSubmitting = creatingIntent || creatingCollect;
+    const [createIntent, { isLoading: creatingOrder }] = useCreatePaymentIntentMutation();
+    const [verifyPayment, { isLoading: verifying }] = useVerifyPaymentMutation();
+    const { data: billingData, refetch: refetchBilling } = useGetBillingProfileQuery();
 
-    const resolvePlan = (value: string | null): 'PRO' | 'INSTITUTION' | null => {
-        if (value === 'Pro') return 'PRO';
-        if (value === 'Institution') return 'INSTITUTION';
-        return null;
+    const isSubmitting = creatingOrder || verifying;
+
+    const showStatus = (type: 'success' | 'error' | 'info', message: string) => {
+        setStatus({ type, message });
+        setTimeout(() => setStatus(null), 6000);
     };
 
-    const resolveProvider = (value: string | null): 'UPI' | 'NET_BANKING' | 'CARD' | null => {
-        if (value === 'upi') return 'UPI';
-        if (value === 'netbanking') return 'NET_BANKING';
-        if (value === 'card') return 'CARD';
-        return null;
-    };
+    const handleUpgrade = async () => {
+        if (!selectedPlan) return;
 
-    const handlePayment = async () => {
         try {
-            const plan = resolvePlan(selectedPlan);
-            const provider = resolveProvider(selectedMethod);
-            if (!plan || !provider) {
-                setPaymentStatus('Select a paid plan and payment method first.');
-                return;
+            // Step 1 — Create Razorpay Order server-side
+            const { intent } = await createIntent({
+                plan: selectedPlan.id,
+                provider: 'UPI',
+            }).unwrap();
+
+            // Step 2 — Load Razorpay Checkout.js
+            await loadRazorpayScript();
+
+            // Step 3 — Open Razorpay Checkout
+            await new Promise<void>((resolve, reject) => {
+                const rzp = new window.Razorpay({
+                    key:       intent.keyId,
+                    order_id:  intent.orderId,
+                    amount:    intent.amountPaise,
+                    currency:  intent.currency ?? 'INR',
+                    name:      'Student Activity Tracker',
+                    description: `${selectedPlan.name} Plan`,
+                    image:     '/logo.png',
+                    // Allow all Razorpay methods — user chooses UPI / card / netbanking in the modal
+                    handler: async (response: {
+                        razorpay_order_id: string;
+                        razorpay_payment_id: string;
+                        razorpay_signature: string;
+                    }) => {
+                        try {
+                            // Step 4 — Verify signature + activate plan
+                            await verifyPayment({
+                                razorpayOrderId:   response.razorpay_order_id,
+                                razorpayPaymentId: response.razorpay_payment_id,
+                                razorpaySignature: response.razorpay_signature,
+                            }).unwrap();
+
+                            showStatus('success', `🎉 ${selectedPlan.name} plan activated! Your account has been upgraded.`);
+                            setSelectedPlan(null);
+                            refetchBilling();
+                            resolve();
+                        } catch (err) {
+                            const msg = typeof err === 'object' && err && 'data' in err
+                                ? String((err as { data?: { message?: string } }).data?.message ?? 'Payment verification failed')
+                                : 'Payment verification failed';
+                            showStatus('error', msg);
+                            reject(new Error(msg));
+                        }
+                    },
+                    modal: {
+                        ondismiss: () => {
+                            showStatus('info', 'Payment cancelled. You can retry whenever you\'re ready.');
+                            resolve();
+                        },
+                    },
+                    prefill: {},
+                    theme: { color: '#6366f1' },
+                });
+
+                rzp.open();
+            });
+        } catch (err) {
+            if (!(err instanceof Error && err.message === 'Payment verification failed')) {
+                const msg = typeof err === 'object' && err && 'data' in err
+                    ? String((err as { data?: { message?: string } }).data?.message ?? 'Something went wrong')
+                    : (err instanceof Error ? err.message : 'Something went wrong');
+                showStatus('error', msg);
             }
-
-            if (provider === 'UPI' && !upiId.trim()) {
-                setPaymentStatus('Enter a valid UPI ID to continue.');
-                return;
-            }
-
-            const intentResponse = await createIntent({ plan, provider }).unwrap();
-            const intent = intentResponse.intent;
-
-            if (provider === 'UPI') {
-                const collectResponse = await createUpiCollect({
-                    intentId: intent.intentId,
-                    upiId: upiId.trim(),
-                }).unwrap();
-
-                setPaymentStatus(`UPI collect created. Approve request for ref ${collectResponse.collect.paymentRef}.`);
-            } else {
-                setPaymentStatus(`Payment intent ${intent.paymentRef} created. Complete provider checkout; plan will activate after webhook confirmation.`);
-            }
-        } catch (error) {
-            const message = typeof error === 'object' && error && 'data' in error
-                ? String((error as { data?: { message?: string } }).data?.message ?? 'Payment request failed')
-                : 'Payment request failed';
-            setPaymentStatus(message);
         }
-
-        setTimeout(() => setPaymentStatus(null), 5000);
     };
+
+    const currentPlan = billingData?.profile;
+    const isAlreadyActive = (plan: Plan) =>
+        currentPlan?.plan === plan.id && currentPlan?.planStatus === 'ACTIVE';
 
     return (
         <div className="space-y-6">
-            {billingData?.profile && (
+            {/* Current plan banner */}
+            {currentPlan && currentPlan.plan !== 'FREE' && (
                 <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-                    Current plan: <span className="font-semibold">{billingData.profile.plan}</span> ({billingData.profile.planStatus})
-                    {billingData.profile.renewalAt ? ` • Renews ${new Date(billingData.profile.renewalAt).toLocaleDateString()}` : ''}
+                    Current plan: <span className="font-semibold">{currentPlan.plan}</span>
+                    {' '}({currentPlan.planStatus})
+                    {currentPlan.renewalAt
+                        ? ` · Renews ${new Date(currentPlan.renewalAt).toLocaleDateString()}`
+                        : ''}
                 </div>
             )}
 
-            {/* Plans Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Status toast */}
+            {status && (
+                <div className={`rounded-xl border p-3 text-sm text-center ${
+                    status.type === 'success'
+                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                        : status.type === 'error'
+                            ? 'border-red-500/20 bg-red-500/10 text-red-300'
+                            : 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300'
+                }`}>
+                    {status.message}
+                </div>
+            )}
+
+            {/* Plans grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {PLANS.map(plan => (
                     <button
-                        key={plan.name}
-                        onClick={() => setSelectedPlan(plan.name === 'Free' ? null : plan.name)}
-                        className={`relative text-left p-5 rounded-2xl border-2 transition-all duration-300 ${plan.highlighted
-                            ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-                            : selectedPlan === plan.name
-                                ? 'bg-white/10 border-white/30'
-                                : 'bg-white/5 border-white/10 hover:border-white/20'
-                            }`}
+                        key={plan.id}
+                        onClick={() => !isAlreadyActive(plan) && setSelectedPlan(p => p?.id === plan.id ? null : plan)}
+                        disabled={isAlreadyActive(plan)}
+                        className={`relative text-left p-5 rounded-2xl border-2 transition-all duration-300 ${
+                            isAlreadyActive(plan)
+                                ? 'bg-emerald-500/10 border-emerald-500/30 cursor-default'
+                                : plan.highlighted
+                                    ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
+                                    : selectedPlan?.id === plan.id
+                                        ? 'bg-white/10 border-white/30'
+                                        : 'bg-white/5 border-white/10 hover:border-white/20'
+                        }`}
                     >
                         {plan.badge && (
                             <span className="absolute -top-3 right-4 px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold rounded-full">
@@ -157,13 +226,9 @@ export function PricingSection() {
                             </span>
                         )}
                         <div className="mb-3">
-                            {plan.highlighted ? (
-                                <Crown className="w-6 h-6 text-indigo-400 mb-2" />
-                            ) : plan.name === 'Institution' ? (
-                                <Shield className="w-6 h-6 text-emerald-400 mb-2" />
-                            ) : (
-                                <Star className="w-6 h-6 text-slate-400 mb-2" />
-                            )}
+                            {plan.highlighted
+                                ? <Crown className="w-6 h-6 text-indigo-400 mb-2" />
+                                : <Shield className="w-6 h-6 text-emerald-400 mb-2" />}
                             <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                             <div className="flex items-baseline gap-1 mt-1">
                                 <span className="text-3xl font-black text-white">{plan.price}</span>
@@ -178,85 +243,53 @@ export function PricingSection() {
                                 </li>
                             ))}
                         </ul>
-                        {plan.name !== 'Free' && (
-                            <div className={`mt-4 py-2 rounded-xl text-center text-sm font-bold transition-all ${selectedPlan === plan.name
-                                ? 'bg-indigo-500 text-white'
-                                : 'bg-white/5 text-slate-400'
-                                }`}>
-                                {selectedPlan === plan.name ? 'Selected' : 'Choose Plan'}
-                            </div>
-                        )}
+                        <div className={`mt-4 py-2 rounded-xl text-center text-sm font-bold transition-all ${
+                            isAlreadyActive(plan)
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : selectedPlan?.id === plan.id
+                                    ? 'bg-indigo-500 text-white'
+                                    : 'bg-white/5 text-slate-400'
+                        }`}>
+                            {isAlreadyActive(plan) ? '✓ Active' : selectedPlan?.id === plan.id ? 'Selected' : 'Choose Plan'}
+                        </div>
                     </button>
                 ))}
             </div>
 
-            {/* Payment Methods (shown when plan selected) */}
+            {/* Checkout button */}
             {selectedPlan && (
-                <div className="animate-in slide-in-from-bottom-4 duration-300 bg-white/5 border border-white/10 rounded-2xl p-6">
-                    <h3 className="font-bold text-white text-lg mb-4 flex items-center gap-2">
+                <div className="animate-in slide-in-from-bottom-4 duration-300 bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-white font-bold text-lg">
                         <Zap className="w-5 h-5 text-yellow-400" />
-                        Choose Payment Method
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {PAYMENT_METHODS.map(method => (
-                            <button
-                                key={method.id}
-                                onClick={() => setSelectedMethod(method.id)}
-                                className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${selectedMethod === method.id
-                                    ? 'border-indigo-500/50 bg-indigo-500/10'
-                                    : 'border-white/10 bg-white/5 hover:bg-white/10'
-                                    }`}
-                            >
-                                <div className={`p-2 rounded-lg bg-gradient-to-br ${method.color}`}>
-                                    <method.icon className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="text-left">
-                                    <div className="text-sm font-bold text-white">{method.label}</div>
-                                    <div className="text-xs text-slate-400">{method.desc}</div>
-                                </div>
-                            </button>
-                        ))}
+                        Pay via Razorpay — UPI, Card, Net Banking
                     </div>
-
-                    {selectedMethod && (
-                        <div className="mt-4 animate-in slide-in-from-bottom-2 duration-200">
-                            {paymentStatus && (
-                                <div className="mb-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-sm text-yellow-300 text-center">
-                                    {paymentStatus}
-                                </div>
-                            )}
-                            {selectedMethod === 'upi' ? (
-                                <div className="flex items-center gap-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                                    <input
-                                        type="text"
-                                        placeholder="Enter UPI ID (e.g., name@paytm)"
-                                        value={upiId}
-                                        onChange={(e) => setUpiId(e.target.value)}
-                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                                    />
-                                    <button
-                                        onClick={handlePayment}
-                                        disabled={isSubmitting}
-                                        className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center gap-2"
-                                    >
-                                        {isSubmitting ? 'Processing...' : `Pay ${selectedPlan === 'Pro' ? '₹99' : '₹999'}`}
-                                        <ArrowRight className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={handlePayment}
-                                    disabled={isSubmitting}
-                                    className="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2"
-                                >
-                                    {isSubmitting ? 'Processing...' : `Continue to ${selectedMethod === 'netbanking' ? 'Net Banking' : 'Card Payment'}`}
-                                    <ArrowRight className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    <p className="text-sm text-slate-400">
+                        You selected <span className="text-white font-semibold">{selectedPlan.name}</span> at{' '}
+                        <span className="text-white font-semibold">{selectedPlan.price}{selectedPlan.period}</span>.
+                        Click below to open the secure Razorpay checkout.
+                    </p>
+                    <button
+                        onClick={handleUpgrade}
+                        disabled={isSubmitting}
+                        className="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {creatingOrder
+                            ? 'Creating order…'
+                            : verifying
+                                ? 'Verifying payment…'
+                                : `Pay ${selectedPlan.price}`}
+                        <ArrowRight className="w-4 h-4" />
+                    </button>
+                    <p className="text-xs text-slate-500 text-center flex items-center justify-center gap-1">
+                        <CreditCard className="w-3 h-3" />
+                        Secured by Razorpay · Your plan activates instantly after payment
+                    </p>
+                    <p className="text-xs text-slate-600 text-center">
+                        Plan activates even if the browser closes — our webhook confirms payment automatically.
+                    </p>
                 </div>
             )}
         </div>
     );
 }
+

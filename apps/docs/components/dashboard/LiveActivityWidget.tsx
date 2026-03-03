@@ -5,13 +5,91 @@ import { useRouter } from 'next/navigation';
 import { Activity, Pause, Play, Loader2 } from 'lucide-react';
 import { useGetActiveLiveSessionQuery } from '@repo/store';
 
-// This widget checks remote DB (primary) then fallback to localStorage for an active focus session
+// ── LiveTimer (isolated) ────────────────────────────────────────────────────
+//
+// Previously, elapsed time was tracked in LiveActivityWidget's own state,
+// meaning setElapsed() called from setInterval fired setState on the entire
+// widget tree every second.  At 60 executions/minute with the progress bar,
+// task title, pulsing indicator, and icon all inside scope, this was
+// wasteful.
+//
+// Solution: extract the clock tick into its own tiny component. React's
+// reconciliation only re-renders <LiveTimer /> on each second tick — the
+// parent widget only re-renders when remote session data changes.
+
+interface LiveTimerProps {
+    startTime: string;
+    durationMinutes: number;
+    isPaused: boolean;
+    onExpired: () => void;
+}
+
+function LiveTimer({ startTime, durationMinutes, isPaused, onExpired }: LiveTimerProps) {
+    const [elapsed, setElapsed] = useState(() =>
+        Math.floor((Date.now() - new Date(startTime).getTime()) / 1000)
+    );
+
+    useEffect(() => {
+        if (isPaused) return;
+
+        const start = new Date(startTime).getTime();
+        const tick = () => {
+            const seconds = Math.floor((Date.now() - start) / 1000);
+            setElapsed(seconds);
+            // Auto-clear if expired (plus 2-minute buffer)
+            if (durationMinutes > 0 && seconds > durationMinutes * 60 + 120) {
+                onExpired();
+            }
+        };
+
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [startTime, durationMinutes, isPaused, onExpired]);
+
+    const remaining = Math.max(0, durationMinutes * 60 - elapsed);
+    const mm = Math.floor(remaining / 60);
+    const ss = remaining % 60;
+    const progress = durationMinutes > 0
+        ? Math.min(100, (elapsed / (durationMinutes * 60)) * 100)
+        : 0;
+
+    return (
+        <>
+            <div className="text-3xl font-black text-white font-mono tracking-tighter tabular-nums">
+                {mm.toString().padStart(2, '0')}:{ss.toString().padStart(2, '0')}
+            </div>
+            <div className="space-y-2">
+                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div
+                        className="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-400 transition-all duration-1000 ease-out"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+                <div className="flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <span>Session: {Math.round(progress)}% Complete</span>
+                    <span className="flex items-center gap-1 text-emerald-400">
+                        {isPaused ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5" />}
+                        {durationMinutes}m Total
+                    </span>
+                </div>
+            </div>
+        </>
+    );
+}
+
+
+// ── LiveActivityWidget ────────────────────────────────────────────────────────
+// This widget checks remote DB (primary) then falls back to localStorage for
+// an active focus session.
 export function LiveActivityWidget() {
     const router = useRouter();
-    const { data: remoteData, isLoading: isRemoteLoading, refetch, isUninitialized } = useGetActiveLiveSessionQuery(
-        undefined,
-        { refetchOnMountOrArgChange: true },
-    );
+    const {
+        data: remoteData,
+        isLoading: isRemoteLoading,
+        refetch,
+        isUninitialized,
+    } = useGetActiveLiveSessionQuery(undefined, { refetchOnMountOrArgChange: true });
 
     const [session, setSession] = useState<{
         taskTitle: string;
@@ -19,7 +97,6 @@ export function LiveActivityWidget() {
         duration: number;
         isPaused: boolean;
     } | null>(null);
-    const [elapsed, setElapsed] = useState(0);
 
     const checkLocalSession = useCallback(() => {
         try {
@@ -42,7 +119,7 @@ export function LiveActivityWidget() {
         return null;
     }, []);
 
-    // Sync remote and local
+    // Sync remote and local session state
     useEffect(() => {
         if (remoteData?.session) {
             setSession({
@@ -52,37 +129,26 @@ export function LiveActivityWidget() {
                 isPaused: remoteData.session.status === 'PAUSED',
             });
         } else {
-            const local = checkLocalSession();
-            setSession(local);
+            setSession(checkLocalSession());
         }
     }, [remoteData, checkLocalSession]);
 
-    // Handle visibility and storage changes — always sync for the live session widget
-    // since focus session state can change at any time from another tab or device.
+    // Re-sync on tab visibility or cross-tab storage change
     useEffect(() => {
         const onSync = () => {
-            // Guard against refetching before the query has started
             if (!isUninitialized && typeof refetch === 'function') {
-                try {
-                    refetch();
-                } catch (_e) {
-                    // Ignore transient refetch errors during mount/unmount
-                }
+                try { refetch(); } catch { /* ignore transient errors during mount/unmount */ }
             }
-            const local = checkLocalSession();
             if (!remoteData?.session) {
-                setSession(local);
+                setSession(checkLocalSession());
             }
         };
-
         const onVisibility = () => {
             if (document.visibilityState === 'visible') onSync();
         };
-
         window.addEventListener('storage', onSync);
         window.addEventListener('focus', onSync);
         document.addEventListener('visibilitychange', onVisibility);
-
         return () => {
             window.removeEventListener('storage', onSync);
             window.removeEventListener('focus', onSync);
@@ -90,26 +156,7 @@ export function LiveActivityWidget() {
         };
     }, [refetch, checkLocalSession, remoteData, isUninitialized]);
 
-    // Timer logic
-    useEffect(() => {
-        if (!session || session.isPaused) return;
-
-        const start = new Date(session.startTime).getTime();
-        const update = () => {
-            const now = Date.now();
-            const seconds = Math.floor((now - start) / 1000);
-            setElapsed(seconds);
-
-            // Auto-clear if expired (plus 2 min buffer)
-            if (session.duration > 0 && seconds > (session.duration * 60 + 120)) {
-                setSession(null);
-            }
-        };
-
-        update();
-        const interval = setInterval(update, 1000);
-        return () => clearInterval(interval);
-    }, [session]);
+    const handleExpired = useCallback(() => setSession(null), []);
 
     if (isRemoteLoading) {
         return (
@@ -121,17 +168,12 @@ export function LiveActivityWidget() {
 
     if (!session) return null;
 
-    const remaining = Math.max(0, session.duration * 60 - elapsed);
-    const mm = Math.floor(remaining / 60);
-    const ss = remaining % 60;
-    const progress = session.duration > 0 ? Math.min(100, (elapsed / (session.duration * 60)) * 100) : 0;
-
     return (
         <div
             onClick={() => router.push('/focus-session')}
             className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-emerald-500/10 backdrop-blur-md border border-emerald-500/20 rounded-2xl p-5 cursor-pointer hover:border-emerald-500/40 transition-all active:scale-[0.98]"
         >
-            {/* Pulsing indicator */}
+            {/* Pulsing live indicator */}
             {!session.isPaused && (
                 <div className="absolute top-3 right-3 flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -154,25 +196,14 @@ export function LiveActivityWidget() {
                         </div>
                     </div>
                 </div>
-                <div className="text-3xl font-black text-white font-mono tracking-tighter tabular-nums">
-                    {mm.toString().padStart(2, '0')}:{ss.toString().padStart(2, '0')}
-                </div>
-            </div>
 
-            <div className="space-y-2">
-                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-400 transition-all duration-1000 ease-out"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-                <div className="flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    <span>Session: {Math.round(progress)}% Complete</span>
-                    <span className="flex items-center gap-1 text-emerald-400">
-                        {session.isPaused ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5" />}
-                        {session.duration}m Total
-                    </span>
-                </div>
+                {/* Only LiveTimer re-renders every second — not the whole widget */}
+                <LiveTimer
+                    startTime={session.startTime}
+                    durationMinutes={session.duration}
+                    isPaused={session.isPaused}
+                    onExpired={handleExpired}
+                />
             </div>
         </div>
     );

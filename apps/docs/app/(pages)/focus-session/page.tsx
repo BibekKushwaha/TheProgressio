@@ -1,30 +1,10 @@
-// app/focus-session/page.tsx
-'use client';
-
-import { Suspense, useState } from 'react';
-import { ActiveFocusTimer } from '@/components/focus-session/ActiveFocusTimer';
-import { SessionComplete } from '@/components/focus-session/SessionComplete';
-
-function FocusSessionContent() {
-    const [isComplete, setIsComplete] = useState(false);
-
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 text-white relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent"></div>
-
-            {!isComplete ? (
-                <ActiveFocusTimer onComplete={() => setIsComplete(true)} />
-            ) : (
-                <SessionComplete />
-            )}
-        </div>
-    );
-}
+import { Suspense } from 'react';
+import { FocusSessionClient } from './FocusSessionClient';
 
 export default function FocusSessionPage() {
     return (
         <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
-            <FocusSessionContent />
+            <FocusSessionClient />
         </Suspense>
     );
 }

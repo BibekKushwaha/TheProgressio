@@ -32,6 +32,8 @@ model User {
   renewalAt        DateTime?
   paymentProvider  String?
   paymentRef       String?
+  // Role-based access control
+  role             String        @default("USER")  // "USER" | "ADMIN"
   createdAt        DateTime   @default(now())
   
   // XP / Gamification
@@ -74,6 +76,9 @@ model User {
   auditLogs           AuditLog[]
   pushSubscriptions   WebPushSubscription[]
   conversations       UserConversation[]
+  // Fraud
+  fraudRisk            String      @default("NONE")  // "NONE" | "LOW" | "MEDIUM" | "HIGH" | "BLOCKED"
+  fraudFlags           FraudFlag[]
 }
 
 model OAuthAccount {
@@ -387,6 +392,11 @@ model Task {
   reminders    Reminder[]
   taskCompletionStat TaskCompletionStat?
   syllabusLinks TaskSyllabusTopic[]
+
+  // Composite index for the most common analytics filter patterns
+  @@index([userId, status, dueDate])  // overdue / upcoming task queries
+  @@index([userId, status])           // count by status queries
+  @@index([userId, dueDate])          // date-range task fetches
 }
 
 model Attachment {
@@ -456,6 +466,11 @@ model ActivityLog {
   
   taskId          String
   task            Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  // Composite index: analytics queries always filter by task.userId + startTime range.
+  // Since ActivityLog→Task is a join, index on (taskId, startTime) covers both.
+  @@index([taskId, startTime])
+  @@index([startTime])  // Supports range scans for admin/monitoring queries
 }
 
 model TaskCompletionStat {
@@ -678,17 +693,26 @@ model PaymentEvent {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   intentId        String   @unique
   paymentRef      String   @unique
-  provider        String   // "UPI" | "PAYTM" | "NET_BANKING"
+  provider        String   // "UPI" | "NET_BANKING" | "CARD" | "WALLET"
   plan            BillingPlan
   amountPaise     Int
-  status          String   // "CREATED" | "PENDING" | "SUCCESS" | "FAILED"
+  status          String   // "CREATED" | "PENDING" | "SUCCESS" | "FAILED" | "REFUNDED"
+  eventType       String   @default("PAYMENT")  // "PAYMENT" | "RENEWAL" | "REFUND" | "UPGRADE"
   upiId           String?
   payload         String?  // JSON metadata / webhook payload
+  // Refund tracking
+  refundId        String?  // Razorpay refund ID (rfnd_xxxx)
+  refundedAt      DateTime?
+  refundAmountPaise Int?   // may be partial
+  // Retry tracking (for failed payments)
+  retryCount      Int      @default(0)  // 0 = original, 1/2/3 = retry attempts
+  parentRef       String?  // paymentRef of the original event this is retrying
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([parentRef])
 }
 
 model SyncOperation {
@@ -773,4 +797,145 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ── 50K-Scale: Pre-Aggregated Daily User Stats ─────────────────────────
+//
+// Updated on every task-completion/activity-log write event (via the BullMQ
+// analytics worker).  Analytics overview endpoints read from this table
+// instead of running expensive live aggregations over millions of rows.
+// Result: analytical reads become O(1) lookups instead of full table scans.
+//
+model DailyUserStats {
+  id                String   @id @default(uuid())
+  userId            String
+  date              DateTime // Truncated to midnight UTC — one row per user per day
+  
+  // Task metrics
+  completedTasks    Int      @default(0)
+  totalTasks        Int      @default(0)
+  overdueTasks      Int      @default(0)
+  
+  // Focus metrics
+  focusMinutes      Int      @default(0)   // Total activity log minutes
+  deepWorkMinutes   Int      @default(0)   // SESSION_TYPE = DEEP_WORK
+  sessionCount      Int      @default(0)   // Number of activity log sessions
+  
+  // Grade/academic metrics  
+  avgScore          Float?                 // Average grade entry score (0-100)
+  gradeEntryCount   Int      @default(0)
+  
+  // Aggregation metadata
+  lastUpdatedAt     DateTime @default(now()) @updatedAt
+  createdAt         DateTime @default(now())
+
+  @@unique([userId, date])                 // One row per (user × day)
+  @@index([userId, date])                  // Hot lookup path for analytics overview
+}
+
+// ── WhatsApp Replay / Idempotency Protection ─────────────────────────────
+//
+// Every inbound Meta webhook message carries a unique wamid. We record it
+// here immediately on first receipt so that:
+//   • Duplicate deliveries from Meta are silently acknowledged (idempotency).
+//   • Replayed old messages (stale timestamp) are rejected before any DB write.
+//
+// Rows are cheap: only the wamid string + a timestamp. A periodic job (or a
+// Prisma cron) can delete rows older than 24 h to keep the table small.
+//
+model ProcessedWhatsAppMessage {
+  messageId   String   @id          // wamid from Meta Cloud API (e.g. "wamid.xxx")
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+}
+
+// ── 50K-Scale: Async Export Job Tracking ─────────────────────────────────
+//
+// PDF / CSV exports are queued as background jobs so the main API thread is
+// never blocked by file generation (which can consume 3 MB+ memory per job).
+// Clients poll this record or receive a webhook / SSE event on completion.
+//
+model ExportJob {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // "PDF_REPORT" | "CSV_TASKS" | "CSV_GRADES"
+  status      String   @default("PENDING") // "PENDING" | "PROCESSING" | "DONE" | "FAILED"
+  params      String?  // JSON: export parameters (date range, format, etc.)
+  fileUrl     String?  // Signed URL to the generated file (set on completion)
+  errorMsg    String?  // Set on failure
+  expiresAt   DateTime?                    // File URL expiry
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ── Fraud Detection ──────────────────────────────────────────────────────────
+
+model FraudFlag {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // "VELOCITY" | "DUPLICATE_INSTRUMENT" | "CROSS_ACCOUNT" | "SUSPICIOUS_AMOUNT" | "RAPID_PLAN_SWITCH"
+  risk        String   // "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+  details     String?  // JSON: contextual evidence
+  paymentRef  String?  // Linked PaymentEvent.paymentRef (if applicable)
+  resolved    Boolean  @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?  // admin user ID
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, risk, resolved])
+  @@index([resolved, createdAt])
+}
+
+// ── Webhook Dead-Letter Queue ────────────────────────────────────────────────
+
+model WebhookDLQ {
+  id          String   @id @default(uuid())
+  event       String   // Razorpay event type e.g. "payment.captured"
+  rawBody     String   // Full raw webhook body
+  signature   String?  // X-Razorpay-Signature header value
+  reason      String   // Why processing failed
+  retryCount  Int      @default(0)
+  nextRetryAt DateTime?
+  resolved    Boolean  @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?  // admin user ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([event, resolved])
+  @@index([resolved, nextRetryAt])
+  @@index([createdAt])
+}
+
+// ── Razorpay Reconciliation Reports ─────────────────────────────────────────
+
+model ReconciliationReport {
+  id                  String   @id @default(uuid())
+  reportDate          DateTime // The settlement date being reconciled
+  status              String   @default("PENDING")  // "PENDING" | "RUNNING" | "COMPLETED" | "FAILED"
+  // Counts
+  rzpTotalCount       Int      @default(0)  // Payments found in Razorpay
+  dbTotalCount        Int      @default(0)  // PaymentEvent SUCCESS rows for that date
+  matchedCount        Int      @default(0)
+  // Discrepancies (stored as JSON arrays)
+  missingInDb         String?  // JSON: payment IDs captured in Razorpay but absent in DB
+  missingInRzp        String?  // JSON: DB SUCCESS paymentRefs not found in Razorpay
+  amountMismatches    String?  // JSON: {paymentRef, dbAmount, rzpAmount}[]
+  // Revenue snapshot for the date
+  totalRevenuePaise   Int      @default(0)
+  refundedPaise       Int      @default(0)
+  netRevenuePaise     Int      @default(0)
+  errorMsg            String?
+  runAt               DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([reportDate])
+  @@index([status, reportDate])
 }

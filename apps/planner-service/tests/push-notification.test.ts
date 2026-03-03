@@ -4,9 +4,12 @@ import { describe, it, beforeEach, expect, vi } from "vitest";
 // Mock auth middleware to inject a test user
 vi.mock("../src/middleware/auth.middleware.js", () => ({
     isAuth: (req: any, _res: any, next: any) => {
-        req.user = { id: "user-1", username: "Tester", email: "test@example.com", dailyGoalHours: 4 };
+        req.user = { id: "user-1", username: "Tester", email: "test@example.com", dailyGoalHours: 4, role: "ADMIN" };
         next();
     },
+    isAdmin: (_req: any, _res: any, next: any) => next(),
+    adminRateLimit: (_req: any, _res: any, next: any) => next(),
+    requireAdminIp: (_req: any, _res: any, next: any) => next(),
     enforceReadOnlyWrites: () => (req: any, res: any, next: any) => next(),
 }));
 

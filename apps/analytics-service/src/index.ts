@@ -7,6 +7,7 @@ import activityRouter from "./routes/activity.route.js";
 import statsRouter from "./routes/stats.route.js";
 import { shutdownWorker } from "./services/worker.service.js";
 import { shutdownSimulationService } from "./services/simulation.service.js";
+import { shutdownExportWorker } from "./services/export.service.js";
 
 export const app = express();
 
@@ -51,8 +52,11 @@ if (process.env.NODE_ENV !== 'test') {
     // Graceful shutdown
     const shutdown = async () => {
         console.log("Shutting down Analytics Service...");
-        await shutdownWorker();
-        await shutdownSimulationService();
+        await Promise.allSettled([
+            shutdownWorker(),
+            shutdownSimulationService(),
+            shutdownExportWorker(),
+        ]);
         process.exit(0);
     };
     process.on("SIGTERM", shutdown);
