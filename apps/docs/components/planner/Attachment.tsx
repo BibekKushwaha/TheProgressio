@@ -1,17 +1,16 @@
 'use client';
 
 import { Download, Trash2, Plus, Link as LinkIcon } from 'lucide-react';
-import { useGetTaskByIdQuery, useCreateAttachmentMutation, useDeleteAttachmentMutation } from '@repo/store';
+import { useCreateAttachmentMutation, useDeleteAttachmentMutation } from '@repo/store';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useTaskRouteId } from '@/hooks/useTaskRouteId';
+import { useTaskDetail } from './TaskDetailContext';
 
 export function AttachmentsList() {
-    const taskId = useTaskRouteId();
-    const { data: task } = useGetTaskByIdQuery(taskId || '', { skip: !taskId });
+    const { task, taskId } = useTaskDetail();
     const [createAttachment] = useCreateAttachmentMutation();
     const [deleteAttachment] = useDeleteAttachmentMutation();
 
@@ -22,6 +21,11 @@ export function AttachmentsList() {
 
     const handleAdd = async () => {
         if (!name || !url || !taskId) return;
+        try {
+            new URL(url); // throws if invalid — prevents storing broken links
+        } catch {
+            return;
+        }
         try {
             await createAttachment({ taskId, name, url }).unwrap();
             setName('');
@@ -37,10 +41,14 @@ export function AttachmentsList() {
     };
 
     const performDelete = async () => {
-        if (!pendingDeleteId) return;
-        if (!taskId) return;
-        await deleteAttachment({ id: pendingDeleteId, taskId });
-        setPendingDeleteId(null);
+        if (!pendingDeleteId || !taskId) return;
+        try {
+            await deleteAttachment({ id: pendingDeleteId, taskId }).unwrap();
+            setPendingDeleteId(null);
+        } catch (err) {
+            console.error('Failed to delete attachment:', err);
+            setPendingDeleteId(null);
+        }
     };
 
     const attachments = task?.attachments || [];

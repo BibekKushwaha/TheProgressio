@@ -4,7 +4,6 @@ import { EventCard } from './EventCard';
 import { useGetCalendarDailyScheduleQuery, ResolvedRotation } from '@repo/store';
 import { toLocalDateKey } from '@/lib/date';
 import { matchesRotationFilter } from '@/lib/rotation';
-import { getDebugMountRefetchOptions } from '@/lib/refetchDebug';
 
 interface DayGridProps {
     date: Date;
@@ -15,14 +14,13 @@ interface DayGridProps {
 export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const dateString = toLocalDateKey(date);
-    const { data: schedule } = useGetCalendarDailyScheduleQuery(
-        { date: dateString },
-        getDebugMountRefetchOptions('dayGrid.mountRefetch')
-    );
+    const { data: schedule } = useGetCalendarDailyScheduleQuery({ date: dateString });
 
+    // 1440px total height / 24 hours = 60px per hour. Scroll to 8 AM on mount.
+    const SLOT_HEIGHT_PX = 60;
     useEffect(() => {
         if (scrollRef.current) {
-            scrollRef.current.scrollTop = 480; // Scroll to 8 AM
+            scrollRef.current.scrollTop = 8 * SLOT_HEIGHT_PX;
         }
     }, []);
 
@@ -67,18 +65,19 @@ export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps
                             })
                         )
                         .map((item) => {
-                        // Calculate position
-                        const [startHourStr, startMinStr] = item.startTime.split(':');
+                        // Calculate position — guard against missing/malformed time strings.
+                        const [startHourStr = '0', startMinStr = '0'] = (item.startTime ?? '0:0').split(':');
                         const startHour = Number(startHourStr) || 0;
-                        const startMin = Number(startMinStr) || 0;
+                        const startMin  = Number(startMinStr)  || 0;
 
-                        const [endHourStr, endMinStr] = item.endTime.split(':');
+                        const [endHourStr = '0', endMinStr = '0'] = (item.endTime ?? '0:0').split(':');
                         const endHour = Number(endHourStr) || 0;
-                        const endMin = Number(endMinStr) || 0;
+                        const endMin  = Number(endMinStr)  || 0;
 
                         const startMinutes = startHour * 60 + startMin;
-                        const endMinutes = endHour * 60 + endMin;
-                        const duration = endMinutes - startMinutes;
+                        const endMinutes   = endHour   * 60 + endMin;
+                        // Clamp to 0 to handle midnight-crossing or malformed events.
+                        const duration = Math.max(endMinutes - startMinutes, 0);
 
                         return (
                             <div

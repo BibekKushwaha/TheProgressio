@@ -20,13 +20,22 @@ export function SubTaskList({ taskId, subtasks }: SubTaskListProps) {
     const [isAdding, setIsAdding] = useState(false);
     const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
     const [pendingSubTask, setPendingSubTask] = useState<SubTask | null>(null);
+    // Optimistic overrides: id → desired completed value, pending server confirmation
+    const [optimisticOverrides, setOptimisticOverrides] = useState<Record<string, boolean>>({});
 
-    const handleToggle = (subtask: SubTask) => {
-        updateSubTask({
-            id: subtask.id,
-            taskId: subtask.taskId,
-            completed: !subtask.completed
-        });
+    const handleToggle = async (subtask: SubTask) => {
+        const next = !(optimisticOverrides[subtask.id] ?? subtask.completed);
+        setOptimisticOverrides(prev => ({ ...prev, [subtask.id]: next }));
+        try {
+            await updateSubTask({ id: subtask.id, taskId: subtask.taskId, completed: next }).unwrap();
+        } catch {
+            // Revert optimistic change on failure
+            setOptimisticOverrides(prev => {
+                const updated = { ...prev };
+                delete updated[subtask.id];
+                return updated;
+            });
+        }
     };
 
     const handleDelete = (subtask: SubTask) => {
@@ -68,10 +77,18 @@ export function SubTaskList({ taskId, subtasks }: SubTaskListProps) {
                         style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'both' }}
                     >
                         <div onClick={() => handleToggle(task)} className="flex items-center gap-3 flex-1 cursor-pointer">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-indigo-500 border-indigo-500' : 'border-indigo-500 bg-transparent'}`}>
-                                {task.completed && <span className="text-white text-xs">✓</span>}
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                (optimisticOverrides[task.id] ?? task.completed)
+                                    ? 'bg-indigo-500 border-indigo-500'
+                                    : 'border-indigo-500 bg-transparent'
+                            }`}>
+                                {(optimisticOverrides[task.id] ?? task.completed) && <span className="text-white text-xs">✓</span>}
                             </div>
-                            <span className={`flex-1 ${task.completed ? 'line-through text-slate-500' : 'text-slate-200'}`}>
+                            <span className={`flex-1 ${
+                                (optimisticOverrides[task.id] ?? task.completed)
+                                    ? 'line-through text-slate-500'
+                                    : 'text-slate-200'
+                            }`}>
                                 {task.title}
                             </span>
                         </div>

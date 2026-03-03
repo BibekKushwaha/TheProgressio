@@ -4,6 +4,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useGetHabitStatsQuery } from "@repo/store"
 import { Loader2, Flame, Trophy, CheckCircle, Calendar, BarChart2 } from "lucide-react"
 
+// Module-level constant — no recreation on render
+const HEATMAP_COLORS = [
+    'bg-white/5',
+    'bg-green-500/20',
+    'bg-green-500/40',
+    'bg-green-500/60',
+    'bg-green-500/80',
+] as const;
+
 interface HabitStatsModalProps {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -71,18 +80,11 @@ export function HabitStatsModal({ open, onOpenChange, habitId }: HabitStatsModal
                                 <div className="grid grid-cols-7 gap-1.5">
                                     {stats.heatmapData.slice(-49).map((day, i) => {
                                         const intensity = day.value > 0 ? Math.min(Math.ceil(day.value / 2), 4) : 0;
-                                        const colors = [
-                                            'bg-white/5',
-                                            'bg-green-500/20',
-                                            'bg-green-500/40',
-                                            'bg-green-500/60',
-                                            'bg-green-500/80',
-                                        ];
                                         return (
                                             <div
-                                                key={i}
+                                                key={day.date ?? i}
                                                 title={`${day.date}: ${day.value} completions`}
-                                                className={`aspect-square rounded ${colors[intensity]} border border-white/10 hover:scale-110 transition-transform cursor-pointer`}
+                                                className={`aspect-square rounded ${HEATMAP_COLORS[intensity]} border border-white/10 hover:scale-110 transition-transform cursor-pointer`}
                                             />
                                         );
                                     })}
@@ -90,8 +92,8 @@ export function HabitStatsModal({ open, onOpenChange, habitId }: HabitStatsModal
                                 <div className="flex items-center gap-2 mt-3 text-xs text-slate-500">
                                     <span>Less</span>
                                     <div className="flex gap-1">
-                                        {[0, 1, 2, 3, 4].map((i) => (
-                                            <div key={i} className={`w-3 h-3 rounded ${['bg-white/5', 'bg-green-500/20', 'bg-green-500/40', 'bg-green-500/60', 'bg-green-500/80'][i]}`} />
+                                        {HEATMAP_COLORS.map((cls, i) => (
+                                            <div key={i} className={`w-3 h-3 rounded ${cls}`} />
                                         ))}
                                     </div>
                                     <span>More</span>

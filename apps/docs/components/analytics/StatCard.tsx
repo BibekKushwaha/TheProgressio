@@ -5,6 +5,7 @@ interface StatItem {
     label: string;
     value: string | number | React.ReactNode;
     trend?: string;
+    trendDirection?: 'up' | 'down' | 'neutral';
     icon: LucideIcon;
     gradient: string;
     isLoading?: boolean;
@@ -26,7 +27,7 @@ export function StatCards({ items }: StatCardsProps) {
                     iconColor="text-white"
                     iconBgColor={`bg-gradient-to-br ${stat.gradient}`}
                     trend={stat.trend}
-                    trendDirection="up" // Defaulting to up as per original design which had green text/badge
+                    trendDirection={stat.trendDirection ?? 'up'}
                     isLoading={stat.isLoading}
                     variant="default" // Using default variant w/ gradient border as per original AnalyticsCard
                     className="p-6"

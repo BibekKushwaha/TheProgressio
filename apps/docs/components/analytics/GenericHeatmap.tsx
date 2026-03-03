@@ -3,6 +3,11 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 
+// Module-scoped so useMemo dependency arrays remain stable across renders.
+function parseDate(date: string): Date {
+    return new Date(`${date}T00:00:00`);
+}
+
 export type HeatmapDataPoint = {
     date: string;
     value: number;
@@ -36,7 +41,6 @@ export function GenericHeatmap({
 }: GenericHeatmapProps) {
     const [hoveredDay, setHoveredDay] = useState<HeatmapDataPoint | null>(null);
 
-    const parseDate = (date: string) => new Date(`${date}T00:00:00`);
     const weekdayIndexMonFirst = (day: number) => (day === 0 ? 6 : day - 1);
 
     const sortedDays = useMemo(

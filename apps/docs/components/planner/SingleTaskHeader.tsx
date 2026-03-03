@@ -1,20 +1,42 @@
-// components/task/TaskHeader.tsx
+// components/planner/SingleTaskHeader.tsx
 "use client"
 import { ChevronRight, Edit, Flag, Tag } from 'lucide-react';
 import Link from 'next/link';
-import { useGetTaskByIdQuery } from '@repo/store';
 import { useRouter } from 'next/navigation';
-import { useTaskRouteId } from '@/hooks/useTaskRouteId';
+import { useTaskDetail } from './TaskDetailContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function SingleTaskHeader() {
     const router = useRouter();
-    const taskId = useTaskRouteId();
-    const { data: task, isLoading } = useGetTaskByIdQuery(taskId || '', { skip: !taskId });
+    const { task, isLoading, taskId } = useTaskDetail();
 
     if (!taskId) {
         return (
             <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
                 Invalid task URL. Please open this page from your task list.
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div>
+                <div className="flex items-center gap-2 mb-4">
+                    <Skeleton className="h-4 w-12 bg-white/10" />
+                    <Skeleton className="h-4 w-4 bg-white/10" />
+                    <Skeleton className="h-4 w-24 bg-white/10" />
+                </div>
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                    <div className="flex-1 space-y-4">
+                        <Skeleton className="h-10 w-3/4 rounded-lg bg-white/10" />
+                        <div className="flex gap-2">
+                            <Skeleton className="h-8 w-24 rounded-lg bg-white/10" />
+                            <Skeleton className="h-8 w-28 rounded-lg bg-white/10" />
+                            <Skeleton className="h-8 w-20 rounded-lg bg-white/10" />
+                        </div>
+                    </div>
+                    <Skeleton className="h-11 w-32 rounded-xl bg-white/10" />
+                </div>
             </div>
         );
     }

@@ -1,30 +1,37 @@
 'use client';
 
 import { Trophy, Zap, TrendingUp } from 'lucide-react';
-import { useGetUserXPQuery } from '@repo/store';
+import { useGetUserXPQuery, type UserXP } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/utils';
 
-const getErrorMessage = (error: unknown): string => {
-    if (!error) return 'Unknown error';
-    if (typeof error === 'string') return error;
-    if (typeof error === 'object' && error !== null && 'message' in error) {
-        const message = (error as { message?: unknown }).message;
-        if (typeof message === 'string') return message;
-    }
-    return 'Unknown error';
-};
+interface UserLevelCardProps {
+    /** XP data pre-fetched server-side via the dashboard bootstrap.
+     *  When provided, the client-side RTK query is skipped — refreshes
+     *  flow through the parent bootstrap query and prop updates. */
+    serverXP?: UserXP;
+}
 
-export function UserLevelCard() {
-    const { data: xpData, isLoading, isError, error, refetch } = useGetUserXPQuery();
+export function UserLevelCard({ serverXP }: UserLevelCardProps = {}) {
+    // Skip the individual query when the parent coordinator already bootstrapped the data.
+    // Invalidations from mutations go through getDashboardBootstrap, which re-runs and
+    // passes a new serverXP prop here.
+    const { data: xpData, isLoading, isError, error, refetch } = useGetUserXPQuery(
+        undefined,
+        { skip: !!serverXP }
+    );
+
+    // Unified value: server prop wins initially; once bootstrap refetches, prop updates.
+    const activeXP = serverXP ?? xpData?.xp;
 
     const prevXpRef = useRef<number | null>(null);
     const prevLevelRef = useRef<number | null>(null);
 
     useEffect(() => {
-        const currentXp = xpData?.xp?.xp ?? null;
-        const currentLevel = xpData?.xp?.level ?? null;
+        const currentXp = activeXP?.xp ?? null;
+        const currentLevel = activeXP?.level ?? null;
         const prevXp = prevXpRef.current;
         const prevLevel = prevLevelRef.current;
 
@@ -39,9 +46,10 @@ export function UserLevelCard() {
 
         prevXpRef.current = currentXp;
         prevLevelRef.current = currentLevel;
-    }, [xpData]);
+    }, [activeXP]);
 
-    if (isLoading) {
+    // Show skeleton only when no data at all (neither server-prefetched nor RTK)
+    if (isLoading && !activeXP) {
         return (
             <div className="bg-gradient-to-br from-white/[0.06] via-amber-500/[0.05] to-white/[0.02] backdrop-blur-md border border-white/20 rounded-2xl p-6">
                 <Skeleton className="h-6 w-32 bg-white/5 mb-4" />
@@ -52,7 +60,7 @@ export function UserLevelCard() {
         );
     }
 
-    if (isError) {
+    if (isError && !activeXP) {
         return (
             <div className="bg-gradient-to-br from-white/[0.06] via-amber-500/[0.05] to-white/[0.02] backdrop-blur-md border border-white/20 rounded-2xl p-6">
                 <div className="text-sm text-rose-400 mb-2">Failed to load XP.</div>
@@ -69,9 +77,9 @@ export function UserLevelCard() {
         );
     }
 
-    if (!xpData) return null;
+    if (!activeXP) return null;
 
-    const { level, levelName, xp, xpToNextLevel, progress } = xpData.xp;
+    const { level, levelName, xp, xpToNextLevel, progress } = activeXP;
 
     return (
         <div className="group relative overflow-hidden bg-gradient-to-br from-white/[0.06] via-amber-500/[0.06] to-white/[0.02] backdrop-blur-md border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-300">

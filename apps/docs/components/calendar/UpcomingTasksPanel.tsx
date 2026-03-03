@@ -6,10 +6,14 @@ import Link from "next/link";
 import { useGetTasksQuery, Task } from "@repo/store";
 import { getTodayDateKey, toLocalDateKey, formatRelativeDate } from "@/lib/date";
 
+// Pure utility — module-level so it is not recreated on every render.
+function formatTaskTitle(title: string) {
+    return title.charAt(0).toUpperCase() + title.slice(1);
+}
+
 export function UpcomingTasksPanel() {
     const tasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
     const { data: tasks, isLoading } = useGetTasksQuery(tasksQueryArgs);
-    const formatTaskTitle = (title: string) => title.charAt(0).toUpperCase() + title.slice(1);
 
     const upcomingTasks = useMemo(() => {
         if (!tasks) return [] as Task[];

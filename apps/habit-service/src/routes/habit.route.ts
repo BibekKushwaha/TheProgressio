@@ -15,9 +15,16 @@ import {
     markAllNudgesAsRead,
     getMorningBriefing,
     updateNudgeSettings,
+    getBootstrap,
+    getBootstrapCritical,
 } from "../controllers/habit.controller.js";
 
 const router = Router();
+
+// ── Dashboard Bootstrap (habits + XP + heatmap + nudges in one round-trip) ───
+router.get("/bootstrap", getBootstrap);
+// ── Critical-only bootstrap (habits + XP) used during React streaming ──────
+router.get("/bootstrap/critical", getBootstrapCritical);
 
 // ── XP & Gamification ──────────────────
 router.get("/xp", getUserXP);

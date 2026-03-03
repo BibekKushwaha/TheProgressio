@@ -17,25 +17,19 @@ import {
   useGetTaskMetricsQuery,
   useLocalTasks,
 } from "@repo/store";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { exportTasksToCSV, downloadCSV } from "@/lib/exportUtils";
 import { mergeTaskSources } from "@/lib/mergeTasks";
-import { getDebugPollingOptions } from "@/lib/refetchDebug";
 import { toast } from "sonner";
 
 export default function AnalyticsOverviewPage() {
   const [pastDays, setPastDays] = useState("1");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const {
     data: summaryData,
     isLoading: isSummaryLoading,
     isFetching: isSummaryFetching
-  } = useGetDailySummaryQuery(pastDays, getDebugPollingOptions('analyticsOverview.dailySummary', 60000));
+  } = useGetDailySummaryQuery(pastDays);
 
   // BFF replaces useGetFocusScoreQuery — gets score+breakdown in the same
   // request as leakage/peak, so no extra round-trip on page load.
@@ -44,8 +38,7 @@ export default function AnalyticsOverviewPage() {
     isLoading: isDashLoading,
     isFetching: isDashFetching
   } = useGetDashboardSummaryQuery(
-    { leakageDays: parseInt(pastDays) || 7, peakDays: 30 },
-    getDebugPollingOptions('analyticsOverview.dashboardSummary', 60000)
+    { leakageDays: parseInt(pastDays) || 7, peakDays: 30 }
   );
 
   // Lightweight count-only endpoint — no full task rows transferred.
@@ -171,11 +164,11 @@ export default function AnalyticsOverviewPage() {
   }, [mergedTasks]);
 
 
-  const handleExportReport = () => {
+  const handleExportReport = useCallback(() => {
     const csvContent = exportTasksToCSV(sortedTasks);
     downloadCSV(csvContent, `analytics_tasks_${new Date().toISOString().slice(0, 10)}.csv`);
     toast.success("Analytics exported to CSV successfully!");
-  };
+  }, [sortedTasks]);
 
   const isWeekly = pastDays === "7";
   const timeLabel = isWeekly ? 'Weekly' : 'Today\'s';
@@ -199,6 +192,7 @@ export default function AnalyticsOverviewPage() {
         label: `${timeLabel} Focus Time`,
         value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : `${formattedHours}h`,
         trend: isWeekly ? "Total" : "+12%",
+        trendDirection: (hours > 0 ? 'up' : 'neutral') as 'up' | 'neutral' | 'down',
         icon: Clock,
         gradient: 'from-cyan-500 to-blue-500',
         isLoading: isSummaryLoading && !summaryData
@@ -207,6 +201,7 @@ export default function AnalyticsOverviewPage() {
         label: `${timeLabel} Completion`,
         value: isSummaryMissing ? <Skeleton className="h-8 w-12 bg-white/10" /> : `${summaryData?.stats?.totalTasksCompleted ?? 0}`,
         trend: "Tasks",
+        trendDirection: ((summaryData?.stats?.totalTasksCompleted ?? 0) > 0 ? 'up' : 'neutral') as 'up' | 'neutral' | 'down',
         icon: CheckCircle,
         gradient: 'from-purple-500 to-pink-500',
         isLoading: isSummaryLoading && !summaryData
@@ -215,6 +210,7 @@ export default function AnalyticsOverviewPage() {
         label: 'Overall Focus Score',
         value: isDashMissing ? <Skeleton className="h-8 w-24 bg-white/10" /> : `${scoreDisplay}/100`,
         trend: focusScore >= 80 ? "Excellent" : focusScore >= 60 ? "Good" : "Steady",
+        trendDirection: (focusScore >= 80 ? 'up' : focusScore >= 50 ? 'neutral' : 'down') as 'up' | 'neutral' | 'down',
         icon: Target,
         gradient: 'from-green-500 to-emerald-500',
         isLoading: isDashLoading && !dashboardData
@@ -223,6 +219,7 @@ export default function AnalyticsOverviewPage() {
         label: `${isWeekly ? 'Weekly' : 'Daily'} Target`,
         value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : `${progress}%`,
         trend: "Progress",
+        trendDirection: (progress >= 80 ? 'up' : progress >= 50 ? 'neutral' : 'down') as 'up' | 'neutral' | 'down',
         icon: TrendingUp,
         gradient: 'from-orange-500 to-red-500',
         isLoading: isSummaryLoading && !summaryData
@@ -232,11 +229,6 @@ export default function AnalyticsOverviewPage() {
 
   return (
     <div className="space-y-8">
-      {!mounted && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
-          <Skeleton className="h-12 w-12 rounded-full" />
-        </div>
-      )}
       <AnalyticsHeader
         pastDays={pastDays}
         setPastDays={setPastDays}

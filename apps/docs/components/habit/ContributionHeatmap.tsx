@@ -1,10 +1,17 @@
 'use client';
 
-import { useGetContributionHeatmapQuery } from '@repo/store';
+import { useGetContributionHeatmapQuery, type HeatmapDay, type HeatmapSummary } from '@repo/store';
 import { Activity, CalendarDays, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { HeatmapDataPoint } from '../analytics/GenericHeatmap';
+
+interface ContributionHeatmapProps {
+    /** Heatmap rows pre-fetched server-side. When provided the client RTK query
+     *  is skipped; refreshes come from the parent bootstrap re-run. */
+    serverHeatmap?: HeatmapDay[];
+    serverSummary?: HeatmapSummary;
+}
 
 function formatDateKey(date: Date): string {
     const year = date.getFullYear();
@@ -13,7 +20,7 @@ function formatDateKey(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
-function buildYearRange(year: number): string[] {
+function _buildYearRange(year: number): string[] {
     const start = new Date(year, 0, 1);
     const end = new Date(year, 11, 31);
     const days: string[] = [];
@@ -72,14 +79,24 @@ function buildMonthGrid(year: number, monthIndex: number, byDate: Map<string, He
     return weeks;
 }
 
-export function ContributionHeatmap() {
-    const { data, isLoading } = useGetContributionHeatmapQuery();
-    const summary = data?.summary;
-    const [hoveredDay, setHoveredDay] = useState<HeatmapDataPoint | null>(null);
+export function ContributionHeatmap({ serverHeatmap, serverSummary }: ContributionHeatmapProps = {}) {
+    // Skip the individual query when the parent coordinator provided data.
+    const { data, isLoading } = useGetContributionHeatmapQuery(
+        undefined,
+        { skip: serverHeatmap !== undefined }
+    );
+    // Server prop wins for initial render; bootstrap refetch pushes new prop.
+    const displayHeatmap = serverHeatmap ?? data?.heatmap;
+    const summary = serverSummary ?? data?.summary;
+    const displayIsLoading = isLoading && serverHeatmap === undefined;
+    // Tooltip driven by a ref to avoid re-rendering the entire 365-cell grid
+    // on every mouse-enter. The tooltip element reads from the ref directly.
+    // useRef<HTMLSpanElement> — matches the <span> target in the footer.
+    const tooltipRef = useRef<HTMLSpanElement>(null);
 
-    const { year, byDate, maxValue, totalPoints } = useMemo(() => {
+    const { year, byDate } = useMemo(() => {
         const year = new Date().getFullYear();
-        const rows = data?.heatmap ?? [];
+        const rows = displayHeatmap ?? [];
 
         const byDate = new Map<string, HeatmapDataPoint>();
         for (const row of rows) {
@@ -96,9 +113,8 @@ export function ContributionHeatmap() {
             entry.intensity = computeIntensity(entry.value, max);
         }
 
-        const totalPoints = buildYearRange(year).length;
-        return { year, byDate, maxValue: max, totalPoints };
-    }, [data?.heatmap]);
+        return { year, byDate };
+    }, [displayHeatmap]);
 
     const monthWeeks = useMemo(() => {
         return Array.from({ length: 12 }, (_, monthIndex) => buildMonthGrid(year, monthIndex, byDate));
@@ -129,7 +145,7 @@ export function ContributionHeatmap() {
 
     const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    if (isLoading) {
+    if (displayIsLoading) {
         return (
             <div className="bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-6 animate-pulse">
                 <div className="h-6 bg-white/10 rounded w-52 mb-4" />
@@ -138,7 +154,8 @@ export function ContributionHeatmap() {
         );
     }
 
-    if (totalPoints === 0) {
+    // Show empty state only when the API has responded but no activity is recorded
+    if (!displayIsLoading && (data || serverHeatmap !== undefined) && byDate.size === 0) {
         return (
             <div className="bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-6">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -214,8 +231,22 @@ export function ContributionHeatmap() {
                                                             "w-3.5 h-3.5 rounded-[3px] transition-all cursor-pointer hover:scale-110 hover:ring-1 hover:ring-emerald-300/60",
                                                             getEmeraldColor(day.intensity)
                                                         )}
-                                                        onMouseEnter={() => setHoveredDay(day)}
-                                                        onMouseLeave={() => setHoveredDay(null)}
+                                                        // onPointerEnter/Leave unifies mouse + touch/stylus.
+                                                        // onMouseEnter does not fire on touch devices.
+                                                        onPointerEnter={() => {
+                                                            if (tooltipRef.current) {
+                                                                tooltipRef.current.textContent = `${
+                                                                    new Date(`${day.date}T00:00:00`).toLocaleDateString('en-US', {
+                                                                        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+                                                                    })
+                                                                } • ${day.value} contributions`;
+                                                            }
+                                                        }}
+                                                        onPointerLeave={() => {
+                                                            if (tooltipRef.current) {
+                                                                tooltipRef.current.textContent = '';
+                                                            }
+                                                        }}
                                                         title={`${day.date}: ${day.value}`}
                                                     />
                                                 );
@@ -230,23 +261,10 @@ export function ContributionHeatmap() {
             </div>
 
             <div className="mt-4 min-h-10 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
-                {hoveredDay ? (
-                    <span>
-                        <span className="text-white font-medium">
-                            {new Date(`${hoveredDay.date}T00:00:00`).toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                            })}
-                        </span>
-                        {' • '}
-                        {hoveredDay.value} contributions
-                        {maxValue > 0 ? '' : ''}
-                    </span>
-                ) : (
-                    <span className="text-slate-400">Hover any cell to view day details</span>
-                )}
+                <span
+                    ref={tooltipRef}
+                    className="text-slate-400 empty:before:content-['Hover_any_cell_to_view_day_details']"
+                />
             </div>
         </div>
     );

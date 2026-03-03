@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useState, useCallback } from "react";
+import React, { memo, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -105,6 +105,21 @@ const NavList = memo(function NavList({ pathname, onNavigate }: NavListProps) {
         analytics: pathname.startsWith("/analytics"),
         "exam-warroom": pathname.startsWith("/exam-warroom"),
     });
+
+    // Sync open state on SPA navigation — auto-open the active section when
+    // the user navigates so the active child link is always visible.
+    useEffect(() => {
+        setOpenMenus((prev) => ({
+            planner:
+                prev.planner ||
+                pathname.startsWith("/planner") ||
+                pathname.startsWith("/tasks") ||
+                pathname.startsWith("/createtask") ||
+                pathname.startsWith("/syllabus-digitizer"),
+            analytics: prev.analytics || pathname.startsWith("/analytics"),
+            "exam-warroom": prev["exam-warroom"] || pathname.startsWith("/exam-warroom"),
+        }));
+    }, [pathname]);
 
     const isActiveRoute = (href: string) =>
         pathname === href || pathname.startsWith(`${href}/`);

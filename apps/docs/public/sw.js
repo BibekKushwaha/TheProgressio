@@ -60,6 +60,19 @@ sw.addEventListener('push', (event) => {
                     vibrate: [100, 50, 100],
                 };
 
+                // Guard: in SW context Notification.permission is accessible via self.
+                // If permission was revoked after subscription creation, skip showNotification
+                // to avoid a silent NotAllowedError and instead post a message to open clients.
+                if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+                    console.warn(`${PUSH_DEBUG_PREFIX} showNotification skipped — permission is "${Notification.permission}"`);
+                    // Notify any open tabs so the PushNotificationManager can reset its UI.
+                    const allClients = await sw.clients.matchAll({ type: 'window', includeUncontrolled: true });
+                    for (const client of allClients) {
+                        client.postMessage({ type: 'PUSH_PERMISSION_REVOKED' });
+                    }
+                    return;
+                }
+
                 await sw.registration.showNotification(title, options);
                 console.info(`${PUSH_DEBUG_PREFIX} showNotification success`, {
                     title,

@@ -1,11 +1,11 @@
 // components/calendar/CalendarHeader.tsx
 'use client';
 
+import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import CreateHolidayForm from './CreateHolidayForm';
 import { toLocalDateKey } from '@/lib/date';
-import React from 'react';
 
 const views = ['Day', 'Month'];
 
@@ -17,7 +17,7 @@ interface CalendarHeaderProps {
 }
 
 export function CalendarHeader({ selectedView, setSelectedView, currentDate, onDateChange }: CalendarHeaderProps) {
-    const [holidayOpen, setHolidayOpen] = React.useState(false);
+    const [holidayOpen, setHolidayOpen] = useState(false);
     const handlePreviousMonth = () => {
         const newDate = new Date(currentDate);
         newDate.setMonth(newDate.getMonth() - 1);
@@ -36,9 +36,7 @@ export function CalendarHeader({ selectedView, setSelectedView, currentDate, onD
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
                 <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-4xl font-bold">{
-                        selectedView === 'Day' ? 'Day' : selectedView === 'Week' ? 'Week' : 'Month'
-                    } </h1>
+                    <h1 className="text-4xl font-bold">{selectedView}</h1>
                     <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
                         <Check className="w-3 h-3 text-green-400" />
                         <span className="text-xs font-semibold text-green-400">Synced</span>

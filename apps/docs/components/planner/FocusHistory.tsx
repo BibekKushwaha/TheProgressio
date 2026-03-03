@@ -24,7 +24,7 @@ export function FocusHistory() {
         };
     });
 
-    const maxMinutes = Math.max(...days.map(d => d.minutes), 60); // Min 60 for scale
+    const maxMinutes = days.reduce((acc, d) => Math.max(acc, d.minutes), 60); // Min 60 for scale
 
     return (
         <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-6">
@@ -40,11 +40,11 @@ export function FocusHistory() {
                 </div>
             ) : (
                 <div className="flex items-end justify-between gap-2 h-32">
-                    {days.map((day, index) => {
+                    {days.map((day) => {
                         const height = day.minutes > 0 ? (day.minutes / maxMinutes) * 100 : 5;
 
                         return (
-                            <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                            <div key={day.day} className="flex-1 flex flex-col items-center gap-2">
                                 <div className="relative w-full flex items-end justify-center h-24">
                                     <div
                                         className={`w-full rounded-t-lg transition-all duration-300 ${day.isToday

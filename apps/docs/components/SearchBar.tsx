@@ -17,12 +17,9 @@ const DEFAULT_PRIORITY_OPTIONS = [
     { label: "High", value: PriorityEnum.HIGH },
 ] as const;
 
+// Minimal default — callers should always pass real category data from the API.
 const DEFAULT_CATEGORY_OPTIONS = [
-    { label: "Category", value: "all", color: "#6B7280" },
-    { label: "Personal", value: "personal", color: "#A855F7" },
-    { label: "Studies", value: "studies", color: "#3B82F6", },
-    { label: "Fitness", value: "fitness", color: "#22C55E" },
-    { label: "Coding", value: "coding", color: "#F97316" },
+    { label: 'Category', value: 'all', color: '#6B7280' },
 ] as const;
 
 

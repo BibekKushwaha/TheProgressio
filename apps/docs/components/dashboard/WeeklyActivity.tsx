@@ -1,18 +1,16 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useId } from 'react';
 import { useGetWeeklyTrendsQuery, useGetProfileQuery } from '@repo/store';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDebugRefetchOptions } from '@/lib/refetchDebug';
 
 export function WeeklyActivity() {
     const [viewType, setViewType] = useState<'week' | 'month'>('week');
+    const gradientAreaId = useId().replace(/:/g, '');
+    const gradientLineId = useId().replace(/:/g, '');
     const { data: profileData } = useGetProfileQuery();
-    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(
-        undefined,
-        getDebugRefetchOptions('weeklyActivity.trends', 300000)
-    );
+    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined);
     const periodOptions = [
         { value: 'week' as const, label: 'Week' },
         { value: 'month' as const, label: 'Month' },
@@ -32,7 +30,7 @@ export function WeeklyActivity() {
 
     // Map dates to short day names
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const data = filteredData.map(d => {
+    const data = useMemo(() => filteredData.map(d => {
         const date = new Date(d.date);
         return {
             ...d,
@@ -40,7 +38,21 @@ export function WeeklyActivity() {
             // Calculate percentage based on user's daily goal for visualization
             percentage: Math.min(100, Math.round((d.hours / dailyLimit) * 100))
         };
-    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [filteredData, dailyLimit]);
+
+    // Generate SVG path for the line and gradient area — must be declared before
+    // any early returns so React Hooks are called unconditionally.
+    const chartWidth = 600;
+    const step = data.length > 1 ? chartWidth / (data.length - 1) : chartWidth;
+    const { areaPath, linePath } = useMemo(() => {
+        if (data.length === 0) return { areaPath: '', linePath: '' };
+        const pts = data.map((d, i) => `${i * step} ${256 - (d.percentage * 2)}`).join(' L ');
+        return {
+            areaPath: `M 0 256 L ${pts} L ${chartWidth} 256 Z`,
+            linePath: `M ${pts}`,
+        };
+    }, [data, step]);
 
     if (isLoading) {
         return (
@@ -59,13 +71,6 @@ export function WeeklyActivity() {
             </div>
         );
     }
-
-    // Generate SVG path for the line and gradient area
-    const chartWidth = 600;
-    const step = data.length > 1 ? chartWidth / (data.length - 1) : chartWidth;
-    const points = data.map((d, i) => `${i * step} ${256 - (d.percentage * 2)}`).join(' L ');
-    const areaPath = `M 0 256 L ${points} L ${chartWidth} 256 Z`;
-    const linePath = `M ${points}`;
 
     return (
         <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 relative overflow-hidden group/container">
@@ -111,13 +116,19 @@ export function WeeklyActivity() {
                     {yAxisLabels.map((label) => <div key={label} className="border-t border-white w-full h-0"></div>)}
                 </div>
 
-                <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 600 256">
+                <svg
+                    className="w-full h-full overflow-visible"
+                    preserveAspectRatio="none"
+                    viewBox="0 0 600 256"
+                    role="img"
+                    aria-label={`${viewType === 'week' ? 'Weekly' : 'Monthly'} activity chart — hours studied per day`}
+                >
                     <defs>
-                        <linearGradient id="activityGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <linearGradient id={gradientAreaId} x1="0%" y1="0%" x2="0%" y2="100%">
                             <stop offset="0%" stopColor="rgb(168, 85, 247)" stopOpacity="0.4" />
                             <stop offset="100%" stopColor="rgb(168, 85, 247)" stopOpacity="0" />
                         </linearGradient>
-                        <linearGradient id="activityLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <linearGradient id={gradientLineId} x1="0%" y1="0%" x2="100%" y2="0%">
                             <stop offset="0%" stopColor="rgb(168, 85, 247)" />
                             <stop offset="100%" stopColor="rgb(236, 72, 153)" />
                         </linearGradient>
@@ -126,7 +137,7 @@ export function WeeklyActivity() {
                     {/* Background Area Gradient */}
                     <path
                         d={areaPath}
-                        fill="url(#activityGradient)"
+                        fill={`url(#${gradientAreaId})`}
                         className="transition-all duration-700 ease-out animate-in fade-in slide-in-from-bottom-4"
                     />
 
@@ -134,7 +145,7 @@ export function WeeklyActivity() {
                     <path
                         d={linePath}
                         fill="none"
-                        stroke="url(#activityLine)"
+                        stroke={`url(#${gradientLineId})`}
                         strokeWidth="4"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -193,14 +204,10 @@ export function WeeklyActivity() {
                 </svg>
             </div>
 
-            <div className="flex justify-between px-2 pl-8 border-t border-white/5 ">
+            <div className="flex justify-between px-2 pl-8 border-t border-white/5">
                 {data.map((point) => (
                     <div key={point.date} className="flex flex-col items-center">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest ">{point.day}</span>
-                        {/* <div className={`w-1 h-1 rounded-full mb-1 ${point.hours > 0 ? 'bg-purple-500' : 'bg-slate-800'}`}></div>
-                        <span className={`text-xs font-bold ${point.hours > 0 ? 'text-white' : 'text-slate-600'}`}>
-                            {point.hours}h
-                        </span> */}
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{point.day}</span>
                     </div>
                 ))}
             </div>

@@ -1,11 +1,10 @@
 'use client';
 
-import React from 'react';
 import { useGetTimeLeakageQuery, TimeLeakageReport } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, TrendingDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, CartesianGrid } from '@/lib/recharts';
 
 interface TimeLeakageCardProps {
     /** Pre-fetched data from a BFF call. When provided the query is skipped. */

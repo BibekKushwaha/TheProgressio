@@ -2,12 +2,43 @@
 import { CalendarDays, Bell } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { NotificationCenter } from '@/components/habit/NotificationCenter';
+import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAppSelector, useGetNudgesQuery, Nudge, useGetUserXPQuery } from '@repo/store';
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { TimetableView } from '../planner/TimetableView';
+
+// NotificationCenter and all its dependencies (NudgeCard, NudgeActions, utils, etc.)
+// are excluded from the initial JS bundle. The chunk is fetched only when the user
+// clicks the bell icon for the first time.
+//
+// webpack magic comments:
+//   webpackChunkName  — gives the chunk a stable, human-readable filename instead
+//                       of a hash (easier to identify in bundle reports).
+//   webpackPrefetch   — emits a <link rel="prefetch"> hint so the browser downloads
+//                       the chunk during idle time, before the user taps the bell.
+const NotificationCenter = dynamic(
+    () =>
+        import(
+            /* webpackChunkName: "notification-center" */
+            /* webpackPrefetch: true */
+            '@/components/notifications/NotificationCenter'
+        ).then(
+            (m) => ({ default: m.NotificationCenter })
+        ),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="bg-slate-900 border border-purple-500/30 rounded-2xl p-6 w-[94vw] sm:w-[500px]">
+                <Skeleton className="h-8 w-48 bg-white/5 mb-4" />
+                <Skeleton className="h-24 w-full bg-white/5 mb-2" />
+                <Skeleton className="h-24 w-full bg-white/5" />
+            </div>
+        ),
+    }
+);
 
 export function WelcomeHeader() {
     const user = useAppSelector((state) => state.auth.user);

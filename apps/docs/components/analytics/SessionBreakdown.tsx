@@ -2,13 +2,12 @@
 
 import { useGetDailySummaryQuery, SessionType } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDebugPollingOptions } from '@/lib/refetchDebug';
 
 export function SessionBreakdown({ pastDays }: { pastDays: string }) {
     // Daily summary updates via tag invalidation on session log.
     const { data: summaryData, isLoading } = useGetDailySummaryQuery(
         pastDays,
-        getDebugPollingOptions('sessionBreakdown.dailySummary', 120000)
+        { refetchOnFocus: false }
     );
 
     const colors: Record<SessionType, string> = {
@@ -88,7 +87,7 @@ export function SessionBreakdown({ pastDays }: { pastDays: string }) {
                     )}
 
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <div className="text-4xl font-bold">{summaryData?.stats.totalHours || 0}h</div>
+                        <div className="text-4xl font-bold">{summaryData?.stats?.totalHours || 0}h</div>
                         <div className="text-sm text-slate-400">Total</div>
                     </div>
                 </div>

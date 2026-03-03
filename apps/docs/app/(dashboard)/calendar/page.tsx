@@ -93,9 +93,10 @@ function CalendarContent() {
                                 }}
                                 currentMonth={selectedDate.getMonth()}
                                 currentYear={selectedDate.getFullYear()}
+                                rotationFilter={rotationFilter}
                             />
                         )}
-                        {selectedView === 'Day' && <DayGrid date={selectedDate} />}
+                        {selectedView === 'Day' && <DayGrid date={selectedDate} rotationFilter={rotationFilter} rotation={rotation} />}
                     </div>
 
                     <div>

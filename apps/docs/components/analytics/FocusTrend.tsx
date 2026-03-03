@@ -1,8 +1,8 @@
 'use client';
 
+import { useId } from 'react';
 import { useGetWeeklyTrendsQuery } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDebugPollingOptions } from '@/lib/refetchDebug';
 
 const DEFAULT_TRENDS = [
     { date: 'Mon', hours: 0 },
@@ -15,10 +15,11 @@ const DEFAULT_TRENDS = [
 ];
 
 export function FocusTrends({ pastDays }: { pastDays: string }) {
+    const uid = useId();
     // Weekly trend data changes at most once per session-log.
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(
         undefined,
-        getDebugPollingOptions('focusTrends.weekly', 300000)
+        { refetchOnFocus: false }
     );
     const chartWidth = 600;
     const chartHeight = 256;
@@ -35,7 +36,7 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
 
     const rawData = trendsData?.data || DEFAULT_TRENDS;
 
-    const maxPoints = pastDays === "7" ? 14 : 7;
+    const maxPoints = pastDays === "7" ? 7 : Number(pastDays) > 7 ? 14 : 7;
     const visibleRawData = rawData.slice(-maxPoints);
     const data = visibleRawData.map((d) => ({
         day: formatDayLabel(d.date),
@@ -70,18 +71,18 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
                     <>
                         <svg className="w-full h-full" preserveAspectRatio="none" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
                             <defs>
-                                <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <linearGradient id={`areaGradient-${uid}`} x1="0%" y1="0%" x2="0%" y2="100%">
                                     <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity="0.3" />
                                     <stop offset="100%" stopColor="rgb(6, 182, 212)" stopOpacity="0" />
                                 </linearGradient>
-                                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <linearGradient id={`lineGradient-${uid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                                     <stop offset="0%" stopColor="rgb(6, 182, 212)" />
                                     <stop offset="100%" stopColor="rgb(37, 99, 235)" />
                                 </linearGradient>
                             </defs>
 
-                            <path d={areaPath} fill="url(#areaGradient)" />
-                            <path d={linePath} fill="none" stroke="url(#lineGradient)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d={areaPath} fill={`url(#areaGradient-${uid})`} />
+                            <path d={linePath} fill="none" stroke={`url(#lineGradient-${uid})`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
                             {data.map((point, index) => (
                                 <circle

@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { TaskStatus } from '@repo/store';
 
 type CategoryOption = { id: string; name: string };
 type TaskView = 'kanban' | 'list' | 'timetable' | 'timeline';
+
+const VALID_VIEWS = new Set<string>(['kanban', 'list', 'timetable', 'timeline']);
 
 interface SearchParamsLike {
     get(name: string): string | null;
@@ -24,6 +26,11 @@ interface UseTaskQuerySyncParams {
     setView: (value: TaskView) => void;
 }
 
+/**
+ * Syncs URL search params → filter state once on mount.
+ * Re-runs only when searchParams changes (navigation), NOT on categories
+ * refetch — which previously reset user-chosen filters via the dep array.
+ */
 export function useTaskQuerySyncFromUrl({
     searchParams,
     categories,
@@ -32,6 +39,11 @@ export function useTaskQuerySyncFromUrl({
     setFocusedTaskId,
     setView,
 }: UseTaskQuerySyncParams) {
+    // Use a ref so category name→id resolution retries once categories load,
+    // but never reverts a user-chosen filter on subsequent category refetches.
+    const categoriesRef = useRef(categories);
+    categoriesRef.current = categories;
+
     useEffect(() => {
         const queryCategoryId = searchParams.get('categoryId');
         const queryCategoryName = searchParams.get('category');
@@ -41,10 +53,10 @@ export function useTaskQuerySyncFromUrl({
         if (queryCategoryId) {
             setSelectedCategory(String(queryCategoryId));
         } else if (queryCategoryName) {
-            const matchedCategory = categories?.find(
-                (category) => category.name.toLowerCase() === queryCategoryName.toLowerCase()
+            const matched = categoriesRef.current?.find(
+                (c) => c.name.toLowerCase() === queryCategoryName.toLowerCase()
             );
-            setSelectedCategory(matchedCategory?.id ? String(matchedCategory.id) : queryCategoryName);
+            setSelectedCategory(matched?.id ? String(matched.id) : queryCategoryName);
         }
 
         if (
@@ -60,15 +72,23 @@ export function useTaskQuerySyncFromUrl({
         if (queryTaskId) {
             setFocusedTaskId(queryTaskId);
             setView('list');
+        } else {
+            // No taskId override — restore persisted view from URL
+            const queryView = searchParams.get('view');
+            if (queryView && VALID_VIEWS.has(queryView)) {
+                setView(queryView as TaskView);
+            }
         }
-    }, [searchParams, categories, setFocusedTaskId, setSelectedCategory, setStatus, setView]);
+    // categories intentionally omitted — reads via ref to avoid reverting user filters
+    }, [searchParams, setFocusedTaskId, setSelectedCategory, setStatus, setView]);
 }
 
 interface UseHighlightedTaskScrollParams {
     focusedTaskId: string;
     highlightedTaskId: string;
     view: TaskView;
-    tasksLength: number;
+    /** @deprecated — no longer used by the scroll logic; retained for call-site compatibility */
+    tasksLength?: number;
     pathname: string;
     router: RouterLike;
     searchParams: SearchParamsLike;
@@ -78,7 +98,6 @@ export function useHighlightedTaskScroll({
     focusedTaskId,
     highlightedTaskId,
     view,
-    tasksLength,
     pathname,
     router,
     searchParams,
@@ -102,5 +121,7 @@ export function useHighlightedTaskScroll({
 
         const timeoutId = window.setTimeout(scrollToTarget, 120);
         return () => window.clearTimeout(timeoutId);
-    }, [focusedTaskId, highlightedTaskId, pathname, router, searchParams, tasksLength, view]);
+    // tasksLength intentionally omitted — scrolling to a focused task should not
+    // re-fire every time an unrelated task is added or removed from the list.
+    }, [focusedTaskId, highlightedTaskId, pathname, router, searchParams, view]);
 }

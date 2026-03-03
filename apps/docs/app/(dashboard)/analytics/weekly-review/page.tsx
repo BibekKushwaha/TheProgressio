@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useGetWeeklyReviewQuery } from "@repo/store";
 import { AlertTriangle, CheckCircle2, Target } from "lucide-react";
 import { formatRelativeDate } from "@/lib/date";
+import { useExamType } from "@/hooks/useExamType";
 
 export default function WeeklyReviewPage() {
+  const examType = useExamType();
   const [days, setDays] = useState<string>("7");
-  const { data, isLoading, isFetching } = useGetWeeklyReviewQuery({ days: Number(days), examType: "JEE" });
+  const { data, isLoading, isFetching } = useGetWeeklyReviewQuery({ days: Number(days), examType });
 
   const adjustment = data?.adjustment ?? "";
 
@@ -53,7 +55,7 @@ export default function WeeklyReviewPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {(isLoading ? Array.from({ length: 3 }) : insights).map((item, idx: number) => (
-          <Card key={idx} variant="glass">
+          <Card key={isLoading ? idx : (item as { title: string }).title} variant="glass">
             <CardHeader>
               <CardTitle className="text-base">
                 {isLoading ? <Skeleton className="h-4 w-24" /> : (item as { title: string }).title}
@@ -91,9 +93,9 @@ export default function WeeklyReviewPage() {
             <p className="text-sm text-slate-400">No priorities found. You’re clear—pick one focused practice block today.</p>
           ) : (
             <div className="space-y-2">
-              {priorities.slice(0, 3).map((p: { title: string; type: string; dueDate?: string }, i: number) => (
+              {priorities.map((p: { title: string; type: string; dueDate?: string }, i: number) => (
                 <div
-                  key={i}
+                  key={p.title || i}
                   className="flex items-start gap-3 p-3 bg-white/5 rounded-lg border border-white/10"
                 >
                   {p.type === "TASK" ? (
@@ -104,7 +106,7 @@ export default function WeeklyReviewPage() {
                   <div className="flex-1">
                     <div className="text-sm text-slate-200 font-medium">{p.title}</div>
                     {p.dueDate && (
-                      <div className="text-xs text-slate-500">Due: {formatRelativeDate(p.dueDate.slice(0, 10))}</div>
+                      <div className="text-xs text-slate-500">Due: {formatRelativeDate(p.dueDate?.slice(0, 10) ?? '')}</div>
                     )}
                   </div>
                 </div>

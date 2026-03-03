@@ -32,6 +32,7 @@ export interface Habit {
     createdAt: string;
     updatedAt: string;
     streakStatus: 'inactive' | 'active' | 'broken';
+    newTrophy?: boolean;
     logs?: HabitLog[];
 }
 
@@ -155,6 +156,35 @@ export interface MorningBriefing {
     conflicts: string[];
 }
 
+export interface HeatmapSummary {
+    totalContributions: number;
+    activeDays: number;
+    totalDays: number;
+    consistencyRate: number;
+}
+
+/** Combined payload returned by GET /api/habits/bootstrap */
+export interface DashboardBootstrap {
+    message: string;
+    habits: Habit[];
+    xp: UserXP;
+    heatmap: HeatmapDay[];
+    heatmapSummary: HeatmapSummary;
+    /** Nudges are now included in the full bootstrap to eliminate the
+     *  4th parallel request.  Generation side-effects run in the background
+     *  server-side and never block this response. */
+    nudges?: Nudge[];
+}
+
+/** Minimal payload returned by GET /api/habits/bootstrap/critical.
+ *  Used for React streaming: habits + XP resolve first so cards can
+ *  paint immediately; heatmap + nudges stream in via the full bootstrap. */
+export interface BootstrapCritical {
+    message: string;
+    habits: Habit[];
+    xp: UserXP;
+}
+
 export const habitsApi = createApi({
     reducerPath: 'habitsApi',
     baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
@@ -241,7 +271,12 @@ export const habitsApi = createApi({
                 url: `/${id}`,
                 method: 'DELETE',
             }),
-            invalidatesTags: (_result, _error, id) => [{ type: 'Habits', id }, { type: 'Habits', id: 'LIST' }],
+            invalidatesTags: (_result, _error, id) => [
+                { type: 'Habits', id },
+                { type: 'Habits', id: 'LIST' },
+                { type: 'Habits', id: 'XP' },
+                { type: 'Habits', id: 'HEATMAP' },
+            ],
             async onQueryStarted(id, { dispatch, queryFulfilled }) {
                 const patchResult = dispatch(
                     habitsApi.util.updateQueryData('getHabits', undefined, (draft) => {
@@ -264,7 +299,11 @@ export const habitsApi = createApi({
                     ...(payload ? { body: payload } : {}),
                 };
             },
-            invalidatesTags: (_result, _error, { id }) => [{ type: 'Habits', id }, { type: 'Habits', id: 'XP' }],
+            invalidatesTags: (_result, _error, { id }) => [
+                { type: 'Habits', id },
+                { type: 'Habits', id: 'XP' },
+                { type: 'Habits', id: 'HEATMAP' },
+            ],
             async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
                 try {
                     const { data } = await queryFulfilled;
@@ -287,7 +326,11 @@ export const habitsApi = createApi({
                 url: `/${id}/reset`,
                 method: 'POST',
             }),
-            invalidatesTags: (_result, _error, id) => [{ type: 'Habits', id }, { type: 'Habits', id: 'XP' }],
+            invalidatesTags: (_result, _error, id) => [
+                { type: 'Habits', id },
+                { type: 'Habits', id: 'XP' },
+                { type: 'Habits', id: 'HEATMAP' },
+            ],
             async onQueryStarted(id, { dispatch, queryFulfilled }) {
                 try {
                     const { data } = await queryFulfilled;
@@ -307,15 +350,90 @@ export const habitsApi = createApi({
             },
         }),
 
-        // ── Phase 2: XP & Gamification ─────────────────────────────────────
+        // ── Dashboard Bootstrap (habits + XP + heatmap + nudges) ────────────
+        getDashboardBootstrap: builder.query<DashboardBootstrap, void>({
+            query: () => '/bootstrap',
+            keepUnusedDataFor: 300,
+            providesTags: [
+                { type: 'Habits', id: 'LIST' },
+                { type: 'Habits', id: 'XP' },
+                { type: 'Habits', id: 'HEATMAP' },
+                { type: 'Habits', id: 'NUDGES' },
+            ],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    const { data } = await queryFulfilled;
+                    dispatch(
+                        habitsApi.util.upsertQueryData('getHabits', undefined, {
+                            message: 'cached',
+                            habits: data.habits,
+                        })
+                    );
+                    dispatch(
+                        habitsApi.util.upsertQueryData('getUserXP', undefined, {
+                            message: 'cached',
+                            xp: data.xp,
+                        })
+                    );
+                    dispatch(
+                        habitsApi.util.upsertQueryData('getContributionHeatmap', undefined, {
+                            message: 'cached',
+                            heatmap: data.heatmap,
+                            summary: data.heatmapSummary,
+                        })
+                    );
+                    if (data.nudges) {
+                        dispatch(
+                            habitsApi.util.upsertQueryData('getNudges', undefined, {
+                                message: 'cached',
+                                nudges: data.nudges,
+                            })
+                        );
+                    }
+                } catch { /* ignore — individual queries remain as fallback */ }
+            },
+        }),
+
+        // Critical bootstrap — habits + XP only, heatmap excluded.
+        // Used by the RSC streaming split: critical data awaited server-side for
+        // first paint; full bootstrap fetched in parallel and streamed in via Suspense.
+        getDashboardBootstrapCritical: builder.query<BootstrapCritical, void>({
+            query: () => '/bootstrap/critical',
+            keepUnusedDataFor: 120,
+            providesTags: [
+                { type: 'Habits', id: 'LIST' },
+                { type: 'Habits', id: 'XP' },
+            ],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    const { data } = await queryFulfilled;
+                    dispatch(
+                        habitsApi.util.upsertQueryData('getHabits', undefined, {
+                            message: 'cached',
+                            habits: data.habits,
+                        })
+                    );
+                    dispatch(
+                        habitsApi.util.upsertQueryData('getUserXP', undefined, {
+                            message: 'cached',
+                            xp: data.xp,
+                        })
+                    );
+                } catch { /* ignore */ }
+            },
+        }),
+
+        // ── Phase 2: XP & Gamification ───────────────────────────────────────────────────
         getUserXP: builder.query<{ message: string; xp: UserXP }, void>({
             query: () => '/xp',
+            keepUnusedDataFor: 300, // 5 min — XP changes only on habit log / reset
             providesTags: [{ type: 'Habits', id: 'XP' }],
         }),
 
-        // ── Phase 2: 365-Day Contribution Heatmap ─────────────────────────
+        // ── Phase 2: 365-Day Contribution Heatmap ──────────────────────────────────
         getContributionHeatmap: builder.query<{ message: string; heatmap: HeatmapDay[]; summary: { totalContributions: number; activeDays: number; totalDays: number; consistencyRate: number } }, void>({
             query: () => '/heatmap',
+            keepUnusedDataFor: 120, // 2 min — heatmap accumulates slowly
             providesTags: [{ type: 'Habits', id: 'HEATMAP' }],
         }),
 
@@ -373,6 +491,9 @@ export const {
     useDeleteHabitMutation,
     useLogHabitMutation,
     useResetHabitMutation,
+    // Bootstrap
+    useGetDashboardBootstrapQuery,
+    useGetDashboardBootstrapCriticalQuery,
     // Phase 2
     useGetUserXPQuery,
     useGetContributionHeatmapQuery,

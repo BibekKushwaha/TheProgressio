@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
     selectIsAuthenticated,
@@ -9,6 +9,9 @@ import {
 } from "@repo/store";
 import { AUTH_SESSION_KEY } from "@/constant";
 import { PageLoader } from "@/components/layout/PageLoader";
+
+/** Max ms to wait for the profile fetch before forcing a redirect to login. */
+const AUTH_TIMEOUT_MS = 8_000;
 
 interface AuthGuardProps {
     children: React.ReactNode;
@@ -36,12 +39,27 @@ export function AuthGuard({ children }: AuthGuardProps) {
     // Defer localStorage read to the client to avoid SSR mismatch.
     const [sessionChecked, setSessionChecked] = useState(false);
     const [hasSessionHint, setHasSessionHint] = useState(false);
+    const [authTimedOut, setAuthTimedOut] = useState(false);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         const hint = localStorage.getItem(AUTH_SESSION_KEY) === '1';
         setHasSessionHint(hint);
         setSessionChecked(true);
     }, []);
+
+    // Start the timeout only once a session hint exists and we are waiting for
+    // the profile fetch. Clear it immediately if auth resolves.
+    useEffect(() => {
+        if (!sessionChecked || !hasSessionHint || isAuthenticated || authStatus === 'unauthenticated') {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            return;
+        }
+        timeoutRef.current = setTimeout(() => setAuthTimedOut(true), AUTH_TIMEOUT_MS);
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
+    }, [sessionChecked, hasSessionHint, isAuthenticated, authStatus]);
 
     useEffect(() => {
         if (!sessionChecked) return;
@@ -56,8 +74,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
         // Had a session flag but the profile fetch returned 401/404 — token expired.
         if (authStatus === 'unauthenticated') {
             router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+            return;
         }
-    }, [sessionChecked, hasSessionHint, isAuthenticated, authStatus, router, pathname]);
+
+        // Auth check timed out — service may be down; redirect to login.
+        if (authTimedOut) {
+            router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        }
+    }, [sessionChecked, hasSessionHint, isAuthenticated, authStatus, authTimedOut, router, pathname]);
 
     // First paint — localStorage not yet read.
     if (!sessionChecked) {

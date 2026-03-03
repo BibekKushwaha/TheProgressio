@@ -52,7 +52,7 @@ export function BadgesGrid({ filter }: BadgesGridProps) {
                         icon: achievement.icon,
                         unlocked: achievement.unlocked,
                         progress: achievement.progress,
-                        requirement: achievement.unlocked ? null : `Target: ${achievement.goalValue} ${achievement.type.toLowerCase()}`
+                        requirement: achievement.unlocked ? null : `Target: ${achievement.goalValue} ${achievement.type?.toLowerCase() ?? ''}`
                     }}
                 />
             ))}

@@ -56,11 +56,66 @@ export function PushNotificationManager() {
         }
     }, []);
 
+    // Seed backendStatus from server-side subscription count so the UI
+    // doesn't flash "Retry" on every page load while the RTK query loads.
+    useEffect(() => {
+        if (pushStatus?.subscriptionCount && pushStatus.subscriptionCount > 0 && backendStatus === 'idle') {
+            setBackendStatus('registered');
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pushStatus?.subscriptionCount]);
+
     useEffect(() => {
         if (!isSupported || !user) return;
         void bootstrapSubscription();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isSupported, user?.id]);
+
+    // Listen for the user revoking notification permission after subscription.
+    useEffect(() => {
+        if (!isSupported) return;
+        if (typeof Notification === 'undefined' || !('permissions' in navigator)) return;
+
+        let permStatus: PermissionStatus | null = null;
+
+        const handlePermissionChange = () => {
+            if (permStatus?.state === 'denied' || Notification.permission === 'denied') {
+                debugLog('notification permission revoked — clearing backendStatus');
+                setBrowserSubscription(null);
+                setBackendStatus('idle');
+                refetchPushStatus();
+            }
+        };
+
+        navigator.permissions.query({ name: 'notifications' as PermissionName }).then((ps) => {
+            permStatus = ps;
+            ps.addEventListener('change', handlePermissionChange);
+        }).catch(() => { /* some browsers block this query */ });
+
+        return () => {
+            permStatus?.removeEventListener('change', handlePermissionChange);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isSupported]);
+
+    // Handle messages posted by the service worker (e.g. permission revoked mid-session).
+    useEffect(() => {
+        if (!isSupported) return;
+
+        const handleSwMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'PUSH_PERMISSION_REVOKED') {
+                debugLog('SW reported PUSH_PERMISSION_REVOKED — resetting UI');
+                setBrowserSubscription(null);
+                setBackendStatus('idle');
+                refetchPushStatus();
+                toast.error('Notification permission was revoked. Re-enable to receive push alerts.');
+            }
+        };
+
+        navigator.serviceWorker.addEventListener('message', handleSwMessage);
+        return () => navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isSupported]);
 
     const ensureRegistration = async (): Promise<ServiceWorkerRegistration> => {
         debugLog('registering service worker /sw.js');
@@ -292,7 +347,7 @@ export function PushNotificationManager() {
                 <div className="flex flex-col gap-2 items-end">
                     <button
                         onClick={sendTestNotification}
-                        disabled={isSendingTest || vapidConfigured === false}
+                        disabled={isSendingTest || vapidConfigured === false || (pushStatus?.subscriptionCount ?? 0) === 0}
                         className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2 rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-2 text-sm font-medium"
                     >
                         {isSendingTest ? 'Sending…' : 'Send Test Notification'}

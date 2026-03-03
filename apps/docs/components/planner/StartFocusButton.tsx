@@ -19,11 +19,10 @@ export function StartFocusButton({ taskId: propTaskId, isInline = false }: Start
     const taskId = propTaskId || activeTaskId || routeTaskId;
     const [showTaskSelector, setShowTaskSelector] = useState(false);
 
-    // Use the same cache key as MorningBriefing ({page:1, limit:10, status:PENDING})
-    // so RTK Query serves this from the already-populated cache instead of
-    // making a separate unbounded tasks?status=PENDING network request.
+    // Only fetch pending tasks when the task selector might be shown (no taskId resolved yet).
+    // When a taskId is already known the selector is never shown — skip the request entirely.
     const pendingTasksQueryArgs = useMemo(() => ({ page: 1, limit: 10, status: TaskStatus.PENDING }), []);
-    const { data: tasks } = useGetTasksQuery(pendingTasksQueryArgs);
+    const { data: tasks } = useGetTasksQuery(pendingTasksQueryArgs, { skip: Boolean(taskId) });
     const [selectedDuration, setSelectedDuration] = useState<number>(25);
 
     const handleStart = () => {

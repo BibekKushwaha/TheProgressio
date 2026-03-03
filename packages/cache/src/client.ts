@@ -191,6 +191,27 @@ export function getRedisClient(): RedisClient {
     if (process.env.NODE_ENV !== 'test') {
       ioredis.on('connect', () => {
         console.log(`[@repo/cache] ioredis connected to ${host}:${port ?? 6379}`);
+
+        // Verify the eviction policy so habit cache keys (XP 5 min, heatmap
+        // 12 h) are eligible for eviction under memory pressure instead of
+        // blocking writes with OOM errors.
+        ioredis.config('GET', 'maxmemory-policy').then((result) => {
+          const [, policy] = result as string[];
+          const desired = 'allkeys-lru';
+          if (policy !== desired) {
+            console.warn(
+              `[@repo/cache] Redis maxmemory-policy is "${policy}" — ` +
+              `recommend "${desired}" so all keys are eligible for LRU eviction.`
+            );
+            // In non-production environments auto-tune the policy so local
+            // development always behaves the same as the tuned production config.
+            if (process.env.NODE_ENV !== 'production') {
+              ioredis.config('SET', 'maxmemory-policy', desired)
+                .then(() => console.log(`[@repo/cache] Set maxmemory-policy → ${desired}`))
+                .catch(() => {/* read-only replica or ACL restriction — ignore */});
+            }
+          }
+        }).catch(() => {/* CONFIG GET may be disabled (e.g. Upstash) — ignore */});
       });
       ioredis.on('error', (err: Error) => {
         console.warn(`[@repo/cache] ioredis error: ${err.message}`);

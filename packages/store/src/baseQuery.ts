@@ -1,5 +1,6 @@
 import { fetchBaseQuery, retry } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn } from '@reduxjs/toolkit/query';
+export type { BaseQueryFn };
 import { isNativeRuntime, resolveServiceUrl, getFamilyShareToken } from './runtime';
 import { clearTokens, getRefreshTokenSync, setTokens, getAccessTokenSync } from './mobile-token-store';
 import { hydrateAuth, logout } from './slices/authSlice';
@@ -88,6 +89,38 @@ async function ensureFreshMobileSession(api: any): Promise<boolean> {
  *
  * @param serviceBaseUrl - root URL of the service (e.g. `http://localhost:4001`)
  */
+/**
+ * Wraps a baseQuery to handle 429 Too Many Requests responses gracefully.
+ * Enriches the error object with `isRateLimit: true` and a `userMessage` so
+ * components and the RTK error logger can distinguish rate-limit errors.
+ *
+ * Note: `withRetry` already calls `retry.fail()` on all 4xx responses — the
+ * request will NOT be retried when rate-limited.
+ */
+export function withRateLimit<BaseQuery extends BaseQueryFn<any, any, any, any, any>>(
+  baseQuery: BaseQuery,
+): BaseQuery {
+  const inner: BaseQueryFn<any, any, any, any, any> = async (args, api, extraOptions) => {
+    const result = await (baseQuery as any)(args, api, extraOptions);
+    const status = (result?.error as { status?: unknown } | undefined)?.status;
+    if (status !== 429) return result;
+
+    const retryAfter = (result.error as any)?.data?.retryAfter ?? 60;
+    return {
+      ...result,
+      error: {
+        ...result.error,
+        data: {
+          ...(result.error as any)?.data,
+          isRateLimit: true,
+          userMessage: `Too many requests — please wait ${retryAfter}s before retrying.`,
+        },
+      },
+    };
+  };
+  return inner as unknown as BaseQuery;
+}
+
 export function createServiceBaseQuery(serviceBaseUrl: string) {
   const base = fetchBaseQuery({
     baseUrl: `${serviceBaseUrl}/api`,
@@ -105,7 +138,7 @@ export function createServiceBaseQuery(serviceBaseUrl: string) {
       return headers;
     },
   });
-  return withAuthRefresh(withRetry(base));
+  return withRateLimit(withAuthRefresh(withRetry(base)));
 }
 
 /**

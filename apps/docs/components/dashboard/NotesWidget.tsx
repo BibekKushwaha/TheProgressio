@@ -2,7 +2,7 @@
 
 import { FileText, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-
+import { toast } from 'sonner';
 import { useGetNotesQuery, useDeleteNoteMutation, Note } from '@repo/store';
 
 export function NotesWidget() {
@@ -15,7 +15,7 @@ export function NotesWidget() {
         try {
             await deleteNoteMutation(id).unwrap();
         } catch (_e) {
-            console.error('Failed to delete note:', _e);
+            toast.error('Failed to delete note. Please try again.');
         }
     };
 
@@ -66,6 +66,7 @@ export function NotesWidget() {
                                 <button
                                     onClick={() => handleDelete(note.id)}
                                     className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-rose-400"
+                                    aria-label="Delete note"
                                     title="Delete Note"
                                 >
                                     <Trash2 className="w-4 h-4" />

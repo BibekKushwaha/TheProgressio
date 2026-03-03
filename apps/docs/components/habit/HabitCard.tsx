@@ -3,52 +3,62 @@ import { cn } from '@/lib/utils';
 import { Habit, useLogHabitMutation, useUpdateHabitMutation } from '@repo/store';
 import { HabitActionMenu } from './HabitActionMenu';
 import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 
-export function HabitCard({ habit, highlighted = false }: { habit: Habit; highlighted?: boolean }) {
-    const hasNewTrophy = Boolean((habit as { newTrophy?: boolean }).newTrophy);
-    // Determine the color theme. If the habit has an RTK-saved color (gradient), use it.
-    // Otherwise fallback to a default purple gradient.
+function HabitCardBase({ habit, highlighted = false }: { habit: Habit; highlighted?: boolean }) {
+    const hasNewTrophy = Boolean(habit.newTrophy);
     const colorTheme = habit.color || "from-purple-600 to-pink-600";
 
     const [logHabit, { isLoading }] = useLogHabitMutation();
     const [updateHabit, { isLoading: isUpdatingMercy }] = useUpdateHabitMutation();
-    const [mercyDays, setMercyDays] = useState(habit.mercyDaysAllowed ?? 1);
 
-    useEffect(() => {
-        setMercyDays(habit.mercyDaysAllowed ?? 1);
-    }, [habit.id, habit.mercyDaysAllowed]);
+    // Controlled "pending" selection — no derived state, no useEffect sync.
+    // null means "unchanged from server value".
+    const [pendingMercyDays, setPendingMercyDays] = useState<number | null>(null);
+    const displayMercyDays = pendingMercyDays ?? (habit.mercyDaysAllowed ?? 1);
+    const isDirty = pendingMercyDays !== null && pendingMercyDays !== (habit.mercyDaysAllowed ?? 1);
 
-    const handleCheckIn = async () => {
+    const habitName = useMemo(
+        () => habit.name.charAt(0).toUpperCase() + habit.name.slice(1),
+        [habit.name]
+    );
+
+    const progressPct = useMemo(
+        () =>
+            habit.targetValue > 0
+                ? Math.min((habit.currentStreak / habit.targetValue) * 100, 100)
+                : 0,
+        [habit.currentStreak, habit.targetValue]
+    );
+
+    const handleCheckIn = useCallback(async () => {
         try {
             await logHabit({ id: habit.id, completedValue: 1 }).unwrap();
-
-            // Show success toast
             toast.success('✅ Habit logged successfully!');
         } catch (error) {
             console.error("Failed to check in habit:", error);
             toast.error('Failed to check in habit');
         }
-    };
+    }, [habit.id, logHabit]);
 
-    const handleSaveMercyDays = async () => {
-        if (mercyDays === (habit.mercyDaysAllowed ?? 1)) {
+    const handleSaveMercyDays = useCallback(async () => {
+        if (!isDirty) {
             toast('No changes to save');
             return;
         }
-
         try {
-            await updateHabit({ id: habit.id, mercyDaysAllowed: mercyDays }).unwrap();
+            await updateHabit({ id: habit.id, mercyDaysAllowed: displayMercyDays }).unwrap();
+            setPendingMercyDays(null); // server is now source of truth
             toast.success('✅ Mercy days updated');
         } catch (error) {
             console.error('Failed to update mercy days:', error);
             toast.error('Failed to update mercy days');
         }
-    };
+    }, [displayMercyDays, habit.id, isDirty, updateHabit]);
 
     return (
         <div className={cn(
-            "group relative overflow-hidden bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 transition-all duration-300",
+            "group relative overflow-hidden bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 transition-[transform,box-shadow,opacity] duration-300",
             highlighted && 'ring-2 ring-purple-400/70 shadow-[0_0_0_1px_rgba(168,85,247,0.45)] pulse-once'
         )}>
             {/* Background glow using the habit's color */}
@@ -72,7 +82,7 @@ export function HabitCard({ habit, highlighted = false }: { habit: Habit; highli
                     {habit.icon || "✨"}
                 </div>
                 <div className="flex-1">
-                    <h3 className="text-xl font-bold mb-1 line-clamp-1">{habit.name.charAt(0).toUpperCase() + habit.name.slice(1)}</h3>
+                    <h3 className="text-xl font-bold mb-1 line-clamp-1">{habitName}</h3>
                     <span className="inline-block px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-bold text-slate-300 uppercase tracking-wider">
                         {habit.frequency}
                     </span>
@@ -97,7 +107,7 @@ export function HabitCard({ habit, highlighted = false }: { habit: Habit; highli
             <div className="mb-4 h-1 items-end gap-0.5 flex bg-white/5 rounded-full overflow-hidden">
                 <div
                     className={cn("h-full bg-gradient-to-r transition-all duration-500", colorTheme)}
-                    style={{ width: `${Math.min((habit.currentStreak / habit.targetValue) * 100, 100)}%` }}
+                    style={{ width: `${progressPct}%` }}
                 />
             </div>
 
@@ -112,11 +122,11 @@ export function HabitCard({ habit, highlighted = false }: { habit: Habit; highli
                             <button
                                 key={value}
                                 type="button"
-                                onClick={() => setMercyDays(value)}
-                                aria-pressed={mercyDays === value}
+                                onClick={() => setPendingMercyDays(value)}
+                                aria-pressed={displayMercyDays === value}
                                 className={cn(
                                     'h-8 w-8 rounded-md text-xs font-bold transition-all',
-                                    mercyDays === value
+                                    displayMercyDays === value
                                         ? 'bg-amber-500 text-white shadow shadow-amber-500/30'
                                         : 'bg-white/5 text-slate-300 hover:bg-white/10'
                                 )}
@@ -128,7 +138,7 @@ export function HabitCard({ habit, highlighted = false }: { habit: Habit; highli
                     <button
                         type="button"
                         onClick={handleSaveMercyDays}
-                        disabled={isUpdatingMercy || mercyDays === (habit.mercyDaysAllowed ?? 1)}
+                        disabled={isUpdatingMercy || !isDirty}
                         className="px-3 py-1.5 rounded-md text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-400 text-black disabled:opacity-50"
                     >
                         {isUpdatingMercy ? 'Saving...' : 'Save'}
@@ -151,3 +161,5 @@ export function HabitCard({ habit, highlighted = false }: { habit: Habit; highli
         </div>
     );
 }
+
+export const HabitCard = React.memo(HabitCardBase);

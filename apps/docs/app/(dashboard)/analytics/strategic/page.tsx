@@ -1,19 +1,15 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { DurationPredictionCard } from '@/components/analytics/DurationPredictionCard';
-import { PredictiveScoreCard } from '@/components/analytics/PredictiveScoreCard';
-import { ProductivityInsights } from '@/components/analytics/ProductivityInsights';
-import { WhatIfGPASimulator } from '@/components/analytics/WhatIfGPASimulator';
-import { SWOTReport } from '@/components/analytics/SWOTReport';
 import { GlassHero } from '@/components/layout/GlassHero';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TaskStatus, useGetTasksQuery, useGetStrategicSummaryQuery } from "@repo/store";
 import { BrainCircuit, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useExamType } from "@/hooks/useExamType";
 
-// Dynamically import recharts-heavy components — keeps them out of the initial bundle.
-// They're only rendered on the analytics/strategic page after user navigation.
+// Dynamically import recharts-heavy components and large analytics cards.
+// Keeps them out of the initial bundle; loaded on demand after navigation.
 const CycleTimeScatterPlot = dynamic(
   () => import('@/components/analytics/CycleTimeScatterPlot').then((m) => ({ default: m.CycleTimeScatterPlot })),
   { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
@@ -26,15 +22,36 @@ const TimeLeakageCard = dynamic(
   () => import('@/components/analytics/TimeLeakageCard').then((m) => ({ default: m.TimeLeakageCard })),
   { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
 );
+const DurationPredictionCard = dynamic(
+  () => import('@/components/analytics/DurationPredictionCard').then((m) => ({ default: m.DurationPredictionCard })),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
+);
+const PredictiveScoreCard = dynamic(
+  () => import('@/components/analytics/PredictiveScoreCard').then((m) => ({ default: m.PredictiveScoreCard })),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
+);
+const ProductivityInsights = dynamic(
+  () => import('@/components/analytics/ProductivityInsights').then((m) => ({ default: m.ProductivityInsights })),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
+);
+const WhatIfGPASimulator = dynamic(
+  () => import('@/components/analytics/WhatIfGPASimulator').then((m) => ({ default: m.WhatIfGPASimulator })),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
+);
+const SWOTReport = dynamic(
+  () => import('@/components/analytics/SWOTReport').then((m) => ({ default: m.SWOTReport })),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
+);
 
 export default function AnalyticsStrategicPage() {
+  const examType = useExamType();
   const [selectedPredictionTaskId, setSelectedPredictionTaskId] = useState("");
-  const tasksQueryArgs = useMemo(() => ({ limit: 50 }), []);
+  const tasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
   const { data: allTasks } = useGetTasksQuery(tasksQueryArgs);
 
   // Single BFF call pre-warms all 5 expensive analytics in parallel.
   // Each child component receives the result as initialData and skips its own query.
-  const { data: strategicData } = useGetStrategicSummaryQuery({ examType: 'JEE' });
+  const { data: strategicData } = useGetStrategicSummaryQuery({ examType });
   const predictionTaskOptions = useMemo(() => {
     if (!allTasks) return [];
     return [...allTasks]
@@ -65,13 +82,11 @@ export default function AnalyticsStrategicPage() {
       setSelectedPredictionTaskId("");
       return;
     }
-    const selectedExists = predictionTaskOptions.some(
-      (task) => task.id === selectedPredictionTaskId
-    );
-    if (!selectedExists) {
-      setSelectedPredictionTaskId(predictionTaskOptions[0]?.id || "");
-    }
-  }, [predictionTaskOptions, selectedPredictionTaskId]);
+    setSelectedPredictionTaskId((current) => {
+      const exists = predictionTaskOptions.some((task) => task.id === current);
+      return exists ? current : (predictionTaskOptions[0]?.id ?? "");
+    });
+  }, [predictionTaskOptions]);
 
   return (
     <div className="space-y-8">
@@ -149,6 +164,7 @@ export default function AnalyticsStrategicPage() {
                     initialLeakage={strategicData?.leakage}
                     initialPeak={strategicData?.peak}
                     initialPredictive={strategicData?.predictive}
+                    examType={examType}
                   />
                 </div>
               </div>

@@ -91,6 +91,9 @@ export const initPushWorker = () => {
                     title,
                     body,
                     icon: icon || "/favicon.ico",
+                    badge: "/favicon.ico",
+                    tag: category ? `push-${category}` : "push-general",
+                    requireInteraction: false,
                     data: {
                         url: deepLink || "/dashboard",
                     },

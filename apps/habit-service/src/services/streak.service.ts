@@ -5,6 +5,30 @@
  * configurable "mercy days" (skip days) before a streak actually breaks.
  */
 import { prisma, type Frequency } from "@repo/db";
+import { getCache, setCache, deleteCache } from "@repo/cache";
+
+// ── Cache keys + TTLs ──────────────────────────────────────────────────
+// XP changes only on habit log / reset → 5-minute TTL is safe.
+// Heatmap aggregates 365 days of data across three DB tables.
+// A nightly recompute is unnecessary: the cached value is invalidated on
+// every habit log, so freshness is maintained automatically.  The 12-hour
+// TTL is a safety-net for orphaned keys (e.g. after server restart).
+
+const XP_CACHE_TTL_S    = 300;     // 5 min
+const HEATMAP_CACHE_TTL_S = 43_200; // 12 h
+
+const xpCacheKey      = (userId: string) => `habit:xp:${userId}`;
+const heatmapCacheKey = (userId: string) => `habit:heatmap:${userId}`;
+
+/** Invalidate the XP cache for a user (call after any XP mutation). */
+export async function invalidateXPCache(userId: string): Promise<void> {
+    await deleteCache(xpCacheKey(userId)).catch(() => { /* non-blocking */ });
+}
+
+/** Invalidate the heatmap cache for a user (call after any habit log). */
+export async function invalidateHeatmapCache(userId: string): Promise<void> {
+    await deleteCache(heatmapCacheKey(userId)).catch(() => { /* non-blocking */ });
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -162,7 +186,68 @@ export async function awardXP(userId: string, amount: number, _reason?: string):
         data: { xp: newXP, level: newLevel },
     });
 
+    // ── Write-through: update XP cache immediately so the next bootstrap or
+    //    getUserXP call returns fresh data without a DB round-trip.
+    const LEVEL_NAMES = [
+        "Novice", "Apprentice", "Disciplined", "Focused", "Consistent",
+        "Performer", "Strategist", "Achiever", "Master", "Legend",
+    ];
+    const progress = xpToNextLevel(newXP);
+    const levelName = LEVEL_NAMES[Math.min(newLevel - 1, LEVEL_NAMES.length - 1)] ?? "Novice";
+    await setCache(
+        xpCacheKey(userId),
+        {
+            xp: newXP,
+            level: newLevel,
+            levelName,
+            xpToNextLevel: Math.max(0, progress.next - newXP),
+            progress: progress.progress,
+            currentLevelXP: progress.current,
+            nextLevelXP: progress.next,
+        },
+        { ttlSeconds: XP_CACHE_TTL_S }
+    ).catch(() => { /* non-blocking */ });
+
     return { xp: newXP, level: newLevel, levelUp: newLevel > oldLevel };
+}
+
+/**
+ * Read XP for a user, checking Redis before hitting Postgres.
+ * Returns the same shape as the getUserXP controller response body.
+ */
+export async function getXPForUser(userId: string): Promise<{
+    xp: number; level: number; levelName: string;
+    xpToNextLevel: number; progress: number;
+    currentLevelXP: number; nextLevelXP: number;
+}> {
+    type XPCacheShape = Awaited<ReturnType<typeof getXPForUser>>;
+    const cached = await getCache<XPCacheShape>(xpCacheKey(userId)).catch(() => null);
+    if (cached) return cached;
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { xp: true },
+    });
+    const xpVal = user?.xp ?? 0;
+    const level = calculateLevel(xpVal);
+    const progress = xpToNextLevel(xpVal);
+    const LEVEL_NAMES = [
+        "Novice", "Apprentice", "Disciplined", "Focused", "Consistent",
+        "Performer", "Strategist", "Achiever", "Master", "Legend",
+    ];
+    const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)] ?? "Novice";
+    const result = {
+        xp: xpVal,
+        level,
+        levelName,
+        xpToNextLevel: Math.max(0, progress.next - xpVal),
+        progress: progress.progress,
+        currentLevelXP: progress.current,
+        nextLevelXP: progress.next,
+    };
+
+    await setCache(xpCacheKey(userId), result, { ttlSeconds: XP_CACHE_TTL_S }).catch(() => { /* non-blocking */ });
+    return result;
 }
 
 /**
@@ -186,6 +271,13 @@ export interface HeatmapDay {
 }
 
 export async function getYearlyHeatmap(userId: string): Promise<HeatmapDay[]> {
+    // ── L1/L2 cache check ───────────────────────────────────────────────
+    // Heatmap is expensive: 3 separate DB queries + 365-day aggregation.
+    // Cache is invalidated by invalidateHeatmapCache() on every habit log,
+    // so the data is always within one log of being current.
+    const cached = await getCache<HeatmapDay[]>(heatmapCacheKey(userId)).catch(() => null);
+    if (cached) return cached;
+
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     oneYearAgo.setHours(0, 0, 0, 0);
@@ -255,6 +347,8 @@ export async function getYearlyHeatmap(userId: string): Promise<HeatmapDay[]> {
         result.push({ date, count, intensity });
     }
 
+    // Write result to cache — invalidated by invalidateHeatmapCache() on any log.
+    await setCache(heatmapCacheKey(userId), result, { ttlSeconds: HEATMAP_CACHE_TTL_S }).catch(() => { /* non-blocking */ });
     return result;
 }
 

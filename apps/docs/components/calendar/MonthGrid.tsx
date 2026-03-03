@@ -1,10 +1,22 @@
-// components/schedule/MonthGrid.tsx
+// components/calendar/MonthGrid.tsx
 'use client';
 
+import { useMemo } from 'react';
 import { DayCell } from './Daycell';
 import { useGetMonthlyEventsQuery, useGetHolidaysQuery, type SchoolHoliday } from '@repo/store';
+import { getTodayDateKey } from '@/lib/date';
 
 const daysOfWeek = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+// Pure helpers — module-level so they are not recreated on every render.
+function getDaysInMonth(month: number, year: number) {
+    return new Date(year, month + 1, 0).getDate();
+}
+function getFirstDayOfMonth(month: number, year: number) {
+    // Returns 0=Mon … 6=Sun
+    const day = new Date(year, month, 1).getDay();
+    return day === 0 ? 6 : day - 1;
+}
 
 interface MonthGridProps {
     selectedDate: number;
@@ -12,18 +24,22 @@ interface MonthGridProps {
     currentMonth: number;
     currentYear: number;
     rotationFilter?: boolean;
-    rotation?: unknown;
 }
 
-export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYear }: MonthGridProps) {
+export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYear, rotationFilter: _rotationFilter = false }: MonthGridProps) {
     const { data: events } = useGetMonthlyEventsQuery({ month: currentMonth + 1, year: currentYear });
     const { data: holidayData } = useGetHolidaysQuery();
 
-    const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
-    const getFirstDayOfMonth = (month: number, year: number) => {
-        const day = new Date(year, month, 1).getDay();
-        return day === 0 ? 6 : day - 1; // Adjust for Mon start (0=Mon, 6=Sun) or standard (0=Sun)
-    };
+    // Pre-compute holiday ranges once per holidayData update — O(H) instead of O(D×H).
+    const holidayRanges = useMemo(() =>
+        (holidayData?.holidays ?? []).map((h: SchoolHoliday) => ({
+            start: new Date(h.startDate).setHours(0, 0, 0, 0),
+            end:   new Date(h.endDate).setHours(23, 59, 59, 999),
+        })),
+        [holidayData]
+    );
+
+    const todayKey = getTodayDateKey();
 
     const daysInMonth = getDaysInMonth(currentMonth, currentYear);
     const firstDay = getFirstDayOfMonth(currentMonth, currentYear); // 0=Mon
@@ -35,10 +51,12 @@ export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYea
     const prevMonthDays = getDaysInMonth(currentMonth - 1, currentYear);
     for (let i = 0; i < firstDay; i++) {
         days.push({
+            key: `prev-${i}`,
             date: prevMonthDays - firstDay + 1 + i,
             isCurrentMonth: false,
             events: [],
-            isHoliday: false
+            isHoliday: false,
+            isExam: false,
         });
     }
 
@@ -46,37 +64,28 @@ export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYea
     for (let i = 1; i <= daysInMonth; i++) {
         const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
         const dayEvents = events?.[dateKey];
-        const eventMarkers = [];
-        if (dayEvents?.taskCount) eventMarkers.push('coding'); // simplified mapping
-        if (dayEvents?.examCount) eventMarkers.push('physics');
+        const eventMarkers: string[] = [];
+        if (dayEvents?.taskCount) eventMarkers.push('task');
+        if (dayEvents?.examCount) eventMarkers.push('exam');
 
-        // Check for holiday
-        const currentDate = new Date(currentYear, currentMonth, i);
-        // Normalize to start of day for comparison
-        currentDate.setHours(0, 0, 0, 0);
-
-        const isHoliday = holidayData?.holidays?.some((h: SchoolHoliday) => {
-            const start = new Date(h.startDate);
-            const end = new Date(h.endDate);
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            return currentDate >= start && currentDate <= end;
-        });
+        const dateMs = new Date(currentYear, currentMonth, i).setHours(0, 0, 0, 0);
+        const isHoliday = holidayRanges.some(r => dateMs >= r.start && dateMs <= r.end);
 
         days.push({
+            key: `cur-${i}`,
             date: i,
             isCurrentMonth: true,
-            isToday: false, // Calculate real today if needed
+            isToday: dateKey === todayKey,
             events: eventMarkers,
-            isHoliday: !!isHoliday,
-            isExam: !!dayEvents?.examCount
+            isHoliday,
+            isExam: !!dayEvents?.examCount,
         });
     }
 
     // Next month padding to fill 35 or 42 slots
     const remaining = 35 - days.length > 0 ? 35 - days.length : 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
-        days.push({ date: i, isCurrentMonth: false, events: [], isHoliday: false, isExam: false });
+        days.push({ key: `next-${i}`, date: i, isCurrentMonth: false, events: [], isHoliday: false, isExam: false });
     }
 
     return (
@@ -107,9 +116,9 @@ export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYea
             </div>
 
             <div className="grid grid-cols-7 gap-4">
-                {days.map((day, index) => (
+                {days.map((day) => (
                     <DayCell
-                        key={index}
+                        key={day.key}
                         date={day.date}
                         events={day.events}
                         isCurrentMonth={day.isCurrentMonth}

@@ -3,18 +3,43 @@ import React from 'react';
 import { ScheduleItemCard } from './ScheduleItemCard';
 import { AiSuggestedDialog } from './AiSuggestedDialog';
 import { useGetCalendarDailyScheduleQuery } from '@repo/store';
+import { toLocalDateKey } from '@/lib/date';
 
 interface ScheduleDetailPanelProps {
     date: Date;
 }
 
-export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
-    // Fix: Use local date string to avoid timezone shifts (toISOString uses UTC)
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const dateString = `${year}-${month}-${day}`;
+interface ClassItem {
+    id: string | number;
+    subject?: string;
+    title: string;
+    startTime: string;
+    subtitle?: string;
+}
 
+function ClassList({ items }: { items: ClassItem[] }) {
+    if (!items.length) {
+        return <div className="text-center text-slate-400 py-2 text-sm">No classes today.</div>;
+    }
+    return (
+        <>
+            {items.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+                    <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs uppercase">
+                        {item.subject?.substring(0, 2) ?? 'CL'}
+                    </div>
+                    <div>
+                        <div className="font-medium text-white text-sm">{item.title}</div>
+                        <div className="text-xs text-slate-400">{item.startTime} • {item.subtitle}</div>
+                    </div>
+                </div>
+            ))}
+        </>
+    );
+}
+
+export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
+    const dateString = toLocalDateKey(date);
     const { data: schedule } = useGetCalendarDailyScheduleQuery({ date: dateString });
 
     return (
@@ -46,14 +71,14 @@ export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
                             <ScheduleItemCard
                                 key={item.id}
                                 item={{
-                                    id: String(item.id), // Ensure string if needed
+                                    id: String(item.id),
                                     type: item.type,
                                     title: item.title,
                                     time: item.startTime === '00:00' ? 'All Day' : `${item.startTime} - ${item.endTime}`,
                                     subtitle: item.subtitle,
                                     location: item.location || '',
                                     progress: item.isCompleted ? 100 : 0,
-                                    color: item.color || 'blue' // Default color
+                                    color: item.color || 'blue'
                                 }}
                             />
                         ))}
@@ -63,26 +88,7 @@ export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
             <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 backdrop-blur-md border border-indigo-500/20 rounded-2xl p-6">
                 <h3 className="text-lg font-semibold mb-4 text-indigo-200">Upcoming Classes</h3>
                 <div className="space-y-3">
-                    {(() => {
-                        const classItems = schedule?.items?.filter(i => i.type === 'class') ?? [];
-                        if (classItems.length === 0) {
-                            return (
-                                <div className="text-center text-slate-400 py-2 text-sm">No classes today.</div>
-                            );
-                        }
-
-                        return classItems.map((item) => (
-                            <div key={item.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-                                <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs uppercase">
-                                    {item.subject?.substring(0, 2) || 'CL'}
-                                </div>
-                                <div>
-                                    <div className="font-medium text-white text-sm">{item.title}</div>
-                                    <div className="text-xs text-slate-400">{item.startTime} • {item.subtitle}</div>
-                                </div>
-                            </div>
-                        ));
-                    })()}
+                    <ClassList items={schedule?.items?.filter(i => i.type === 'class') ?? []} />
                 </div>
             </div>
             {/* Conflicts */}
