@@ -6,9 +6,12 @@ import { describe, it, beforeEach, expect, vi } from 'vitest'
 // Mock auth middleware to inject a test user
 vi.mock('../src/middleware/auth.middleware.js', () => ({
   isAuth: (req: any, _res: any, next: any) => {
-    req.user = { id: 'user-1', username: 'Tester', email: 'test@example.com', dailyGoalHours: 4 }
+    req.user = { id: 'user-1', username: 'Tester', email: 'test@example.com', dailyGoalHours: 4, role: 'ADMIN' }
     next()
   },
+  isAdmin: (_req: any, _res: any, next: any) => next(),
+  adminRateLimit: (_req: any, _res: any, next: any) => next(),
+  requireAdminIp: (_req: any, _res: any, next: any) => next(),
   enforceReadOnlyWrites: () => (req: any, res: any, next: any) => next(),
 }))
 
@@ -36,6 +39,7 @@ vi.mock('../src/services/queue.service.js', () => ({
 vi.mock('../src/services/ai.service.js', () => ({
   aiService: {
     sanitizeIncomingText: vi.fn((text: string) => text),
+    sanitizeIncomingTextWithMetadata: vi.fn((text: string) => ({ text, matchedPatterns: [] })),
     extractWhatsAppIntentAndTask: vi.fn().mockResolvedValue({
       intent: 'create_task',
       title: 'Chemistry lab report',

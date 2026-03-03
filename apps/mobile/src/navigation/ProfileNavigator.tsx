@@ -8,6 +8,7 @@ import { FamilyInviteScreen } from '../screens/profile/FamilyInviteScreen';
 import { SubscriptionScreen } from '../screens/profile/SubscriptionScreen';
 import { QRAttendanceScreen } from '../screens/profile/QRAttendanceScreen';
 import { AdvancedScreen } from '../screens/profile/AdvancedScreen';
+import { AdminDashboardScreen } from '../screens/profile/AdminDashboardScreen';
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
@@ -29,5 +30,6 @@ export const ProfileNavigator: React.FC = () => (
             options={{ presentation: 'fullScreenModal' }}
         />
         <Stack.Screen name="Advanced" component={AdvancedScreen} />
+        <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
     </Stack.Navigator>
 );

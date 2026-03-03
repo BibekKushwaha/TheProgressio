@@ -6,6 +6,7 @@ export interface User {
   username: string;
   email: string;
   createdAt: string;
+  role?: string; // "USER" | "ADMIN"
 }
 
 /** Tracks whether the session hydration fetch is pending, done, or failed. */
@@ -59,5 +60,6 @@ export const { setAuthLoading, setCredentials, logout, hydrateAuth } = authSlice
 export const selectCurrentUser = (state: RootState) => state.auth.user;
 export const selectIsAuthenticated = (state: RootState) => state.auth.isAuthenticated;
 export const selectAuthStatus = (state: RootState) => state.auth.status;
+export const selectIsAdmin = (state: RootState) => state.auth.user?.role === 'ADMIN';
 
 export default authSlice.reducer;

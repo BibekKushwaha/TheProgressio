@@ -29,9 +29,21 @@ vi.mock('../src/controllers/task.controller.js', async (importOriginal) => {
 vi.mock('../src/services/ai.service.js', () => ({
   aiService: {
     sanitizeIncomingText: mockSanitizeIncomingText,
+    sanitizeIncomingTextWithMetadata: (text: string) => ({ text, matchedPatterns: [] }),
     extractWhatsAppIntentAndTask: mockExtractWhatsAppIntentAndTask,
     generateSubtasks: vi.fn().mockResolvedValue(['Step 1', 'Step 2']),
   },
+}));
+
+vi.mock('../src/middleware/auth.middleware.js', () => ({
+  isAuth: (req: any, _res: any, next: any) => {
+    req.user = { id: 'user-1', username: 'Tester', email: 'test@example.com', dailyGoalHours: 4, role: 'ADMIN' };
+    next();
+  },
+  isAdmin: (_req: any, _res: any, next: any) => next(),
+  adminRateLimit: (_req: any, _res: any, next: any) => next(),
+  requireAdminIp: (_req: any, _res: any, next: any) => next(),
+  enforceReadOnlyWrites: () => (_req: any, _res: any, next: any) => next(),
 }));
 
 vi.mock('../src/services/producer.service.js', () => ({

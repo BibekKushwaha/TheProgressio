@@ -1,5 +1,6 @@
 import { Worker, type Job, type ConnectionOptions } from "bullmq";
 import { prisma } from "@repo/db";
+import { aggregateDailyStatsForUser, backfillDailyStats } from "./daily-stats-aggregator.service.js";
 
 // ─── Event Shape (mirrors planner-service TaskEvent) ────────────────────────────
 export interface TaskEvent {
@@ -149,6 +150,17 @@ async function handleTaskCompleted(taskId: string, userId: string): Promise<void
     });
 
     console.log(`[AnalyticsWorker] ✅ Recorded completion stat for taskId=${taskId} (${totalMinutes} min)`);
+
+    // ── Pre-aggregate today's stats (write-time hook — Step 3/Blueprint) ──
+    // Updating DailyUserStats immediately on task completion means the overview
+    // dashboard reads from a pre-computed row (O(1)) instead of a live aggregation
+    // across millions of activity-log rows (O(N) scans).
+    try {
+        await aggregateDailyStatsForUser(userId, new Date());
+    } catch (aggErr) {
+        // Non-fatal: the nightly backfill will catch any misses.
+        console.warn(`[AnalyticsWorker] DailyStats aggregation failed for userId=${userId}:`, aggErr);
+    }
 }
 
 async function handleTaskUpdated(taskId: string, userId: string, payload: Record<string, unknown>): Promise<void> {
@@ -220,4 +232,42 @@ export const analyticsWorker: AnalyticsWorkerInterface = QUEUE_ENABLED
 export async function shutdownWorker() {
     console.log("🔄 Shutting down Analytics BullMQ worker...");
     await analyticsWorker.close();
+}
+
+// ─── Nightly Backfill Cron ──────────────────────────────────────────────────────
+// Scheduled to run daily at 00:05 UTC so any missed write-time aggregation events
+// are caught within 24 hours. Uses a simple setTimeout loop — no external cron
+// dependency required. In a multi-instance deployment, use a distributed lock
+// (e.g., Redis SETNX) to prevent multiple workers from running this concurrently.
+function scheduleNightlyBackfill(): void {
+    const scheduleNext = () => {
+        const now = new Date();
+        const nextRun = new Date(now);
+        // Target: next 00:05 UTC
+        nextRun.setUTCHours(0, 5, 0, 0);
+        if (nextRun <= now) {
+            nextRun.setUTCDate(nextRun.getUTCDate() + 1);
+        }
+        const msUntilRun = nextRun.getTime() - now.getTime();
+
+        setTimeout(async () => {
+            try {
+                console.log("[AnalyticsWorker] 🌙 Starting nightly DailyUserStats backfill...");
+                await backfillDailyStats(7);
+            } catch (err) {
+                console.error("[AnalyticsWorker] Nightly backfill failed:", err);
+            } finally {
+                scheduleNext(); // Schedule next run regardless of success/failure
+            }
+        }, msUntilRun);
+
+        console.log(`[AnalyticsWorker] 📅 Nightly backfill scheduled for ${nextRun.toISOString()}`);
+    };
+
+    scheduleNext();
+}
+
+// Start the nightly backfill in non-test environments
+if (process.env.NODE_ENV !== "test") {
+    scheduleNightlyBackfill();
 }

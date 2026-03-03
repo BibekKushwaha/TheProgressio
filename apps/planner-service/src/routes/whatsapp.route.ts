@@ -2,9 +2,12 @@ import express from "express";
 import {
 	captureWhatsAppTaskInternal,
 	captureWhatsAppTaskWebhook,
+	getWhatsAppInboundMetrics,
+	getWhatsAppPrometheusMetrics,
 	sendOutcomeNudge,
 	sendWhatsAppTaskReminder,
 	sendWhatsAppTemplateMessage,
+	toggleAiKillSwitch,
 	triggerSilentWatch,
 	verifyWhatsAppWebhook,
 } from "../controllers/whatsapp.controller.js";
@@ -21,5 +24,13 @@ router.post("/reminders/task", sendWhatsAppTaskReminder);
 router.post("/templates/send", sendWhatsAppTemplateMessage);
 router.post("/nudges/outcome", sendOutcomeNudge);
 router.post("/silent-watch/sweep", triggerSilentWatch);
+
+// Internal observability — all require x-whatsapp-secret header
+router.get("/metrics",            getWhatsAppInboundMetrics);    // JSON snapshot
+router.get("/metrics/prometheus", getWhatsAppPrometheusMetrics); // Prometheus text format
+
+// Admin controls — require x-whatsapp-secret header
+// POST { "enabled": true|false } to toggle AI extraction bypass
+router.post("/ai/killswitch",     toggleAiKillSwitch);
 
 export default router;

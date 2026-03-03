@@ -119,12 +119,17 @@ export function TodaysTasks() {
         }
     }, [toggleTask]);
 
-    // Sort: non-completed first by priority desc, then completed
-    const sortedTasks = tasks ? [...tasks].sort((a, b) => {
-        if (a.status === TaskStatus.COMPLETED && b.status !== TaskStatus.COMPLETED) return 1;
-        if (a.status !== TaskStatus.COMPLETED && b.status === TaskStatus.COMPLETED) return -1;
-        return (PRIORITY_RANK[b.priority] || 0) - (PRIORITY_RANK[a.priority] || 0);
-    }) : [];
+    // Sort: non-completed first by priority desc, then completed.
+    // Wrapped in useMemo so the O(n log n) sort only runs when `tasks`
+    // changes (i.e. on a network response), not on every render tick.
+    const sortedTasks = useMemo(() => {
+        if (!tasks) return [];
+        return [...tasks].sort((a, b) => {
+            if (a.status === TaskStatus.COMPLETED && b.status !== TaskStatus.COMPLETED) return 1;
+            if (a.status !== TaskStatus.COMPLETED && b.status === TaskStatus.COMPLETED) return -1;
+            return (PRIORITY_RANK[b.priority] || 0) - (PRIORITY_RANK[a.priority] || 0);
+        });
+    }, [tasks]);
 
     const incompleteTasks = sortedTasks.filter(t => t.status !== TaskStatus.COMPLETED);
     const top3 = incompleteTasks.slice(0, 3);

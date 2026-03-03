@@ -1,54 +1,125 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import {
-    useCreateOrderMutation,
+    useCreatePaymentIntentMutation,
+    useVerifyPaymentMutation,
     useGetSubscriptionStatusQuery,
     useCancelSubscriptionMutation,
     useGetPaymentHistoryQuery,
 } from '@repo/store';
 import type { ProfileScreenProps } from '../../navigation/types';
 
-const PLANS: Array<{ id: 'FREE' | 'PRO' | 'INSTITUTION'; label: string; amountPaise: number }> = [
-    { id: 'FREE', label: 'Free', amountPaise: 0 },
-    { id: 'PRO', label: 'Pro', amountPaise: 99900 },
-    { id: 'INSTITUTION', label: 'Institution', amountPaise: 499900 },
+// Base URL of the planner service (set in .env as EXPO_PUBLIC_PLANNER_SERVICE_URL)
+const PLANNER_URL =
+    process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL ?? 'http://localhost:4001';
+
+const PLANS: Array<{ id: 'PRO' | 'INSTITUTION'; label: string; amountPaise: number; price: string }> = [
+    { id: 'PRO',         label: 'Pro',         amountPaise: 14900,  price: '₹149/mo' },
+    { id: 'INSTITUTION', label: 'Institution', amountPaise: 99900,  price: '₹999/yr' },
 ];
 
 export const SubscriptionScreen: React.FC<ProfileScreenProps<'Subscription'>> = ({ navigation }) => {
     const { data: profile, isLoading, refetch } = useGetSubscriptionStatusQuery(undefined);
     const { data: history } = useGetPaymentHistoryQuery(undefined);
-    const [createOrder, { isLoading: isCreating }] = useCreateOrderMutation();
+    const [createIntent, { isLoading: isCreating }] = useCreatePaymentIntentMutation();
+    const [verifyPayment, { isLoading: isVerifying }] = useVerifyPaymentMutation();
     const [cancelSubscription, { isLoading: isCancelling }] = useCancelSubscriptionMutation();
+
+    const [processingPlan, setProcessingPlan] = useState<string | null>(null);
 
     const activePlan = (profile as any)?.plan ?? 'FREE';
     const planStatus = (profile as any)?.planStatus ?? 'INACTIVE';
 
-    const handleCreateOrder = async (plan: 'FREE' | 'PRO' | 'INSTITUTION', amountPaise: number) => {
+    /**
+     * Full Razorpay flow for mobile:
+     * 1. Create order server-side   → get orderId + keyId
+     * 2. Open checkout.razorpay.com → hosted HTML page we serve at /api/payments/checkout
+     * 3. Razorpay redirects to      → transition://subscription?razorpay_*=...
+     * 4. Parse redirect params      → call /api/payments/verify
+     * 5. Refetch billing profile
+     */
+    const handleUpgrade = async (planId: 'PRO' | 'INSTITUTION') => {
+        setProcessingPlan(planId);
         try {
-            await createOrder({
-                plan,
-                paymentMethod: 'UPI',
-                amountPaise,
-            }).unwrap();
+            // Step 1 — create Razorpay order
+            const { intent } = await createIntent({ plan: planId, provider: 'UPI' }).unwrap();
+
+            // Step 2 — build checkout URL served by planner-service
+            const checkoutUrl =
+                `${PLANNER_URL}/api/payments/checkout` +
+                `?orderId=${encodeURIComponent(intent.orderId)}` +
+                `&keyId=${encodeURIComponent(intent.keyId)}` +
+                `&amount=${encodeURIComponent(String(intent.amountPaise))}` +
+                `&plan=${encodeURIComponent(planId)}`;
+
+            // Step 3 — open in expo-web-browser, wait for deep-link redirect
+            const result = await WebBrowser.openAuthSessionAsync(
+                checkoutUrl,
+                'transition://subscription',
+            );
+
+            if (result.type !== 'success') {
+                // User dismissed / cancelled
+                return;
+            }
+
+            // Step 4 — parse Razorpay callback params from redirect URL
+            const redirectUrl = new URL(result.url);
+            const cancelled = redirectUrl.searchParams.get('cancelled');
+            if (cancelled === 'true') return;
+
+            const razorpayOrderId   = redirectUrl.searchParams.get('razorpay_order_id')   ?? '';
+            const razorpayPaymentId = redirectUrl.searchParams.get('razorpay_payment_id') ?? '';
+            const razorpaySignature = redirectUrl.searchParams.get('razorpay_signature')  ?? '';
+
+            if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+                Alert.alert('Payment Error', 'Missing payment details in callback. Please contact support.');
+                return;
+            }
+
+            // Step 5 — verify signature + activate plan
+            await verifyPayment({ razorpayOrderId, razorpayPaymentId, razorpaySignature }).unwrap();
+
+            Alert.alert('Success', 'Your plan has been activated! 🎉');
             refetch();
-        } catch {
-            /* ignore */
+        } catch (err: unknown) {
+            const msg =
+                typeof err === 'object' && err !== null && 'data' in err
+                    ? String((err as any).data?.message ?? 'Payment failed')
+                    : 'Payment failed. Please try again.';
+            Alert.alert('Payment Failed', msg);
+        } finally {
+            setProcessingPlan(null);
         }
     };
 
     const handleCancel = async () => {
-        try {
-            await cancelSubscription().unwrap();
-            refetch();
-        } catch {
-            /* ignore */
-        }
+        Alert.alert('Cancel Subscription', 'Are you sure you want to cancel?', [
+            { text: 'No', style: 'cancel' },
+            {
+                text: 'Yes, Cancel',
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await cancelSubscription().unwrap();
+                        refetch();
+                    } catch {
+                        Alert.alert('Error', 'Could not cancel subscription. Try again.');
+                    }
+                },
+            },
+        ]);
     };
+
+    const isActive = (planId: string) => activePlan === planId && planStatus === 'ACTIVE';
+    const isBusy = isCreating || isVerifying;
 
     return (
         <ScreenWrapper edges={['top', 'left', 'right']}>
+            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.back}>{'< Profile'}</Text>
@@ -59,55 +130,64 @@ export const SubscriptionScreen: React.FC<ProfileScreenProps<'Subscription'>> = 
                 </TouchableOpacity>
             </View>
 
+            {/* Current plan card */}
             <GlassCard style={styles.statusCard}>
-                <Text style={styles.statusTitle}>Current Plan</Text>
+                <Text style={styles.statusTitle}>CURRENT PLAN</Text>
                 <Text style={styles.statusPlan}>{activePlan}</Text>
                 <Text style={styles.statusMeta}>Status: {planStatus}</Text>
                 {(profile as any)?.renewalAt && (
-                    <Text style={styles.statusMeta}>Renews: {new Date((profile as any).renewalAt).toLocaleString()}</Text>
+                    <Text style={styles.statusMeta}>
+                        Renews: {new Date((profile as any).renewalAt).toLocaleDateString()}
+                    </Text>
                 )}
-                {activePlan !== 'FREE' && (
+                {activePlan !== 'FREE' && planStatus === 'ACTIVE' && (
                     <TouchableOpacity
                         onPress={handleCancel}
                         disabled={isCancelling}
                         style={[styles.cancelBtn, isCancelling && styles.disabled]}
                     >
-                        <Text style={styles.cancelText}>{isCancelling ? 'Cancelling…' : 'Cancel subscription'}</Text>
+                        <Text style={styles.cancelText}>
+                            {isCancelling ? 'Cancelling…' : 'Cancel subscription'}
+                        </Text>
                     </TouchableOpacity>
                 )}
             </GlassCard>
 
-            <Text style={styles.sectionTitle}>Choose Plan</Text>
+            {/* Plans */}
+            <Text style={styles.sectionTitle}>Upgrade Plan</Text>
             {PLANS.map((plan) => (
                 <GlassCard key={plan.id} style={styles.planCard}>
                     <View style={styles.planRow}>
                         <View>
                             <Text style={styles.planName}>{plan.label}</Text>
-                            <Text style={styles.planPrice}>
-                                {plan.amountPaise === 0 ? 'Free' : `₹${(plan.amountPaise / 100).toFixed(0)}`}
-                            </Text>
+                            <Text style={styles.planPrice}>{plan.price}</Text>
                         </View>
                         <TouchableOpacity
-                            onPress={() => handleCreateOrder(plan.id, plan.amountPaise)}
-                            disabled={isCreating || (activePlan === plan.id && planStatus === 'ACTIVE')}
+                            onPress={() => handleUpgrade(plan.id)}
+                            disabled={isBusy || isActive(plan.id)}
                             style={[
                                 styles.planBtn,
-                                (activePlan === plan.id && planStatus === 'ACTIVE') && styles.planBtnActive,
-                                isCreating && styles.disabled,
+                                isActive(plan.id) && styles.planBtnActive,
+                                (isBusy || processingPlan === plan.id) && styles.disabled,
                             ]}
                         >
                             <Text style={styles.planBtnText}>
-                                {activePlan === plan.id && planStatus === 'ACTIVE' ? 'Active' : 'Select'}
+                                {processingPlan === plan.id
+                                    ? 'Processing…'
+                                    : isActive(plan.id)
+                                        ? 'Active'
+                                        : 'Upgrade'}
                             </Text>
                         </TouchableOpacity>
                     </View>
                 </GlassCard>
             ))}
 
-            <Text style={styles.sectionTitle}>Payment History</Text>
+            {/* Payment history */}
+            <Text style={[styles.sectionTitle, { marginTop: Spacing['4'] }]}>Payment History</Text>
             <FlatList
                 data={Array.isArray(history) ? history : []}
-                keyExtractor={(item: any, idx) => item.intentId ?? String(idx)}
+                keyExtractor={(item: any, idx: number) => item.intentId ?? String(idx)}
                 refreshing={isLoading}
                 onRefresh={refetch}
                 contentContainerStyle={styles.historyList}
@@ -120,12 +200,16 @@ export const SubscriptionScreen: React.FC<ProfileScreenProps<'Subscription'>> = 
                 }
                 renderItem={({ item }: { item: any }) => (
                     <GlassCard style={styles.historyCard}>
-                        <Text style={styles.historyTitle}>{item.plan} • {item.provider}</Text>
+                        <Text style={styles.historyTitle}>
+                            {item.plan} · {item.provider}
+                        </Text>
                         <Text style={styles.historyMeta}>
-                            ₹{((item.amountPaise ?? 0) / 100).toFixed(0)} • {item.status}
+                            ₹{((item.amountPaise ?? 0) / 100).toFixed(0)} · {item.status}
                         </Text>
                         {item.createdAt && (
-                            <Text style={styles.historyMeta}>{new Date(item.createdAt).toLocaleString()}</Text>
+                            <Text style={styles.historyMeta}>
+                                {new Date(item.createdAt).toLocaleDateString()}
+                            </Text>
                         )}
                     </GlassCard>
                 )}
@@ -142,13 +226,13 @@ const styles = StyleSheet.create({
         paddingTop: Spacing['4'],
         marginBottom: Spacing['4'],
     },
-    back: { color: Colors.primaryLight, fontSize: Typography.fontSize.base },
-    title: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '700' },
+    back:    { color: Colors.primaryLight, fontSize: Typography.fontSize.base },
+    title:   { color: Colors.textPrimary,  fontSize: Typography.fontSize.lg,   fontWeight: '700' },
     refresh: { color: Colors.textSecondary, fontSize: Typography.fontSize.lg },
-    statusCard: { marginBottom: Spacing['4'] },
+    statusCard:  { marginBottom: Spacing['4'] },
     statusTitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
-    statusPlan: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '700', marginTop: 4 },
-    statusMeta: { color: Colors.textMuted, fontSize: Typography.fontSize.xs, marginTop: 2 },
+    statusPlan:  { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '700', marginTop: 4 },
+    statusMeta:  { color: Colors.textMuted, fontSize: Typography.fontSize.xs, marginTop: 2 },
     cancelBtn: {
         marginTop: Spacing['3'],
         alignSelf: 'flex-start',
@@ -167,21 +251,23 @@ const styles = StyleSheet.create({
         marginBottom: Spacing['2'],
     },
     planCard: { marginBottom: Spacing['2'] },
-    planRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    planName: { color: Colors.textPrimary, fontSize: Typography.fontSize.base, fontWeight: '600' },
-    planPrice: { color: Colors.textMuted, fontSize: Typography.fontSize.xs, marginTop: 2 },
+    planRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    planName:  { color: Colors.textPrimary, fontSize: Typography.fontSize.base, fontWeight: '600' },
+    planPrice: { color: Colors.textMuted,   fontSize: Typography.fontSize.xs,   marginTop: 2 },
     planBtn: {
         backgroundColor: Colors.primary,
         borderRadius: Radius.full,
         paddingHorizontal: Spacing['3'],
         paddingVertical: Spacing['2'],
     },
-    planBtnActive: { backgroundColor: `${Colors.success}66` },
-    planBtnText: { color: '#fff', fontSize: Typography.fontSize.xs, fontWeight: '600' },
-    historyList: { gap: Spacing['2'], paddingBottom: Spacing['8'] },
-    historyCard: { marginBottom: Spacing['2'] },
-    historyTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.sm, fontWeight: '600' },
-    historyMeta: { color: Colors.textMuted, fontSize: Typography.fontSize.xs, marginTop: 2 },
-    emptyText: { color: Colors.textMuted, fontSize: Typography.fontSize.sm },
-    disabled: { opacity: 0.5 },
+    planBtnActive:  { backgroundColor: `${Colors.success}66` },
+    planBtnText:    { color: '#fff', fontSize: Typography.fontSize.xs, fontWeight: '600' },
+    historyList:    { gap: Spacing['2'], paddingBottom: Spacing['8'] },
+    historyCard:    { marginBottom: Spacing['2'] },
+    historyTitle:   { color: Colors.textPrimary, fontSize: Typography.fontSize.sm, fontWeight: '600' },
+    historyMeta:    { color: Colors.textMuted, fontSize: Typography.fontSize.xs, marginTop: 2 },
+    emptyText:      { color: Colors.textMuted, fontSize: Typography.fontSize.sm },
+    disabled:       { opacity: 0.5 },
 });
+
+

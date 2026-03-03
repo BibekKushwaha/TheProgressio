@@ -14,6 +14,7 @@ import rotationRouter from "./routes/rotation.route.js";
 import whatsappRouter from "./routes/whatsapp.route.js";
 import attendanceRouter from "./routes/attendance.route.js";
 import paymentRouter from "./routes/payment.route.js";
+import revenueRouter from "./routes/revenue.route.js";
 import syncRouter from "./routes/sync.route.js";
 import notificationRouter from "./routes/notification.route.js";
 import noteRouter from "./routes/note.route.js";
@@ -24,6 +25,7 @@ import { shutdownProducer } from "./services/queue.service.js";
 import { runSilentWatchSweep } from "./services/whatsapp-watch.service.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { initPushWorker } from "./workers/push.worker.js";
+import { startRenewalWorker, stopRenewalWorker } from "./services/renewal.service.js";
 
 export const app = express();
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL ?? "http://localhost:3000";
@@ -62,6 +64,7 @@ app.get("/", (_req, res) => {
 app.use("/api/integrations/whatsapp", whatsappRouter);
 app.use("/api/attendance", isAuth, enforceReadOnlyWrites(), attendanceRouter);
 app.use("/api/payments", paymentRouter);
+app.use("/api/revenue",  revenueRouter);
 app.use("/api/sync", isAuth, enforceReadOnlyWrites(), syncRouter);
 app.use("/api/notifications", isAuth, enforceReadOnlyWrites(), notificationRouter);
 app.use("/api/tasks", isAuth, enforceReadOnlyWrites(), taskRouter);
@@ -84,6 +87,11 @@ const PORT = process.env.PORT || 4001;
 const pushWorker = initPushWorker();
 
 if (process.env.NODE_ENV !== 'test') {
+    // Start renewal + retry workers (gracefully skip if Redis is unavailable)
+    startRenewalWorker().catch((err) => {
+        console.warn('[renewal] worker failed to start (Redis unavailable?)', err?.message ?? err);
+    });
+
     if (process.env.WHATSAPP_SILENT_WATCH_CRON_ENABLED === 'true') {
         const intervalMinutes = Number(process.env.WHATSAPP_SILENT_WATCH_INTERVAL_MINUTES || 60);
         setInterval(() => {
@@ -101,6 +109,7 @@ if (process.env.NODE_ENV !== 'test') {
         console.log("Shutting down Planner Service...");
         await shutdownProducer();
         if (pushWorker) await pushWorker.close();
+        await stopRenewalWorker().catch(() => null);
         process.exit(0);
     };
 

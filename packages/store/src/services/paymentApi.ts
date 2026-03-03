@@ -25,10 +25,14 @@ export interface BillingProfile {
 
 export interface PaymentIntent {
   intentId: string;
-  paymentRef: string;
+  /** Razorpay order ID — pass to Razorpay Checkout as `order_id` */
+  orderId: string;
+  /** Razorpay public key — pass to Razorpay Checkout as `key` */
+  keyId: string;
   plan: BillingPlan;
   provider: PaymentProvider;
   amountPaise: number;
+  currency: string;
   status: string;
 }
 
@@ -42,16 +46,18 @@ export interface CreateOrderResponse {
   intent: PaymentIntent;
 }
 
+/** Fields returned by Razorpay Checkout handler callback */
 export interface VerifyPaymentRequest {
-  intentId: string;
-  paymentRef: string;
-  status?: 'PENDING' | 'SUCCESS' | 'FAILED';
-  payload?: string;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
 }
 
 export interface VerifyPaymentResponse {
-  message: string;
-  intent: PaymentIntent;
+  verified: boolean;
+  idempotent: boolean;
+  orderId: string;
+  plan: BillingPlan | null;
 }
 
 export type SubscriptionStatus = BillingProfile;
@@ -64,14 +70,6 @@ export interface PaymentRecord {
   amountPaise: number;
   status: string;
   createdAt?: string;
-}
-
-export interface UpiCollectResponse {
-  intentId: string;
-  paymentRef: string;
-  status: string;
-  upiId: string;
-  deepLink: string;
 }
 
 export const paymentApi = createApi({
@@ -105,17 +103,6 @@ export const paymentApi = createApi({
       }),
       invalidatesTags: ['Payments'],
     }),
-    createUpiCollect: builder.mutation<
-      { message: string; collect: UpiCollectResponse },
-      { intentId: string; upiId: string }
-    >({
-      query: (body) => ({
-        url: '/payments/upi/collect',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['Payments'],
-    }),
     createOrder: builder.mutation<CreateOrderResponse, CreateOrderRequest>({
       query: (body) => ({
         url: '/payments/intents',
@@ -131,7 +118,11 @@ export const paymentApi = createApi({
       query: (body) => ({
         url: '/payments/verify',
         method: 'POST',
-        body,
+        body: {
+          razorpayOrderId:   body.razorpayOrderId,
+          razorpayPaymentId: body.razorpayPaymentId,
+          razorpaySignature: body.razorpaySignature,
+        },
       }),
       invalidatesTags: ['Payments'],
     }),
@@ -150,8 +141,8 @@ export const paymentApi = createApi({
     }),
     getPaymentHistory: builder.query<PaymentRecord[], void>({
       query: () => '/payments/history',
-      transformResponse: (response: { items?: PaymentRecord[] } | PaymentRecord[]) =>
-        Array.isArray(response) ? response : response.items ?? [],
+      transformResponse: (response: { payments?: PaymentRecord[] } | PaymentRecord[]) =>
+        Array.isArray(response) ? response : response.payments ?? [],
       providesTags: ['Payments'],
     }),
   }),
@@ -160,7 +151,6 @@ export const paymentApi = createApi({
 export const {
   useGetBillingProfileQuery,
   useCreatePaymentIntentMutation,
-  useCreateUpiCollectMutation,
   useCreateOrderMutation,
   useVerifyPaymentMutation,
   useGetSubscriptionStatusQuery,

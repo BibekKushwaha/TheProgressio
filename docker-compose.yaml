@@ -1,48 +1,157 @@
 # ── Usage examples ─────────────────────────────────────────────────────
 # Start everything:    docker compose up -d
-# Infra only:          docker compose up -d redis postgres
+# Infra only:          docker compose up -d redis postgres pgbouncer
 # Single service:      docker compose up -d analytics-service
-# With backups:         docker compose --profile backup up -d
+# With backups:        docker compose --profile backup up -d
+# ──────────────────────────────────────────────────────────────────────
+#
+# 50K-Scale Connection Pool Model (Step 6):
+#   Postgres max_connections: 200 (configured via command flags below)
+#   PgBouncer pool_size: 25 per service, transaction mode
+#   4 services × 25 = 100 DB connections max (within the 200 limit)
+#   With BullMQ workers + admin headroom → ~200 total peak connections
+#
+# Redis Memory Model (Step 7):
+#   Session cache: ~20K active users × 1KB = ~20MB
+#   Analytics cache: ~50K users × 5KB = 250MB theoretical max
+#   With LRU eviction at 256MB limit: only hot users stay in cache
+#   TTLs prevent unbounded growth:
+#     - Focus score: 60s
+#     - Dashboard BFF: 120s
+#     - Overview: 120s
+#     - Strategic: 5min
+#     - SRL weekly: 5min
+#     - Notification intel: 1h
 # ──────────────────────────────────────────────────────────────────────
 
 services:
   # ── Infrastructure ────────────────────────────────────────────────────
+
   redis:
     image: redis:7-alpine
-    # Enforce allkeys-lru so all keys (including habit XP / heatmap cache keys)
-    # are eligible for LRU eviction once the memory limit is reached.
-    # 128 MB is chosen to hold ~500 k concurrent user caches comfortably.
+    # 50K-Scale Redis config (Step 7):
+    #   - allkeys-lru: ALL keys eligible for eviction when memory limit hit.
+    #     This is critical — without this, analytics cache keys fill memory
+    #     until Redis returns OOM errors on write.
+    #   - maxmemory 256mb: Covers ~50K active analytical sessions (5KB each)
+    #     with LRU eviction trimming the least-recently-used users.
+    #   - lazyfree-lazy-eviction: Evictions happen in background thread,
+    #     preventing latency spikes on the main Redis thread.
+    #   - save "": Disable RDB snapshots (pure cache, no durability needed)
+    #   - appendonly no: No AOF either — cache is reconstructable from DB.
     command: >
       redis-server
-      --maxmemory 128mb
+      --maxmemory 256mb
       --maxmemory-policy allkeys-lru
+      --lazyfree-lazy-eviction yes
+      --lazyfree-lazy-expire yes
       --save ""
+      --appendonly no
+      --tcp-keepalive 60
+      --timeout 300
     ports:
       - "127.0.0.1:${REDIS_HOST_PORT:-6380}:6379"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
-          memory: 128m
-          cpus: '0.25'
+          memory: 280m   # 256MB Redis + 24MB overhead
+          cpus: '0.50'
 
   # postgres:
   #   image: postgres:15-alpine
   #   ports:
   #     - "127.0.0.1:5432:5432"
   #   environment:
-  #     POSTGRES_PASSWORD: password
-  #     POSTGRES_DB: transition
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+  #     POSTGRES_DB: ${POSTGRES_DB:-transition}
+  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #   # 50K-Scale Postgres tuning:
+  #   #   max_connections=200: Supports PgBouncer pool + direct admin connections
+  #   #   shared_buffers=256MB: Cache for hot index pages (analytics queries)
+  #   #   work_mem=4MB: Per-query sort/hash memory (safe for concurrent analytics)
+  #   #   effective_cache_size=1GB: Hint to planner on available OS cache
+  #   command: >
+  #     postgres
+  #     -c max_connections=200
+  #     -c shared_buffers=256MB
+  #     -c work_mem=4MB
+  #     -c effective_cache_size=1GB
+  #     -c maintenance_work_mem=64MB
+  #     -c checkpoint_completion_target=0.9
+  #     -c random_page_cost=1.1
+  #     -c log_min_duration_statement=500
   #   volumes:
   #     - pgdata:/var/lib/postgresql/data
   #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-transition}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
   #   deploy:
   #     resources:
   #       limits:
   #         memory: 512m
-  #         cpus: '0.50'
+  #         cpus: '1.00'
 
-  # # ── Microservices ─────────────────────────────────────────────────────
+  # ── PgBouncer — Connection Pooler (Step 6) ────────────────────────────
+  #
+  # Why PgBouncer:
+  #   Without pooling: 4 services × N threads → N connections at once.
+  #   At 50K users with peak analytics load, connections can spike to 500+.
+  #   Postgres crashes beyond max_connections (200).
+  #
+  #   PgBouncer pools connections in TRANSACTION mode:
+  #   Each service gets a pool of 25 server-side connections.
+  #   Clients (app servers) can have thousands of "connections" to PgBouncer
+  #   which PgBouncer multiplexes down to 25 real Postgres connections per service.
+  #
+  # Pool math:
+  #   4 services × pool_size=25 = 100 DB connections max
+  #   + 20 reserve for admin/migrations = 120 total
+  #   Postgres max_connections=200 → safe headroom
+  # pgbouncer:
+  #   image: bitnami/pgbouncer:latest
+  #   ports:
+  #     - "127.0.0.1:5433:5432"  # App services connect to port 5433
+  #   environment:
+  #     POSTGRESQL_HOST: postgres
+  #     POSTGRESQL_PORT: 5432
+  #     POSTGRESQL_USERNAME: ${POSTGRES_USER:-postgres}
+  #     POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD:-password}
+  #     POSTGRESQL_DATABASE: ${POSTGRES_DB:-transition}
+  #     PGBOUNCER_POOL_MODE: transaction       # Best for analytics workloads
+  #     PGBOUNCER_MAX_CLIENT_CONN: 1000        # Max simultaneous app connections
+  #     PGBOUNCER_DEFAULT_POOL_SIZE: 25        # Server-side connections per database
+  #     PGBOUNCER_RESERVE_POOL_SIZE: 5         # Extra connections for burst
+  #     PGBOUNCER_RESERVE_POOL_TIMEOUT: 3      # Wait 3s before using reserve pool
+  #     PGBOUNCER_SERVER_IDLE_TIMEOUT: 600     # Release idle connections after 10min
+  #     PGBOUNCER_CLIENT_IDLE_TIMEOUT: 300     # Disconnect idle clients after 5min
+  #     PGBOUNCER_LOG_CONNECTIONS: 0
+  #     PGBOUNCER_LOG_DISCONNECTIONS: 0
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U ${POSTGRES_USER:-postgres}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 64m
+  #         cpus: '0.25'
+
+  # ── Microservices ─────────────────────────────────────────────────────
+
   # analytics-service:
   #   build:
   #     context: .
@@ -53,19 +162,33 @@ services:
   #     - "4003:4003"
   #   env_file: ./apps/analytics-service/.env
   #   environment:
-  #     - NODE_ENV=development
+  #     - NODE_ENV=production
   #     - PORT=4003
-  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+  #     # Connect through PgBouncer (port 5433) instead of direct Postgres
+  #     # This applies the connection pooling from Step 6 to all queries.
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@pgbouncer:5432/${POSTGRES_DB:-transition}
   #     - REDIS_HOST=redis
-  #   depends_on: [postgres, redis]
+  #     - REDIS_PORT=6379
+  #     - QUEUE_ENABLED=true
+  #     - EXPORT_CONCURRENCY=3
+  #     - EXPORT_DIR=/tmp/exports
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     pgbouncer:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
   #   restart: unless-stopped
   #   deploy:
+  #     replicas: 2         # Run 2 instances for load distribution
   #     resources:
   #       limits:
-  #         # Monte Carlo simulation is CPU-heavy; cap at 1 core to prevent
-  #         # runaway usage when QUEUE_ENABLED=false (synchronous fallback).
+  #         # Monte Carlo simulation is CPU-heavy; cap at 1.5 cores.
+  #         # At QUEUE_ENABLED=true the simulation runs in BullMQ (concurrency=2)
+  #         # so it doesn't block Express request processing.
   #         memory: 512m
-  #         cpus: '1.00'
+  #         cpus: '1.50'
 
   # auth-service:
   #   build:
@@ -77,11 +200,18 @@ services:
   #     - "4000:4000"
   #   env_file: ./apps/auth-service/.env
   #   environment:
-  #     - NODE_ENV=development
+  #     - NODE_ENV=production
   #     - PORT=4000
-  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@pgbouncer:5432/${POSTGRES_DB:-transition}
   #     - REDIS_HOST=redis
-  #   depends_on: [postgres, redis]
+  #     - REDIS_PORT=6379
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     pgbouncer:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
   #   restart: unless-stopped
   #   deploy:
   #     resources:
@@ -99,11 +229,18 @@ services:
   #     - "4002:4002"
   #   env_file: ./apps/habit-service/.env
   #   environment:
-  #     - NODE_ENV=development
+  #     - NODE_ENV=production
   #     - PORT=4002
-  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@pgbouncer:5432/${POSTGRES_DB:-transition}
   #     - REDIS_HOST=redis
-  #   depends_on: [postgres, redis]
+  #     - REDIS_PORT=6379
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     pgbouncer:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
   #   restart: unless-stopped
   #   deploy:
   #     resources:
@@ -121,11 +258,19 @@ services:
   #     - "4001:4001"
   #   env_file: ./apps/planner-service/.env
   #   environment:
-  #     - NODE_ENV=development
+  #     - NODE_ENV=production
   #     - PORT=4001
-  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/transition
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@pgbouncer:5432/${POSTGRES_DB:-transition}
   #     - REDIS_HOST=redis
-  #   depends_on: [postgres, redis]
+  #     - REDIS_PORT=6379
+  #     - QUEUE_ENABLED=true
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     pgbouncer:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
   #   restart: unless-stopped
   #   deploy:
   #     resources:
@@ -133,23 +278,25 @@ services:
   #         memory: 256m
   #         cpus: '0.50'
 
-  # # ── Database Backup ───────────────────────────────────────────────────
+  # # # ── Database Backup ───────────────────────────────────────────────────
   # pgbackup:
   #   profiles: ["backup"]
   #   image: prodrigestivill/postgres-backup-local:15
   #   restart: unless-stopped
   #   environment:
   #     - POSTGRES_HOST=postgres
-  #     - POSTGRES_DB=transition
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_PASSWORD=password
+  #     - POSTGRES_DB=${POSTGRES_DB:-transition}
+  #     - POSTGRES_USER=${POSTGRES_USER:-postgres}
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
   #     - SCHEDULE=@daily
   #     - BACKUP_KEEP_DAYS=7
   #     - BACKUP_KEEP_WEEKS=4
   #     - BACKUP_KEEP_MONTHS=6
   #   volumes:
   #     - pgbackups:/backups
-  #   depends_on: [postgres]
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
   #   deploy:
   #     resources:
   #       limits:

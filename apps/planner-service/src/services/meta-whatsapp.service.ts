@@ -1,3 +1,5 @@
+import { incrementWhatsAppMetric } from './whatsapp-audit.service.js';
+
 type MetaInteractiveButton = {
   id: string;
   title: string;
@@ -42,13 +44,16 @@ const postCloudMessage = async (payload: Record<string, unknown>): Promise<MetaC
 
   if (!response.ok) {
     const message = body?.error?.message || `Cloud API failed with status ${response.status}`;
+    incrementWhatsAppMetric('wa_outbound_failure');
     throw new Error(message);
   }
 
+  incrementWhatsAppMetric('wa_outbound_success');
   return body;
 };
 
 export const sendWhatsAppText = async (to: string, text: string): Promise<MetaCloudResponse> => {
+  incrementWhatsAppMetric('wa_outbound_text');
   return postCloudMessage({
     to,
     type: 'text',
@@ -62,6 +67,7 @@ export const sendWhatsAppTemplate = async (params: {
   languageCode?: string;
   bodyVariables?: string[];
 }): Promise<MetaCloudResponse> => {
+  incrementWhatsAppMetric('wa_outbound_template');
   const languageCode = params.languageCode || 'en';
   const variables = params.bodyVariables ?? [];
 
@@ -91,6 +97,7 @@ export const sendWhatsAppInteractiveButtons = async (params: {
   footer?: string;
   buttons: MetaInteractiveButton[];
 }): Promise<MetaCloudResponse> => {
+  incrementWhatsAppMetric('wa_outbound_interactive');
   return postCloudMessage({
     to: params.to,
     type: 'interactive',

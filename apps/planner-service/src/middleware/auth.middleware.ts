@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import crypto from "crypto";
+import { rateLimit } from "express-rate-limit";
 import { prisma } from "@repo/db";
 import ErrorHandler from "../utils/errorHandler.js";
 
@@ -17,6 +18,7 @@ export interface User {
     username: string;
     email: string;
     dailyGoalHours: number;
+    role: string; // "USER" | "ADMIN"
 }
 
 export interface AuthContext {
@@ -174,6 +176,7 @@ export const isAuth = async (
                 username: true,
                 email: true,
                 dailyGoalHours: true,
+                role: true,
             },
         });
 
@@ -219,4 +222,62 @@ export const enforceReadOnlyWrites: any = (arg1?: any, arg2?: any, arg3?: any) =
         return buildReadOnlyMiddleware()(arg1, arg2, arg3);
     }
     return buildReadOnlyMiddleware(arg1 as EnforceOptions | undefined);
+};
+
+// ---------------------------------------------------------------------------
+// isAdmin — must be chained AFTER isAuth
+// Passes only if req.user.role === "ADMIN".
+// ---------------------------------------------------------------------------
+
+export const isAdmin = (req: AuthenticatedRequest, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+        return next(new ErrorHandler(401, "Authentication required"));
+    }
+    if (req.user.role !== "ADMIN") {
+        return next(new ErrorHandler(403, "Admin access required"));
+    }
+    next();
+};
+
+// ---------------------------------------------------------------------------
+// adminRateLimit — strict rate limit for admin/revenue endpoints.
+// 60 req / 15 min per IP — prevents enumeration and scraping.
+// ---------------------------------------------------------------------------
+
+export const adminRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,   // 15 minutes
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+        // Key on authenticated user ID when available, fall back to IP
+        const userId = (req as AuthenticatedRequest).user?.id;
+        if (userId) return `admin:user:${userId}`;
+        const forwarded = req.headers["x-forwarded-for"];
+        const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(",")[0]?.trim();
+        return `admin:ip:${ip ?? req.socket.remoteAddress ?? "unknown"}`;
+    },
+    message: { message: "Too many admin requests — please slow down" },
+});
+
+// ---------------------------------------------------------------------------
+// requireAdminIp — optional IP allowlist.
+// Set ADMIN_IP_ALLOWLIST="1.2.3.4,5.6.7.8" in env to enable.
+// When the env var is absent or empty, the check is a no-op (pass-through).
+// ---------------------------------------------------------------------------
+
+export const requireAdminIp = (req: Request, _res: Response, next: NextFunction): void => {
+    const allowlist = process.env.ADMIN_IP_ALLOWLIST?.split(",").map((s) => s.trim()).filter(Boolean);
+    if (!allowlist || allowlist.length === 0) {
+        // No allowlist configured — restriction disabled
+        return next();
+    }
+    const forwarded = req.headers["x-forwarded-for"];
+    const clientIp  = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(",")[0]?.trim();
+    const remoteIp  = clientIp ?? req.socket?.remoteAddress ?? "";
+
+    if (!allowlist.includes(remoteIp)) {
+        return next(new ErrorHandler(403, "Access denied: IP not in admin allowlist"));
+    }
+    next();
 };

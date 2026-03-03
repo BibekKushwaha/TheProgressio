@@ -30,27 +30,37 @@ export function MorningBriefing() {
         [allTasks]
     );
 
-    const now = new Date();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const startOfToday = useMemo(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()), []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const endOfToday = useMemo(() => new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), []);
+    // ── Date boundaries ────────────────────────────────────────────────────
+    // INTENTIONALLY NOT memoized with []. The previous pattern:
+    //
+    //   const startOfToday = useMemo(() => new Date(...), []);
+    //
+    // froze the boundary at component-mount time. A user who leaves the
+    // dashboard open past midnight would see tasks mis-categorised for the
+    // entire next session. Since these boundaries are recomputed from
+    // `new Date()` they are correct for the current calendar day on every
+    // render. The cost is a single `new Date()` call — negligible.
+    const todayStart = (() => {
+        const d = new Date();
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    })();
+    const todayEnd = todayStart + 24 * 60 * 60 * 1000;
 
     const overdueTasks = useMemo(() => pendingTasks.filter(t => {
         if (!t.dueDate) return false;
-        return new Date(t.dueDate).getTime() < startOfToday.getTime();
-    }), [pendingTasks, startOfToday]);
+        return new Date(t.dueDate).getTime() < todayStart;
+    }), [pendingTasks, todayStart]);
 
     const dueTodayTasks = useMemo(() => pendingTasks.filter(t => {
         if (!t.dueDate) return false;
         const due = new Date(t.dueDate).getTime();
-        return due >= startOfToday.getTime() && due < endOfToday.getTime();
-    }), [pendingTasks, startOfToday, endOfToday]);
+        return due >= todayStart && due < todayEnd;
+    }), [pendingTasks, todayStart, todayEnd]);
 
     const upcomingTasks = useMemo(() => pendingTasks.filter(t => {
         if (!t.dueDate) return false;
-        return new Date(t.dueDate).getTime() >= endOfToday.getTime();
-    }), [pendingTasks, endOfToday]);
+        return new Date(t.dueDate).getTime() >= todayEnd;
+    }), [pendingTasks, todayEnd]);
 
     // Compute Top 3 Priority Tasks: due today first, then upcoming (never include overdue)
     const top3Tasks = useMemo(() => [...dueTodayTasks, ...upcomingTasks]
@@ -64,7 +74,7 @@ export function MorningBriefing() {
             return 0;
         })
         .slice(0, 3),
-    [dueTodayTasks, upcomingTasks]);
+        [dueTodayTasks, upcomingTasks]);
 
     if (isLoading) {
         return (

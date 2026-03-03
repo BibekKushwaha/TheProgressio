@@ -9,18 +9,12 @@ import { Clock, CheckCircle, Target, TrendingUp } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 import {
-  TaskStatus,
   useGetDailySummaryQuery,
   useGetDashboardSummaryQuery,
   useGetHabitsQuery,
-  useGetTasksQuery,
   useGetTaskMetricsQuery,
-  useLocalTasks,
 } from "@repo/store";
-import { useMemo, useState, useCallback } from "react";
-import { exportTasksToCSV, downloadCSV } from "@/lib/exportUtils";
-import { mergeTaskSources } from "@/lib/mergeTasks";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
 
 export default function AnalyticsOverviewPage() {
   const [pastDays, setPastDays] = useState("1");
@@ -47,16 +41,6 @@ export default function AnalyticsOverviewPage() {
     isLoading: isTaskMetricsLoading,
   } = useGetTaskMetricsQuery(undefined);
 
-  // Full task list only for the table render and CSV export.
-  const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 500 }), []);
-  const { data: allServerTasks = [] } = useGetTasksQuery(allTasksQueryArgs);
-  const { tasks: cachedTasks } = useLocalTasks();
-
-  const mergedTasks = useMemo(
-    () => mergeTaskSources(allServerTasks ?? [], cachedTasks ?? []),
-    [allServerTasks, cachedTasks]
-  );
-
   const {
     data: habitsResponse,
     isLoading: isHabitsLoading
@@ -64,62 +48,19 @@ export default function AnalyticsOverviewPage() {
 
   const habits = useMemo(() => habitsResponse?.habits || [], [habitsResponse]);
 
-  // Prefer client-side merged counts (server + local) so analytics reflect what the UI shows.
-  const taskMetrics = useMemo(() => {
-    // If we have merged tasks (server + local), compute counts locally.
-    if (mergedTasks && mergedTasks.length > 0) {
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-
-      let total = 0;
-      let pending = 0;
-      let inProgress = 0;
-      let completed = 0;
-      let highPriority = 0;
-      let mediumPriority = 0;
-      let lowPriority = 0;
-      let overdue = 0;
-      let dueToday = 0;
-      let withoutDueDate = 0;
-
-      mergedTasks.forEach((t) => {
-        total += 1;
-        const status = t.status;
-        if (status === TaskStatus.PENDING) pending += 1;
-        else if (status === TaskStatus.IN_PROGRESS) inProgress += 1;
-        else if (status === TaskStatus.COMPLETED) completed += 1;
-
-        const priority = t.priority;
-        if (priority === 'HIGH') highPriority += 1;
-        else if (priority === 'MEDIUM') mediumPriority += 1;
-        else if (priority === 'LOW') lowPriority += 1;
-
-        if (!t.dueDate) withoutDueDate += 1;
-        else {
-          const due = new Date(t.dueDate);
-          if (t.status !== TaskStatus.COMPLETED && due < now) overdue += 1;
-          if (t.status !== TaskStatus.COMPLETED && due >= todayStart && due < todayEnd) dueToday += 1;
-        }
-      });
-
-      return { total, pending, inProgress, completed, highPriority, mediumPriority, lowPriority, withoutDueDate, overdue, dueToday };
-    }
-
-    // Fallback to lightweight server metrics when merged data isn't ready yet.
-    return {
-      total: taskMetricsData?.total ?? 0,
-      pending: taskMetricsData?.pending ?? 0,
-      inProgress: taskMetricsData?.inProgress ?? 0,
-      completed: taskMetricsData?.completed ?? 0,
-      highPriority: taskMetricsData?.highPriority ?? 0,
-      mediumPriority: taskMetricsData?.mediumPriority ?? 0,
-      lowPriority: taskMetricsData?.lowPriority ?? 0,
-      withoutDueDate: taskMetricsData?.withoutDueDate ?? 0,
-      overdue: taskMetricsData?.overdue ?? 0,
-      dueToday: taskMetricsData?.dueToday ?? 0,
-    };
-  }, [mergedTasks, taskMetricsData]);
+  // Use server-computed metrics directly — avoids fetching 500 task objects client-side.
+  const taskMetrics = {
+    total: taskMetricsData?.total ?? 0,
+    pending: taskMetricsData?.pending ?? 0,
+    inProgress: taskMetricsData?.inProgress ?? 0,
+    completed: taskMetricsData?.completed ?? 0,
+    highPriority: taskMetricsData?.highPriority ?? 0,
+    mediumPriority: taskMetricsData?.mediumPriority ?? 0,
+    lowPriority: taskMetricsData?.lowPriority ?? 0,
+    withoutDueDate: taskMetricsData?.withoutDueDate ?? 0,
+    overdue: taskMetricsData?.overdue ?? 0,
+    dueToday: taskMetricsData?.dueToday ?? 0,
+  };
 
   const habitMetrics = useMemo(() => {
     const total = habits.length;
@@ -145,30 +86,6 @@ export default function AnalyticsOverviewPage() {
       longestStreak,
     };
   }, [habits]);
-
-  const sortedTasks = useMemo(() => {
-    const rank: Record<string, number> = {
-      [TaskStatus.PENDING]: 0,
-      [TaskStatus.IN_PROGRESS]: 1,
-      [TaskStatus.COMPLETED]: 2,
-    };
-    return [...mergedTasks].sort((left, right) => {
-      const leftRank = rank[left.status] ?? 99;
-      const rightRank = rank[right.status] ?? 99;
-      if (leftRank !== rightRank) return leftRank - rightRank;
-
-      const leftDue = left.dueDate ? new Date(left.dueDate).getTime() : Number.POSITIVE_INFINITY;
-      const rightDue = right.dueDate ? new Date(right.dueDate).getTime() : Number.POSITIVE_INFINITY;
-      return leftDue - rightDue;
-    });
-  }, [mergedTasks]);
-
-
-  const handleExportReport = useCallback(() => {
-    const csvContent = exportTasksToCSV(sortedTasks);
-    downloadCSV(csvContent, `analytics_tasks_${new Date().toISOString().slice(0, 10)}.csv`);
-    toast.success("Analytics exported to CSV successfully!");
-  }, [sortedTasks]);
 
   const isWeekly = pastDays === "7";
   const timeLabel = isWeekly ? 'Weekly' : 'Today\'s';
@@ -232,7 +149,6 @@ export default function AnalyticsOverviewPage() {
       <AnalyticsHeader
         pastDays={pastDays}
         setPastDays={setPastDays}
-        onExport={handleExportReport}
       />
       <StatCards items={stats} />
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

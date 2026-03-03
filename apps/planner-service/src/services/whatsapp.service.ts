@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { prisma } from "@repo/db";
+import { consumeRateLimit, getRedisClient } from "@repo/cache";
 
 type PlainObject = Record<string, unknown>;
 
@@ -17,6 +18,10 @@ export interface WhatsAppInbound {
     confidence: number | null;
     interactiveReplyId: string | null;
     interactiveReplyTitle: string | null;
+    /** wamid from Meta Cloud API — used for idempotency deduplication */
+    messageId: string | null;
+    /** Unix epoch seconds from Meta message timestamp — used for replay-attack detection */
+    messageTimestamp: number | null;
 }
 
 const asObject = (value: unknown): PlainObject | null => {
@@ -72,6 +77,8 @@ export const extractWhatsAppInbound = (payload: unknown): WhatsAppInbound => {
             confidence: null,
             interactiveReplyId: null,
             interactiveReplyTitle: null,
+            messageId: null,
+            messageTimestamp: null,
         };
     }
 
@@ -106,6 +113,9 @@ export const extractWhatsAppInbound = (payload: unknown): WhatsAppInbound => {
             confidence: directConfidence,
             interactiveReplyId: directInteractiveReplyId,
             interactiveReplyTitle: directInteractiveReplyTitle,
+            // Internal callers don't carry wamid / timestamp
+            messageId: null,
+            messageTimestamp: null,
         };
     }
 
@@ -144,6 +154,15 @@ export const extractWhatsAppInbound = (payload: unknown): WhatsAppInbound => {
     const interactiveReplyTitle =
         (buttonReply ? toStringValue(buttonReply.title) : null) ??
         (listReply ? toStringValue(listReply.title) : null);
+    // wamid — unique message identifier from Meta Cloud API
+    const messageId = firstMessage ? toStringValue(firstMessage.id) : null;
+    // Unix epoch seconds; Meta always provides this as a numeric string
+    const rawTs = firstMessage ? firstMessage.timestamp : null;
+    const messageTimestamp = typeof rawTs === "number"
+        ? rawTs
+        : typeof rawTs === "string" && rawTs.trim().length > 0
+            ? Number(rawTs)
+            : null;
 
     return {
         text: messageType === "text" ? text : null,
@@ -159,6 +178,8 @@ export const extractWhatsAppInbound = (payload: unknown): WhatsAppInbound => {
         confidence,
         interactiveReplyId,
         interactiveReplyTitle,
+        messageId,
+        messageTimestamp,
     };
 };
 
@@ -185,6 +206,180 @@ export const resolveWhatsAppUserId = async (params: {
     } catch (error) {
         console.error("[WhatsApp Service] DB lookup error:", error);
         return null;
+    }
+};
+
+// ─── Replay-attack / Idempotency helpers ────────────────────────────────────
+
+/** How many seconds old a Meta webhook timestamp may be before we treat it as a replay. */
+const WHATSAPP_TIMESTAMP_MAX_AGE_S = Number(
+    process.env.WHATSAPP_TIMESTAMP_MAX_AGE_S ?? "300",
+);
+
+/**
+ * Returns true when the message timestamp from Meta is outside the acceptable
+ * freshness window, indicating a potential replay attack.
+ *
+ * @param timestamp - Unix epoch SECONDS as reported by Meta (firstMessage.timestamp).
+ */
+export const isWhatsAppTimestampStale = (timestamp: number | null): boolean => {
+    if (timestamp === null || Number.isNaN(timestamp)) return false; // can't judge → allow through
+    const ageSecs = Math.abs(Date.now() / 1000 - timestamp);
+    return ageSecs > WHATSAPP_TIMESTAMP_MAX_AGE_S;
+};
+
+/**
+ * Returns true if this wamid has already been processed, preventing
+ * duplicate task creation on Meta webhook retries.
+ */
+export const isWhatsAppMessageAlreadyProcessed = async (
+    messageId: string,
+): Promise<boolean> => {
+    try {
+        const existing = await prisma.processedWhatsAppMessage.findUnique({
+            where: { messageId },
+            select: { messageId: true },
+        });
+        return existing !== null;
+    } catch (error) {
+        console.error("[WhatsApp] idempotency check failed:", error);
+        return false; // fail-open: better to risk a dup than drop a real message
+    }
+};
+
+/**
+ * Records a wamid as processed. Silently ignores unique-constraint violations
+ * so concurrent webhook deliveries for the same message ID are safe.
+ */
+export const markWhatsAppMessageProcessed = async (
+    messageId: string,
+): Promise<void> => {
+    try {
+        await prisma.processedWhatsAppMessage.create({ data: { messageId } });
+    } catch (error) {
+        const isAlreadyExists = (error as { code?: string } | null)?.code === "P2002";
+        if (!isAlreadyExists) {
+            console.error("[WhatsApp] failed to mark message processed:", error);
+        }
+    }
+};
+
+// ─── Per-phone rate limiter ──────────────────────────────────────────────────
+//
+// Limits how many inbound messages a single WhatsApp number can send within a
+// sliding window.  Uses the shared Redis-backed `consumeRateLimit` primitive so
+// limits are shared across all planner-service replicas in a cluster.
+//
+// Configurable via environment variables:
+//   WHATSAPP_INBOUND_RATE_LIMIT      — max messages per window (default 20)
+//   WHATSAPP_INBOUND_RATE_WINDOW_S   — window size in seconds  (default 60)
+
+/**
+ * Progressive throttle tier based on how close the phone is to the window limit.
+ *
+ *  0 → under 50 % of limit   — no action needed
+ *  1 → 50–74 % of limit      — inform the user they're sending quickly
+ *  2 → 75–89 % of limit      — ask the user to slow down
+ *  3 → 90 %+ / over limit    — hard block (allowed = false)
+ */
+export type RateLimitTier = 0 | 1 | 2 | 3;
+
+/** Check whether a phone number is within its inbound rate limit. Fail-open: if Redis is unreachable, allows the message through. */
+export const checkWhatsAppPhoneRateLimit = async (
+    phone: string,
+): Promise<{ allowed: boolean; remaining: number; resetAt: number; totalHits: number; throttleTier: RateLimitTier }> => {
+    const limit = Math.max(1, Number(process.env.WHATSAPP_INBOUND_RATE_LIMIT ?? "20"));
+    const windowSeconds = Math.max(1, Number(process.env.WHATSAPP_INBOUND_RATE_WINDOW_S ?? "60"));
+
+    try {
+        const result = await consumeRateLimit({
+            key: phone,
+            prefix: "wa:inbound",
+            limit,
+            windowSeconds,
+        });
+
+        const usageRatio = result.totalHits / limit;
+        const throttleTier: RateLimitTier =
+            !result.allowed || usageRatio >= 0.90 ? 3
+            : usageRatio >= 0.75                  ? 2
+            : usageRatio >= 0.50                  ? 1
+            : 0;
+
+        return { ...result, throttleTier };
+    } catch (error) {
+        console.error("[WhatsApp] Rate limit check failed (fail-open):", error);
+        return { allowed: true, remaining: limit, resetAt: Date.now() + windowSeconds * 1000, totalHits: 0, throttleTier: 0 };
+    }
+};
+
+// ─── Abuse detection ─────────────────────────────────────────────────────────
+//
+// Tracks "bad" signals from a phone number within a short window.  A signal is
+// recorded when:
+//   • The sender is not paired and sends non-pairing messages repeatedly
+//   • The message text is empty after injection-pattern sanitization
+//
+// When the counter reaches WHATSAPP_ABUSE_THRESHOLD the phone is placed in a
+// block list for WHATSAPP_ABUSE_BLOCK_S seconds (default 1 hour).
+//
+// All keys are scoped to `wa:abuse_*` so they don't pollute unrelated cache
+// namespaces.  Fail-open: Redis outages never block legitimate messages.
+
+const ABUSE_THRESHOLD    = Math.max(1, Number(process.env.WHATSAPP_ABUSE_THRESHOLD    ?? "8"));
+const ABUSE_WINDOW_S     = Math.max(1, Number(process.env.WHATSAPP_ABUSE_WINDOW_S     ?? "120"));
+const ABUSE_BLOCK_S      = Math.max(1, Number(process.env.WHATSAPP_ABUSE_BLOCK_S      ?? "3600"));
+
+/**
+ * Increment the abuse signal counter for a phone number and return whether the
+ * phone should now be blocked.  If the threshold is reached this call also
+ * persists the block entry in Redis.
+ */
+export const recordWhatsAppAbuseSignal = async (
+    phone: string,
+): Promise<{ abusive: boolean; reason: string | null }> => {
+    try {
+        const client = getRedisClient() as any;
+        const blockKey = `wa:abuse_block:${phone}`;
+        const countKey = `wa:abuse_count:${phone}`;
+
+        // Already blocked by a previous escalation?
+        const blocked = (await client.get(blockKey)) as string | null;
+        if (blocked) {
+            return { abusive: true, reason: "phone_blocked" };
+        }
+
+        const count: number = await client.incr(countKey);
+        if (count === 1) {
+            // Set the TTL on first increment so the counter self-expires.
+            await client.expire(countKey, ABUSE_WINDOW_S);
+        }
+
+        if (count >= ABUSE_THRESHOLD) {
+            // Escalate: place the phone in the block list.
+            await client.set(blockKey, "1", { ex: ABUSE_BLOCK_S });
+            return { abusive: true, reason: `flood_${count}_in_${ABUSE_WINDOW_S}s` };
+        }
+
+        return { abusive: false, reason: null };
+    } catch (error) {
+        console.error("[WhatsApp] Abuse signal recording failed (fail-open):", error);
+        return { abusive: false, reason: null };
+    }
+};
+
+/**
+ * Check whether a phone number currently has an active abuse block.
+ * This is the fast path — called before any processing so blocked phones
+ * are dropped with minimal overhead.
+ */
+export const isWhatsAppPhoneBlocked = async (phone: string): Promise<boolean> => {
+    try {
+        const client = getRedisClient() as any;
+        const blocked = (await client.get(`wa:abuse_block:${phone}`)) as string | null;
+        return Boolean(blocked);
+    } catch {
+        return false; // fail-open: Redis outage never blocks a real user
     }
 };
 

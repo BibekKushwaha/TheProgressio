@@ -18,6 +18,13 @@ vi.mock('../src/middleware/auth.middleware.js', () => ({
     enforceReadOnlyWrites: (_req: any, _res: any, next: any) => next(),
 }));
 
+// Mock internal middleware — bypass secret checks in test environment
+vi.mock('../src/middleware/internal.middleware.js', () => ({
+    requireInternalSignature: (_req: any, _res: any, next: any) => next(),
+    requireInternalDispatchAuth: (_req: any, _res: any, next: any) => next(),
+    requireInternalReadAuth: (_req: any, _res: any, next: any) => next(),
+}));
+
 // Mock streak service
 vi.mock('../src/services/streak.service.js', () => ({
     calculateGentleStreak: vi.fn().mockResolvedValue({

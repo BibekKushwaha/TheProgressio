@@ -41,6 +41,7 @@ export {
   selectCurrentUser,
   selectIsAuthenticated,
   selectAuthStatus,
+  selectIsAdmin,
 } from './slices/authSlice';
 export type { User } from './slices/authSlice';
 
@@ -389,7 +390,6 @@ export {
   paymentApi,
   useGetBillingProfileQuery,
   useCreatePaymentIntentMutation,
-  useCreateUpiCollectMutation,
   useCreateOrderMutation,
   useVerifyPaymentMutation,
   useGetSubscriptionStatusQuery,
@@ -402,7 +402,6 @@ export type {
   PaymentProvider,
   BillingProfile,
   PaymentIntent,
-  UpiCollectResponse,
   PlanId,
   PaymentMethod,
   CreateOrderRequest,
