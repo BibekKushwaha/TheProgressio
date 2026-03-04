@@ -1810,3 +1810,116 @@ export const logoutAllDevices = TryCatch(async (req, res) => {
 
   return res.json({ success: true, message: `${result.count} session(s) revoked`, count: result.count });
 });
+
+// ─── Admin bootstrap ─────────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/admin/promote
+ *
+ * Promotes an existing registered user to the ADMIN role.
+ * Requires the request header `x-admin-bootstrap-secret` to match
+ * the server-side env var `ADMIN_BOOTSTRAP_SECRET`.
+ *
+ * SECURITY: This endpoint is intentionally NOT protected by normal auth
+ * middleware — it uses the bootstrap secret instead, so it can be called
+ * before any admin exists in the system.  The secret must be long, random,
+ * and kept out of version control.
+ *
+ * Flow for creating the first admin:
+ *   1. Register a normal user  →  POST /api/auth/register
+ *   2. Call this endpoint      →  POST /api/auth/admin/promote
+ *   3. The user's role is set to "ADMIN" in the DB and cache is cleared
+ *
+ * Body:   { "email": "user@example.com" }
+ * Header: x-admin-bootstrap-secret: <ADMIN_BOOTSTRAP_SECRET>
+ */
+export const promoteToAdmin = TryCatch(async (req, res) => {
+  const secret = process.env.ADMIN_BOOTSTRAP_SECRET;
+  if (!secret) {
+    return res.status(503).json({
+      message: 'Admin bootstrap is not configured. Set ADMIN_BOOTSTRAP_SECRET env var.',
+    });
+  }
+
+  const provided = req.headers['x-admin-bootstrap-secret'];
+  if (!provided || provided !== secret) {
+    return res.status(403).json({ message: 'Invalid or missing x-admin-bootstrap-secret header.' });
+  }
+
+  const { email } = req.body as { email?: string };
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ message: 'email is required in the request body.' });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, username: true, role: true },
+  });
+  if (!user) {
+    return res.status(404).json({
+      message: 'User not found. Register the account normally first, then promote it.',
+    });
+  }
+
+  if (user.role === 'ADMIN') {
+    return res.json({ message: `${email} is already an ADMIN.`, userId: user.id });
+  }
+
+  await prisma.user.update({ where: { email }, data: { role: 'ADMIN' } });
+  await safeDeleteUserCache(user.id);
+
+  return res.status(200).json({
+    message: `${email} has been promoted to ADMIN.`,
+    userId: user.id,
+    username: user.username,
+  });
+});
+
+/**
+ * POST /api/auth/admin/demote
+ *
+ * Reverts an ADMIN back to the USER role.
+ * Same secret-header protection as /admin/promote.
+ *
+ * Body:   { "email": "admin@example.com" }
+ * Header: x-admin-bootstrap-secret: <ADMIN_BOOTSTRAP_SECRET>
+ */
+export const demoteFromAdmin = TryCatch(async (req, res) => {
+  const secret = process.env.ADMIN_BOOTSTRAP_SECRET;
+  if (!secret) {
+    return res.status(503).json({
+      message: 'Admin bootstrap is not configured. Set ADMIN_BOOTSTRAP_SECRET env var.',
+    });
+  }
+
+  const provided = req.headers['x-admin-bootstrap-secret'];
+  if (!provided || provided !== secret) {
+    return res.status(403).json({ message: 'Invalid or missing x-admin-bootstrap-secret header.' });
+  }
+
+  const { email } = req.body as { email?: string };
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ message: 'email is required in the request body.' });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, username: true, role: true },
+  });
+  if (!user) {
+    return res.status(404).json({ message: 'User not found.' });
+  }
+
+  if (user.role !== 'ADMIN') {
+    return res.json({ message: `${email} is not an ADMIN.`, userId: user.id });
+  }
+
+  await prisma.user.update({ where: { email }, data: { role: 'USER' } });
+  await safeDeleteUserCache(user.id);
+
+  return res.status(200).json({
+    message: `${email} has been demoted to USER.`,
+    userId: user.id,
+    username: user.username,
+  });
+});
