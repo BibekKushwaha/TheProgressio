@@ -712,6 +712,22 @@ export const loginUser = TryCatch(async (req, res) => {
         retryAfter: LOCKOUT_DURATION_MS / 1000,
       });
     }
+    // If the account was originally created via OAuth (e.g. Google), the stored
+    // password is a random server-generated value the user never set.  Give a
+    // clear, actionable error instead of the generic "Invalid credentials".
+    const linkedOauth = await (prisma as any).oAuthAccount?.findFirst?.({
+      where: { userId: user.id },
+      select: { provider: true },
+    });
+    if (linkedOauth?.provider) {
+      const providerName =
+        String(linkedOauth.provider).charAt(0).toUpperCase() +
+        String(linkedOauth.provider).slice(1);
+      return res.status(400).json({
+        message: `This account was created with ${providerName} Sign-In. Please use "Continue with ${providerName}" to log in, or click "Forgot Password" to set a password first.`,
+        oauthProvider: linkedOauth.provider as string,
+      });
+    }
     return res.status(400).json({ message: 'Invalid credentials' });
   }
 

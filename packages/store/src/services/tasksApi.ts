@@ -5,6 +5,8 @@ import { analyticsApi } from './analyticsApi';
 import { getFamilyShareToken, isAIAssistanceDisabled, isNativeRuntime, resolveServiceUrl } from '../runtime';
 import { getAccessTokenSync } from '../mobile-token-store';
 
+type EffortOption = '30m' | '1h' | '2h' | '4h+';
+
 const PLANNER_SERVICE_URL = resolveServiceUrl(
     process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL ?? process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL,
     'http://localhost:4001'
@@ -104,7 +106,7 @@ export interface Task {
     priority: Priority;
     dueDate: string | null;
     isRecurring: boolean;
-    effort: string | null;
+    effort: EffortOption | null;
     userId: string;
     categoryId: string | null;
     category?: Category | null;
@@ -120,7 +122,7 @@ export interface CreateTaskRequest {
     categoryId?: string;
     dueDate?: string;
     isRecurring?: boolean;
-    effort?: string;
+    effort?: EffortOption;
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
@@ -438,7 +440,7 @@ export const tasksApi = createApi({
             dueDate?: string;
             priority?: Priority;
             subject?: string;
-            effort?: string;
+            effort?: EffortOption;
             isRecurring?: boolean;
             type?: string;
         }, { text: string }>({

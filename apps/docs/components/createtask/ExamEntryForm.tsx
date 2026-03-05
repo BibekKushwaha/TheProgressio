@@ -4,6 +4,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TimePickerInput } from '@/components/ui/time-picker-input';
+import { CreateTaskDatePicker } from '@/components/createtask/CreateTaskDatePicker';
 import type { Subject } from '@repo/store';
 
 interface ExamEntryFormProps {
@@ -124,11 +125,9 @@ export function ExamEntryForm({
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                             <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Exam Date</Label>
-                            <Input
-                                type="date"
+                            <CreateTaskDatePicker
                                 value={dueDateValue}
-                                onChange={(e) => updateDueDateTime(e.target.value, dueTimeValue, true)}
-                                className="h-12 bg-white/5 border-white/10"
+                                onChange={(nextDate) => updateDueDateTime(nextDate, dueTimeValue, true)}
                             />
                         </div>
                         <div className="space-y-2">

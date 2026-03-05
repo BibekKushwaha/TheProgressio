@@ -26,7 +26,13 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
     const paramTaskTitle = searchParams.get('task') || searchParams.get('goal') || 'Deep Work Session';
-    const taskId = searchParams.get('taskId') || '';
+    const rawTaskId = searchParams.get('taskId');
+    const taskId = (() => {
+        const normalized = (rawTaskId || '').trim();
+        if (!normalized) return '';
+        if (['undefined', 'null', 'nan'].includes(normalized.toLowerCase())) return '';
+        return normalized;
+    })();
     const paramDuration = Number(searchParams.get('duration')) || 25;
     const intensityParam = Number(searchParams.get('intensity')) || 75;
     const avoidBackToBack = searchParams.get('avoidBackToBack') !== '0';
@@ -128,8 +134,11 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
                     localStorage.setItem('activeFocusSessionId', response.session.sessionId);
                 }
             } catch (error: unknown) {
-                const err = error as { data?: { message?: string }; message?: string };
-                console.error('Failed to start live focus session:', err?.data?.message || err?.message || error);
+                const err = error as { status?: number; data?: { message?: string }; message?: string };
+                // A stale/invalid taskId can legitimately 404 (e.g. deleted task or bad deep-link).
+                if (err?.status !== 404) {
+                    console.error('Failed to start live focus session:', err?.data?.message || err?.message || error);
+                }
             }
         };
 

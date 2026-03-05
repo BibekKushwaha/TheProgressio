@@ -35,8 +35,8 @@ export function FilterDropdown<T extends string>({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
-                    className="flex items-center gap-2 px-4 py-3 bg-white/5 border border-white/10
-                     rounded-xl hover:bg-white/10 transition-all duration-300"
+                    className="flex items-center justify-center gap-2 px-4 bg-white/5 border border-white/10
+                     rounded-xl hover:bg-white/10 transition-all duration-300 h-12"
                 >
                     {icon}
                     <span className="hidden md:inline text-sm text-white">

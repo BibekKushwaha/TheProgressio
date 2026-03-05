@@ -265,7 +265,7 @@ export const TaskDetailScreen: React.FC<TasksScreenProps<'TaskDetail'>> = ({ nav
                     )}
                     {effortLevel && (
                         <View style={styles.metaChip}>
-                            <Text style={styles.metaText}>⚡ Effort {effortLevel}/5</Text>
+                            <Text style={styles.metaText}>⚡ Effort: {effortLevel}</Text>
                         </View>
                     )}
                 </View>

@@ -22,6 +22,7 @@ import {
     usePreviewSubtasksMutation,
     useSmartCreateTaskMutation,
 } from '@repo/store';
+import { EFFORT_OPTIONS } from '@repo/schemas/task';
 import type { TasksScreenProps } from '../../navigation/types';
 import { sanitizeTaskId } from '../../utils/task';
 import { isOnline, localCategories, localTasks } from '../../native/localDbAdapter';
@@ -34,11 +35,10 @@ const PRIORITY_OPTIONS: Array<{ label: string; value: PriorityEnum; color: strin
     { label: 'Urgent', value: PriorityEnum.HIGH, color: Colors.error },
 ];
 
-const EFFORT_OPTIONS = ['30m', '1h', '2h+'];
-
 type EntryType = 'task' | 'exam';
 type ExamSubMode = 'schedule' | 'result';
 type ParsedMeta = { subject?: string; date?: string; time?: string };
+type EffortOption = (typeof EFFORT_OPTIONS)[number];
 
 export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ navigation, route }) => {
     const editingTaskId = sanitizeTaskId((route.params as any)?.taskId);
@@ -52,7 +52,7 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<PriorityEnum>(PriorityEnum.LOW);
-    const [effort, setEffort] = useState('1h');
+    const [effort, setEffort] = useState<EffortOption>('1h');
     const [isRecurring, setIsRecurring] = useState(false);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(
         (route?.params as any)?.prefillSubjectId
@@ -85,7 +85,11 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
         setTitle(task.title ?? '');
         setDescription(task.description ?? '');
         setPriority(task.priority ?? PriorityEnum.LOW);
-        setEffort(task.effort ?? '1h');
+        if (task.effort && EFFORT_OPTIONS.includes(task.effort as EffortOption)) {
+            setEffort(task.effort as EffortOption);
+        } else {
+            setEffort('1h');
+        }
         setIsRecurring(Boolean(task.isRecurring));
         setSelectedCategoryId(task.categoryId ?? undefined);
         setParsedDueDateISO(task.dueDate ?? null);
@@ -122,8 +126,8 @@ export const CreateTaskScreen: React.FC<TasksScreenProps<'CreateTask'>> = ({ nav
                 if (result?.priority) {
                     setPriority(result.priority);
                 }
-                if (result?.effort) {
-                    setEffort(result.effort);
+                if (result?.effort && EFFORT_OPTIONS.includes(result.effort as EffortOption)) {
+                    setEffort(result.effort as EffortOption);
                 }
                 if (result?.isRecurring !== undefined) {
                     setIsRecurring(result.isRecurring);

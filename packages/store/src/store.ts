@@ -33,9 +33,15 @@ const rtkErrorLogger: Middleware = () => (next) => (action: unknown) => {
     };
     const status = a.payload?.status;
     const endpoint = a.meta?.arg?.endpointName ?? 'unknown';
+    // Expected user-level auth failures should be handled in the UI (inline form
+    // error) and not escalated as console errors. Payload may be an empty object,
+    // so suppress by endpoint/status instead of message text.
+    const isExpectedLogin400 = endpoint === 'login' && status === 400;
 
     if (status === 429) {
       console.warn('[SAT:rate-limit]', endpoint, a.payload?.data);
+    } else if (isExpectedLogin400) {
+      // no-op
     } else if (status !== 401 && status !== 404) {
       console.error(`[SAT:api-error] ${endpoint} → ${status ?? 'network'}`, a.payload);
     }

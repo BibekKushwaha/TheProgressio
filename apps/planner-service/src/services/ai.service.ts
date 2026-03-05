@@ -3,6 +3,7 @@ import PQueue from "p-queue";
 import { createHash } from "node:crypto";
 import { createRequire } from "module";
 import { getRedisClient } from "@repo/cache";
+import { normalizeEffortValue } from "@repo/schemas/effort";
 
 const require = createRequire(import.meta.url);
 const API_KEY = process.env.MISTRAL_API_KEY;
@@ -1271,7 +1272,7 @@ JSON schema:
                 priority: data.priority,
                 type: data.type,
                 subject: data.subject,
-                effort: data.effort,
+                effort: normalizeEffortValue(data.effort),
                 ...(data.dueDate && { dueDate: new Date(data.dueDate) })
             };
         } catch (err: any) {
@@ -1322,7 +1323,7 @@ JSON schema:
             const amount = effortMatch[1];
             const unit = effortMatch[2]?.toLowerCase();
             if (amount) {
-                effort = `${amount}${unit?.startsWith("h") ? "h" : "m"}`;
+                effort = normalizeEffortValue(`${amount}${unit?.startsWith("h") ? "h" : "m"}`);
             }
         }
 

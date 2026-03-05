@@ -117,9 +117,15 @@ export function TaskCard({ task, completed }: TaskCardProps) {
             await createRevisionCampaign({
                 examTitle: task.title,
                 examDate: task.dueDate || new Date().toISOString(),
-                chapter: task.category?.name || 'General'
+                chapter: task.category?.name || 'General',
+                deepLinkBase: '/exam-warroom/revision',
             }).unwrap();
-            toast.success('Revision drip campaign scheduled!');
+            toast.success('Revision drip campaign scheduled!', {
+                action: {
+                    label: 'View revision',
+                    onClick: () => router.push('/exam-warroom/revision'),
+                },
+            });
         } catch (err) {
             toast.error('Failed to schedule revision campaign');
             console.error(err);
@@ -240,6 +246,14 @@ export function TaskCard({ task, completed }: TaskCardProps) {
 
                 {task.description && (
                     <p className="text-sm text-slate-400 mb-4 line-clamp-2">{task.description}</p>
+                )}
+
+                {task.effort && (
+                    <div className="mb-3">
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-indigo-400/30 bg-indigo-500/15 px-2.5 py-1 text-xs font-semibold text-indigo-200">
+                            ⚡ Effort: {task.effort}
+                        </span>
+                    </div>
                 )}
 
                 {task.subtasks && task.subtasks.length > 0 && (() => {

@@ -10,12 +10,14 @@ interface TaskListProps {
     status: string;
     priority: string;
     category: string;
+    effort: string;
+    sort: 'default' | 'quickWins';
     tasks: Task[];
     highlightedTaskId?: string;
 }
 
-export function TaskList({ searchQuery, status, priority, category, tasks, highlightedTaskId }: TaskListProps) {
-    const filteredTasks = filterTasks(tasks, { searchQuery, priority, category, status });
+export function TaskList({ searchQuery, status, priority, category, effort, sort, tasks, highlightedTaskId }: TaskListProps) {
+    const filteredTasks = filterTasks(tasks, { searchQuery, priority, category, status, effort, sort });
 
     const parentRef = useRef<HTMLDivElement>(null);
 

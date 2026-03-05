@@ -1,12 +1,12 @@
 // components/createtask/TaskDetailsForm.tsx
 'use client';
 
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TimePickerInput } from '@/components/ui/time-picker-input';
+import { CreateTaskDatePicker } from '@/components/createtask/CreateTaskDatePicker';
 import type { Category } from '@repo/store';
 import type { EffortOption, SubtaskDraft } from '@/hooks/useCreateTaskForm';
-import { EFFORT_OPTIONS } from '@/hooks/useCreateTaskForm';
+import { EFFORT_OPTIONS } from '@repo/schemas/task';
 
 interface TaskDetailsFormProps {
     selectedSubjectId: string;
@@ -72,11 +72,10 @@ export function TaskDetailsForm({
                                 key={p}
                                 type="button"
                                 onClick={() => setSelectedPriority(p)}
-                                className={`h-12 rounded-xl text-xs font-semibold border transition-all ${
-                                    selectedPriority === p
+                                className={`h-12 rounded-xl text-xs font-semibold border transition-all ${selectedPriority === p
                                         ? 'bg-indigo-500/30 border-indigo-400/50 text-white'
                                         : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                                }`}
+                                    }`}
                             >
                                 {p}
                             </button>
@@ -93,11 +92,10 @@ export function TaskDetailsForm({
                                 key={effort}
                                 type="button"
                                 onClick={() => setSelectedEffort(effort)}
-                                className={`h-12 rounded-xl text-xs font-semibold border transition-all ${
-                                    selectedEffort === effort
+                                className={`h-12 rounded-xl text-xs font-semibold border transition-all ${selectedEffort === effort
                                         ? 'bg-indigo-500/30 border-indigo-400/50 text-white'
                                         : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                                }`}
+                                    }`}
                             >
                                 {effort}
                             </button>
@@ -134,11 +132,9 @@ export function TaskDetailsForm({
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2">
                                     <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Due Date</Label>
-                                    <Input
-                                        type="date"
+                                    <CreateTaskDatePicker
                                         value={dueDateValue}
-                                        onChange={(e) => updateDueDateTime(e.target.value, dueTimeValue, true)}
-                                        className="h-12 bg-white/5 border-white/10"
+                                        onChange={(nextDate) => updateDueDateTime(nextDate, dueTimeValue, true)}
                                     />
                                 </div>
                                 <div className="space-y-2">
