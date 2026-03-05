@@ -755,15 +755,23 @@ export async function getUserNudges(userId: string, unreadOnly: boolean = false)
     const filtered = nudges.filter((nudge) => shouldSendWithCurrentContext(settings, nudge.type, now));
     if (!settings.groupedSummaries) return filtered.slice(0, 50);
 
-    const nonUrgent = filtered.filter((nudge) => !isUrgentType(nudge.type));
-    const urgent = filtered.filter((nudge) => isUrgentType(nudge.type));
+    const isDripCampaign = (nudge: Nudge): boolean => {
+        const meta = parseMetadata(nudge.metadata);
+        return meta.dripCampaign === true;
+    };
 
-    if (nonUrgent.length <= 2) {
+    // Drip campaigns are the "scheduled revision" items users explicitly create.
+    // Never collapse them into a digest, even when groupedSummaries is enabled.
+    const dripCampaign = filtered.filter(isDripCampaign);
+    const urgent = filtered.filter((nudge) => isUrgentType(nudge.type));
+    const nonUrgentNonDrip = filtered.filter((nudge) => !isUrgentType(nudge.type) && !isDripCampaign(nudge));
+
+    if (nonUrgentNonDrip.length <= 2) {
         return filtered.slice(0, 50);
     }
 
-    const digest = toDigestNudge(userId, nonUrgent);
-    return [digest, ...urgent].slice(0, 50);
+    const digest = toDigestNudge(userId, nonUrgentNonDrip);
+    return [digest, ...dripCampaign, ...urgent].slice(0, 50);
 }
 
 export async function createTransactionSystemNudge(params: {

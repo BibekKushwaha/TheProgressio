@@ -23,15 +23,13 @@ import {
     type Category,
 } from '@repo/store';
 import type { Subject } from '@repo/store';
+import { EFFORT_OPTIONS } from '@repo/schemas/task';
 import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-// ── Shared constants ────────────────────────────────────────────────────────
-export const EFFORT_OPTIONS = ['30m', '1h', '2h', '4h+'] as const;
-export type EffortOption = typeof EFFORT_OPTIONS[number];
-
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export type EffortOption = (typeof EFFORT_OPTIONS)[number];
 
 /**
  * Shift a local Date object to "apparent UTC" so the backend stores the number
@@ -41,29 +39,6 @@ export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 export const toApparentUtcIso = (d: Date): string => {
     const apparent = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
     return apparent.toISOString();
-};
-
-/** Map a raw effort string (e.g. "1.5h", "3h", "45m") to the nearest UI bucket. */
-export const normalizeEffortValue = (value?: string | null): EffortOption => {
-    if (!value) return '1h';
-    const s = value.trim().toLowerCase();
-    const minuteMatch = s.match(/^(\d+(?:\.\d+)?)m$/);
-    if (minuteMatch) {
-        const mins = parseFloat(minuteMatch[1]!);
-        if (mins <= 45) return '30m';
-        if (mins <= 90) return '1h';
-        if (mins <= 150) return '2h';
-        return '4h+';
-    }
-    const hourMatch = s.match(/^(\d+(?:\.\d+)?)h\+?$/);
-    if (hourMatch) {
-        const hrs = parseFloat(hourMatch[1]!);
-        if (hrs <= 0.75) return '30m';
-        if (hrs <= 1.5) return '1h';
-        if (hrs <= 3) return '2h';
-        return '4h+';
-    }
-    return '1h';
 };
 
 // ── Draft subtask shape ──────────────────────────────────────────────────────
@@ -207,7 +182,9 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         else if (existingTask.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
 
         if (existingTask.categoryId) setSelectedSubjectId(existingTask.categoryId);
-        if (existingTask.effort) setSelectedEffort(normalizeEffortValue(existingTask.effort));
+        if (existingTask.effort && EFFORT_OPTIONS.includes(existingTask.effort as EffortOption)) {
+            setSelectedEffort(existingTask.effort as EffortOption);
+        }
 
         if (existingTask.subtasks) {
             setSubtasks(existingTask.subtasks.map(s => ({ id: s.id, text: s.title, completed: s.completed })));
@@ -256,7 +233,9 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                         else if (result.priority === PriorityEnum.MEDIUM) setSelectedPriority('Medium');
                         else if (result.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
 
-                        if (result.effort) setSelectedEffort(normalizeEffortValue(result.effort));
+                        if (result.effort && EFFORT_OPTIONS.includes(result.effort as EffortOption)) {
+                            setSelectedEffort(result.effort as EffortOption);
+                        }
                         if (result.isRecurring !== undefined) setIsRecurring(result.isRecurring);
 
                         if (result.subject && categories) {

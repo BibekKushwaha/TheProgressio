@@ -122,6 +122,12 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
                         <span className={priorityColor}>
                             {task.priority}
                         </span>
+                        {task.effort && (
+                            <>
+                                <span>•</span>
+                                <span className="text-indigo-300">⚡ {task.effort}</span>
+                            </>
+                        )}
                     </div>
 
                     {task.subtasks && task.subtasks.length > 0 && (() => {

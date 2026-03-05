@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import { prisma, Status, Priority } from "@repo/db";
+import { z } from "zod";
 import {
     parseTaskIntentSchema,
     previewSubtasksSchema,
@@ -8,6 +9,7 @@ import {
     smartCreateTaskSchema,
     taskSchema,
 } from "@repo/schemas/task";
+import { fromDbEffortValue, normalizeEffortValue, toDbEffortValue } from "@repo/schemas/effort";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService, type ParsedTaskIntent } from "../services/ai.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/queue.service.js";
@@ -18,6 +20,23 @@ import { logAuditAction } from "../services/audit.service.js";
 
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || "http://localhost:4003";
+const parseTaskIntentResultSchema = z.object({
+    title: z.string().min(1),
+    description: z.string().optional(),
+    dueDate: z.coerce.date().optional(),
+    priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
+    subject: z.string().optional(),
+    effort: z.enum(["30m", "1h", "2h", "4h+"]).optional(),
+    isRecurring: z.boolean().optional(),
+    type: z.enum(["ASSIGNMENT", "EXAM", "STUDY_GOAL"]).optional(),
+});
+
+const serializeTaskEffort = <T extends { effort?: unknown }>(task: T): T & { effort: string | null } => {
+    return {
+        ...task,
+        effort: fromDbEffortValue(task.effort) ?? null,
+    };
+};
 
 const SIDE_EFFECT_OUTAGE_BACKOFF_MS = Number(process.env.SIDE_EFFECT_OUTAGE_BACKOFF_MS || 30000);
 const sideEffectOutageUntil: Record<"habit" | "analytics", number> = {
@@ -212,7 +231,7 @@ export const createTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
             priority,
             dueDate: dueDate ?? null,
             isRecurring: isRecurring ?? false,
-            effort: effort ?? null,
+            effort: toDbEffortValue(effort) ?? null,
             userId,
             categoryId: categoryId || null,
             subjectId: subjectId || null,
@@ -229,7 +248,7 @@ export const createTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         categoryId: task.categoryId,
     });
 
-    return res.status(201).json(task);
+    return res.status(201).json(serializeTaskEffort(task));
 });
 
 export const getTaskMetrics = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
@@ -336,7 +355,7 @@ export const getAllTasks = TryCatch(async (req: AuthenticatedRequest, res: Respo
         take: pageSize,
     });
 
-    return res.status(200).json(tasks);
+    return res.status(200).json(tasks.map((task) => serializeTaskEffort(task)));
 });
 
 export const getTaskById = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
@@ -366,7 +385,7 @@ export const getTaskById = TryCatch(async (req: AuthenticatedRequest, res: Respo
         throw new ErrorHandler(403, "Forbidden: You don't own this task");
     }
 
-    return res.status(200).json(task);
+    return res.status(200).json(serializeTaskEffort(task));
 });
 
 export const updateTask = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
@@ -406,7 +425,7 @@ export const updateTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
             ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
             ...(updates.isRecurring !== undefined && { isRecurring: updates.isRecurring }),
             ...(updates.categoryId !== undefined && { categoryId: updates.categoryId || null }),
-            ...(updates.effort !== undefined && { effort: updates.effort || null }),
+            ...(updates.effort !== undefined && { effort: toDbEffortValue(updates.effort) || null }),
         },
     });
 
@@ -443,7 +462,7 @@ export const updateTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         });
     }
 
-    return res.status(200).json(updatedTask);
+    return res.status(200).json(serializeTaskEffort(updatedTask));
 });
 
 export const deleteTask = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
@@ -545,7 +564,7 @@ export const toggleTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         });
     }
 
-    return res.status(200).json(updatedTask);
+    return res.status(200).json(serializeTaskEffort(updatedTask));
 });
 
 export const taskCategories = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
@@ -640,7 +659,7 @@ export const createTaskFromText = async ({
             priority: (parsedData.priority as Priority) || Priority.MEDIUM,
             status: Status.PENDING,
             dueDate: parsedData.dueDate || null,
-            effort: parsedData.effort || null,
+            effort: toDbEffortValue(parsedData.effort) || null,
             isRecurring: parsedData.isRecurring || false,
             userId,
         }
@@ -657,7 +676,7 @@ export const createTaskFromText = async ({
         ...metadata,
     });
 
-    return { task, parsedData };
+    return { task: serializeTaskEffort(task), parsedData };
 };
 
 export const smartCreateTask = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
@@ -748,7 +767,7 @@ export const generateSubtasks = TryCatch(async (req: AuthenticatedRequest, res: 
         include: { subtasks: true }
     });
 
-    return res.status(200).json(updatedTask);
+    return res.status(200).json(updatedTask ? serializeTaskEffort(updatedTask) : updatedTask);
 });
 
 export const previewSubtasks = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
@@ -777,6 +796,10 @@ export const parseTaskIntent = TryCatch(async (req: AuthenticatedRequest, res: R
     const { text } = parsed.data;
 
     const parsedData = await aiService.parseTaskIntent(text, { disableAI: isAIDisabled(req) });
+    const normalized = parseTaskIntentResultSchema.parse({
+        ...parsedData,
+        effort: normalizeEffortValue(parsedData.effort),
+    });
 
-    return res.status(200).json(parsedData);
+    return res.status(200).json(normalized);
 });

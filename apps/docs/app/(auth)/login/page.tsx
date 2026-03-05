@@ -25,6 +25,7 @@ const LoginPage = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [oauthHint, setOauthHint] = useState<string | null>(null);
 
     const dispatch = useAppDispatch();
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -54,6 +55,7 @@ const LoginPage = () => {
             return;
         }
         setError("");
+        setOauthHint(null);
 
         try {
             const response = await loginApi(validate.data).unwrap();
@@ -65,6 +67,9 @@ const LoginPage = () => {
             }
         } catch (err) {
             setError(getApiErrorMessage(err, 'Login failed. Please try again.'));
+            const errRecord = err as Record<string, unknown>;
+            const data = errRecord?.data as Record<string, unknown> | undefined;
+            setOauthHint(typeof data?.oauthProvider === 'string' ? data.oauthProvider : null);
         }
     };
 
@@ -127,9 +132,18 @@ const LoginPage = () => {
                         {error && (
                             <div
                                 role="alert"
-                                className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm"
+                                className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm space-y-2"
                             >
-                                {error}
+                                <p>{error}</p>
+                                {oauthHint === 'google' && (
+                                    <button
+                                        type="button"
+                                        onClick={handleGoogleLogin}
+                                        className="w-full mt-1 rounded-lg border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 py-2 text-xs font-semibold transition-colors"
+                                    >
+                                        Continue with Google
+                                    </button>
+                                )}
                             </div>
                         )}
 

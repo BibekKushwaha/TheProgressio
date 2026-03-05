@@ -371,7 +371,7 @@ model Task {
   priority     Priority   @default(MEDIUM)
   dueDate      DateTime?
   isRecurring  Boolean    @default(false)
-  effort       String?
+  effort       Effort?
   
   userId       String
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -511,6 +511,13 @@ enum Priority {
   LOW
   MEDIUM
   HIGH
+}
+
+enum Effort {
+  M30
+  H1
+  H2
+  H4_PLUS
 }
 
 enum Frequency {

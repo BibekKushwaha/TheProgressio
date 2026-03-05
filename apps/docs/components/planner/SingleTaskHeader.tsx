@@ -78,6 +78,12 @@ export function SingleTaskHeader() {
                             {task?.status}
                             <ChevronRight className="w-4 h-4" />
                         </Link>
+
+                        {task?.effort && (
+                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 border border-indigo-500/30 rounded-lg text-sm font-semibold text-indigo-300">
+                                ⚡ Effort: {task.effort}
+                            </span>
+                        )}
                     </div>
                 </div>
                 <button

@@ -30,6 +30,10 @@
       "types": "./dist/task.d.ts",
       "import": "./dist/task.js"
     },
+    "./effort": {
+      "types": "./dist/effort.d.ts",
+      "import": "./dist/effort.js"
+    },
     "./habit": {
       "types": "./dist/habit.d.ts",
       "import": "./dist/habit.js"

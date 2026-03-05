@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SearchBar } from '@/components/SearchBar';
 import { useHighlightedTaskScroll, useTaskQuerySyncFromUrl } from '@/hooks/useTasksPageRouting';
 import { mergeTaskSources } from '@/lib/mergeTasks';
+import { FilterDropdown } from '@/components/planner/FilterDropdown';
+import { Gauge, ArrowUpDown } from 'lucide-react';
 
 export function TasksClient() {
     const router = useRouter();
@@ -32,6 +34,8 @@ export function TasksClient() {
     const [status, setStatus] = useState('all');
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [effort, setEffort] = useState('all');
+    const [sort, setSort] = useState<'default' | 'quickWins'>('default');
     const [view, setView] = useState<'kanban' | 'list' | 'timetable' | 'timeline'>('kanban');
 
     const localHydrated = useLocalDbHydration();
@@ -88,6 +92,23 @@ export function TasksClient() {
         ],
         [categories]
     );
+    const effortOptions = useMemo(
+        () => [
+            { label: 'Effort', value: 'all' },
+            { label: '30m', value: '30m' },
+            { label: '1h', value: '1h' },
+            { label: '2h', value: '2h' },
+            { label: '4h+', value: '4h+' },
+        ] as const,
+        []
+    );
+    const sortOptions = useMemo(
+        () => [
+            { label: 'Default Sort', value: 'default' },
+            { label: 'Quick Wins', value: 'quickWins' },
+        ] as const,
+        []
+    );
 
     // All hooks called above — safe to short-circuit now
     if (authStatus === 'unauthenticated' || (!currentUser && authStatus !== 'idle' && authStatus !== 'loading')) {
@@ -127,13 +148,32 @@ export function TasksClient() {
                     setView={setView}
                     categoryOptions={categoryOptions}
                 />
+                <div className="flex justify-end gap-2 items-center">
+                    <FilterDropdown
+                        value={effort}
+                        options={effortOptions}
+                        onChange={setEffort}
+                        placeholder="Effort"
+                        icon={<Gauge className="w-4 h-4" />}
+                    />
+                    <FilterDropdown
+                        value={sort}
+                        options={sortOptions}
+                        onChange={setSort}
+                        placeholder="Sort"
+                        icon={<ArrowUpDown className="w-4 h-4" />}
+                    />
+                </div>
             </div>
+            
             {view === 'kanban' ? (
                 <KanbanBoard
                     searchQuery={searchQuery}
                     status={status}
                     priority={priority}
                     category={selectedCategory}
+                    effort={effort}
+                    sort={sort}
                     tasks={tasks}
                 />
             ) : view === 'list' ? (
@@ -142,6 +182,8 @@ export function TasksClient() {
                     status={status}
                     priority={priority}
                     category={selectedCategory}
+                    effort={effort}
+                    sort={sort}
                     tasks={tasks}
                     highlightedTaskId={focusedTaskId || undefined}
                 />
@@ -151,6 +193,8 @@ export function TasksClient() {
                     status={status}
                     priority={priority}
                     category={selectedCategory}
+                    effort={effort}
+                    sort={sort}
                     tasks={tasks}
                 />
             ) : (

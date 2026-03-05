@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { makeStore, AppStore } from './store';
-import { useGetProfileQuery } from './services/authApi';
+import { useGetProfileQuery, authApi } from './services/authApi';
 import { useAppDispatch, useAppSelector } from './hooks';
 import { setAuthLoading, hydrateAuth, logout, selectIsAuthenticated } from './slices/authSlice';
 import { AUTH_SESSION_KEY } from './runtime';
@@ -57,6 +57,13 @@ function AuthHydrator() {
     const status = 'status' in error ? error.status : undefined;
     if (status === 401 || status === 404) {
       removeLocalStorageItem(AUTH_SESSION_KEY);
+      // Reset the RTK Query API state BEFORE clearing the persist cache so
+      // the debounced localStorage save (triggered by the dispatch below)
+      // writes a clean empty-queries state rather than the 401 error.  Without
+      // this, a stale rejected-query entry could survive in localStorage and
+      // cause an immediate logout on the *next* page load (e.g. after Google
+      // OAuth) when makeStore() pre-loads that error as initial RTK state.
+      dispatch(authApi.util.resetApiState());
       clearRtkCache();
       dispatch(logout());
       setShouldFetch(false);

@@ -2,6 +2,7 @@ import express from 'express';
 import {
     createFamilyShareLink,
     deleteAccount,
+    demoteFromAdmin,
     exportAccountData,
     forgotPassword,
     getCurrentUser,
@@ -21,6 +22,7 @@ import {
     mobileLogout,
     mobileMe,
     mobileRefresh,
+    promoteToAdmin,
     registerUser,
     resetPassword,
     resolveFamilyShareLink,
@@ -66,6 +68,10 @@ router.get("/family-links/resolve/:token", resolveFamilyShareLink);
 router.get("/sessions", listSessions);
 router.delete("/sessions", logoutAllDevices);   // revoke all sessions
 router.delete("/sessions/:id", revokeSession);   // revoke one session
+
+// Admin role management (protected by ADMIN_BOOTSTRAP_SECRET header)
+router.post("/admin/promote", promoteToAdmin);
+router.post("/admin/demote", demoteFromAdmin);
 
 
 

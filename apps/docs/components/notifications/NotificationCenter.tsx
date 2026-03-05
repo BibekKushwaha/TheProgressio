@@ -7,14 +7,16 @@ import type { Nudge } from '@repo/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, TrendingUp, AlertCircle, Sparkles, Award } from 'lucide-react';
+import { Bell, TrendingUp, AlertCircle, Sparkles, Award, CalendarDays } from 'lucide-react';
 import { NudgeCard } from './NudgeCard';
 import { useNudgeActions } from './useNudgeActions';
+import { parseNudgeMetadata } from './notificationUtils';
 
-type FilterId = 'all' | 'unread' | 'streak_reminder' | 'urgency_driven' | 'suggestion' | 'achievement';
+type FilterId = 'all' | 'unread' | 'revision' | 'streak_reminder' | 'urgency_driven' | 'suggestion' | 'achievement';
 
 const FILTER_TABS: { id: FilterId; label: string; Icon: React.ElementType }[] = [
     { id: 'all', label: 'All', Icon: Bell },
+    { id: 'revision', label: 'Revision', Icon: CalendarDays },
     { id: 'streak_reminder', label: 'Streaks', Icon: TrendingUp },
     { id: 'urgency_driven', label: 'Priority', Icon: AlertCircle },
     { id: 'suggestion', label: 'Tips', Icon: Sparkles },
@@ -42,6 +44,7 @@ export function NotificationCenter() {
     const filteredNudges = nudges.filter((n) => {
         if (filter === 'unread') return !n.isRead;
         if (filter === 'all') return true;
+        if (filter === 'revision') return parseNudgeMetadata(n.metadata).dripCampaign === true;
         return n.type === filter;
     });
 
