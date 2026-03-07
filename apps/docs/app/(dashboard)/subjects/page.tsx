@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { TaskStatus, useGetCategoriesQuery, useGetTasksQuery } from '@repo/store';
 import { GPACalculator } from '@/components/analytics/GPACalculator';
 import { SubjectGradePredictor } from '@/components/analytics/SubjectGradePredictor';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getApiErrorReportStatus } from '@/lib/api-error';
+import { reportApiError } from '@/lib/errorReporter';
 import {
     Dialog,
     DialogContent,
@@ -24,6 +26,7 @@ import {
     FolderKanban,
     GraduationCap,
     Layers,
+    RefreshCcw,
     Search,
     Sparkles,
     Target,
@@ -34,9 +37,21 @@ type SubjectSortMode = 'name' | 'tasks' | 'completion';
 type SubjectTaskStatusFilter = 'all' | TaskStatus.PENDING | TaskStatus.IN_PROGRESS | TaskStatus.COMPLETED;
 
 export default function SubjectLibraryPage() {
-    const { data: categories, isLoading: catLoading } = useGetCategoriesQuery();
+    const {
+        data: categories,
+        isLoading: catLoading,
+        isError: isCategoriesError,
+        error: categoriesError,
+        refetch: refetchCategories,
+    } = useGetCategoriesQuery();
     const allTasksQueryArgs = useMemo(() => ({ page: 1, limit: 100 }), []);
-    const { data: allTasks, isLoading: tasksLoading } = useGetTasksQuery(allTasksQueryArgs);
+    const {
+        data: allTasks,
+        isLoading: tasksLoading,
+        isError: isTasksError,
+        error: tasksError,
+        refetch: refetchTasks,
+    } = useGetTasksQuery(allTasksQueryArgs);
     const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
     const [showGPA, setShowGPA] = useState(false);
     const [subjectSearch, setSubjectSearch] = useState('');
@@ -48,7 +63,31 @@ export default function SubjectLibraryPage() {
         () => (selectedSubject ? { page: 1, limit: 300, categoryId: selectedSubject } : skipToken),
         [selectedSubject]
     );
-    const { data: selectedSubjectTasks, isFetching: selectedTasksLoading } = useGetTasksQuery(selectedSubjectTasksQueryArgs);
+    const {
+        data: selectedSubjectTasks,
+        isFetching: selectedTasksLoading,
+        isError: isSelectedTasksError,
+        error: selectedTasksError,
+        refetch: refetchSelectedTasks,
+    } = useGetTasksQuery(selectedSubjectTasksQueryArgs);
+
+    useEffect(() => {
+        if (categoriesError) {
+            reportApiError(getApiErrorReportStatus(categoriesError), 'getCategories', categoriesError);
+        }
+    }, [categoriesError]);
+
+    useEffect(() => {
+        if (tasksError) {
+            reportApiError(getApiErrorReportStatus(tasksError), 'getTasks', tasksError);
+        }
+    }, [tasksError]);
+
+    useEffect(() => {
+        if (selectedTasksError) {
+            reportApiError(getApiErrorReportStatus(selectedTasksError), 'getTasksBySubject', selectedTasksError);
+        }
+    }, [selectedTasksError]);
 
     const subjects = useMemo(() => categories || [], [categories]);
     const tasks = useMemo(() => allTasks || [], [allTasks]);
@@ -160,8 +199,66 @@ export default function SubjectLibraryPage() {
         return highlights.slice(0, 3);
     }, [subjects, statsBySubject, overview]);
 
+    const failedPanels = [
+        isCategoriesError ? 'subject categories' : null,
+        isTasksError ? 'subject task totals' : null,
+        isSelectedTasksError && selectedSubject ? 'selected subject tasks' : null,
+    ].filter((value): value is string => Boolean(value));
+    const canRenderSubjectShell = subjects.length > 0 || tasks.length > 0;
+    const retryVisibleQueries = () => {
+        void Promise.allSettled([
+            refetchCategories(),
+            refetchTasks(),
+            selectedSubject ? refetchSelectedTasks() : Promise.resolve(),
+        ]);
+    };
+
+    if (!catLoading && !tasksLoading && !canRenderSubjectShell && (isCategoriesError || isTasksError)) {
+        return (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-white backdrop-blur-xl">
+                <div className="flex items-start gap-3">
+                    <div className="rounded-xl border border-red-400/30 bg-red-500/20 p-2">
+                        <AlertTriangle className="h-5 w-5 text-red-200" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-lg font-semibold">Subject library is temporarily unavailable</h2>
+                        <p className="mt-2 text-sm text-slate-200">
+                            We could not load subject categories or task totals right now.
+                        </p>
+                        <button
+                            onClick={retryVisibleQueries}
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
+                        >
+                            <RefreshCcw className="h-4 w-4" />
+                            Retry subjects
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-8">
+            {failedPanels.length > 0 ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-start gap-2">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
+                            <p>
+                                Some subject insights are using partial data because {failedPanels.join(', ')} {failedPanels.length === 1 ? 'is' : 'are'} temporarily unavailable.
+                            </p>
+                        </div>
+                        <button
+                            onClick={retryVisibleQueries}
+                            className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                        >
+                            <RefreshCcw className="h-3.5 w-3.5" />
+                            Retry data
+                        </button>
+                    </div>
+                </div>
+            ) : null}
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-4">
                     <div className="p-4 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl shadow-lg shadow-cyan-500/20">
@@ -448,6 +545,19 @@ export default function SubjectLibraryPage() {
                                             {[1, 2, 3].map((index) => (
                                                 <Skeleton key={index} className="h-20 w-full rounded-xl bg-white/5" />
                                             ))}
+                                        </div>
+                                    ) : isSelectedTasksError && selectedTasks.length === 0 ? (
+                                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <p>Detailed subject tasks are temporarily unavailable for this view.</p>
+                                                <button
+                                                    onClick={() => void refetchSelectedTasks()}
+                                                    className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                                                >
+                                                    <RefreshCcw className="h-3.5 w-3.5" />
+                                                    Retry subject tasks
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : selectedTasks.length === 0 ? (
                                         <p className="text-slate-400 text-center py-8">

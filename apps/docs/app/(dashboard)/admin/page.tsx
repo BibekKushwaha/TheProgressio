@@ -1,22 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppSelector } from "@repo/store";
 import { selectCurrentUser, selectIsAdmin } from "@repo/store";
 import { Shield, Users, TrendingUp, AlertTriangle } from "lucide-react";
 
 export default function AdminPage() {
-    const router = useRouter();
     const user = useAppSelector(selectCurrentUser);
     const isAdmin = useAppSelector(selectIsAdmin);
-
-    // Redirect non-admin users away from this page
-    useEffect(() => {
-        if (user && !isAdmin) {
-            router.replace("/dashboard");
-        }
-    }, [user, isAdmin, router]);
 
     if (!isAdmin) {
         return (

@@ -3,11 +3,13 @@ import { cn } from '@/lib/utils';
 import { Habit, useLogHabitMutation, useUpdateHabitMutation } from '@repo/store';
 import { HabitActionMenu } from './HabitActionMenu';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
 
 function HabitCardBase({ habit, highlighted = false }: { habit: Habit; highlighted?: boolean }) {
     const hasNewTrophy = Boolean(habit.newTrophy);
     const colorTheme = habit.color || "from-purple-600 to-pink-600";
+    const router = useRouter();
 
     const [logHabit, { isLoading }] = useLogHabitMutation();
     const [updateHabit, { isLoading: isUpdatingMercy }] = useUpdateHabitMutation();
@@ -34,12 +36,18 @@ function HabitCardBase({ habit, highlighted = false }: { habit: Habit; highlight
     const handleCheckIn = useCallback(async () => {
         try {
             await logHabit({ id: habit.id, completedValue: 1 }).unwrap();
-            toast.success('✅ Habit logged successfully!');
+            toast.success(`${habit.name} logged!`, {
+                description: `${habit.currentStreak + 1}-day streak 🔥`,
+                action: {
+                    label: 'View all habits',
+                    onClick: () => router.push('/habits'),
+                },
+            });
         } catch (error) {
             console.error("Failed to check in habit:", error);
             toast.error('Failed to check in habit');
         }
-    }, [habit.id, logHabit]);
+    }, [habit.id, habit.name, habit.currentStreak, logHabit, router]);
 
     const handleSaveMercyDays = useCallback(async () => {
         if (!isDirty) {

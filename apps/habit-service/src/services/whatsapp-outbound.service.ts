@@ -10,15 +10,6 @@ import {
 
 const prismaAny = prisma as any;
 
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID ?? "";
-const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN ?? "";
-const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION ?? process.env.WHATSAPP_GRAPH_VERSION ?? "v22.0";
-const META_API_BASE = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}`;
-const MAX_RETRIES = Number.parseInt(process.env.WHATSAPP_DISPATCH_MAX_RETRIES ?? "3", 10);
-const WHATSAPP_NUDGE_TEMPLATE_NAME = process.env.WHATSAPP_NUDGE_TEMPLATE_NAME ?? "study_nudge";
-const WHATSAPP_NUDGE_TEMPLATE_LANG = process.env.WHATSAPP_NUDGE_TEMPLATE_LANG ?? "en_US";
-const WHATSAPP_OUTBOUND_URL = process.env.WHATSAPP_OUTBOUND_URL ?? "";
-const WHATSAPP_OUTBOUND_TOKEN = process.env.WHATSAPP_OUTBOUND_TOKEN ?? "";
 const WHATSAPP_ACTIVITY_WINDOW_MS = Math.max(
     1,
     Number.parseInt(process.env.WHATSAPP_RECENT_ACTIVITY_HOURS ?? "2", 10),
@@ -117,6 +108,112 @@ const delay = async (ms: number): Promise<void> =>
         setTimeout(resolve, ms);
     });
 
+const logWhatsAppDispatchEvent = (params: {
+    event: 'dependency_request_failed' | 'dependency_request_retry';
+    dependency: 'meta-whatsapp-cloud' | 'whatsapp-relay';
+    reason: string;
+    status: number;
+    durationMs?: number;
+    timeoutMs: number;
+    attempt?: number;
+    maxRetries?: number;
+    responsePreview?: string | null;
+}): void => {
+    console.warn(JSON.stringify({
+        service: 'habit-service',
+        subsystem: 'whatsapp-outbound',
+        dependency: params.dependency,
+        operation: 'dispatch_nudge',
+        event: params.event,
+        level: 'warn',
+        method: 'POST',
+        target: params.dependency === 'meta-whatsapp-cloud' ? 'https://graph.facebook.com' : 'relay',
+        status: params.status,
+        reason: params.reason,
+        ...(params.durationMs !== undefined ? { durationMs: params.durationMs } : {}),
+        timeoutMs: params.timeoutMs,
+        ...(params.attempt !== undefined ? { attempt: params.attempt } : {}),
+        ...(params.maxRetries !== undefined ? { maxRetries: params.maxRetries } : {}),
+        ...(params.responsePreview ? { responsePreview: params.responsePreview.slice(0, 160) } : {}),
+        ts: new Date().toISOString(),
+    }));
+};
+
+const getDispatchTimeoutMs = (): number =>
+    Math.max(500, Number.parseInt(process.env.WHATSAPP_DISPATCH_TIMEOUT_MS ?? "5000", 10) || 5000);
+
+const getDispatchRetryCount = (): number =>
+    Math.max(1, Number.parseInt(process.env.WHATSAPP_DISPATCH_MAX_RETRIES ?? "3", 10) || 3);
+
+const readMetaCloudConfig = (): {
+    enabled: boolean;
+    apiBase: string;
+    accessToken: string;
+    templateName: string;
+    templateLanguage: string;
+} => {
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID ?? "";
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN ?? "";
+    const apiVersion = process.env.WHATSAPP_API_VERSION ?? process.env.WHATSAPP_GRAPH_VERSION ?? "v22.0";
+
+    return {
+        enabled: Boolean(phoneNumberId && accessToken),
+        apiBase: `https://graph.facebook.com/${apiVersion}/${phoneNumberId}`,
+        accessToken,
+        templateName: process.env.WHATSAPP_NUDGE_TEMPLATE_NAME ?? "study_nudge",
+        templateLanguage: process.env.WHATSAPP_NUDGE_TEMPLATE_LANG ?? "en_US",
+    };
+};
+
+const readHttpRelayConfig = (): { url: string; token: string } => ({
+    url: process.env.WHATSAPP_OUTBOUND_URL ?? "",
+    token: process.env.WHATSAPP_OUTBOUND_TOKEN ?? "",
+});
+
+const postJsonWithTimeout = async (params: {
+    url: string;
+    headers: Record<string, string>;
+    body: Record<string, unknown>;
+    dependency: 'meta-whatsapp-cloud' | 'whatsapp-relay';
+}): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutMs = getDispatchTimeoutMs();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const startedAt = Date.now();
+
+    try {
+        return await fetch(params.url, {
+            method: "POST",
+            headers: params.headers,
+            body: JSON.stringify(params.body),
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if (
+            typeof error === "object"
+            && error !== null
+            && "name" in error
+            && error.name === "AbortError"
+        ) {
+            logWhatsAppDispatchEvent({
+                event: 'dependency_request_failed',
+                dependency: params.dependency,
+                reason: 'timeout',
+                status: 408,
+                durationMs: Date.now() - startedAt,
+                timeoutMs,
+            });
+            const timeoutError = new Error(`WhatsApp dispatch timed out after ${timeoutMs}ms`);
+            (timeoutError as Error & { retryable?: boolean }).retryable = true;
+            throw timeoutError;
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+};
+
 const isPremiumUser = (user: NudgeLike["user"]): boolean =>
     Boolean(user && user.plan !== "FREE" && user.planStatus === "ACTIVE");
 
@@ -175,21 +272,23 @@ const mergeDispatchMetadata = (params: {
 };
 
 const sendWhatsApp = async (params: { to: string; message: string; nudgeId: string; priority: string }) => {
-    if (WHATSAPP_PHONE_NUMBER_ID && WHATSAPP_ACCESS_TOKEN) {
-        const response = await fetch(`${META_API_BASE}/messages`, {
-            method: "POST",
+    const metaConfig = readMetaCloudConfig();
+    if (metaConfig.enabled) {
+        const response = await postJsonWithTimeout({
+            url: `${metaConfig.apiBase}/messages`,
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+                Authorization: `Bearer ${metaConfig.accessToken}`,
             },
-            body: JSON.stringify({
+            dependency: 'meta-whatsapp-cloud',
+            body: {
                 messaging_product: "whatsapp",
                 recipient_type: "individual",
                 to: params.to,
                 type: "template",
                 template: {
-                    name: WHATSAPP_NUDGE_TEMPLATE_NAME,
-                    language: { code: WHATSAPP_NUDGE_TEMPLATE_LANG },
+                    name: metaConfig.templateName,
+                    language: { code: metaConfig.templateLanguage },
                     components: [
                         {
                             type: "body",
@@ -197,11 +296,19 @@ const sendWhatsApp = async (params: { to: string; message: string; nudgeId: stri
                         },
                     ],
                 },
-            }),
+            },
         });
 
         if (!response.ok) {
             const body = await response.text();
+            logWhatsAppDispatchEvent({
+                event: 'dependency_request_failed',
+                dependency: 'meta-whatsapp-cloud',
+                reason: `http_${response.status}`,
+                status: response.status,
+                timeoutMs: getDispatchTimeoutMs(),
+                responsePreview: body,
+            });
             const error = new Error(`Meta WhatsApp API error (${response.status}): ${body || "unknown"}`);
             (error as Error & { retryable?: boolean }).retryable = response.status >= 500 || response.status === 429;
             throw error;
@@ -210,23 +317,33 @@ const sendWhatsApp = async (params: { to: string; message: string; nudgeId: stri
         return { ok: true, provider: "meta-cloud" as const };
     }
 
-    if (WHATSAPP_OUTBOUND_URL) {
-        const response = await fetch(WHATSAPP_OUTBOUND_URL, {
-            method: "POST",
+    const relayConfig = readHttpRelayConfig();
+    if (relayConfig.url) {
+        const response = await postJsonWithTimeout({
+            url: relayConfig.url,
             headers: {
                 "Content-Type": "application/json",
-                ...(WHATSAPP_OUTBOUND_TOKEN ? { Authorization: `Bearer ${WHATSAPP_OUTBOUND_TOKEN}` } : {}),
+                ...(relayConfig.token ? { Authorization: `Bearer ${relayConfig.token}` } : {}),
             },
-            body: JSON.stringify({
+            dependency: 'whatsapp-relay',
+            body: {
                 to: params.to,
                 body: params.message,
                 nudgeId: params.nudgeId,
                 priority: params.priority,
-            }),
+            },
         });
 
         if (!response.ok) {
             const body = await response.text();
+            logWhatsAppDispatchEvent({
+                event: 'dependency_request_failed',
+                dependency: 'whatsapp-relay',
+                reason: `http_${response.status}`,
+                status: response.status,
+                timeoutMs: getDispatchTimeoutMs(),
+                responsePreview: body,
+            });
             const error = new Error(`WhatsApp outbound failed (${response.status}): ${body || "unknown"}`);
             (error as Error & { retryable?: boolean }).retryable = response.status >= 500 || response.status === 429;
             throw error;
@@ -247,23 +364,34 @@ const sendWithRetry = async (params: {
     message: string;
     priority: string;
 }): Promise<{ success: boolean; attempts: number; error?: string }> => {
-    for (let attempt = 1; attempt <= Math.max(1, MAX_RETRIES); attempt += 1) {
+    const maxRetries = getDispatchRetryCount();
+
+    for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
         try {
             await sendWhatsApp(params);
             return { success: true, attempts: attempt };
         } catch (error) {
             const retryable = Boolean((error as { retryable?: boolean }).retryable);
-            if (!retryable || attempt >= MAX_RETRIES) {
+            if (!retryable || attempt >= maxRetries) {
                 return {
                     success: false,
                     attempts: attempt,
                     error: error instanceof Error ? error.message : "Unknown dispatch error",
                 };
             }
+            logWhatsAppDispatchEvent({
+                event: 'dependency_request_retry',
+                dependency: process.env.WHATSAPP_OUTBOUND_URL ? 'whatsapp-relay' : 'meta-whatsapp-cloud',
+                reason: error instanceof Error ? error.message : 'retryable_failure',
+                status: 0,
+                timeoutMs: getDispatchTimeoutMs(),
+                attempt,
+                maxRetries,
+            });
             await delay(attempt * 350);
         }
     }
-    return { success: false, attempts: MAX_RETRIES, error: "Dispatch retries exhausted" };
+    return { success: false, attempts: maxRetries, error: "Dispatch retries exhausted" };
 };
 
 const scheduleFallbackDispatch = async (params: {

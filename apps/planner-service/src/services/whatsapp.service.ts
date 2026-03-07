@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from "@repo/db";
 import { consumeRateLimit, getRedisClient } from "@repo/cache";
+import { requestJson } from "./internal-http.service.js";
 
 type PlainObject = Record<string, unknown>;
 
@@ -478,33 +479,34 @@ export const resolveWhatsAppTranscript = async (
         return { transcript: null, language: null, confidence: null, source: "none" };
     }
 
-    try {
-        const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                audioUrl: inbound.audioUrl,
-                audioMessageId: inbound.audioMessageId,
-                sender: inbound.sender,
-            }),
-        });
+    const result = await requestJson<unknown>({
+        url: endpoint,
+        method: "POST",
+        body: {
+            audioUrl: inbound.audioUrl,
+            audioMessageId: inbound.audioMessageId,
+            sender: inbound.sender,
+        },
+        logContext: {
+            service: "planner-service",
+            subsystem: "whatsapp",
+            dependency: "transcription-service",
+            operation: "resolve_transcript",
+        },
+    });
 
-        if (!response.ok) {
-            return { transcript: null, language: null, confidence: null, source: "none" };
-        }
-
-        const body = await response.json() as unknown;
-        const object = asObject(body);
-
-        return {
-            transcript: object ? toStringValue(object.transcript) : null,
-            language: object ? toStringValue(object.language) : null,
-            confidence: object ? toNumberValue(object.confidence) : null,
-            source: "service",
-        };
-    } catch {
+    if (!result.ok) {
         return { transcript: null, language: null, confidence: null, source: "none" };
     }
+
+    const object = asObject(result.data);
+
+    return {
+        transcript: object ? toStringValue(object.transcript) : null,
+        language: object ? toStringValue(object.language) : null,
+        confidence: object ? toNumberValue(object.confidence) : null,
+        source: "service",
+    };
 };
 
 export const resolveWhatsAppOcr = async (
@@ -528,31 +530,32 @@ export const resolveWhatsAppOcr = async (
         return { text: null, language: null, confidence: null, source: "none" };
     }
 
-    try {
-        const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                imageUrl: inbound.imageUrl,
-                imageMessageId: inbound.imageMessageId,
-                sender: inbound.sender,
-            }),
-        });
+    const result = await requestJson<unknown>({
+        url: endpoint,
+        method: "POST",
+        body: {
+            imageUrl: inbound.imageUrl,
+            imageMessageId: inbound.imageMessageId,
+            sender: inbound.sender,
+        },
+        logContext: {
+            service: "planner-service",
+            subsystem: "whatsapp",
+            dependency: "ocr-service",
+            operation: "resolve_ocr",
+        },
+    });
 
-        if (!response.ok) {
-            return { text: null, language: null, confidence: null, source: "none" };
-        }
-
-        const body = await response.json() as unknown;
-        const object = asObject(body);
-
-        return {
-            text: object ? toStringValue(object.text) ?? toStringValue(object.ocrText) : null,
-            language: object ? toStringValue(object.language) : null,
-            confidence: object ? toNumberValue(object.confidence) : null,
-            source: "service",
-        };
-    } catch {
+    if (!result.ok) {
         return { text: null, language: null, confidence: null, source: "none" };
     }
+
+    const object = asObject(result.data);
+
+    return {
+        text: object ? toStringValue(object.text) ?? toStringValue(object.ocrText) : null,
+        language: object ? toStringValue(object.language) : null,
+        confidence: object ? toNumberValue(object.confidence) : null,
+        source: "service",
+    };
 };

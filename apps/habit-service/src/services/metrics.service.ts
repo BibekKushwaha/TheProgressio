@@ -10,6 +10,13 @@ type MetricName =
 
 const counters = new Map<MetricName, number>();
 
+const toMetricKey = (value: string): string =>
+    value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^_+|_+$/g, '');
+
 export const incrementMetric = (name: MetricName, by: number = 1): void => {
     counters.set(name, (counters.get(name) ?? 0) + by);
 };
@@ -116,6 +123,23 @@ export function getLatencySnapshot(): Record<string, EndpointLatencyStats> {
         };
     }
     return result;
+}
+
+export function getOperationalMetricsSnapshot(): Record<string, number> {
+    const snapshot: Record<string, number> = {
+        ...getMetricsSnapshot(),
+    };
+
+    for (const [endpoint, stats] of Object.entries(getLatencySnapshot())) {
+        const key = toMetricKey(endpoint);
+        snapshot[`latency_${key}_count`] = stats.count;
+        snapshot[`latency_${key}_mean_ms`] = stats.mean;
+        snapshot[`latency_${key}_p50_ms`] = stats.p50;
+        snapshot[`latency_${key}_p95_ms`] = stats.p95;
+        snapshot[`latency_${key}_p99_ms`] = stats.p99;
+    }
+
+    return snapshot;
 }
 
 /** Reset all histograms — useful in tests. */

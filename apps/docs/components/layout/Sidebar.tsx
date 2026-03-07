@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useState, useCallback, useEffect } from "react";
+import React, { memo, useState, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -20,11 +20,12 @@ import {
     Award,
     Layers,
     Shield,
+    Lock,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Card } from "../ui/card";
-import { logout as logoutAction, useAppDispatch, useAppSelector, useLogoutMutation, selectIsAdmin } from "@repo/store";
+import { logout as logoutAction, useAppDispatch, useAppSelector, useLogoutMutation, selectIsAdmin, useGetUserXPQuery } from "@repo/store";
 import { AUTH_SESSION_KEY } from "@/constant";
 import { toast } from "sonner";
 import { trackFeatureOpened } from "@/lib/navigationTelemetry";
@@ -37,50 +38,78 @@ type NavItem = {
     href: string;
     menuKey?: MenuKey;
     children?: NavChild[];
+    /** When true the item renders as a locked/teaser row instead of a link */
+    locked?: boolean;
 };
 
-const NAV_ITEMS: NavItem[] = [
-    { name: "Command Center", icon: LayoutDashboard, href: "/dashboard" },
+type NavGroup = {
+    section: string;
+    items: NavItem[];
+};
+
+const NAV_GROUPS: NavGroup[] = [
     {
-        name: "Tasks & Planning",
-        icon: CheckSquare,
-        href: "/planner",
-        menuKey: "planner",
-        children: [
-            { name: "Create New", href: "/createtask" },
-            { name: "Task Board", href: "/tasks" },
-            { name: "Expired Tasks", href: "/planner" },
-            { name: "Syllabus Digitizer", href: "/syllabus-digitizer" },
-        ],
-    },
-    { name: "Timetable", icon: Calendar, href: "/calendar" },
-    { name: "Habit Gallery", icon: Flame, href: "/habits" },
-    {
-        name: "Analytics",
-        icon: BarChart2,
-        href: "/analytics",
-        menuKey: "analytics",
-        children: [
-            { name: "Overview", href: "/analytics/overview" },
-            { name: "Strategic", href: "/analytics/strategic" },
-            { name: "Weekly Review", href: "/analytics/weekly-review" },
+        section: "Main",
+        items: [
+            { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+            {
+                name: "Tasks & Planning",
+                icon: CheckSquare,
+                href: "/planner",
+                menuKey: "planner",
+                children: [
+                    { name: "Create New", href: "/createtask" },
+                    { name: "Task Board", href: "/tasks" },
+                    { name: "Task Archive", href: "/planner" },
+                    { name: "Syllabus Digitizer", href: "/syllabus-digitizer" },
+                ],
+            },
+            { name: "Timetable", icon: Calendar, href: "/calendar" },
         ],
     },
     {
-        name: "Exam War Room",
-        icon: Swords,
-        href: "/exam-warroom",
-        menuKey: "exam-warroom",
-        children: [
-            { name: "Overview", href: "/exam-warroom/overview" },
-            { name: "Academic", href: "/exam-warroom/academic" },
-            { name: "Revision", href: "/exam-warroom/revision" },
+        section: "Academic",
+        items: [
+            { name: "Subject Library", icon: BookOpen, href: "/subjects" },
+            { name: "Knowledge Map", icon: Layers, href: "/syllabus" },
+            { name: "Habit Tracker", icon: Flame, href: "/habits" },
+            {
+                name: "Exam War Room",
+                icon: Swords,
+                href: "/exam-warroom",
+                menuKey: "exam-warroom",
+                children: [
+                    { name: "Overview", href: "/exam-warroom/overview" },
+                    { name: "Academic", href: "/exam-warroom/academic" },
+                    { name: "Revision", href: "/exam-warroom/revision" },
+                ],
+            },
         ],
     },
-    { name: "Subject Library", icon: BookOpen, href: "/subjects" },
-    { name: "Syllabus Graph", icon: Layers, href: "/syllabus" },
-    { name: "Achievements", icon: Award, href: "/achievement" },
-    { name: "Family Connect", icon: Users, href: "/family-connect" },
+    {
+        section: "Analytics & Review",
+        items: [
+            {
+                name: "Analytics",
+                icon: BarChart2,
+                href: "/analytics",
+                menuKey: "analytics",
+                children: [
+                    { name: "Overview", href: "/analytics/overview" },
+                    { name: "Strategic", href: "/analytics/strategic" },
+                    { name: "Weekly Review", href: "/analytics/weekly-review" },
+                    { name: "Reports", href: "/reports" },
+                ],
+            },
+            { name: "Achievements", icon: Award, href: "/achievement" },
+        ],
+    },
+    {
+        section: "Social",
+        items: [
+            { name: "Family Connect", icon: Users, href: "/family-connect" },
+        ],
+    },
 ];
 
 // ---------------------------------------------------------------------------
@@ -105,9 +134,31 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
             pathname.startsWith("/tasks") ||
             pathname.startsWith("/createtask") ||
             pathname.startsWith("/syllabus-digitizer"),
-        analytics: pathname.startsWith("/analytics"),
+        analytics: pathname.startsWith("/analytics") || pathname.startsWith("/reports"),
         "exam-warroom": pathname.startsWith("/exam-warroom"),
     });
+
+    const { data: xpData } = useGetUserXPQuery();
+    const userLevel = xpData?.xp?.level ?? 1;
+
+    const filteredGroups = useMemo(() => {
+        return NAV_GROUPS.map(group => {
+            // Hide the full analytics section until level 2
+            if (userLevel < 2 && group.section === "Analytics & Review") return null;
+            // Keep Exam War Room visible but mark it locked so users know it exists
+            if (group.section === "Academic") {
+                return {
+                    ...group,
+                    items: group.items.map(item =>
+                        item.name === "Exam War Room" && userLevel < 2
+                            ? { ...item, locked: true }
+                            : item
+                    ),
+                };
+            }
+            return group;
+        }).filter(Boolean) as NavGroup[];
+    }, [userLevel]);
 
     // Sync open state on SPA navigation — auto-open the active section when
     // the user navigates so the active child link is always visible.
@@ -119,7 +170,10 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
                 pathname.startsWith("/tasks") ||
                 pathname.startsWith("/createtask") ||
                 pathname.startsWith("/syllabus-digitizer"),
-            analytics: prev.analytics || pathname.startsWith("/analytics"),
+            analytics:
+                prev.analytics ||
+                pathname.startsWith("/analytics") ||
+                pathname.startsWith("/reports"),
             "exam-warroom": prev["exam-warroom"] || pathname.startsWith("/exam-warroom"),
         }));
     }, [pathname]);
@@ -131,94 +185,122 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
         setOpenMenus((prev) => ({ ...prev, [menuKey]: !prev[menuKey] }));
 
     return (
-        <nav className="flex-1 space-y-1 overflow-y-auto pr-2">
-            {NAV_ITEMS.map((item) => (
-                <div key={item.href}>
-                    {item.children ? (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => item.menuKey && toggleMenu(item.menuKey)}
-                                className={cn(
-                                    "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative",
-                                    isActiveRoute(item.href) || (item.menuKey && openMenus[item.menuKey])
-                                        ? "bg-white/10 text-white shadow-lg shadow-indigo-500/10"
-                                        : "text-gray-400 hover:bg-white/5 hover:text-white"
-                                )}
-                            >
-                                {(isActiveRoute(item.href) || (item.menuKey && openMenus[item.menuKey])) && (
-                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full" />
-                                )}
-                                <item.icon
-                                    className={cn(
-                                        "w-5 h-5 transition-colors",
-                                        isActiveRoute(item.href) || (item.menuKey && openMenus[item.menuKey])
-                                            ? "text-indigo-400"
-                                            : "group-hover:text-indigo-400"
-                                    )}
-                                />
-                                <span className="font-medium">{item.name}</span>
-                                <ChevronDown
-                                    className={cn(
-                                        "ml-auto h-4 w-4 transition-transform",
-                                        item.menuKey && openMenus[item.menuKey] && "rotate-180"
-                                    )}
-                                />
-                            </button>
-                            {item.menuKey && openMenus[item.menuKey] && (
-                                <div className="ml-6 mt-1 space-y-1">
-                                    {item.children.map((child) => (
-                                        <Link
-                                            key={child.href}
-                                            href={child.href}
-                                            onClick={() => {
-                                                trackFeatureOpened(child.href, pathname);
-                                                onNavigate?.();
-                                            }}
-                                            className={cn(
-                                                "block px-3 py-2 rounded-lg text-sm transition-colors",
-                                                isActiveRoute(child.href)
-                                                    ? "bg-indigo-500/20 text-indigo-300"
-                                                    : "text-gray-400 hover:bg-white/5 hover:text-white"
-                                            )}
-                                        >
-                                            {child.name}
-                                        </Link>
-                                    ))}
+        <nav className="flex-1 space-y-6 overflow-y-auto pr-2 pb-4">
+            {filteredGroups.map((group, groupIdx) => (
+                <div key={group.section} className="space-y-1">
+                    {/* Only show section headers for groups after the first one, or all if preferred. Let's show all but make Main subtle */}
+                    <div className={cn(
+                        "px-3 mb-2 text-[11px] font-semibold tracking-[0.15em] uppercase",
+                        groupIdx === 0 ? "text-slate-600" : "text-slate-500 mt-6"
+                    )}>
+                        {group.section}
+                    </div>
+                    {group.items.map((item) => (
+                        <div key={item.href}>
+                            {item.locked ? (
+                                /* Locked feature teaser — visible but non-interactive */
+                                <div
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-default select-none"
+                                    title="Complete more tasks to unlock this feature"
+                                >
+                                    <item.icon className="w-5 h-5 text-slate-600 shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-slate-600 text-sm">{item.name}</div>
+                                        <div className="text-[10px] text-indigo-400/70 font-medium mt-0.5 flex items-center gap-1">
+                                            <Lock className="w-2.5 h-2.5" />
+                                            Unlocks at Level 2
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
-                        </>
-                    ) : (
-                        <Link
-                            href={item.href}
-                            onClick={() => {
-                                trackFeatureOpened(item.href, pathname);
-                                onNavigate?.();
-                            }}
-                        >
-                            <div
-                                className={cn(
-                                    "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative",
-                                    isActiveRoute(item.href)
-                                        ? "bg-white/10 text-white shadow-lg shadow-indigo-500/10"
-                                        : "text-gray-400 hover:bg-white/5 hover:text-white"
-                                )}
-                            >
-                                {isActiveRoute(item.href) && (
-                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full" />
-                                )}
-                                <item.icon
-                                    className={cn(
-                                        "w-5 h-5 transition-colors",
-                                        isActiveRoute(item.href) ? "text-indigo-400" : "group-hover:text-indigo-400"
+                            ) : item.children ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => item.menuKey && toggleMenu(item.menuKey)}
+                                        className={cn(
+                                            "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative",
+                                            isActiveRoute(item.href) || (item.menuKey && openMenus[item.menuKey])
+                                                ? "bg-white/10 text-white shadow-lg shadow-indigo-500/10"
+                                                : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                        )}
+                                    >
+                                        {(isActiveRoute(item.href) || (item.menuKey && openMenus[item.menuKey])) && (
+                                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full" />
+                                        )}
+                                        <item.icon
+                                            className={cn(
+                                                "w-5 h-5 transition-colors",
+                                                isActiveRoute(item.href) || (item.menuKey && openMenus[item.menuKey])
+                                                    ? "text-indigo-400"
+                                                    : "group-hover:text-indigo-400"
+                                            )}
+                                        />
+                                        <span className="font-medium">{item.name}</span>
+                                        <ChevronDown
+                                            className={cn(
+                                                "ml-auto h-4 w-4 transition-transform",
+                                                item.menuKey && openMenus[item.menuKey] && "rotate-180"
+                                            )}
+                                        />
+                                    </button>
+                                    {item.menuKey && openMenus[item.menuKey] && (
+                                        <div className="ml-6 mt-1 space-y-1">
+                                            {item.children.map((child) => (
+                                                <Link
+                                                    key={child.href}
+                                                    href={child.href}
+                                                    aria-current={isActiveRoute(child.href) ? "page" : undefined}
+                                                    onClick={() => {
+                                                        trackFeatureOpened(child.href, pathname);
+                                                        onNavigate?.();
+                                                    }}
+                                                    className={cn(
+                                                        "block px-3 py-2 rounded-lg text-sm transition-colors",
+                                                        isActiveRoute(child.href)
+                                                            ? "bg-indigo-500/20 text-indigo-300"
+                                                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                                    )}
+                                                >
+                                                    {child.name}
+                                                </Link>
+                                            ))}
+                                        </div>
                                     )}
-                                />
-                                <span className="font-medium">{item.name}</span>
-                            </div>
-                        </Link>
-                    )}
+                                </>
+                            ) : (
+                                <Link
+                                    href={item.href}
+                                    aria-current={isActiveRoute(item.href) ? "page" : undefined}
+                                    onClick={() => {
+                                        trackFeatureOpened(item.href, pathname);
+                                        onNavigate?.();
+                                    }}
+                                    className={cn(
+                                        "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative outline-none",
+                                        "focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900",
+                                        isActiveRoute(item.href)
+                                            ? "bg-white/10 text-white shadow-lg shadow-indigo-500/10"
+                                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                    )}
+                                >
+                                    {isActiveRoute(item.href) && (
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full" />
+                                    )}
+                                    <item.icon
+                                        className={cn(
+                                            "w-5 h-5 transition-colors",
+                                            isActiveRoute(item.href) ? "text-indigo-400" : "group-hover:text-indigo-400"
+                                        )}
+                                    />
+                                    <span className="font-medium">{item.name}</span>
+                                </Link>
+                            )}
+                        </div>
+                    ))}
                 </div>
-            ))}            {/* Admin-only panel link */}
+            ))}
+
+            {/* Admin-only panel link */}
             {isAdmin && (
                 <Link
                     href="/admin"
@@ -229,7 +311,7 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
                 >
                     <div
                         className={cn(
-                            "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative",
+                            "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative mt-6",
                             pathname === "/admin" || pathname.startsWith("/admin/")
                                 ? "bg-red-500/20 text-red-300 shadow-lg shadow-red-500/10"
                                 : "text-gray-400 hover:bg-red-500/10 hover:text-red-300"
@@ -273,7 +355,15 @@ const BottomActions = memo(function BottomActions({
         pathname === href || pathname.startsWith(`${href}/`);
 
     return (
-        <div className="mt-auto border-t border-white/10 pt-4 space-y-1">
+        <div className="mt-auto space-y-1">
+            {/* ⌘K quick-actions hint */}
+            <div className="flex items-center gap-2 px-3 py-2 text-[10px] text-slate-600 select-none">
+                <kbd className="inline-flex items-center px-1.5 py-0.5 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-slate-500">
+                    ⌘K
+                </kbd>
+                <span>Quick actions</span>
+            </div>
+            <div className="border-t border-white/10 pt-3 space-y-1">
             <Link
                 href="/settings"
                 onClick={() => {
@@ -299,6 +389,7 @@ const BottomActions = memo(function BottomActions({
                 <LogOut className="w-5 h-5 group-hover:text-red-400" />
                 <span className="font-medium">{isLoggingOut ? "Logging out..." : "Logout"}</span>
             </button>
+            </div>
         </div>
     );
 });

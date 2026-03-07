@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { DashboardLayoutProvider } from '../components/dashboard/DashboardLayoutContext';
 
 vi.mock('@repo/store', () => ({
     useAppSelector: (selector: (s: { auth: { user: { username: string } | null } }) => unknown) =>
@@ -26,36 +27,46 @@ vi.mock('@/components/habit/NotificationCenter', () => ({
 vi.mock('@/components/planner/TimetableView', () => ({
     TimetableView: () => <div>__TimetableView__</div>,
 }));
+vi.mock('@/components/dashboard/CustomizeLayoutButton', () => ({
+    CustomizeLayoutButton: () => <button type="button">__CustomizeLayoutButton__</button>,
+}));
+vi.mock('@/components/dashboard/AmbientNudge', () => ({
+    AmbientNudge: () => <div>__AmbientNudge__</div>,
+}));
 
 import { WelcomeHeader } from '../components/dashboard/WelcomeHeader';
 
+function renderWithLayout(ui: React.ReactNode) {
+    return render(<DashboardLayoutProvider>{ui}</DashboardLayoutProvider>);
+}
+
 describe('WelcomeHeader', () => {
     it('renders a greeting with the username', () => {
-        render(<WelcomeHeader />);
+        renderWithLayout(<WelcomeHeader />);
         // The greeting uses the username from the auth selector
         expect(screen.getByText(/Welcome back, Alice/i)).toBeTruthy();
     });
 
     it('renders the current date as a subtitle', () => {
-        render(<WelcomeHeader />);
+        renderWithLayout(<WelcomeHeader />);
         // Date will vary; just check the subtitle includes a year
         const subtitles = screen.getAllByText(/202\d/);
         expect(subtitles.length).toBeGreaterThan(0);
     });
 
     it('renders the XP level badge when XP data is available', () => {
-        render(<WelcomeHeader />);
+        renderWithLayout(<WelcomeHeader />);
         expect(screen.getByText('Scholar')).toBeTruthy();
         expect(screen.getByText('320')).toBeTruthy();
     });
 
     it('renders the notifications button', () => {
-        render(<WelcomeHeader />);
+        renderWithLayout(<WelcomeHeader />);
         expect(screen.getByRole('button', { name: /notification/i })).toBeTruthy();
     });
 
     it('shows unread badge as 0 when all nudges are read', () => {
-        render(<WelcomeHeader />);
+        renderWithLayout(<WelcomeHeader />);
         // No unread badge should be rendered since nudges array is empty
         // The badge displays when displayedCount > 0; with empty list it should be absent
         expect(screen.queryByText('1')).toBeNull();

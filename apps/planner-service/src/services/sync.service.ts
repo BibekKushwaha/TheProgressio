@@ -1,7 +1,30 @@
 import { prisma, Priority, Status } from '@repo/db';
+import { postJsonRequest } from './internal-http.service.js';
 import { emitTaskEvent, TaskEventType } from './queue.service.js';
 
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://localhost:4003';
+
+const notifyAnalyticsSyncEvent = async (body: Record<string, unknown>): Promise<void> => {
+  if (process.env.NODE_ENV === 'test') return;
+
+  const result = await postJsonRequest({
+    url: `${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`,
+    body,
+    logContext: {
+      service: 'planner-service',
+      subsystem: 'sync',
+      dependency: 'analytics-service',
+      operation: 'sync_task_event',
+    },
+  });
+
+  if (!result.ok) {
+    const detail = result.status > 0
+      ? `${result.status}: ${result.bodyText || 'Unknown error'}`
+      : result.reason;
+    console.warn(`Failed to notify analytics from sync service (${detail})`);
+  }
+};
 
 export type SyncEntityType = 'task' | 'category';
 export type SyncAction = 'UPSERT' | 'DELETE';
@@ -270,11 +293,7 @@ const applyTaskOperation = async (params: {
     }
 
     try {
-      await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'TASK_DELETED', taskId: params.entityId, userId: params.userId }),
-      });
+      await notifyAnalyticsSyncEvent({ type: 'TASK_DELETED', taskId: params.entityId, userId: params.userId });
     } catch (_err) {
       // swallow errors for robustness
     }
@@ -334,10 +353,12 @@ const applyTaskOperation = async (params: {
       }
 
       try {
-        await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'TASK_STATUS_CHANGED', taskId: params.entityId, userId: params.userId, previousStatus: existing.status, newStatus: normalized.status }),
+        await notifyAnalyticsSyncEvent({
+          type: 'TASK_STATUS_CHANGED',
+          taskId: params.entityId,
+          userId: params.userId,
+          previousStatus: existing.status,
+          newStatus: normalized.status,
         });
       } catch (_err) {
         // ignore

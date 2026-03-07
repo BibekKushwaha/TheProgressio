@@ -8,6 +8,22 @@ export function getApiErrorStatus(error: unknown): number | null {
     return error.status;
 }
 
+export function getApiErrorReportStatus(error: unknown): number | string | undefined {
+    if (!isRecord(error)) return undefined;
+
+    if (typeof error.status === 'number' || typeof error.status === 'string') {
+        return error.status;
+    }
+
+    if (typeof error.error === 'string') {
+        if (error.error.includes('FETCH_ERROR') || error.error.includes('Failed to fetch')) {
+            return 'FETCH_ERROR';
+        }
+    }
+
+    return undefined;
+}
+
 export function getApiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
     if (!isRecord(error)) return fallback;
 

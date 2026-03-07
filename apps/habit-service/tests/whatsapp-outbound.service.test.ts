@@ -39,8 +39,12 @@ vi.mock("../src/services/nudge-dispatch.queue.js", () => ({
 
 beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
     delete process.env.WHATSAPP_PHONE_NUMBER_ID;
     delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_DISPATCH_TIMEOUT_MS;
+    delete process.env.WHATSAPP_DISPATCH_MAX_RETRIES;
     delete process.env.WHATSAPP_OUTBOUND_URL;
     delete process.env.WHATSAPP_USER_PHONE_MAP;
     mockSchoolHolidayFindFirst.mockResolvedValue(null);
@@ -201,5 +205,66 @@ describe("whatsapp-outbound push-first flow", () => {
         const parsedMetadata = JSON.parse(updateCall.data.metadata);
         expect(parsedMetadata.dispatch.wa.status).toBe("sent");
         expect(updateCall.data.skippedReason).toBeNull();
+    });
+
+    it("retries outbound relay delivery after a timeout and eventually sends", async () => {
+        vi.useFakeTimers();
+        process.env.WHATSAPP_OUTBOUND_URL = "https://wa-relay.example.com/send";
+        process.env.WHATSAPP_DISPATCH_TIMEOUT_MS = "25";
+        process.env.WHATSAPP_DISPATCH_MAX_RETRIES = "2";
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const pushSentAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        mockNudgeFindFirst.mockResolvedValue({
+            id: "nudge-5",
+            userId: "user-5",
+            title: "Reminder",
+            message: "Finish the revision set",
+            priority: "HIGH",
+            metadata: JSON.stringify({
+                dispatch: {
+                    push: { sentAt: pushSentAt, status: "sent" },
+                    wa: { status: "scheduled" },
+                },
+            }),
+            scheduledAt: new Date(Date.now() - 50 * 60 * 1000),
+            expiresAt: null,
+            deliveredAt: new Date(Date.now() - 30 * 60 * 1000),
+            user: {
+                whatsappVerified: true,
+                whatsappNumber: "919800000001",
+                plan: "PRO",
+                planStatus: "ACTIVE",
+                lastActiveAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+            },
+        });
+        mockUserConversationFindUnique.mockResolvedValue({
+            windowStartedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        });
+
+        const fetchMock = vi
+            .fn()
+            .mockImplementationOnce((_url: string, init?: RequestInit) => {
+                return new Promise((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => {
+                        reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+                    });
+                });
+            })
+            .mockResolvedValueOnce(new Response(null, { status: 200 }));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const pending = processWhatsAppFallbackNudgeById("nudge-5");
+
+        await vi.advanceTimersByTimeAsync(1_000);
+
+        const result = await pending;
+
+        expect(result.status).toBe("sent");
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(warnSpy).toHaveBeenCalled();
+        const updateCall = mockNudgeUpdate.mock.calls[0]?.[0];
+        const parsedMetadata = JSON.parse(updateCall.data.metadata);
+        expect(parsedMetadata.dispatch.wa.attempts).toBe(2);
     });
 });

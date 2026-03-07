@@ -1,18 +1,69 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGetCategoriesQuery } from '@repo/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TopicSection } from './_components/TopicSection';
 import { PrerequisiteSection } from './_components/PrerequisiteSection';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { getApiErrorReportStatus } from '@/lib/api-error';
+import { reportApiError } from '@/lib/errorReporter';
 
 export default function SyllabusPage() {
-  const { data: categories } = useGetCategoriesQuery();
+  const { data: categories, isLoading, isError, error, refetch } = useGetCategoriesQuery();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+
+  useEffect(() => {
+    if (error) {
+      reportApiError(getApiErrorReportStatus(error), 'getCategories', error);
+    }
+  }, [error]);
+
+  if (isError && !(categories ?? []).length && !isLoading) {
+    return (
+      <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-white backdrop-blur-xl">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl border border-red-400/30 bg-red-500/20 p-2">
+            <AlertTriangle className="h-5 w-5 text-red-200" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold">Syllabus graph is temporarily unavailable</h2>
+            <p className="mt-2 text-sm text-slate-200">
+              We could not load subject categories for syllabus management right now.
+            </p>
+            <button
+              onClick={() => void refetch()}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Retry syllabus
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {isError ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
+              <p>Category sync is temporarily unavailable. Syllabus editing may be limited until the next refresh.</p>
+            </div>
+            <button
+              onClick={() => void refetch()}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Retry data
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold text-white">Syllabus Graph</h1>
         <p className="text-slate-400 text-sm">

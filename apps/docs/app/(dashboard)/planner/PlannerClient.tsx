@@ -2,17 +2,31 @@
 
 import { RecoveryModePanel } from '@/components/planner/RecoveryModePanel';
 import { useGetTasksQuery } from '@repo/store';
-import { useMemo } from 'react';
-import { AlertCircle, Zap, Clock } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { AlertCircle, Zap, Clock, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { toLocalDateKey, getTodayDateKey } from '@/lib/date';
+import { getApiErrorMessage, getApiErrorReportStatus } from '@/lib/api-error';
+import { reportApiError } from '@/lib/errorReporter';
 
 // Static — declared outside the component so RTK Query receives a stable reference
 // and useMemo overhead is avoided entirely.
 const PLANNER_TASKS_ARGS = { page: 1, limit: 500 } as const;
 
 export function PlannerClient() {
-    const { data: allTasks } = useGetTasksQuery(PLANNER_TASKS_ARGS);
+    const {
+        data: allTasks,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useGetTasksQuery(PLANNER_TASKS_ARGS);
     const tasks = useMemo(() => allTasks ?? [], [allTasks]);
+
+    useEffect(() => {
+        if (error) {
+            reportApiError(getApiErrorReportStatus(error), 'getTasks', error);
+        }
+    }, [error]);
 
     // Calculate task metrics
     const metrics = useMemo(() => {
@@ -47,8 +61,63 @@ export function PlannerClient() {
         return { overdue, dueToday, pending, completed, total: tasks.length };
     }, [tasks]);
 
+    if (isLoading && tasks.length === 0) {
+        return (
+            <div className="flex-1 space-y-6 py-4">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {[1, 2, 3, 4].map((item) => (
+                        <div key={item} className="h-24 rounded-lg border border-white/10 bg-white/[0.02]" />
+                    ))}
+                </div>
+                <div className="h-96 rounded-xl border border-white/10 bg-white/[0.02]" />
+            </div>
+        );
+    }
+
+    if (isError && tasks.length === 0) {
+        return (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-white backdrop-blur-xl">
+                <div className="flex items-start gap-3">
+                    <div className="rounded-xl border border-red-400/30 bg-red-500/20 p-2">
+                        <AlertTriangle className="h-5 w-5 text-red-200" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-lg font-semibold">Recovery planner is temporarily unavailable</h2>
+                        <p className="mt-2 text-sm text-slate-200">
+                            {getApiErrorMessage(error, 'Unable to load planner tasks right now.')}
+                        </p>
+                        <button
+                            onClick={() => void refetch()}
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
+                        >
+                            <RefreshCcw className="h-4 w-4" />
+                            Retry planner
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex-1 flex flex-col py-4">
+            {isError ? (
+                <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-start gap-2">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
+                            <p>Planner insights may be stale because the latest task refresh failed. Showing the most recent task snapshot available.</p>
+                        </div>
+                        <button
+                            onClick={() => void refetch()}
+                            className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                        >
+                            <RefreshCcw className="h-3.5 w-3.5" />
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            ) : null}
             {/* Header Section */}
             <div className="pb-4 border-b border-white/10">
                 <div className="flex flex-col gap-4">

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from 'react';
 import { AlertTriangle, RefreshCcw } from "lucide-react";
+import { reportError } from '@/lib/errorReporter';
 
 export default function DashboardError({
     error,
@@ -10,6 +12,13 @@ export default function DashboardError({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
+    useEffect(() => {
+        reportError(error, {
+            context: 'dashboard.home.error',
+            ...(error.digest ? { digest: error.digest } : {}),
+        });
+    }, [error]);
+
     return (
         <div className="flex flex-1 items-center justify-center min-h-[60vh] p-6">
             <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-red-500/10 backdrop-blur-xl p-6 text-center text-white">

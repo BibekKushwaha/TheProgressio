@@ -30,6 +30,8 @@ import { toast } from 'sonner';
 
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type EffortOption = (typeof EFFORT_OPTIONS)[number];
+export type EditableField = 'priority' | 'effort' | 'recurring' | 'subject';
+export type ParseConfidence = 'idle' | 'parsing' | 'high' | 'low' | 'none';
 
 /**
  * Shift a local Date object to "apparent UTC" so the backend stores the number
@@ -73,7 +75,7 @@ export interface CreateTaskFormResult {
     entryType: 'task' | 'exam';
     setEntryType: (v: 'task' | 'exam') => void;
     examSubMode: 'schedule' | 'result';
-    setExamSubMode: (v: 'schedule' | 'result') => void;
+    setExamSubMode: (v: 'schedule' | 'result') => void; // clears related validation errors
     examType: string;
     setExamType: (v: string) => void;
     obtainedMarks: string;
@@ -101,6 +103,12 @@ export interface CreateTaskFormResult {
     isLoadingTask: boolean;
     categories: Category[] | undefined;
     subjects: Subject[] | undefined;
+    // validation & confidence
+    validationErrors: Record<string, string>;
+    clearValidationError: (field: string) => void;
+    parseConfidence: ParseConfidence;
+    useSmartCreate: boolean;
+    setUseSmartCreate: (v: boolean) => void;
     // loading flags
     isSubmitting: boolean;
     isParsingTask: boolean;
@@ -116,6 +124,8 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const router = useRouter();
     const searchParams = useSearchParams();
     const taskId = searchParams.get('id');
+    const mode = searchParams.get('mode');
+    const title = searchParams.get('title');
     const dispatch = useAppDispatch();
 
     // ── Form state ──────────────────────────────────────────────────────────
@@ -140,15 +150,21 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const [showManualDetails, setShowManualDetails] = useState(true);
     const [aiSubtaskEnabled, setAiSubtaskEnabled] = useState(false);
     const [isSubmittingNow, setIsSubmittingNow] = useState(false);
+    const [useSmartCreate, setUseSmartCreate] = useState(false);
     // Parsed date
     const [parsedMeta, setParsedMeta] = useState<{ subject?: string; date?: string; time?: string }>({});
     const [parsedDueDate, setParsedDueDate] = useState<string | null>(null);
     const [hasExplicitDueDate, setHasExplicitDueDate] = useState(false);
+    // Validation & confidence
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+    const [parseConfidence, setParseConfidence] = useState<ParseConfidence>('idle');
 
     // ── Refs ────────────────────────────────────────────────────────────────
     const hasHydratedFromExistingTask = useRef(false);
     // Prevents the parse-debounce from overwriting a user-chosen date
     const isDueDateManuallyEditedRef = useRef(false);
+    // Tracks which fields user has manually edited — AI parse will skip these
+    const manuallyEditedFieldsRef = useRef(new Set<EditableField>());
 
     // ── RTK mutations & queries ──────────────────────────────────────────────
     const [addGradeEntry, { isLoading: isAddingGrade }] = useAddGradeEntryMutation();
@@ -164,11 +180,91 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const { data: categories } = useGetCategoriesQuery();
     const { data: subjects } = useGetSubjectsQuery();
 
+    // ── Wrapped setters – mark fields as user-edited ────────────────────────
+    const handleSetPriority = (v: string) => {
+        manuallyEditedFieldsRef.current.add('priority');
+        setSelectedPriority(v);
+        clearValidationError('priority');
+    };
+    const handleSetEffort = (v: EffortOption) => {
+        manuallyEditedFieldsRef.current.add('effort');
+        setSelectedEffort(v);
+    };
+    const handleSetRecurring = (v: boolean) => {
+        manuallyEditedFieldsRef.current.add('recurring');
+        setIsRecurring(v);
+    };
+    const handleSetSubjectId = (v: string) => {
+        manuallyEditedFieldsRef.current.add('subject');
+        setSelectedSubjectId(v);
+        clearValidationError('subject');
+    };
+    const handleSetTaskDescription = (v: string) => {
+        setTaskDescription(v);
+        clearValidationError('title');
+    };
+    const handleSetExamSubMode = (v: 'schedule' | 'result') => {
+        setExamSubMode(v);
+        // Clear errors that belong to the mode being left
+        setValidationErrors(prev => {
+            const next = { ...prev };
+            if (v === 'schedule') {
+                delete next.obtainedMarks;
+                delete next.totalMarks;
+            } else {
+                delete next.dueDate;
+            }
+            return next;
+        });
+    };
+
+    // ── Validation helpers ──────────────────────────────────────────────────
+    const clearValidationError = (field: string) => {
+        setValidationErrors(prev => {
+            if (!prev[field]) return prev;
+            const next = { ...prev };
+            delete next[field];
+            return next;
+        });
+    };
+
+    const validateForm = (): boolean => {
+        const errors: Record<string, string> = {};
+        if (!taskDescription.trim()) errors.title = 'Task title is required';
+        else if (taskDescription.trim().length > 100) errors.title = 'Title must be under 100 characters';
+
+        if (entryType === 'exam') {
+            if (examSubMode === 'result') {
+                const marks = parseFloat(obtainedMarks);
+                const total = parseFloat(totalMarks);
+                if (Number.isNaN(marks) || marks < 0) errors.obtainedMarks = 'Enter valid marks';
+                if (Number.isNaN(total) || total <= 0) errors.totalMarks = 'Enter valid total';
+            } else if (!hasExplicitDueDate) {
+                errors.dueDate = 'Please pick an exam date';
+            }
+        }
+        setValidationErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     // ── Hydrate from existing task on edit ──────────────────────────────────
     useEffect(() => {
         hasHydratedFromExistingTask.current = false;
         isDueDateManuallyEditedRef.current = false;
+        manuallyEditedFieldsRef.current.clear();
     }, [taskId]);
+
+    useEffect(() => {
+        if (taskId) return;
+        if (mode === 'exam') setEntryType('exam');
+        if (mode === 'task') setEntryType('task');
+    }, [mode, taskId]);
+
+    useEffect(() => {
+        if (taskId) return;
+        if (!title) return;
+        setTaskDescription((current) => current || title);
+    }, [title, taskId]);
 
     useEffect(() => {
         if (!existingTask || hasHydratedFromExistingTask.current) return;
@@ -208,8 +304,10 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     // ── Debounced AI parse ──────────────────────────────────────────────────
     useEffect(() => {
         let cancelled = false;
+        const edited = manuallyEditedFieldsRef.current;
         const timer = setTimeout(async () => {
             if (taskDescription.trim().length > 5) {
+                setParseConfidence('parsing');
                 try {
                     const result = await parseTask({ text: taskDescription }).unwrap();
                     if (cancelled) return;
@@ -229,31 +327,51 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                             setHasExplicitDueDate(true);
                         }
 
-                        if (result.priority === PriorityEnum.LOW) setSelectedPriority('Routine');
-                        else if (result.priority === PriorityEnum.MEDIUM) setSelectedPriority('Medium');
-                        else if (result.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
-
-                        if (result.effort && EFFORT_OPTIONS.includes(result.effort as EffortOption)) {
-                            setSelectedEffort(result.effort as EffortOption);
+                        // Only set fields the user hasn't manually edited
+                        if (!edited.has('priority')) {
+                            if (result.priority === PriorityEnum.LOW) setSelectedPriority('Routine');
+                            else if (result.priority === PriorityEnum.MEDIUM) setSelectedPriority('Medium');
+                            else if (result.priority === PriorityEnum.HIGH) setSelectedPriority('Urgent');
                         }
-                        if (result.isRecurring !== undefined) setIsRecurring(result.isRecurring);
 
-                        if (result.subject && categories) {
-                            const matched = categories.find(c => c.name.toLowerCase() === result.subject?.toLowerCase());
-                            if (matched) setSelectedSubjectId(matched.id);
+                        if (!edited.has('effort')) {
+                            if (result.effort && EFFORT_OPTIONS.includes(result.effort as EffortOption)) {
+                                setSelectedEffort(result.effort as EffortOption);
+                            }
                         }
+
+                        if (!edited.has('recurring')) {
+                            if (result.isRecurring !== undefined) setIsRecurring(result.isRecurring);
+                        }
+
+                        if (!edited.has('subject')) {
+                            if (result.subject && categories) {
+                                const matched = categories.find(c => c.name.toLowerCase() === result.subject?.toLowerCase());
+                                if (matched) setSelectedSubjectId(matched.id);
+                            }
+                        }
+
+                        // Compute parse confidence from filled fields
+                        const filledFields = [result.subject, result.dueDate, result.priority, result.effort].filter(Boolean).length;
+                        setParseConfidence(filledFields >= 2 ? 'high' : filledFields >= 1 ? 'low' : 'none');
+                    } else {
+                        setParseConfidence('none');
                     }
                 } catch (err) {
                     if (cancelled) return;
                     console.error('Failed to parse task description:', err);
+                    setParseConfidence('none');
                 }
             } else {
-                if (!cancelled) setParsedMeta({});
+                if (!cancelled) {
+                    setParsedMeta({});
+                    setParseConfidence('idle');
+                }
             }
         }, 500);
 
         return () => { cancelled = true; clearTimeout(timer); };
-        // isDueDateManuallyEditedRef intentionally omitted — accessed via ref
+        // manuallyEditedFieldsRef & isDueDateManuallyEditedRef intentionally omitted — accessed via ref
     }, [taskDescription, parseTask, categories]);
 
     // ── Date/time helper ────────────────────────────────────────────────────
@@ -277,20 +395,24 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     // ── Submit ──────────────────────────────────────────────────────────────
     const handleSaveTask = async () => {
         if (isSubmittingNow) return;
+        if (!validateForm()) return;
         setIsSubmittingNow(true);
         try {
-            const shouldUseSmartCreate =
-                !taskId && entryType === 'task' && taskDescription.trim().length > 80 && description.trim().length === 0;
-
-            if (shouldUseSmartCreate) {
+            // Explicit smart-create toggle (replaces hidden 80-char heuristic)
+            if (!taskId && useSmartCreate && entryType === 'task') {
                 const response = await smartCreateTask({ text: taskDescription }).unwrap();
                 if (response?.task) {
                     dispatch(addTask(response.task));
-                    toast.success('✅ Task created!');
+                    const titlePreview = taskDescription.slice(0, 40) + (taskDescription.length > 40 ? '…' : '');
+                    toast.success('Task created!', {
+                        description: `"${titlePreview}" added to your planner`,
+                        action: { label: 'View Planner', onClick: () => router.push('/planner') },
+                    });
                     if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
                     router.push('/planner');
                     return;
                 }
+                // AI returned no structured task — fall through to regular create
             }
 
             if (entryType === 'exam') {
@@ -310,7 +432,10 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                         obtainedMarks: marks,
                         totalMarks: total,
                     }).unwrap();
-                    toast.success('✅ Exam result logged!');
+                    toast.success('Exam result logged!', {
+                        description: `${obtainedMarks}/${totalMarks} recorded for ${parsedMeta.subject || taskDescription}`,
+                        action: { label: 'View War Room', onClick: () => router.push('/exam-warroom') },
+                    });
                     router.push('/exam-warroom');
                 } else {
                     if (!hasExplicitDueDate || !parsedDueDate) {
@@ -327,7 +452,10 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                         subjectId: UUID_REGEX.test(selectedExamSubjectId) ? selectedExamSubjectId : undefined,
                         priority: 'HIGH',
                     }).unwrap();
-                    toast.success('🗓️ Exam scheduled!');
+                    toast.success('Exam scheduled!', {
+                        description: `"${taskDescription.slice(0, 40)}${taskDescription.length > 40 ? '…' : ''}" is on the calendar`,
+                        action: { label: 'View Calendar', onClick: () => router.push('/calendar') },
+                    });
                     router.push('/calendar');
                 }
                 if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
@@ -389,7 +517,18 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                 }
             }
 
-            toast.success(taskId ? '✏️ Task updated!' : '✅ Task created!');
+            const titlePreview = taskDescription.slice(0, 40) + (taskDescription.length > 40 ? '…' : '');
+            if (taskId) {
+                toast.success('Task updated!', {
+                    description: `"${titlePreview}" has been saved`,
+                    action: { label: 'View Planner', onClick: () => router.push('/planner') },
+                });
+            } else {
+                toast.success('Task created!', {
+                    description: `"${titlePreview}" added to your planner${subtasks.length ? ` with ${subtasks.length} subtask${subtasks.length > 1 ? 's' : ''}` : ''}`,
+                    action: { label: 'View Planner', onClick: () => router.push('/planner') },
+                });
+            }
             if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
             router.push('/planner');
         } catch (error: unknown) {
@@ -429,17 +568,17 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const isSubmitting = isSubmittingNow || isCreating || isSmartCreating || isUpdating || isAddingGrade || isCreatingExam;
 
     return {
-        taskDescription, setTaskDescription,
+        taskDescription, setTaskDescription: handleSetTaskDescription,
         description, setDescription,
-        selectedSubjectId, setSelectedSubjectId,
-        selectedPriority, setSelectedPriority,
-        selectedEffort, setSelectedEffort,
+        selectedSubjectId, setSelectedSubjectId: handleSetSubjectId,
+        selectedPriority, setSelectedPriority: handleSetPriority,
+        selectedEffort, setSelectedEffort: handleSetEffort,
         subtasks, setSubtasks,
-        isRecurring, setIsRecurring,
+        isRecurring, setIsRecurring: handleSetRecurring,
         showManualDetails, setShowManualDetails,
         aiSubtaskEnabled, setAiSubtaskEnabled,
         entryType, setEntryType,
-        examSubMode, setExamSubMode,
+        examSubMode, setExamSubMode: handleSetExamSubMode,
         examType, setExamType,
         obtainedMarks, setObtainedMarks,
         totalMarks, setTotalMarks,
@@ -458,6 +597,11 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         isLoadingTask,
         categories,
         subjects,
+        validationErrors,
+        clearValidationError,
+        parseConfidence,
+        useSmartCreate,
+        setUseSmartCreate,
         isSubmitting,
         isParsingTask,
         isSmartCreating,

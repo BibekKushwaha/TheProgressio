@@ -1,5 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
+import { AnalyticsEmptyState } from '@/components/analytics/AnalyticsEmptyState';
 import { GlassHero } from '@/components/layout/GlassHero';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -88,6 +89,8 @@ export default function AnalyticsStrategicPage() {
     });
   }, [predictionTaskOptions]);
 
+  const isEmptyStrategic = predictionTaskOptions.length === 0;
+
   return (
     <div className="space-y-8">
       <GlassHero
@@ -144,6 +147,17 @@ export default function AnalyticsStrategicPage() {
 
 
               <div className="space-y-6">
+                {isEmptyStrategic ? (
+                  <AnalyticsEmptyState
+                    title="Strategic predictions need a few real tasks first"
+                    description="This area estimates duration, reveals leakage, and highlights your best study windows. Add a pending task or start a focus session to unlock meaningful predictions."
+                    primaryHref="/createtask"
+                    primaryLabel="Create a task"
+                    secondaryHref="/focus-session"
+                    secondaryLabel="Start a focus session"
+                  />
+                ) : (
+                  <>
                 <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1.5fr] gap-6">
                   <DurationPredictionCard
                     taskId={selectedPredictionTaskId || undefined}
@@ -167,6 +181,8 @@ export default function AnalyticsStrategicPage() {
                     examType={examType}
                   />
                 </div>
+                  </>
+                )}
               </div>
 
 

@@ -12,6 +12,7 @@ import {
 import { fromDbEffortValue, normalizeEffortValue, toDbEffortValue } from "@repo/schemas/effort";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { aiService, type ParsedTaskIntent } from "../services/ai.service.js";
+import { postJsonRequest } from "../services/internal-http.service.js";
 import { emitTaskEvent, TaskEventType } from "../services/queue.service.js";
 import { recoveryService } from "../services/recovery.service.js";
 import { TryCatch } from "../utils/tryCatch.js";
@@ -66,6 +67,16 @@ const markServiceUnavailable = (service: "habit" | "analytics", reason: string):
     }
 };
 
+const shouldOpenOutageWindow = (status: number): boolean => status === 0 || status >= 500;
+
+const formatSideEffectFailure = (result: { status: number; bodyText: string | null; reason: string }): string => {
+    if (result.status > 0) {
+        return `${result.status}: ${result.bodyText || "Unknown error"}`;
+    }
+
+    return result.reason;
+};
+
 const notifyHabitCategoryCompletion = async (params: {
     userId: string;
     categoryId: string | null;
@@ -75,28 +86,29 @@ const notifyHabitCategoryCompletion = async (params: {
     if (!params.categoryId) return;
     if (isTemporarilyUnavailable("habit")) return;
 
-    try {
-        const response = await fetch(`${HABIT_SERVICE_URL}/api/habits/events`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                type: "TaskCompleted",
-                userId: params.userId,
-                categoryId: params.categoryId,
-                completedValue: 1,
-                occurredAt: params.occurredAt,
-            }),
-        });
+    const result = await postJsonRequest({
+        url: `${HABIT_SERVICE_URL}/api/habits/events`,
+        body: {
+            type: "TaskCompleted",
+            userId: params.userId,
+            categoryId: params.categoryId,
+            completedValue: 1,
+            occurredAt: params.occurredAt,
+        },
+        logContext: {
+            service: "planner-service",
+            subsystem: "task-side-effects",
+            dependency: "habit-service",
+            operation: "task_completed_event",
+        },
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.warn(
-                `⚠️ Habit automation event failed (${response.status}): ${errorText || "Unknown error"}`
-            );
+    if (!result.ok) {
+        if (shouldOpenOutageWindow(result.status)) {
+            markServiceUnavailable("habit", result.reason);
         }
-    } catch (error: any) {
-        const reason = error?.cause?.code || error?.code || error?.name || "fetch_failed";
-        markServiceUnavailable("habit", String(reason));
+
+        console.warn(`⚠️ Habit automation event failed (${formatSideEffectFailure(result)})`);
     }
 };
 
@@ -105,25 +117,26 @@ const notifyAnalyticsTaskCompletion = async (params: {
 }): Promise<void> => {
     if (process.env.NODE_ENV === "test") return;
     if (isTemporarilyUnavailable("analytics")) return;
-    try {
-        const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                type: "TASK_COMPLETED",
-                taskId: params.taskId,
-            }),
-        });
+    const result = await postJsonRequest({
+        url: `${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`,
+        body: {
+            type: "TASK_COMPLETED",
+            taskId: params.taskId,
+        },
+        logContext: {
+            service: "planner-service",
+            subsystem: "task-side-effects",
+            dependency: "analytics-service",
+            operation: "task_completed_event",
+        },
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.warn(
-                `⚠️ Analytics completion event failed (${response.status}): ${errorText || "Unknown error"}`
-            );
+    if (!result.ok) {
+        if (shouldOpenOutageWindow(result.status)) {
+            markServiceUnavailable("analytics", result.reason);
         }
-    } catch (error: any) {
-        const reason = error?.cause?.code || error?.code || error?.name || "fetch_failed";
-        markServiceUnavailable("analytics", String(reason));
+
+        console.warn(`⚠️ Analytics completion event failed (${formatSideEffectFailure(result)})`);
     }
 };
 
@@ -134,27 +147,28 @@ const notifyAnalyticsTaskUpdate = async (params: {
 }): Promise<void> => {
     if (process.env.NODE_ENV === "test") return;
     if (isTemporarilyUnavailable("analytics")) return;
-    try {
-        const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                type: "TASK_UPDATED",
-                taskId: params.taskId,
-                userId: params.userId,
-                changedFields: params.changedFields,
-            }),
-        });
+    const result = await postJsonRequest({
+        url: `${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`,
+        body: {
+            type: "TASK_UPDATED",
+            taskId: params.taskId,
+            userId: params.userId,
+            changedFields: params.changedFields,
+        },
+        logContext: {
+            service: "planner-service",
+            subsystem: "task-side-effects",
+            dependency: "analytics-service",
+            operation: "task_updated_event",
+        },
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.warn(
-                `⚠️ Analytics update event failed (${response.status}): ${errorText || "Unknown error"}`
-            );
+    if (!result.ok) {
+        if (shouldOpenOutageWindow(result.status)) {
+            markServiceUnavailable("analytics", result.reason);
         }
-    } catch (error: any) {
-        const reason = error?.cause?.code || error?.code || error?.name || "fetch_failed";
-        markServiceUnavailable("analytics", String(reason));
+
+        console.warn(`⚠️ Analytics update event failed (${formatSideEffectFailure(result)})`);
     }
 };
 
@@ -164,26 +178,27 @@ const notifyAnalyticsTaskDeletion = async (params: {
 }): Promise<void> => {
     if (process.env.NODE_ENV === "test") return;
     if (isTemporarilyUnavailable("analytics")) return;
-    try {
-        const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                type: "TASK_DELETED",
-                taskId: params.taskId,
-                userId: params.userId,
-            }),
-        });
+    const result = await postJsonRequest({
+        url: `${ANALYTICS_SERVICE_URL}/api/stats/events/task-completed`,
+        body: {
+            type: "TASK_DELETED",
+            taskId: params.taskId,
+            userId: params.userId,
+        },
+        logContext: {
+            service: "planner-service",
+            subsystem: "task-side-effects",
+            dependency: "analytics-service",
+            operation: "task_deleted_event",
+        },
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.warn(
-                `⚠️ Analytics deletion event failed (${response.status}): ${errorText || "Unknown error"}`
-            );
+    if (!result.ok) {
+        if (shouldOpenOutageWindow(result.status)) {
+            markServiceUnavailable("analytics", result.reason);
         }
-    } catch (error: any) {
-        const reason = error?.cause?.code || error?.code || error?.name || "fetch_failed";
-        markServiceUnavailable("analytics", String(reason));
+
+        console.warn(`⚠️ Analytics deletion event failed (${formatSideEffectFailure(result)})`);
     }
 };
 

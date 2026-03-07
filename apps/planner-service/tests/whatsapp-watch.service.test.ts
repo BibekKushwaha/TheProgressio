@@ -40,6 +40,7 @@ import { runSilentWatchSweep } from '../src/services/whatsapp-watch.service.js';
 describe('whatsapp-watch.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
     delete process.env.WHATSAPP_PARENT_WATCH_MAP;
     delete process.env.ANALYTICS_INTERNAL_SECRET;
   });
@@ -92,5 +93,43 @@ describe('whatsapp-watch.service', () => {
 
     expect(result.alertsSent).toBe(0);
     expect(sendWhatsAppText).not.toHaveBeenCalled();
+  });
+
+  it('uses analytics consistency when the internal secret is configured', async () => {
+    process.env.ANALYTICS_INTERNAL_SECRET = 'analytics-secret';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ consistencyScore: 20 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    mockPrisma.mentorAlertSubscription.findMany.mockResolvedValueOnce([
+      {
+        id: 'sub-2',
+        userId: 'user-2',
+        label: 'Dad',
+        recipientPhone: '+911234567891',
+        overdueThreshold: 99,
+        consistencyThreshold: 50,
+        cooldownMinutes: 0,
+        lastAlertAt: null,
+      },
+    ]);
+
+    mockPrisma.task.count.mockResolvedValueOnce(0);
+
+    const result = await runSilentWatchSweep();
+
+    expect(result.alertsSent).toBe(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/stats/internal/consistency?userId=user-2'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: { 'x-internal-secret': 'analytics-secret' },
+      }),
+    );
+    expect(sendWhatsAppText).toHaveBeenCalledTimes(1);
   });
 });

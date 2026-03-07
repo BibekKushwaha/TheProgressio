@@ -30,6 +30,7 @@ import {
     revokeSession,
     updateProfile,
 } from '../controllers/auth.controller.js';
+import { requireAdminBootstrapIp } from '../utils/adminBootstrapGuard.js';
 
 const router = express.Router();
 
@@ -70,8 +71,8 @@ router.delete("/sessions", logoutAllDevices);   // revoke all sessions
 router.delete("/sessions/:id", revokeSession);   // revoke one session
 
 // Admin role management (protected by ADMIN_BOOTSTRAP_SECRET header)
-router.post("/admin/promote", promoteToAdmin);
-router.post("/admin/demote", demoteFromAdmin);
+router.post("/admin/promote", requireAdminBootstrapIp, promoteToAdmin);
+router.post("/admin/demote", requireAdminBootstrapIp, demoteFromAdmin);
 
 
 

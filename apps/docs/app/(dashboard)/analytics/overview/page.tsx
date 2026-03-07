@@ -1,12 +1,16 @@
 "use client";
 import { AnalyticsHeader } from "@/components/analytics/AnalyticHeader";
+import { AnalyticsEmptyState } from "@/components/analytics/AnalyticsEmptyState";
+import Link from "next/link";
 import { FocusTrends } from "@/components/analytics/FocusTrend";
 import { SessionBreakdown } from "@/components/analytics/SessionBreakdown";
 import { StatCards } from "@/components/analytics/StatCard";
 import { MetricGrid } from "@/components/analytics/MetricCard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, CheckCircle, Target, TrendingUp } from 'lucide-react';
+import { Clock, CheckCircle, Target, TrendingUp, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { getApiErrorReportStatus } from '@/lib/api-error';
+import { reportApiError } from '@/lib/errorReporter';
 
 import {
   useGetDailySummaryQuery,
@@ -14,7 +18,7 @@ import {
   useGetHabitsQuery,
   useGetTaskMetricsQuery,
 } from "@repo/store";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function AnalyticsOverviewPage() {
   const [pastDays, setPastDays] = useState("1");
@@ -22,7 +26,10 @@ export default function AnalyticsOverviewPage() {
   const {
     data: summaryData,
     isLoading: isSummaryLoading,
-    isFetching: isSummaryFetching
+    isFetching: isSummaryFetching,
+    isError: isSummaryError,
+    error: summaryError,
+    refetch: refetchSummary,
   } = useGetDailySummaryQuery(pastDays);
 
   // BFF replaces useGetFocusScoreQuery — gets score+breakdown in the same
@@ -30,7 +37,10 @@ export default function AnalyticsOverviewPage() {
   const {
     data: dashboardData,
     isLoading: isDashLoading,
-    isFetching: isDashFetching
+    isFetching: isDashFetching,
+    isError: isDashError,
+    error: dashboardError,
+    refetch: refetchDashboard,
   } = useGetDashboardSummaryQuery(
     { leakageDays: parseInt(pastDays) || 7, peakDays: 30 }
   );
@@ -39,12 +49,42 @@ export default function AnalyticsOverviewPage() {
   const {
     data: taskMetricsData,
     isLoading: isTaskMetricsLoading,
+    isError: isTaskMetricsError,
+    error: taskMetricsError,
+    refetch: refetchTaskMetrics,
   } = useGetTaskMetricsQuery(undefined);
 
   const {
     data: habitsResponse,
-    isLoading: isHabitsLoading
+    isLoading: isHabitsLoading,
+    isError: isHabitsError,
+    error: habitsError,
+    refetch: refetchHabits,
   } = useGetHabitsQuery(undefined);
+
+  useEffect(() => {
+    if (summaryError) {
+      reportApiError(getApiErrorReportStatus(summaryError), 'getDailySummary', summaryError);
+    }
+  }, [summaryError]);
+
+  useEffect(() => {
+    if (dashboardError) {
+      reportApiError(getApiErrorReportStatus(dashboardError), 'getDashboardSummary', dashboardError);
+    }
+  }, [dashboardError]);
+
+  useEffect(() => {
+    if (taskMetricsError) {
+      reportApiError(getApiErrorReportStatus(taskMetricsError), 'getTaskMetrics', taskMetricsError);
+    }
+  }, [taskMetricsError]);
+
+  useEffect(() => {
+    if (habitsError) {
+      reportApiError(getApiErrorReportStatus(habitsError), 'getHabits', habitsError);
+    }
+  }, [habitsError]);
 
   const habits = useMemo(() => habitsResponse?.habits || [], [habitsResponse]);
 
@@ -89,10 +129,23 @@ export default function AnalyticsOverviewPage() {
 
   const isWeekly = pastDays === "7";
   const timeLabel = isWeekly ? 'Weekly' : 'Today\'s';
+  const failedPanels = [
+    isSummaryError && !summaryData ? 'focus summary' : null,
+    isDashError && !dashboardData ? 'focus score' : null,
+    isTaskMetricsError && !taskMetricsData ? 'task metrics' : null,
+    isHabitsError && !habitsResponse ? 'habit metrics' : null,
+  ].filter((value): value is string => Boolean(value));
+  const isEmptyAnalytics = !isSummaryLoading && !isDashLoading && !isTaskMetricsLoading && !isHabitsLoading
+    && failedPanels.length === 0
+    && taskMetrics.total === 0
+    && habitMetrics.total === 0
+    && (summaryData?.stats?.totalHours ?? 0) === 0;
 
   const stats = useMemo(() => {
     const isSummaryMissing = !summaryData && (isSummaryLoading || isSummaryFetching);
     const isDashMissing = !dashboardData && (isDashLoading || isDashFetching);
+    const isSummaryUnavailable = isSummaryError && !summaryData;
+    const isDashUnavailable = isDashError && !dashboardData;
 
     const hours = summaryData?.stats?.totalHours ?? 0;
     const formattedHours = hours >= 10 ? Math.round(hours) : hours.toFixed(1);
@@ -107,7 +160,7 @@ export default function AnalyticsOverviewPage() {
     return [
       {
         label: `${timeLabel} Focus Time`,
-        value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : `${formattedHours}h`,
+        value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : isSummaryUnavailable ? 'Unavailable' : `${formattedHours}h`,
         trend: isWeekly ? "Total" : "+12%",
         trendDirection: (hours > 0 ? 'up' : 'neutral') as 'up' | 'neutral' | 'down',
         icon: Clock,
@@ -116,7 +169,7 @@ export default function AnalyticsOverviewPage() {
       },
       {
         label: `${timeLabel} Completion`,
-        value: isSummaryMissing ? <Skeleton className="h-8 w-12 bg-white/10" /> : `${summaryData?.stats?.totalTasksCompleted ?? 0}`,
+        value: isSummaryMissing ? <Skeleton className="h-8 w-12 bg-white/10" /> : isSummaryUnavailable ? 'Unavailable' : `${summaryData?.stats?.totalTasksCompleted ?? 0}`,
         trend: "Tasks",
         trendDirection: ((summaryData?.stats?.totalTasksCompleted ?? 0) > 0 ? 'up' : 'neutral') as 'up' | 'neutral' | 'down',
         icon: CheckCircle,
@@ -125,7 +178,7 @@ export default function AnalyticsOverviewPage() {
       },
       {
         label: 'Overall Focus Score',
-        value: isDashMissing ? <Skeleton className="h-8 w-24 bg-white/10" /> : `${scoreDisplay}/100`,
+        value: isDashMissing ? <Skeleton className="h-8 w-24 bg-white/10" /> : isDashUnavailable ? 'Unavailable' : `${scoreDisplay}/100`,
         trend: focusScore >= 80 ? "Excellent" : focusScore >= 60 ? "Good" : "Steady",
         trendDirection: (focusScore >= 80 ? 'up' : focusScore >= 50 ? 'neutral' : 'down') as 'up' | 'neutral' | 'down',
         icon: Target,
@@ -134,7 +187,7 @@ export default function AnalyticsOverviewPage() {
       },
       {
         label: `${isWeekly ? 'Weekly' : 'Daily'} Target`,
-        value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : `${progress}%`,
+        value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : isSummaryUnavailable ? 'Unavailable' : `${progress}%`,
         trend: "Progress",
         trendDirection: (progress >= 80 ? 'up' : progress >= 50 ? 'neutral' : 'down') as 'up' | 'neutral' | 'down',
         icon: TrendingUp,
@@ -142,7 +195,16 @@ export default function AnalyticsOverviewPage() {
         isLoading: isSummaryLoading && !summaryData
       },
     ];
-  }, [summaryData, dashboardData, isSummaryLoading, isSummaryFetching, isDashLoading, isDashFetching, timeLabel, isWeekly]);
+  }, [summaryData, dashboardData, isSummaryLoading, isSummaryFetching, isSummaryError, isDashLoading, isDashFetching, isDashError, timeLabel, isWeekly]);
+
+  const retryAll = () => {
+    void Promise.allSettled([
+      refetchSummary(),
+      refetchDashboard(),
+      refetchTaskMetrics(),
+      refetchHabits(),
+    ]);
+  };
 
   return (
     <div className="space-y-8">
@@ -150,6 +212,36 @@ export default function AnalyticsOverviewPage() {
         pastDays={pastDays}
         setPastDays={setPastDays}
       />
+      {failedPanels.length > 0 ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
+              <p>
+                Some analytics panels are using partial data because {failedPanels.join(', ')} {failedPanels.length === 1 ? 'is' : 'are'} temporarily unavailable.
+              </p>
+            </div>
+            <button
+              onClick={retryAll}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Retry data
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {isEmptyAnalytics ? (
+        <AnalyticsEmptyState
+          title="Your analytics will come alive after your first few study actions"
+          description="Create a task, log one habit, or complete a focus session. As soon as you have a little activity, this page will turn into a real study dashboard instead of empty numbers."
+          primaryHref="/createtask"
+          primaryLabel="Create your first task"
+          secondaryHref="/habits"
+          secondaryLabel="Start a study habit"
+        />
+      ) : (
+        <>
       <StatCards items={stats} />
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 min-w-0">
@@ -172,6 +264,10 @@ export default function AnalyticsOverviewPage() {
                 {Array.from({ length: 10 }).map((_, index) => (
                   <Skeleton key={index} className="h-16 bg-white/10" />
                 ))}
+              </div>
+            ) : isTaskMetricsError && !taskMetricsData ? (
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                Task metrics are temporarily unavailable. Retry data loading to refresh this panel.
               </div>
             ) : (
               <MetricGrid
@@ -203,6 +299,10 @@ export default function AnalyticsOverviewPage() {
                   <Skeleton key={index} className="h-16 bg-white/10" />
                 ))}
               </div>
+            ) : isHabitsError && !habitsResponse ? (
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                Habit metrics are temporarily unavailable. Retry data loading to refresh this panel.
+              </div>
             ) : (
               <MetricGrid
                 metrics={[
@@ -222,7 +322,26 @@ export default function AnalyticsOverviewPage() {
         </Card>
       </div>
 
+      <Card variant="glass" className="p-6">
+        <CardHeader>
+          <CardTitle>Weekly Report</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <p className="max-w-2xl text-sm text-slate-400">
+            Need a compact summary instead of the full analytics workspace? Open the weekly report for a cleaner, shareable snapshot of focus time, completed work, and momentum.
+          </p>
+          <Link
+            href="/reports"
+            className="inline-flex items-center justify-center rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 transition hover:bg-indigo-500/20"
+          >
+            Open weekly report
+          </Link>
+        </CardContent>
+      </Card>
 
+
+        </>
+      )}
     </div>
   );
 }

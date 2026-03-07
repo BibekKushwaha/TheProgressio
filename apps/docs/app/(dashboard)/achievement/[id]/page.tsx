@@ -1,11 +1,13 @@
 "use client";
 
-import { use } from 'react';
+import { use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGetAchievementsQuery } from '@repo/store';
 import AchievementDetailModal from '../../../../components/modals/achievement-detail-modal';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { getApiErrorReportStatus } from '@/lib/api-error';
+import { reportApiError } from '@/lib/errorReporter';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -15,9 +17,15 @@ const AchievementDetailPage = ({ params }: PageProps) => {
     const router = useRouter();
     const { id } = use(params);
 
-    const { data: achievementsData, isLoading, isError } = useGetAchievementsQuery();
+    const { data: achievementsData, isLoading, isError, error, refetch } = useGetAchievementsQuery();
     const achievements = achievementsData?.achievements ?? [];
     const achievement = achievements.find(a => a.id === id);
+
+    useEffect(() => {
+        if (error) {
+            reportApiError(getApiErrorReportStatus(error), 'getAchievements', error);
+        }
+    }, [error]);
 
     const handleClose = () => router.push('/achievement');
 
@@ -36,7 +44,34 @@ const AchievementDetailPage = ({ params }: PageProps) => {
         );
     }
 
-    if (isError || !achievement) {
+    if (isError && achievements.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center p-4 text-center">
+                <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl max-w-md">
+                    <h1 className="text-2xl font-bold text-red-400 mb-2">Achievement details unavailable</h1>
+                    <p className="text-slate-400 mb-6">
+                        We couldn&apos;t load the achievement catalog right now.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button
+                            onClick={() => void refetch()}
+                            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-full transition-colors inline-block"
+                        >
+                            Retry
+                        </button>
+                        <Link
+                            href="/achievement"
+                            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-full transition-colors inline-block"
+                        >
+                            Back to Achievements
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!achievement) {
         return (
             <div className="flex flex-col items-center justify-center p-4 text-center">
                 <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl max-w-md">

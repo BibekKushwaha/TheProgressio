@@ -17,6 +17,10 @@ const BASE_URL = `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}`;
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 400;
+const REQUEST_TIMEOUT_MS = Math.max(
+    1_000,
+    Number.parseInt(process.env.WHATSAPP_CLOUD_TIMEOUT_MS ?? "5000", 10) || 5000,
+);
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -47,6 +51,35 @@ interface MetaErrorResponse {
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const logCloudClientEvent = (params: {
+    event: 'dependency_request_failed' | 'dependency_request_retry';
+    status: number;
+    reason: string;
+    durationMs?: number;
+    attempt?: number;
+    maxRetries?: number;
+    responsePreview?: string | null;
+}): void => {
+    console.warn(JSON.stringify({
+        service: 'planner-service',
+        subsystem: 'whatsapp-cloud-client',
+        dependency: 'meta-whatsapp-cloud',
+        operation: 'send_message',
+        event: params.event,
+        level: 'warn',
+        method: 'POST',
+        target: 'https://graph.facebook.com',
+        status: params.status,
+        reason: params.reason,
+        ...(params.durationMs !== undefined ? { durationMs: params.durationMs } : {}),
+        timeoutMs: REQUEST_TIMEOUT_MS,
+        ...(params.attempt !== undefined ? { attempt: params.attempt } : {}),
+        ...(params.maxRetries !== undefined ? { maxRetries: params.maxRetries } : {}),
+        ...(params.responsePreview ? { responsePreview: params.responsePreview.slice(0, 160) } : {}),
+        ts: new Date().toISOString(),
+    }));
+};
+
 function isConfigured(): boolean {
     return Boolean(PHONE_NUMBER_ID && ACCESS_TOKEN);
 }
@@ -55,19 +88,50 @@ async function metaRequest<T>(
     path: string,
     body: Record<string, unknown>,
 ): Promise<T> {
-    const response = await fetch(`${BASE_URL}${path}`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${ACCESS_TOKEN}`,
-        },
-        body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const startedAt = Date.now();
+
+    let response: Response;
+    try {
+        response = await fetch(`${BASE_URL}${path}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${ACCESS_TOKEN}`,
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+        });
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError') {
+            logCloudClientEvent({
+                event: 'dependency_request_failed',
+                status: 408,
+                reason: 'timeout',
+                durationMs: Date.now() - startedAt,
+            });
+            const timeoutError = new Error(`Meta WhatsApp API error: timeout after ${REQUEST_TIMEOUT_MS}ms`);
+            (timeoutError as any).retryable = true;
+            (timeoutError as any).statusCode = 408;
+            throw timeoutError;
+        }
+        throw error;
+    }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
         const err = (await response.json().catch(() => ({}))) as MetaErrorResponse;
         const msg = err.error?.message ?? `HTTP ${response.status}`;
         const retryable = response.status === 429 || response.status >= 500;
+        logCloudClientEvent({
+            event: 'dependency_request_failed',
+            status: response.status,
+            reason: `http_${response.status}`,
+            durationMs: Date.now() - startedAt,
+            responsePreview: msg,
+        });
         const error = new Error(`Meta WhatsApp API error: ${msg}`);
         (error as any).retryable = retryable;
         (error as any).statusCode = response.status;
@@ -93,6 +157,13 @@ async function withRetry<T>(
                     attempts: attempt,
                 };
             }
+            logCloudClientEvent({
+                event: 'dependency_request_retry',
+                status: Number((err as any).statusCode ?? 0),
+                reason: err instanceof Error ? err.message : 'retryable_failure',
+                attempt,
+                maxRetries,
+            });
             await delay(RETRY_BASE_MS * Math.pow(2, attempt - 1));
         }
     }

@@ -13,6 +13,7 @@ interface TaskInputCardProps {
     onChange: (value: string) => void;
     isParsing?: boolean;
     highlights?: TokenHighlight[];
+    maxLength?: number;
 }
 
 const HIGHLIGHT_COLORS: Record<string, string> = {
@@ -63,7 +64,7 @@ function buildHighlightedText(text: string, highlights: TokenHighlight[]) {
     return <>{fragments}</>;
 }
 
-export function TaskInputCard({ value, onChange, isParsing, highlights = [] }: TaskInputCardProps) {
+export function TaskInputCard({ value, onChange, isParsing, highlights = [], maxLength = 100 }: TaskInputCardProps) {
     const handleVoiceResult = (text: string) => {
         onChange(value ? `${value} ${text}` : text);
     };
@@ -101,7 +102,16 @@ export function TaskInputCard({ value, onChange, isParsing, highlights = [] }: T
                     </div>
                 ) : <span className="text-xs text-transparent select-none">status</span>}
 
-                <VoiceInput onResult={handleVoiceResult} isCompact />
+                <div className="flex items-center gap-3">
+                    {value.length >= maxLength - 20 && (
+                        <span className={`text-[10px] tabular-nums transition-colors ${
+                            value.length >= maxLength ? 'text-rose-400 font-semibold' : 'text-slate-500'
+                        }`}>
+                            {value.length}/{maxLength}
+                        </span>
+                    )}
+                    <VoiceInput onResult={handleVoiceResult} isCompact />
+                </div>
             </div>
         </div>
     );

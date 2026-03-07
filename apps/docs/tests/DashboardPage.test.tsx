@@ -3,6 +3,27 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, vi, expect } from 'vitest';
 
 // Mock child widgets so this test validates page wiring without depending on RTK Query.
+vi.mock('@/components/dashboard/DashboardLayoutContext', () => ({
+  DashboardLayoutProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+vi.mock('@/components/dashboard/OnboardingWizard', () => ({
+  OnboardingWizard: () => <div>__OnboardingWizard__</div>,
+}));
+vi.mock('@/components/dashboard/ModifiableDashboard', () => ({
+  ModifiableDashboard: () => (
+    <div>
+      <div>__WelcomeHeader__</div>
+      <div>__LiveActivityWidget__</div>
+      <div>__TopStats__</div>
+      <div>__WeeklyActivity__</div>
+      <div>__TodaysTasks__</div>
+      <div>__MorningBriefing__</div>
+      <div>__QuickActions__</div>
+      <div>__NotesWidget__</div>
+      <div>__ActivityLedger__</div>
+    </div>
+  ),
+}));
 vi.mock('@/components/dashboard/WelcomeHeader', () => ({
   WelcomeHeader: () => <div>__WelcomeHeader__</div>,
 }));
@@ -48,4 +69,3 @@ describe('Dashboard page', () => {
     expect(screen.getByText('__ActivityLedger__')).toBeTruthy();
   });
 });
-

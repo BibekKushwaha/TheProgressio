@@ -15,8 +15,75 @@ type ErrorContext = Record<string, string | number | boolean | undefined>;
 
 type CaptureException = (error: unknown, context?: ErrorContext) => void;
 
+type BrowserErrorPayload = {
+    message: string;
+    name: string;
+    stack?: string;
+    context?: ErrorContext;
+    href?: string;
+    userAgent?: string;
+    ts: string;
+};
+
+const CLIENT_ERROR_ENDPOINT = '/api/client-errors';
+
 /** Wired-in Sentry capture function (set once at bootstrap). */
 let _capture: CaptureException | null = null;
+
+const isBrowser = (): boolean => typeof window !== 'undefined';
+
+const normalizeError = (error: unknown): Pick<BrowserErrorPayload, 'message' | 'name' | 'stack'> => {
+    if (error instanceof Error) {
+        return {
+            message: error.message,
+            name: error.name,
+            ...(error.stack ? { stack: error.stack.slice(0, 4000) } : {}),
+        };
+    }
+
+    if (typeof error === 'string') {
+        return {
+            message: error,
+            name: 'Error',
+        };
+    }
+
+    return {
+        message: 'Unknown error',
+        name: 'UnknownError',
+    };
+};
+
+const emitBrowserError = (error: unknown, context?: ErrorContext): boolean => {
+    if (!isBrowser()) return false;
+
+    const payload: BrowserErrorPayload = {
+        ...normalizeError(error),
+        ...(context ? { context } : {}),
+        href: window.location.href,
+        userAgent: window.navigator.userAgent,
+        ts: new Date().toISOString(),
+    };
+
+    try {
+        const body = JSON.stringify(payload);
+        if (typeof navigator.sendBeacon === 'function') {
+            const blob = new Blob([body], { type: 'application/json' });
+            return navigator.sendBeacon(CLIENT_ERROR_ENDPOINT, blob);
+        }
+
+        void fetch(CLIENT_ERROR_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+            keepalive: true,
+        }).catch(() => {
+        });
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 /**
  * Call once from instrumentation.ts or app bootstrap to wire in Sentry:
@@ -29,6 +96,10 @@ export function configureSentry(captureException: CaptureException): void {
     _capture = captureException;
 }
 
+export function resetErrorReporterForTests(): void {
+    _capture = null;
+}
+
 /**
  * Report a caught error. Sends to Sentry if configured, otherwise to
  * console.error so log aggregators / Sentry's console integration can pick it up.
@@ -36,6 +107,12 @@ export function configureSentry(captureException: CaptureException): void {
 export function reportError(error: unknown, context?: ErrorContext): void {
     if (_capture) {
         _capture(error, context);
+        return;
+    }
+    if (emitBrowserError(error, context)) {
+        if (process.env.NODE_ENV !== 'production') {
+            console.error('[SAT:error]', JSON.stringify(context ?? {}), error);
+        }
         return;
     }
     // Structured log so cloud log monitors can parse severity + context easily.

@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SearchBar } from "@/components/SearchBar";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Flame, CheckCircle2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export function HabitsClient({
@@ -90,8 +90,8 @@ export function HabitsClient({
             <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
             <PageHeader
-                title="Habit Gallery"
-                subtitle="Keep up the streak! You're doing great."
+                title="Habit Tracker"
+                subtitle="Build small daily systems that support your study goals."
             >
                 <Button
                     onClick={() => setIsDialogOpen(true)}
@@ -116,17 +116,32 @@ export function HabitsClient({
                     ))}
                 </div>
             ) : habits.length === 0 ? (
-                <div className="text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
-                    <h3 className="text-xl font-bold text-slate-300 mb-2">No habits found</h3>
-                    <p className="text-slate-500 mb-6">
-                        Start your journey by creating your first habit!
+                <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 px-6 py-16 text-center">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/20 bg-orange-500/10 text-orange-400">
+                        <Flame className="h-6 w-6" />
+                    </div>
+                    <h3 className="mb-2 text-xl font-bold text-slate-200">No habits yet</h3>
+                    <p className="mx-auto mb-6 max-w-md text-sm leading-relaxed text-slate-400">
+                        Start with one tiny academic habit — like 20 minutes of revision, one mock question set, or a daily recap — and let streaks build the momentum.
                     </p>
+                    <div className="mx-auto mb-6 grid max-w-2xl grid-cols-1 gap-3 text-left md:grid-cols-3">
+                        {[
+                            'Track consistency over time',
+                            'Protect streaks during busy weeks',
+                            'See habits appear in your analytics',
+                        ].map((benefit) => (
+                            <div key={benefit} className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
+                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                                <span>{benefit}</span>
+                            </div>
+                        ))}
+                    </div>
                     <Button
-                        variant="ghost"
                         onClick={() => setIsDialogOpen(true)}
-                        className="text-purple-400 font-semibold hover:text-purple-300"
+                        className="btn-primary"
                     >
-                        + Create New Habit
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create your first habit
                     </Button>
                 </div>
             ) : (

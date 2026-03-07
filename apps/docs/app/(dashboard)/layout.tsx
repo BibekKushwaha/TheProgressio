@@ -3,6 +3,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LazyPushManager } from "@/components/LazyPushManager";
+import { MobileFAB } from "@/components/layout/MobileFAB";
 
 function DashboardPageSkeleton() {
     return (
@@ -51,6 +52,7 @@ export default function DashboardLayout({
                         </Suspense>
                     </div>
                 </main>
+                <MobileFAB />
             </div>
         </AuthGuard>
     );

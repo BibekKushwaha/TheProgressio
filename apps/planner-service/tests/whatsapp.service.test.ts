@@ -2,6 +2,8 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import crypto from 'crypto';
 
+process.env.NODE_ENV = 'test';
+
 const { mockCreateTaskFromText } = vi.hoisted(() => ({
   mockCreateTaskFromText: vi.fn(),
 }));
@@ -58,6 +60,15 @@ vi.mock('../src/services/producer.service.js', () => ({
   },
 }));
 
+vi.mock('@repo/cache', () => ({
+  consumeRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 10, resetAt: Date.now() + 60_000 }),
+  getRedisClient: vi.fn(() => ({
+    set: vi.fn(),
+    zadd: vi.fn(),
+    expire: vi.fn(),
+  })),
+}));
+
 vi.mock('@repo/db', () => ({
   prisma: {
     user: { findUnique: vi.fn() },
@@ -67,6 +78,15 @@ vi.mock('@repo/db', () => ({
   Priority: { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH' },
   AttendanceStatus: { PRESENT: 'PRESENT', ABSENT: 'ABSENT', LATE: 'LATE' },
   AttendanceMethod: { QR: 'QR', MANUAL: 'MANUAL', GEOFENCE: 'GEOFENCE' },
+}));
+
+vi.mock('../src/workers/push.worker.js', () => ({
+  initPushWorker: vi.fn(() => null),
+}));
+
+vi.mock('../src/services/renewal.service.js', () => ({
+  startRenewalWorker: vi.fn(() => undefined),
+  stopRenewalWorker: vi.fn(() => Promise.resolve()),
 }));
 
 import { app } from '../src/index.js';
@@ -181,10 +201,12 @@ describe('whatsapp.service — resolveWhatsAppTranscript', () => {
   it('falls back to remote transcription service when audio URL exists', async () => {
     process.env.WHATSAPP_TRANSCRIBE_URL = 'https://transcribe.example.com';
 
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ transcript: 'mock transcript', language: 'en', confidence: 0.93 }),
-    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ transcript: 'mock transcript', language: 'en', confidence: 0.93 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -209,6 +231,45 @@ describe('whatsapp.service — resolveWhatsAppTranscript', () => {
       transcript: 'mock transcript',
       language: 'en',
       confidence: 0.93,
+      source: 'service',
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it('falls back to OCR service when image URL exists', async () => {
+    process.env.WHATSAPP_OCR_URL = 'https://ocr.example.com';
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ text: 'Scanned worksheet text', language: 'en', confidence: 0.79 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await resolveWhatsAppOcr({
+      text: null,
+      sender: '9198',
+      explicitUserId: null,
+      audioUrl: null,
+      audioMessageId: null,
+      imageUrl: 'https://example.com/homework.jpg',
+      imageMessageId: 'img-2',
+      imageCaption: null,
+      transcript: null,
+      language: null,
+      confidence: null,
+      interactiveReplyId: null,
+      interactiveReplyTitle: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      text: 'Scanned worksheet text',
+      language: 'en',
+      confidence: 0.79,
       source: 'service',
     });
 
