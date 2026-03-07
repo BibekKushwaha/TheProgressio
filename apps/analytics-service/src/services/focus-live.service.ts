@@ -245,6 +245,25 @@ class FocusLiveSessionRegistry {
         this.sessionsByUser.clear();
     }
 
+    getOperationalSnapshot(): { activeSessions: number; runningSessions: number; pausedSessions: number } {
+        let runningSessions = 0;
+        let pausedSessions = 0;
+
+        for (const session of this.sessionsByUser.values()) {
+            if (session.status === 'RUNNING') {
+                runningSessions += 1;
+            } else if (session.status === 'PAUSED') {
+                pausedSessions += 1;
+            }
+        }
+
+        return {
+            activeSessions: this.sessionsByUser.size,
+            runningSessions,
+            pausedSessions,
+        };
+    }
+
     private assertSession(userId: string, sessionId: string): FocusLiveSessionRuntime {
         const session = this.sessionsByUser.get(userId);
         if (!session || session.sessionId !== sessionId) {

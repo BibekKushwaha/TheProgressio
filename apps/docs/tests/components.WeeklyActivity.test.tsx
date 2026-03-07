@@ -49,7 +49,7 @@ describe('WeeklyActivity', () => {
     it('shows empty state when there is no data', () => {
         mockTrendsData = { data: [] };
         render(<WeeklyActivity />);
-        expect(screen.getByText(/No activity data yet/i)).toBeTruthy();
+        expect(screen.getByText(/No study sessions logged yet/i)).toBeTruthy();
     });
 
     it('renders Week / Month toggle buttons', () => {

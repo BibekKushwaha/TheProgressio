@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { rateLimit } from "express-rate-limit";
 import { prisma } from "@repo/db";
 import ErrorHandler from "../utils/errorHandler.js";
+import { postJsonRequest } from "../services/internal-http.service.js";
 
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
 const HABIT_INTERNAL_SECRET = process.env.HABIT_INTERNAL_SECRET || process.env.ANALYTICS_INTERNAL_SECRET || "";
@@ -62,14 +63,18 @@ const touchUserLastActive = (userId: string): void => {
     if (nowMs - lastSignalMs < ACTIVITY_CANCEL_DEBOUNCE_MS) return;
     lastCancellationSignalAt.set(userId, nowMs);
 
-    void fetch(`${HABIT_SERVICE_URL}/api/habits/internal/wa-fallback/cancel`, {
-        method: "POST",
+    void postJsonRequest({
+        url: `${HABIT_SERVICE_URL}/api/habits/internal/wa-fallback/cancel`,
         headers: {
-            "Content-Type": "application/json",
             "x-internal-secret": HABIT_INTERNAL_SECRET,
         },
-        body: JSON.stringify({ userId, source: "planner_auth" }),
-    }).catch((_error: unknown) => {
+        body: { userId, source: "planner_auth" },
+        logContext: {
+            service: "planner-service",
+            subsystem: "auth",
+            dependency: "habit-service",
+            operation: "cancel_whatsapp_fallback",
+        },
     });
 };
 
@@ -152,7 +157,9 @@ export const isAuth = async (
             return next(new ErrorHandler(401, "Authentication token is missing"));
         }
 
-        const decodedPayload = jwt.verify(token, process.env.JWT_SEC as string) as JwtPayload;
+        const decodedPayload = jwt.verify(token, process.env.JWT_SEC as string, {
+            algorithms: ["HS256"],
+        }) as JwtPayload;
         if (!decodedPayload?.id) {
             return next(new ErrorHandler(401, "Invalid token"));
         }

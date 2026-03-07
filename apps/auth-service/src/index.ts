@@ -9,7 +9,20 @@ import type { Request, Response, NextFunction } from 'express';
 
 import { closeEmailWorker } from "./services/email.worker.js";
 import { closeEmailQueue } from "./services/email.queue.js";
+import { getAuthOperationalMetricsSnapshot, recordAuthRequestMetric } from './services/metrics.service.js';
 import { prisma } from "@repo/db/client";
+import {
+  registerOperationalMiddleware,
+  registerOperationalRoutes,
+  registerProcessSafetyHandlers,
+  validateRequiredEnv,
+} from "@repo/schemas/runtime";
+import { resolveAdminBootstrapClientIp } from './utils/adminBootstrapGuard.js';
+
+validateRequiredEnv({
+  serviceName: 'auth-service',
+  requiredEnv: ['DATABASE_URL', 'JWT_SEC'],
+});
 
 const app = express();
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL ?? 'http://localhost:3000';
@@ -45,6 +58,18 @@ app.use(cors({
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
+registerOperationalMiddleware({
+  app,
+  serviceName: 'auth-service',
+});
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.on('finish', () => {
+    const routePath = (req as Request & { route?: { path?: string } }).route?.path ?? req.path;
+    const route = `${req.baseUrl || ''}${routePath}` || req.originalUrl || req.path;
+    recordAuthRequestMetric(req.method, route, res.statusCode);
+  });
+  next();
+});
 
 // ─── CSRF: Origin check for state-changing requests ──────────────────────────
 // sameSite: 'lax' already blocks most CSRF. This adds defense-in-depth by
@@ -120,6 +145,16 @@ const refreshLimiter = rateLimit({
   message: { message: 'Too many refresh attempts, please try again later' },
 });
 
+// Sensitive bootstrap-only admin routes should be far tighter than normal auth traffic.
+const adminBootstrapLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `admin-bootstrap:${resolveAdminBootstrapClientIp(req) || 'unknown'}`,
+  message: { message: 'Too many admin bootstrap attempts, please try again later.' },
+});
+
 app.use(globalLimiter);
 // Per-endpoint rate limits (applied before the router)
 app.use('/api/auth/login', loginLimiter);
@@ -130,10 +165,25 @@ app.use('/api/auth/reset', resetLimiter);
 // Tighter rate limit on refresh token endpoints
 app.use('/api/auth/refresh', refreshLimiter);
 app.use('/api/auth/mobile/refresh', refreshLimiter);
+app.use('/api/auth/admin', adminBootstrapLimiter);
 app.use('/api/auth', userRouter);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Auth Service API', status: 'UP' });
+});
+
+registerOperationalRoutes({
+  app,
+  serviceName: 'auth-service',
+  collectMetrics: getAuthOperationalMetricsSnapshot,
+  readinessChecks: [
+    {
+      name: 'database',
+      check: async () => {
+        await prisma.$queryRaw`SELECT 1`;
+      },
+    },
+  ],
 });
 
 // ─── Expired session cleanup ──────────────────────────────────────────────────
@@ -166,7 +216,7 @@ async function cleanupExpiredSessions(): Promise<void> {
 const PORT = process.env.PORT || 4000;
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`🚀 Auth service running on port ${PORT}`);
     console.log(`🔗 Accepting requests from: ${FRONTEND_ORIGIN}`);
     console.log(`📧 Email worker initialized (BullMQ)`);
@@ -181,14 +231,18 @@ if (process.env.NODE_ENV !== 'test') {
     console.log("Shutting down Auth Service...");
     clearInterval(cleanupTimer);
     await Promise.all([
+      new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      }),
       closeEmailWorker(),
       closeEmailQueue(),
       prisma.$disconnect(),
     ]);
-    process.exit(0);
   };
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+  registerProcessSafetyHandlers({
+    serviceName: 'auth-service',
+    shutdown,
+  });
 }
 
 export default app;

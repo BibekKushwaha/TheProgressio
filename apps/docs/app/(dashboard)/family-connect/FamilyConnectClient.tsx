@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useGetTasksQuery, useGetHabitsQuery, useGetDailySummaryQuery, useGetProfileQuery, useGetTaskMetricsQuery, useComposeNotificationMutation, Task, Habit } from '@repo/store';
-import { Eye, Shield, TrendingUp, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, Share2, MessageSquare, Download } from 'lucide-react';
+import { Eye, Shield, TrendingUp, CheckCircle, Flame, Clock, AlertTriangle, BookOpen, Share2, MessageSquare, Download, RefreshCcw } from 'lucide-react';
 import { exportTasksToCSV, downloadCSV } from '@/lib/exportUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui/stat-card';
 import { TaskListItem } from '@/components/family-connect/TaskListItem';
 import { HabitListItem } from '@/components/family-connect/HabitListItem';
+import { getApiErrorReportStatus } from '@/lib/api-error';
+import { reportApiError } from '@/lib/errorReporter';
 import { toast } from 'sonner';
 
 type Summary = {
@@ -25,19 +27,78 @@ type Summary = {
 const UPCOMING_TASK_ARGS = { page: 1, limit: 10, sortBy: 'dueDate', sortOrder: 'asc' } as const;
 
 export function FamilyConnectClient() {
-    const { data: profileData } = useGetProfileQuery();
+    const {
+        data: profileData,
+        isError: isProfileError,
+        error: profileError,
+        refetch: refetchProfile,
+    } = useGetProfileQuery();
     // FIX: Fetch only what's needed for the table display (10 upcoming) — not 500 tasks for counting
-    const { data: upcomingTasksData, isLoading: tasksLoading } = useGetTasksQuery(UPCOMING_TASK_ARGS);
+    const {
+        data: upcomingTasksData,
+        isLoading: tasksLoading,
+        isError: isTasksError,
+        error: tasksError,
+        refetch: refetchTasks,
+    } = useGetTasksQuery(UPCOMING_TASK_ARGS);
     // FIX: Use the lightweight metrics endpoint for counts — avoids 500-task payload
-    const { data: taskMetricsData, isLoading: metricsLoading } = useGetTaskMetricsQuery(undefined);
-    const { data: habitsData, isLoading: habitsLoading } = useGetHabitsQuery();
-    const { data: summaryData, isLoading: summaryLoading } = useGetDailySummaryQuery('7');
+    const {
+        data: taskMetricsData,
+        isLoading: metricsLoading,
+        isError: isMetricsError,
+        error: metricsError,
+        refetch: refetchMetrics,
+    } = useGetTaskMetricsQuery(undefined);
+    const {
+        data: habitsData,
+        isLoading: habitsLoading,
+        isError: isHabitsError,
+        error: habitsError,
+        refetch: refetchHabits,
+    } = useGetHabitsQuery();
+    const {
+        data: summaryData,
+        isLoading: summaryLoading,
+        isError: isSummaryError,
+        error: summaryError,
+        refetch: refetchSummary,
+    } = useGetDailySummaryQuery('7');
     const [composeNotification] = useComposeNotificationMutation();
     const [nudgeOpen, setNudgeOpen] = useState(false);
     const [nudgeMessage, setNudgeMessage] = useState('');
     const [shareOpen, setShareOpen] = useState(false);
 
     const user = profileData?.user;
+
+    useEffect(() => {
+        if (profileError) {
+            reportApiError(getApiErrorReportStatus(profileError), 'getProfile', profileError);
+        }
+    }, [profileError]);
+
+    useEffect(() => {
+        if (tasksError) {
+            reportApiError(getApiErrorReportStatus(tasksError), 'getTasks', tasksError);
+        }
+    }, [tasksError]);
+
+    useEffect(() => {
+        if (metricsError) {
+            reportApiError(getApiErrorReportStatus(metricsError), 'getTaskMetrics', metricsError);
+        }
+    }, [metricsError]);
+
+    useEffect(() => {
+        if (habitsError) {
+            reportApiError(getApiErrorReportStatus(habitsError), 'getHabits', habitsError);
+        }
+    }, [habitsError]);
+
+    useEffect(() => {
+        if (summaryError) {
+            reportApiError(getApiErrorReportStatus(summaryError), 'getDailySummary', summaryError);
+        }
+    }, [summaryError]);
 
     // FIX: Use server-computed metrics for aggregate counts
     const completedTasks = taskMetricsData?.completed ?? 0;
@@ -107,6 +168,24 @@ export function FamilyConnectClient() {
     };
 
     const isLoading = tasksLoading || metricsLoading || habitsLoading || summaryLoading;
+    const failedPanels = [
+        isProfileError ? 'profile data' : null,
+        isTasksError ? 'upcoming tasks' : null,
+        isMetricsError ? 'task metrics' : null,
+        isHabitsError ? 'habit activity' : null,
+        isSummaryError ? 'weekly summary' : null,
+    ].filter((value): value is string => Boolean(value));
+    const hasAnyData = Boolean(profileData || upcomingTasksData || taskMetricsData || habitsData || summaryData);
+
+    const retryAll = () => {
+        void Promise.allSettled([
+            refetchProfile(),
+            refetchTasks(),
+            refetchMetrics(),
+            refetchHabits(),
+            refetchSummary(),
+        ]);
+    };
 
     if (isLoading) {
         return (
@@ -120,8 +199,52 @@ export function FamilyConnectClient() {
         );
     }
 
+    if (!hasAnyData && failedPanels.length > 0) {
+        return (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-white backdrop-blur-xl">
+                <div className="flex items-start gap-3">
+                    <div className="rounded-xl border border-red-400/30 bg-red-500/20 p-2">
+                        <AlertTriangle className="h-5 w-5 text-red-200" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-lg font-semibold">Family Connect is temporarily unavailable</h2>
+                        <p className="mt-2 text-sm text-slate-200">
+                            We could not load enough progress data to render the family dashboard right now.
+                        </p>
+                        <button
+                            onClick={retryAll}
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
+                        >
+                            <RefreshCcw className="h-4 w-4" />
+                            Retry Family Connect
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
+            {failedPanels.length > 0 ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-start gap-2">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
+                            <p>
+                                Family Connect is using partial data because {failedPanels.join(', ')} {failedPanels.length === 1 ? 'is' : 'are'} temporarily unavailable.
+                            </p>
+                        </div>
+                        <button
+                            onClick={retryAll}
+                            className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                        >
+                            <RefreshCcw className="h-3.5 w-3.5" />
+                            Retry data
+                        </button>
+                    </div>
+                </div>
+            ) : null}
             <PageHeader
                 title="Family Connect"
                 subtitle={`Read-only progress dashboard for ${user?.username || 'Student'}`}
@@ -184,7 +307,9 @@ export function FamilyConnectClient() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {upcomingTasks.length === 0 ? (
+                    {isTasksError && upcomingTasks.length === 0 ? (
+                        <p className="text-amber-200 text-center py-8">Upcoming assignments are temporarily unavailable.</p>
+                    ) : upcomingTasks.length === 0 ? (
                         <p className="text-slate-500 text-center py-8">No urgent assignments in the next 3 days. 🎉</p>
                     ) : (
                         <div className="space-y-2">
@@ -205,7 +330,9 @@ export function FamilyConnectClient() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {habits.length === 0 ? (
+                    {isHabitsError && habits.length === 0 ? (
+                        <p className="text-amber-200 text-center py-8">Habit activity is temporarily unavailable.</p>
+                    ) : habits.length === 0 ? (
                         <p className="text-slate-500 text-center py-8">No habits tracked yet.</p>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -226,6 +353,11 @@ export function FamilyConnectClient() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
+                    {isSummaryError && !summary ? (
+                        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                            Weekly summary metrics are temporarily unavailable.
+                        </div>
+                    ) : (
                     <div className="grid grid-cols-3 gap-4">
                         <div className="p-4 bg-white/5 rounded-xl text-center">
                             <div className="text-2xl font-black text-white">{summary?.totalTasksCompleted ?? 0}</div>
@@ -240,6 +372,7 @@ export function FamilyConnectClient() {
                             <div className="text-xs text-slate-400 mt-1">Consistency score</div>
                         </div>
                     </div>
+                    )}
                 </CardContent>
             </Card>
 

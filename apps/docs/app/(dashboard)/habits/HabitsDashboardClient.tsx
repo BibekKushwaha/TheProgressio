@@ -31,8 +31,14 @@
  *       <SecondarySection use(secondaryPromise)>
  */
 
-import { use, Suspense } from "react";
-import { useGetDashboardBootstrapQuery, type BootstrapCritical, type DashboardBootstrap } from "@repo/store";
+import { use, Suspense, useEffect, useState } from "react";
+import {
+    habitsApi,
+    useAppDispatch,
+    useGetDashboardBootstrapQuery,
+    type BootstrapCritical,
+    type DashboardBootstrap,
+} from "@repo/store";
 import { HabitsClient } from "./HabitsClient";
 import { UserLevelCard } from "@/components/habit/UserLevelCard";
 import { ContributionHeatmap } from "@/components/habit/ContributionHeatmap";
@@ -116,9 +122,76 @@ interface Props {
 }
 
 export function HabitsDashboardClient({ criticalData, secondaryPromise }: Props) {
+    const dispatch = useAppDispatch();
+    const [bootstrapSubscriptionEnabled, setBootstrapSubscriptionEnabled] = useState(!criticalData);
+
+    useEffect(() => {
+        let isActive = true;
+
+        if (criticalData) {
+            dispatch(
+                habitsApi.util.upsertQueryData("getHabits", undefined, {
+                    message: criticalData.message,
+                    habits: criticalData.habits,
+                })
+            );
+            dispatch(
+                habitsApi.util.upsertQueryData("getUserXP", undefined, {
+                    message: criticalData.message,
+                    xp: criticalData.xp,
+                })
+            );
+        }
+
+        if (!criticalData) {
+            setBootstrapSubscriptionEnabled(true);
+            return () => {
+                isActive = false;
+            };
+        }
+
+        Promise.resolve(secondaryPromise)
+            .then((fullData) => {
+                if (!isActive || !fullData) {
+                    return;
+                }
+
+                dispatch(
+                    habitsApi.util.upsertQueryData("getDashboardBootstrap", undefined, fullData)
+                );
+                dispatch(
+                    habitsApi.util.upsertQueryData("getContributionHeatmap", undefined, {
+                        message: fullData.message,
+                        heatmap: fullData.heatmap,
+                        summary: fullData.heatmapSummary,
+                    })
+                );
+
+                if (fullData.nudges) {
+                    dispatch(
+                        habitsApi.util.upsertQueryData("getNudges", undefined, {
+                            message: fullData.message,
+                            nudges: fullData.nudges,
+                        })
+                    );
+                }
+            })
+            .finally(() => {
+                if (isActive) {
+                    setBootstrapSubscriptionEnabled(true);
+                }
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [criticalData, dispatch, secondaryPromise]);
+
     // Client-side bootstrap query keeps data fresh after mutations.
     // Fires after hydration; onQueryStarted pre-warms individual RTK caches.
-    const { data: rtkBootstrap } = useGetDashboardBootstrapQuery();
+    const { data: rtkBootstrap } = useGetDashboardBootstrapQuery(undefined, {
+        skip: !bootstrapSubscriptionEnabled,
+    });
 
     // DEV-ONLY: profile JS heap usage while the secondary Suspense boundary
     // is in-flight (streaming heatmap + nudges from server).  No-op in prod.

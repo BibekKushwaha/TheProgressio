@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   useCreateSyllabusTopicMutation,
   useDeleteSyllabusTopicMutation,
@@ -13,13 +13,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { EditTopicDialog } from './EditTopicDialog';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { getApiErrorReportStatus } from '@/lib/api-error';
+import { reportApiError } from '@/lib/errorReporter';
 
 interface TopicSectionProps {
   selectedCategoryId: string;
 }
 
 export function TopicSection({ selectedCategoryId }: TopicSectionProps) {
-  const { data: topicsData, isLoading: topicsLoading } = useGetSyllabusTopicsQuery(
+  const { data: topicsData, isLoading: topicsLoading, isError: isTopicsError, error: topicsError, refetch } = useGetSyllabusTopicsQuery(
     { categoryId: selectedCategoryId },
   );
   const [createTopic, { isLoading: isCreating }] = useCreateSyllabusTopicMutation();
@@ -44,6 +47,12 @@ export function TopicSection({ selectedCategoryId }: TopicSectionProps) {
   const [newTitle, setNewTitle] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<SyllabusTopic | null>(null);
+
+  useEffect(() => {
+    if (topicsError) {
+      reportApiError(getApiErrorReportStatus(topicsError), 'getSyllabusTopics', topicsError);
+    }
+  }, [topicsError]);
 
   const handleAddTopic = useCallback(async () => {
     if (!newTitle.trim()) return toast.error('Topic title is required');
@@ -116,6 +125,23 @@ export function TopicSection({ selectedCategoryId }: TopicSectionProps) {
           <div className="space-y-4">
             {topicsLoading ? (
               <div className="text-sm text-slate-500">Loading topics…</div>
+            ) : isTopicsError && topics.length === 0 ? (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
+                    <p>Topics are temporarily unavailable for this subject.</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
+                    onClick={() => void refetch()}
+                  >
+                    <RefreshCcw className="mr-2 h-4 w-4" />
+                    Retry topics
+                  </Button>
+                </div>
+              </div>
             ) : topics.length === 0 ? (
               <div className="text-sm text-slate-500">No topics yet.</div>
             ) : (

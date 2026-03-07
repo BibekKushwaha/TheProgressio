@@ -6,14 +6,19 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useCreateNoteMutation } from '@repo/store';
+import { addTask, PriorityEnum, TaskStatus, useAppDispatch, useCreateNoteMutation, useCreateTaskMutation, useGetTasksQuery } from '@repo/store';
 import { toast } from 'sonner';
 
 export function QuickActions() {
     const router = useRouter();
+    const dispatch = useAppDispatch();
     const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
     const [noteText, setNoteText] = useState('');
+    const [firstTaskTitle, setFirstTaskTitle] = useState('');
     const [createNote, { isLoading: isCreating }] = useCreateNoteMutation();
+    const [createTask, { isLoading: isCreatingTask }] = useCreateTaskMutation();
+    const { data: taskList } = useGetTasksQuery({ page: 1, limit: 1 });
+    const hasAnyTasks = (taskList?.length ?? 0) > 0;
 
     const handleSaveNote = async () => {
         if (!noteText.trim()) return;
@@ -25,6 +30,30 @@ export function QuickActions() {
             toast.success('Note saved!');
         } catch (_e) {
             toast.error('Failed to save note. Please try again.');
+        }
+    };
+
+    const handleCreateFirstTask = async () => {
+        const title = firstTaskTitle.trim();
+        if (!title) return;
+
+        try {
+            const task = await createTask({
+                title,
+                status: TaskStatus.PENDING,
+                priority: PriorityEnum.LOW,
+            }).unwrap();
+            dispatch(addTask(task));
+            setFirstTaskTitle('');
+            toast.success('First task created!', {
+                description: 'You can add AI subtasks or more details next.',
+                action: {
+                    label: 'Add details',
+                    onClick: () => router.push(`/createtask?id=${task.id}`),
+                },
+            });
+        } catch {
+            toast.error('Failed to create task. Please try again.');
         }
     };
 
@@ -56,17 +85,54 @@ export function QuickActions() {
             </h2>
 
             <div className="space-y-3">
+                {!hasAnyTasks && (
+                    <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-4">
+                        <div className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-purple-300/80">Start here</div>
+                        <div className="mb-3 text-sm text-slate-200">Type your first study task and create it without leaving the dashboard.</div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <input
+                                value={firstTaskTitle}
+                                onChange={(e) => setFirstTaskTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        void handleCreateFirstTask();
+                                    }
+                                }}
+                                placeholder="e.g. Revise cell biology for 30 minutes"
+                                className="h-12 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                            />
+                            <Button
+                                onClick={() => void handleCreateFirstTask()}
+                                disabled={!firstTaskTitle.trim() || isCreatingTask}
+                                className="btn-primary w-full sm:w-auto"
+                            >
+                                {isCreatingTask ? 'Creating…' : 'Create first task'}
+                            </Button>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => router.push(`/createtask${firstTaskTitle.trim() ? `?title=${encodeURIComponent(firstTaskTitle.trim())}` : ''}`)}
+                            className="mt-2 text-xs font-medium text-purple-300 transition-colors hover:text-purple-200"
+                        >
+                            Open full task editor instead
+                        </button>
+                    </div>
+                )}
+
                 <StartFocusButton isInline={true} />
 
-                {actionButtons.map((button) => {
-                    const Icon = button.icon;
-                    return (
-                        <button key={button.label} onClick={button.onClick} className={button.className}>
-                            <Icon className="w-5 h-5" />
-                            {button.label}
-                        </button>
-                    );
-                })}
+                <div className="grid grid-cols-2 gap-3">
+                    {actionButtons.map((button) => {
+                        const Icon = button.icon;
+                        return (
+                            <button key={button.label} onClick={button.onClick} className={button.className}>
+                                <Icon className="w-5 h-5 mb-1" />
+                                <span className="text-xs">{button.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
             <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
@@ -88,9 +154,14 @@ export function QuickActions() {
                         <Button
                             onClick={handleSaveNote}
                             disabled={!noteText.trim() || isCreating}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 rounded-xl"
+                            className="btn-primary w-full"
                         >
-                            {isCreating ? "Saving..." : "Save Note"}
+                            {isCreating ? (
+                                <span className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                                    Saving…
+                                </span>
+                            ) : "Save Note"}
                         </Button>
                     </div>
                 </DialogContent>

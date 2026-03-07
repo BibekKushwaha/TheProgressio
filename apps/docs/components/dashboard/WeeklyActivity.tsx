@@ -38,7 +38,7 @@ export function WeeklyActivity() {
             // Calculate percentage based on user's daily goal for visualization
             percentage: Math.min(100, Math.round((d.hours / dailyLimit) * 100))
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [filteredData, dailyLimit]);
 
     // Generate SVG path for the line and gradient area — must be declared before
@@ -56,9 +56,27 @@ export function WeeklyActivity() {
 
     if (isLoading) {
         return (
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 h-[400px]">
-                <Skeleton className="h-10 w-1/3 mb-10 bg-white/5" />
-                <Skeleton className="h-64 w-full bg-white/5" />
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
+                {/* Header row */}
+                <div className="flex items-end justify-between mb-10">
+                    <div className="space-y-2">
+                        <Skeleton className="h-7 w-40 bg-white/5" />
+                        <Skeleton className="h-4 w-56 bg-white/5" />
+                    </div>
+                    <Skeleton className="h-9 w-28 rounded-xl bg-white/5" />
+                </div>
+                {/* Fake bar chart — 7 bars of varying heights to mimic the area chart */}
+                <div className="flex items-end gap-3 h-48 px-2">
+                    {[55, 80, 40, 95, 60, 75, 50].map((h, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                            <Skeleton
+                                className="w-full rounded-t-md bg-white/5"
+                                style={{ height: `${h}%` }}
+                            />
+                            <Skeleton className="h-3 w-6 bg-white/[0.03]" />
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -67,7 +85,13 @@ export function WeeklyActivity() {
         return (
             <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6">
                 <h2 className="text-2xl font-bold text-white mb-2">Weekly Activity</h2>
-                <p className="text-sm text-slate-400">No activity data yet.</p>
+                <p className="text-sm text-slate-400 mb-6">No study sessions logged yet. Complete your first focus session to see your chart.</p>
+                {/* Ghost chart — gives an impression of what they’ll see */}
+                <div className="flex items-end gap-3 h-32 opacity-20">
+                    {[30, 50, 20, 80, 45, 60, 35].map((h, i) => (
+                        <div key={i} className="flex-1 bg-gradient-to-t from-purple-500 to-pink-500 rounded-t-md" style={{ height: `${h}%` }} />
+                    ))}
+                </div>
             </div>
         );
     }
@@ -91,11 +115,10 @@ export function WeeklyActivity() {
                         <button
                             key={option.value}
                             onClick={() => setViewType(option.value)}
-                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                                viewType === option.value
+                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewType === option.value
                                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
                                     : 'text-slate-500 hover:text-white'
-                            }`}
+                                }`}
                         >
                             {option.label}
                         </button>
@@ -177,26 +200,36 @@ export function WeeklyActivity() {
                                 className="group-hover/point:opacity-0 transition-opacity"
                             />
 
-                            {/* Simple tooltip simulation using SVG text - more reliable in standard SVG */}
-                            <g className="opacity-0 group-hover/point:opacity-100 transition-opacity duration-300">
+                            {/* Enhanced tooltip with day + hours + date */}
+                            <g className="opacity-0 group-hover/point:opacity-100 transition-opacity duration-300 pointer-events-none">
                                 <rect
-                                    x={index * step - 30}
-                                    y={256 - (point.percentage * 2) - 45}
-                                    width="60"
-                                    height="30"
-                                    rx="6"
-                                    fill="black"
-                                    fillOpacity="0.8"
-                                    className="backdrop-blur-md"
+                                    x={Math.max(0, Math.min(index * step - 45, chartWidth - 90))}
+                                    y={256 - (point.percentage * 2) - 55}
+                                    width="90"
+                                    height="40"
+                                    rx="8"
+                                    fill="rgb(15, 23, 42)"
+                                    fillOpacity="0.95"
+                                    stroke="rgba(168, 85, 247, 0.3)"
+                                    strokeWidth="1"
                                 />
                                 <text
-                                    x={index * step}
-                                    y={256 - (point.percentage * 2) - 25}
+                                    x={Math.max(45, Math.min(index * step, chartWidth - 45))}
+                                    y={256 - (point.percentage * 2) - 37}
                                     textAnchor="middle"
                                     fill="white"
-                                    className="text-[10px] font-black"
+                                    className="text-[11px] font-black"
                                 >
-                                    {point.hours}h
+                                    {point.day} • {point.hours}h
+                                </text>
+                                <text
+                                    x={Math.max(45, Math.min(index * step, chartWidth - 45))}
+                                    y={256 - (point.percentage * 2) - 23}
+                                    textAnchor="middle"
+                                    fill="rgb(148, 163, 184)"
+                                    className="text-[9px]"
+                                >
+                                    {new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </text>
                             </g>
                         </g>

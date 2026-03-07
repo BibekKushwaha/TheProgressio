@@ -2,13 +2,27 @@
 import { AchievementsHeader } from '@/components/achievements/AchievementsHeader';
 import { BadgesTabs } from '@/components/achievements/BadgesTabs';
 import { BadgesGrid } from '@/components/achievements/BadgesGrid';
-import { Award, Sparkles, Target } from 'lucide-react';
-import { useState } from 'react';
+import { Award, Sparkles, Target, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useGetAchievementsQuery } from '@repo/store';
+import { getApiErrorReportStatus } from '@/lib/api-error';
+import { reportApiError } from '@/lib/errorReporter';
 
 export default function AchievementsPage() {
     const [filter, setFilter] = useState('all');
-    const { data: achievementsData } = useGetAchievementsQuery();
+    const {
+        data: achievementsData,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useGetAchievementsQuery();
+
+    useEffect(() => {
+        if (error) {
+            reportApiError(getApiErrorReportStatus(error), 'getAchievements', error);
+        }
+    }, [error]);
 
     const achievements = achievementsData?.achievements ?? [];
     const totalBadges    = achievements.length;
@@ -17,8 +31,50 @@ export default function AchievementsPage() {
     const currentLevel   = Math.floor(unlockedCount / badgesPerLevel) + 1;
     const completionPct  = totalBadges > 0 ? Math.round((unlockedCount / totalBadges) * 100) : 0;
 
+    if (isError && achievements.length === 0 && !isLoading) {
+        return (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-white backdrop-blur-xl">
+                <div className="flex items-start gap-3">
+                    <div className="rounded-xl border border-red-400/30 bg-red-500/20 p-2">
+                        <AlertTriangle className="h-5 w-5 text-red-200" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-lg font-semibold">Achievements are temporarily unavailable</h2>
+                        <p className="mt-2 text-sm text-slate-200">
+                            We could not load your achievement progress right now.
+                        </p>
+                        <button
+                            onClick={() => void refetch()}
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
+                        >
+                            <RefreshCcw className="h-4 w-4" />
+                            Retry achievements
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-7">
+            {isError ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-start gap-2">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
+                            <p>Achievement progress may be stale because the latest badge sync failed. Showing the most recent data available.</p>
+                        </div>
+                        <button
+                            onClick={() => void refetch()}
+                            className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                        >
+                            <RefreshCcw className="h-3.5 w-3.5" />
+                            Retry sync
+                        </button>
+                    </div>
+                </div>
+            ) : null}
             <div
                 className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-500/[0.16] via-fuchsia-500/[0.10] to-indigo-500/[0.10] p-6 md:p-8"
                 style={{

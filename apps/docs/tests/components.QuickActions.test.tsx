@@ -3,15 +3,23 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const pushMock = vi.fn();
+const dispatchMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ push: pushMock }),
 }));
 
 const createNoteMock = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
+const createTaskMock = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ id: 'task-1', title: 'First Task' }) });
 
 vi.mock('@repo/store', () => ({
+    useAppDispatch: () => dispatchMock,
     useCreateNoteMutation: () => [createNoteMock, { isLoading: false }],
+    useCreateTaskMutation: () => [createTaskMock, { isLoading: false }],
+    useGetTasksQuery: () => ({ data: [{ id: 't1' }] }),
+    addTask: (task: unknown) => ({ type: 'tasks/addTask', payload: task }),
+    PriorityEnum: { LOW: 'LOW' },
+    TaskStatus: { PENDING: 'PENDING' },
 }));
 
 // Stub StartFocusButton so we don't need full planner store
@@ -24,7 +32,9 @@ import { QuickActions } from '../components/dashboard/QuickActions';
 describe('QuickActions', () => {
     beforeEach(() => {
         pushMock.mockClear();
+        dispatchMock.mockClear();
         createNoteMock.mockClear();
+        createTaskMock.mockClear();
     });
 
     it('renders Quick Actions heading', () => {

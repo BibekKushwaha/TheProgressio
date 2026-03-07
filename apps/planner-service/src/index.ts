@@ -21,11 +21,25 @@ import noteRouter from "./routes/note.route.js";
 import auditRouter from "./routes/audit.route.js";
 import mentorshipRouter from "./routes/mentorship.route.js";
 import syllabusRouter from "./routes/syllabus.route.js";
+import { getAiCircuitBreakerState, isAiKillSwitchActive } from "./services/ai.service.js";
 import { shutdownProducer } from "./services/queue.service.js";
+import { getOperationalMetricsSnapshot as getWhatsAppOperationalMetricsSnapshot } from "./services/whatsapp-audit.service.js";
 import { runSilentWatchSweep } from "./services/whatsapp-watch.service.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { initPushWorker } from "./workers/push.worker.js";
 import { startRenewalWorker, stopRenewalWorker } from "./services/renewal.service.js";
+import { prisma } from "@repo/db/client";
+import {
+    registerOperationalMiddleware,
+    registerOperationalRoutes,
+    registerProcessSafetyHandlers,
+    validateRequiredEnv,
+} from "@repo/schemas/runtime";
+
+validateRequiredEnv({
+    serviceName: 'planner-service',
+    requiredEnv: ['DATABASE_URL', 'JWT_SEC'],
+});
 
 export const app = express();
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL ?? "http://localhost:3000";
@@ -46,6 +60,10 @@ app.use(express.json({
     },
 }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+registerOperationalMiddleware({
+    app,
+    serviceName: 'planner-service',
+});
 
 // Global rate limit
 const globalLimiter = rateLimit({
@@ -59,6 +77,38 @@ app.use(globalLimiter);
 
 app.get("/", (_req, res) => {
     res.send("Task Management API");
+});
+
+registerOperationalRoutes({
+    app,
+    serviceName: 'planner-service',
+    collectMetrics: async () => {
+        const [whatsAppMetrics, aiKillSwitchEnabled] = await Promise.all([
+            getWhatsAppOperationalMetricsSnapshot(),
+            isAiKillSwitchActive(),
+        ]);
+        const aiCircuitBreaker = getAiCircuitBreakerState();
+
+        return {
+            ...whatsAppMetrics,
+            wa_ai_circuit_breaker_state: aiCircuitBreaker.state === 'open'
+                ? 1
+                : aiCircuitBreaker.state === 'half-open'
+                    ? 2
+                    : 0,
+            wa_ai_circuit_breaker_failure_count: aiCircuitBreaker.failureCount,
+            wa_ai_circuit_breaker_next_retry_at_ms: aiCircuitBreaker.nextRetryAt ?? 0,
+            wa_ai_kill_switch_enabled: aiKillSwitchEnabled ? 1 : 0,
+        };
+    },
+    readinessChecks: [
+        {
+            name: 'database',
+            check: async () => {
+                await prisma.$queryRaw`SELECT 1`;
+            },
+        },
+    ],
 });
 
 app.use("/api/integrations/whatsapp", whatsappRouter);
@@ -101,18 +151,24 @@ if (process.env.NODE_ENV !== 'test') {
         }, Math.max(5, intervalMinutes) * 60 * 1000);
     }
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
     });
 
     const shutdown = async () => {
         console.log("Shutting down Planner Service...");
-        await shutdownProducer();
-        if (pushWorker) await pushWorker.close();
-        await stopRenewalWorker().catch(() => null);
-        process.exit(0);
+        await Promise.allSettled([
+            new Promise<void>((resolve) => {
+                server.close(() => resolve());
+            }),
+            shutdownProducer(),
+            pushWorker ? pushWorker.close() : Promise.resolve(),
+            stopRenewalWorker().catch(() => null),
+        ]);
     };
 
-    process.on("SIGTERM", shutdown);
-    process.on("SIGINT", shutdown);
+    registerProcessSafetyHandlers({
+        serviceName: 'planner-service',
+        shutdown,
+    });
 }

@@ -28,6 +28,7 @@ interface ExamEntryFormProps {
     setExamLocation: (v: string) => void;
     examDuration: string;
     setExamDuration: (v: string) => void;
+    validationErrors?: Record<string, string>;
 }
 
 export function ExamEntryForm({
@@ -41,6 +42,7 @@ export function ExamEntryForm({
     chapter, setChapter,
     examLocation, setExamLocation,
     examDuration, setExamDuration,
+    validationErrors = {},
 }: ExamEntryFormProps) {
     return (
         <div className="space-y-4 border-t border-white/10 pt-4">
@@ -100,14 +102,17 @@ export function ExamEntryForm({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Marks (Obtained / Total)</Label>
+                        <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">
+                            Marks (Obtained / Total)
+                        </Label>
                         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
                             <Input
                                 type="number"
                                 value={obtainedMarks}
                                 onChange={(e) => setObtainedMarks(e.target.value)}
                                 placeholder="85"
-                                className="bg-white/5 border-white/10 h-12"
+                                aria-invalid={!!validationErrors.obtainedMarks}
+                                className={`bg-white/5 border-white/10 h-12 ${validationErrors.obtainedMarks ? 'border-rose-500/60 focus:ring-rose-500/50' : ''}`}
                             />
                             <span className="text-slate-400">/</span>
                             <Input
@@ -115,20 +120,32 @@ export function ExamEntryForm({
                                 value={totalMarks}
                                 onChange={(e) => setTotalMarks(e.target.value)}
                                 placeholder="100"
-                                className="bg-white/5 border-white/10 h-12"
+                                aria-invalid={!!validationErrors.totalMarks}
+                                className={`bg-white/5 border-white/10 h-12 ${validationErrors.totalMarks ? 'border-rose-500/60 focus:ring-rose-500/50' : ''}`}
                             />
                         </div>
+                        {(validationErrors.obtainedMarks || validationErrors.totalMarks) && (
+                            <p className="text-[11px] text-rose-400 px-1">
+                                {validationErrors.obtainedMarks || validationErrors.totalMarks}
+                            </p>
+                        )}
                     </div>
                 </>
             ) : (
                 <>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
-                            <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Exam Date</Label>
+                            <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">
+                                Exam Date
+                                <span className="text-rose-400 ml-0.5">*</span>
+                            </Label>
                             <CreateTaskDatePicker
                                 value={dueDateValue}
                                 onChange={(nextDate) => updateDueDateTime(nextDate, dueTimeValue, true)}
                             />
+                            {validationErrors.dueDate && (
+                                <p className="text-[11px] text-rose-400 px-1">{validationErrors.dueDate}</p>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[11px] tracking-[0.14em] uppercase text-slate-400">Time</Label>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnalyticsEmptyState } from "@/components/analytics/AnalyticsEmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,7 @@ export default function WeeklyReviewPage() {
 
   const insights = (data?.insights ?? []) as { title: string; detail: string }[];
   const priorities = (data?.priorities ?? []) as { type: string; title: string; dueDate?: string }[];
+  const isEmptyWeeklyReview = !isLoading && insights.length === 0 && priorities.length === 0 && !adjustment;
 
   const headerSubtitle = useMemo(() => {
     if (!data) return "A 5-minute review to reduce overload and decide what to do next.";
@@ -53,6 +55,17 @@ export default function WeeklyReviewPage() {
         </CardContent>
       </Card>
 
+      {isEmptyWeeklyReview ? (
+        <AnalyticsEmptyState
+          title="Weekly review appears after you build a little study history"
+          description="Finish a few tasks or focus sessions and this screen will start surfacing what worked, what slipped, and what deserves attention next week."
+          primaryHref="/createtask"
+          primaryLabel="Plan this week"
+          secondaryHref="/dashboard"
+          secondaryLabel="Back to dashboard"
+        />
+      ) : (
+        <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {(isLoading ? Array.from({ length: 3 }) : insights).map((item, idx: number) => (
           <Card key={isLoading ? idx : (item as { title: string }).title} variant="glass">
@@ -128,6 +141,8 @@ export default function WeeklyReviewPage() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

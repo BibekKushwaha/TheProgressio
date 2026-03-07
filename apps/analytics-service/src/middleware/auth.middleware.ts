@@ -3,6 +3,7 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 import crypto from "crypto";
 import { rateLimit } from "express-rate-limit";
 import { prisma } from "@repo/db";
+import { postJsonRequest } from "../services/internal-http.service.js";
 
 const prismaAny = prisma as any;
 const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
@@ -63,14 +64,18 @@ const touchUserLastActive = (userId: string): void => {
     if (nowMs - lastSignalMs < ACTIVITY_CANCEL_DEBOUNCE_MS) return;
     lastCancellationSignalAt.set(userId, nowMs);
 
-    void fetch(`${HABIT_SERVICE_URL}/api/habits/internal/wa-fallback/cancel`, {
-        method: "POST",
+    void postJsonRequest({
+        url: `${HABIT_SERVICE_URL}/api/habits/internal/wa-fallback/cancel`,
         headers: {
-            "Content-Type": "application/json",
             "x-internal-secret": HABIT_INTERNAL_SECRET,
         },
-        body: JSON.stringify({ userId, source: "analytics_auth" }),
-    }).catch((_error: unknown) => {
+        body: { userId, source: "analytics_auth" },
+        logContext: {
+            service: "analytics-service",
+            subsystem: "auth",
+            dependency: "habit-service",
+            operation: "cancel_whatsapp_fallback",
+        },
     });
 };
 
@@ -157,7 +162,9 @@ export const isAuth = async (
             return;
         }
 
-        const decodedPayload = jwt.verify(token, process.env.JWT_SEC as string) as JwtPayload;
+        const decodedPayload = jwt.verify(token, process.env.JWT_SEC as string, {
+            algorithms: ["HS256"],
+        }) as JwtPayload;
         if (!decodedPayload?.id) {
             res.status(401).json({ message: "Invalid token" });
             return;

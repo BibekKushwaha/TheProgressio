@@ -8,7 +8,7 @@ import { TaskInputCard } from '@/components/createtask/TaskInputCard';
 import { MetaChips } from '@/components/createtask/MetaChips';
 import { ExamEntryForm } from '@/components/createtask/ExamEntryForm';
 import { TaskDetailsForm } from '@/components/createtask/TaskDetailsForm';
-import { Edit, GraduationCap } from 'lucide-react';
+import { Edit, GraduationCap, Sparkles, Brain } from 'lucide-react';
 import { useAppSelector, selectAuthStatus, selectCurrentUser } from '@repo/store';
 import { useCreateTaskForm } from '@/hooks/useCreateTaskForm';
 
@@ -53,10 +53,12 @@ function CreateTaskPageContent() {
                         className="text-center space-y-3"
                     >
                         <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-white via-purple-200 to-indigo-300 text-transparent bg-clip-text tracking-tight">
-                            What would you like to capture?
+                            {form.taskId ? 'Edit Task' : 'What would you like to capture?'}
                         </h1>
                         <p className="text-sm md:text-base text-slate-400 max-w-2xl mx-auto">
-                            Add a focused task or log an exam result in under a minute.
+                            {form.taskId
+                                ? 'Update the details below and save when ready.'
+                                : 'Add a focused task or log an exam result in under a minute.'}
                         </p>
                     </motion.div>
 
@@ -84,7 +86,7 @@ function CreateTaskPageContent() {
                                             role="tab"
                                             aria-selected={isActive}
                                             onClick={() => form.setEntryType(mode.id)}
-                                            className={`relative flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                                            className={`relative flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900 outline-none ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
                                         >
                                             {isActive && (
                                                 <motion.div
@@ -134,12 +136,41 @@ function CreateTaskPageContent() {
                                             : []),
                                     ]}
                                 />
-                                <MetaChips
-                                    subject={form.parsedMeta.subject}
-                                    date={form.parsedMeta.date}
-                                    time={form.parsedMeta.time}
-                                    subjectColor={form.matchedCategoryForChip?.colorCode}
-                                />
+                                {form.validationErrors.title && (
+                                    <p className="text-xs text-rose-400 px-1">{form.validationErrors.title}</p>
+                                )}
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <MetaChips
+                                        subject={form.parsedMeta.subject}
+                                        date={form.parsedMeta.date}
+                                        time={form.parsedMeta.time}
+                                        subjectColor={form.matchedCategoryForChip?.colorCode}
+                                    />
+                                    {form.parseConfidence === 'parsing' && (
+                                        <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                                            <Brain className="w-3.5 h-3.5 animate-pulse text-purple-400" />
+                                            Analyzing…
+                                        </span>
+                                    )}
+                                    {form.parseConfidence === 'high' && (
+                                        <span className="flex items-center gap-1.5 text-[11px] text-emerald-400">
+                                            <Brain className="w-3.5 h-3.5" />
+                                            AI confident
+                                        </span>
+                                    )}
+                                    {form.parseConfidence === 'low' && (
+                                        <span className="flex items-center gap-1.5 text-[11px] text-amber-400">
+                                            <Brain className="w-3.5 h-3.5" />
+                                            AI partially matched
+                                        </span>
+                                    )}
+                                    {form.parseConfidence === 'none' && form.taskDescription.trim().length > 5 && (
+                                        <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                                            <Brain className="w-3.5 h-3.5" />
+                                            No AI matches
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
                             {/* ── Mode-specific fields ── */}
@@ -166,6 +197,7 @@ function CreateTaskPageContent() {
                                     dueTimeValue={form.dueTimeValue}
                                     updateDueDateTime={form.updateDueDateTime}
                                     handleGenerateSubtasks={form.handleGenerateSubtasks}
+                                    validationErrors={form.validationErrors}
                                 />
                             ) : (
                                 <ExamEntryForm
@@ -189,11 +221,35 @@ function CreateTaskPageContent() {
                                     setExamLocation={form.setExamLocation}
                                     examDuration={form.examDuration}
                                     setExamDuration={form.setExamDuration}
+                                    validationErrors={form.validationErrors}
                                 />
                             )}
 
                             {/* ── Action buttons ── */}
-                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                            <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
+                                {/* Smart Create toggle (new task only) */}
+                                {!form.taskId && form.entryType === 'task' && (
+                                    <div className="flex flex-col gap-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => form.setUseSmartCreate(!form.useSmartCreate)}
+                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                                                form.useSmartCreate
+                                                    ? 'bg-indigo-500/20 border-indigo-400/40 text-indigo-300'
+                                                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-200 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <Sparkles className="w-3.5 h-3.5" />
+                                            Smart Create
+                                        </button>
+                                        <p className="text-[10px] text-slate-500 px-1">
+                                            {form.useSmartCreate
+                                                ? 'AI will infer all fields automatically'
+                                                : 'Let AI fill subject, dates & priority'}
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-3 ml-auto">
                                 <button
                                     type="button"
                                     onClick={() => router.back()}
@@ -217,6 +273,7 @@ function CreateTaskPageContent() {
                                                     : 'Schedule Exam'
                                                 : 'Create Task'}
                                 </button>
+                                </div>
                             </div>
                         </motion.div>
                     </AnimatePresence>

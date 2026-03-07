@@ -5,6 +5,7 @@ import { useGetAuditLogsQuery, AuditLog } from '@repo/store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle, Flame, MapPin, Activity, FileText, LucideIcon, Info } from 'lucide-react';
+import { EmptyLedgerIllustration } from '../illustrations/EmptyLedgerIllustration';
 
 export function ActivityLedger() {
     const { data: logsData, isLoading } = useGetAuditLogsQuery({ limit: 15, page: 1 });
@@ -88,7 +89,10 @@ export function ActivityLedger() {
             </CardHeader>
             <CardContent>
                 {ledgerItems.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-4">No recent activity found.</p>
+                    <div className="flex flex-col items-center justify-center py-10 mt-4 bg-white/[0.02] rounded-xl border border-dashed border-white/5">
+                        <EmptyLedgerIllustration className="w-28 h-20 mb-3 text-indigo-500" />
+                        <p className="text-sm text-slate-500 font-medium">No recent activity found.</p>
+                    </div>
                 ) : (
                     <div className="relative border-l border-white/10 ml-3 space-y-6 pb-2">
                         {ledgerItems.map(item => (

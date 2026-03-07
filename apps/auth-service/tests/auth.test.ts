@@ -33,11 +33,15 @@ vi.mock('@repo/db/client', () => {
     delete: vi.fn(),
     deleteMany: vi.fn(),
   }
+  const securityEvent = {
+    create: vi.fn(),
+  }
   return {
     prisma: {
       user,
       familyShareLink,
       mobileRefreshToken,
+      securityEvent,
       $transaction: async (ops: any[]) => Promise.all(ops),
     }
   }
@@ -49,7 +53,10 @@ import bcrypt from 'bcrypt'
 
 describe('Auth endpoints', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     process.env.JWT_SEC = process.env.JWT_SEC ?? 'testsecret'
+    process.env.ADMIN_BOOTSTRAP_SECRET = 'bootstrap-secret'
+    delete process.env.ADMIN_IP_ALLOWLIST
       // reinitialize mocked prisma user methods to ensure they are vi.fn()s
       ; (prisma as any).user = {
         findFirst: vi.fn(),
@@ -71,6 +78,9 @@ describe('Auth endpoints', () => {
         updateMany: vi.fn(),
         delete: vi.fn(),
         deleteMany: vi.fn(),
+      }
+      ; (prisma as any).securityEvent = {
+        create: vi.fn(),
       }
   })
 
@@ -264,5 +274,46 @@ describe('Auth endpoints', () => {
 
     expect(ok.status).toBe(200)
     expect(ok.body).toHaveProperty('message')
+  })
+
+  it('denies bootstrap admin routes from non-allowlisted IPs', async () => {
+    process.env.ADMIN_IP_ALLOWLIST = '203.0.113.10'
+
+    const res = await request(app)
+      .post('/api/auth/admin/promote')
+      .set('x-admin-bootstrap-secret', 'bootstrap-secret')
+      .set('x-forwarded-for', '198.51.100.23')
+      .send({ email: 'target@example.com' })
+
+    expect(res.status).toBe(403)
+    expect(res.body).toMatchObject({
+      message: 'Admin bootstrap access denied from this IP address.',
+    })
+  })
+
+  it('rate limits bootstrap admin routes', async () => {
+    ; (prisma as any).user.findUnique.mockResolvedValue({
+      id: 'u-admin-target',
+      username: 'Target',
+      role: 'USER',
+    })
+    ; (prisma as any).user.update.mockResolvedValue({
+      id: 'u-admin-target',
+      role: 'ADMIN',
+    })
+
+    let response = null as Awaited<ReturnType<typeof request>> | null
+
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      response = await request(app)
+        .post('/api/auth/admin/promote')
+        .set('x-admin-bootstrap-secret', 'bootstrap-secret')
+        .send({ email: 'target@example.com' })
+    }
+
+    expect(response?.status).toBe(429)
+    expect(response?.body).toMatchObject({
+      message: 'Too many admin bootstrap attempts, please try again later.',
+    })
   })
 })

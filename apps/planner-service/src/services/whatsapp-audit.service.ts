@@ -31,6 +31,13 @@
 
 import { getRedisClient } from '@repo/cache';
 
+const toMetricKey = (value: string): string =>
+    value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^_+|_+$/g, '');
+
 // ── 1. Distributed metrics counters ──────────────────────────────────────────
 
 const METRICS_HASH_KEY = 'wa:metrics';
@@ -194,6 +201,30 @@ export async function getIntentLatencyMetrics(): Promise<Record<string, {
     } catch { /* use in-process fallback */ }
 
     return result;
+}
+
+export async function getOperationalMetricsSnapshot(): Promise<Record<string, number>> {
+    const [metrics, intentLatency] = await Promise.all([
+        getWhatsAppMetrics(),
+        getIntentLatencyMetrics(),
+    ]);
+
+    const snapshot: Record<string, number> = {
+        ...metrics,
+    };
+
+    for (const [intent, stats] of Object.entries(intentLatency)) {
+        const key = toMetricKey(intent);
+        snapshot[`wa_intent_${key}_count`] = stats.count;
+        snapshot[`wa_intent_${key}_avg_ms`] = stats.avgMs;
+        snapshot[`wa_intent_${key}_min_ms`] = stats.minMs;
+        snapshot[`wa_intent_${key}_max_ms`] = stats.maxMs;
+        snapshot[`wa_intent_${key}_p95_ms`] = stats.p95Ms;
+        snapshot[`wa_intent_${key}_p99_ms`] = stats.p99Ms;
+        snapshot[`wa_intent_${key}_sample_count`] = stats.sampleCount;
+    }
+
+    return snapshot;
 }
 
 // ── 5. Auto-alerting threshold logic ─────────────────────────────────────────

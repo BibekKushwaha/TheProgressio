@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, memo, useCallback } from 'react';
-import { ChevronRight, Clock, CheckCircle2, Circle } from 'lucide-react';
-import { useGetTasksQuery, useToggleTaskMutation, TaskStatus, PriorityEnum } from '@repo/store';
+import { useMemo, memo, useCallback, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight, Clock, CheckCircle2, Circle, GripVertical, Play } from 'lucide-react';
+import { useGetTasksQuery, useToggleTaskMutation, useUpdateTaskMutation, TaskStatus, PriorityEnum, tasksApi, useAppDispatch, Task } from '@repo/store';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { EmptyTasksIllustration } from '../illustrations/EmptyTasksIllustration';
 
 // ---------------------------------------------------------------------------
 // Module-scope pure helpers — defined once, never recreated per render
@@ -41,65 +47,178 @@ function formatTime(dateStr: string | null): string {
 // TaskItem — extracted memoized component; stable reference prevents full
 // list re-renders when only one task's state changes.
 // ---------------------------------------------------------------------------
-type Task = {
-    id: string;
-    title: string;
-    status: string;
-    priority: string;
-    dueDate: string | null;
-};
 
 interface TaskItemProps {
     task: Task;
     isTop3: boolean;
     index: number;
     onToggle: (id: string) => void;
+    onUpdate: (id: string, updates: Partial<{ title: string; priority: PriorityEnum }>) => void;
+    onFocus: (taskId: string, taskTitle: string) => void;
 }
 
-const TaskItem = memo(function TaskItem({ task, isTop3, index, onToggle }: TaskItemProps) {
-    return (
-        <div
-            className={`group flex items-center gap-4 p-4 border rounded-xl hover:bg-white/10 hover:border-white/20 transition-all duration-300 ${task.status === TaskStatus.COMPLETED
-                ? 'bg-white/[0.02] border-white/5'
-                : isTop3
-                    ? 'bg-gradient-to-r from-white/10 to-white/5 border-purple-500/30 shadow-sm shadow-purple-500/10'
-                    : 'bg-white/5 border-white/10'
-                }`}
-        >
-            <button
-                onClick={() => onToggle(task.id)}
-                aria-label={task.status === TaskStatus.COMPLETED ? 'Mark task incomplete' : 'Mark task complete'}
-                className="transition-transform hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-purple-500 rounded-full"
-            >
-                {task.status === TaskStatus.COMPLETED ? (
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
-                ) : (
-                    <Circle className="w-6 h-6 text-slate-500 group-hover:text-purple-400 transition-colors" />
-                )}
-            </button>
+const TaskItem = memo(function TaskItem({ task, isTop3, index, onToggle, onUpdate, onFocus }: TaskItemProps) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: task.id, disabled: task.status === TaskStatus.COMPLETED });
 
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                    <div className={`font-semibold mb-1 truncate ${task.status === TaskStatus.COMPLETED ? 'line-through text-slate-500' : 'text-white'}`}>
-                        {task.title}
-                    </div>
-                    {isTop3 && task.status !== TaskStatus.COMPLETED && (
-                        <span className="shrink-0 text-[9px] font-black uppercase tracking-widest bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                            🎯 Top {index + 1}
-                        </span>
-                    )}
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [titleVal, setTitleVal] = useState(task.title);
+    const [swipeState, setSwipeState] = useState<'idle' | 'completing' | 'rescheduling'>('idle');
+    const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+    useEffect(() => {
+        setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    }, []);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            saveTitle();
+        } else if (e.key === 'Escape') {
+            setIsEditingTitle(false);
+            setTitleVal(task.title);
+        }
+    };
+
+    const saveTitle = () => {
+        setIsEditingTitle(false);
+        if (titleVal.trim() && titleVal !== task.title) {
+            onUpdate(task.id, { title: titleVal });
+        } else {
+            setTitleVal(task.title);
+        }
+    };
+
+    const cyclePriority = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (task.status === TaskStatus.COMPLETED) return;
+        const order = [PriorityEnum.LOW, PriorityEnum.MEDIUM, PriorityEnum.HIGH];
+        const currentIndex = order.indexOf(task.priority as PriorityEnum);
+        const next = order[(currentIndex + 1) % order.length];
+        onUpdate(task.id, { priority: next });
+    };
+
+    return (
+        <div className="relative overflow-hidden rounded-xl">
+            {/* Swipe reveal layer: green = complete, purple = reschedule */}
+            <div className="absolute inset-0 flex items-center justify-between px-6 pointer-events-none">
+                <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-opacity ${swipeState === 'completing' ? 'opacity-100 text-green-400' : 'opacity-0'}`}>
+                    <CheckCircle2 className="w-5 h-5" /> Done!
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400 font-medium tracking-wide">
-                    <Clock className="w-3 h-3" />
-                    {formatTime(task.dueDate)}
+                <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-opacity ${swipeState === 'rescheduling' ? 'opacity-100 text-purple-400' : 'opacity-0'}`}>
+                    Reschedule <Clock className="w-5 h-5" />
                 </div>
             </div>
 
-            <span
-                className={`px-2.5 py-1 border rounded-lg text-[10px] font-black tracking-widest uppercase transition-colors ${getPriorityStyle(task.priority, task.status)}`}
+            <motion.div
+                ref={setNodeRef}
+                layout
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                drag={isTouchDevice && task.status !== TaskStatus.COMPLETED ? 'x' : false}
+                dragDirectionLock
+                dragSnapToOrigin
+                dragConstraints={{ left: -120, right: 120 }}
+                dragElastic={0.15}
+                onDrag={(_e, info) => {
+                    if (info.offset.x > 50) setSwipeState('completing');
+                    else if (info.offset.x < -50) setSwipeState('rescheduling');
+                    else setSwipeState('idle');
+                }}
+                onDragEnd={(_e, info) => {
+                    if (info.offset.x > 80 && Math.abs(info.velocity.x) > 50) {
+                        onToggle(task.id);
+                    }
+                    setSwipeState('idle');
+                }}
+                style={{
+                    transform: CSS.Transform.toString(transform),
+                    transition,
+                    opacity: isDragging ? 0.5 : 1,
+                    zIndex: isDragging ? 50 : 1,
+                    ...(isDragging ? { position: 'relative' } : {})
+                }}
+                className={`group flex items-center gap-4 p-4 border rounded-xl hover:bg-white/10 hover:border-white/20 transition-all duration-300 touch-pan-y ${task.status === TaskStatus.COMPLETED
+                    ? 'bg-white/[0.02] border-white/5'
+                    : isTop3
+                        ? 'bg-gradient-to-r from-white/10 to-white/5 border-purple-500/30 shadow-sm shadow-purple-500/10'
+                        : 'bg-white/5 border-white/10'
+                    }`}
             >
-                {task.status === TaskStatus.COMPLETED ? 'Done' : task.priority}
-            </span>
+                {task.status !== TaskStatus.COMPLETED && (
+                    <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-white outline-none -ml-2 p-1">
+                        <GripVertical className="w-5 h-5 opacity-50 hover:opacity-100 transition-opacity" />
+                    </div>
+                )}
+                <button
+                    onClick={() => onToggle(task.id)}
+                    aria-label={task.status === TaskStatus.COMPLETED ? 'Mark task incomplete' : 'Mark task complete'}
+                    className="transition-transform hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-purple-500 rounded-full"
+                >
+                    {task.status === TaskStatus.COMPLETED ? (
+                        <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    ) : (
+                        <Circle className="w-6 h-6 text-slate-500 group-hover:text-purple-400 transition-colors" />
+                    )}
+                </button>
+
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        {isEditingTitle && task.status !== TaskStatus.COMPLETED ? (
+                            <input
+                                autoFocus
+                                className="bg-slate-900 border border-purple-500/50 rounded-lg px-2 text-white w-full outline-none focus:ring-2 focus:ring-purple-500"
+                                value={titleVal}
+                                onChange={(e) => setTitleVal(e.target.value)}
+                                onBlur={saveTitle}
+                                onKeyDown={handleKeyDown}
+                            />
+                        ) : (
+                            <div
+                                onDoubleClick={() => task.status !== TaskStatus.COMPLETED && setIsEditingTitle(true)}
+                                className={`font-semibold mb-1 truncate cursor-text ${task.status === TaskStatus.COMPLETED ? 'line-through text-slate-500' : 'text-white'}`}
+                                title={task.status !== TaskStatus.COMPLETED ? "Double-click to edit" : undefined}
+                            >
+                                {task.title}
+                            </div>
+                        )}
+                        {isTop3 && task.status !== TaskStatus.COMPLETED && !isEditingTitle && (
+                            <span className="shrink-0 text-[9px] font-black uppercase tracking-widest bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                🎯 Top {index + 1}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400 font-medium tracking-wide">
+                        <Clock className="w-3 h-3" />
+                        {formatTime(task.dueDate)}
+                    </div>
+                </div>
+
+                {task.status !== TaskStatus.COMPLETED && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onFocus(task.id, task.title); }}
+                        aria-label={`Start focus session for ${task.title}`}
+                        title="Start Focus Session"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 transition-all active:scale-90 opacity-0 group-hover:opacity-100"
+                    >
+                        <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                    </button>
+                )}
+
+                <button
+                    onClick={cyclePriority}
+                    className={`px-2.5 py-1 border rounded-lg text-[10px] font-black tracking-widest uppercase transition-colors ${task.status !== TaskStatus.COMPLETED ? 'cursor-pointer hover:opacity-80 active:scale-95' : 'cursor-default'} ${getPriorityStyle(task.priority, task.status)}`}
+                    title={task.status !== TaskStatus.COMPLETED ? "Click to cycle priority" : undefined}
+                >
+                    {task.status === TaskStatus.COMPLETED ? 'Done' : task.priority}
+                </button>
+            </motion.div>
         </div>
     );
 });
@@ -109,6 +228,40 @@ export function TodaysTasks() {
     const todaysTasksQueryArgs = useMemo(() => ({ date: today }), [today]);
     const { data: tasks, isLoading } = useGetTasksQuery(todaysTasksQueryArgs);
     const [toggleTask] = useToggleTaskMutation();
+    const [updateTask] = useUpdateTaskMutation();
+    const dispatch = useAppDispatch();
+    const router = useRouter();
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        dispatch(
+            tasksApi.util.updateQueryData('getTasks', todaysTasksQueryArgs, (draft) => {
+                const oldIndex = draft.findIndex(t => t.id === active.id);
+                const newIndex = draft.findIndex(t => t.id === over.id);
+
+                if (oldIndex !== -1 && newIndex !== -1) {
+                    const item = draft[oldIndex];
+                    if (item) {
+                        draft.splice(oldIndex, 1);
+                        draft.splice(newIndex, 0, item);
+                    }
+                }
+            })
+        );
+    }, [dispatch, todaysTasksQueryArgs]);
 
     const handleToggle = useCallback(async (id: string) => {
         try {
@@ -118,6 +271,19 @@ export function TodaysTasks() {
             console.warn('Failed to toggle task:', message);
         }
     }, [toggleTask]);
+
+    const handleUpdate = useCallback(async (id: string, updates: Partial<{ title: string; priority: PriorityEnum }>) => {
+        try {
+            await updateTask({ id, ...updates }).unwrap();
+        } catch (error) {
+            const message = getApiErrorMessage(error, 'Failed to update task');
+            console.warn('Failed to update task:', message);
+        }
+    }, [updateTask]);
+
+    const handleFocus = useCallback((taskId: string, taskTitle: string) => {
+        router.push(`/focus-session?taskId=${taskId}&task=${encodeURIComponent(taskTitle)}&duration=25`);
+    }, [router]);
 
     // Sort: non-completed first by priority desc, then completed.
     // Wrapped in useMemo so the O(n log n) sort only runs when `tasks`
@@ -185,28 +351,37 @@ export function TodaysTasks() {
                         ))}
                     </div>
                 ) : sortedTasks.length > 0 ? (
-                    <>
-                        {sections.map((section) =>
-                            section.tasks.length > 0 ? (
-                                <div key={section.key} className={section.className}>
-                                    <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${section.titleClass}`}>{section.title}</p>
-                                    {section.tasks.map((task, i) => (
-                                        <TaskItem
-                                            key={task.id}
-                                            task={task}
-                                            isTop3={section.isTop3}
-                                            index={i}
-                                            onToggle={handleToggle}
-                                        />
-                                    ))}
-                                </div>
-                            ) : null
-                        )}
-                    </>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={incompleteTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                            {sections.map((section) =>
+                                section.tasks.length > 0 ? (
+                                    <div key={section.key} className={section.className}>
+                                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${section.titleClass}`}>{section.title}</p>
+                                        <div className="space-y-3 mt-3">
+                                            <AnimatePresence mode="popLayout">
+                                                {section.tasks.map((task, i) => (
+                                                    <TaskItem
+                                                        key={task.id}
+                                                        task={task}
+                                                        isTop3={section.isTop3}
+                                                        index={i}
+                                                        onToggle={handleToggle}
+                                                        onUpdate={handleUpdate}
+                                                        onFocus={handleFocus}
+                                                    />
+                                                ))}
+                                            </AnimatePresence>
+                                        </div>
+                                    </div>
+                                ) : null
+                            )}
+                        </SortableContext>
+                    </DndContext>
                 ) : (
-                    <div className="text-center py-10 bg-white/[0.02] rounded-xl border border-dashed border-white/10">
-                        <p className="text-slate-400 text-sm italic font-medium">No tasks scheduled for today.</p>
-                        <Link href="/createtask" className="mt-3 inline-block text-xs bg-purple-500/10 text-purple-400 px-4 py-2 rounded-full hover:bg-purple-500/20 transition-all">
+                    <div className="flex flex-col items-center justify-center py-10 bg-white/[0.02] rounded-xl border border-dashed border-white/10">
+                        <EmptyTasksIllustration className="w-32 h-24 mb-3 text-purple-500" />
+                        <p className="text-slate-400 text-sm font-medium">No tasks scheduled for today.</p>
+                        <Link href="/createtask" className="mt-4 inline-block text-xs font-bold uppercase tracking-wider bg-purple-500/10 text-purple-400 px-5 py-2.5 rounded-full hover:bg-purple-500/20 transition-all active:scale-95">
                             + Add a task
                         </Link>
                     </div>

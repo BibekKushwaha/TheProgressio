@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { prisma, Status } from "@repo/db";
 import { deleteAnalyticsCache, getAnalyticsCache, setAnalyticsCache } from "@repo/cache";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { requestJson } from "../services/internal-http.service.js";
 import { predictTaskDuration, getCycleTimePercentiles, predictGrade } from "../services/prediction.service.js";
 import { generateSWOT, getSubjectPerformance } from "../services/swot.service.js";
 import { calculateCGPA, whatIfGPA, addCourseGrade, updateCourseGrade, deleteCourseGrade } from "../services/gpa.service.js";
@@ -46,37 +47,28 @@ const buildConsecutiveStreak = (distinctDates: string[]): number => {
 const getHabitActiveDates = async (userId: string): Promise<string[]> => {
     if (process.env.NODE_ENV === "test") return [];
 
-    try {
-        const headers: Record<string, string> = {};
-        if (HABIT_INTERNAL_SECRET) {
-            headers["x-internal-secret"] = HABIT_INTERNAL_SECRET;
-        }
-
-        // 3-second hard timeout — habit service latency must not stall the BFF
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        let response: globalThis.Response;
-        try {
-            response = await fetch(
-                `${HABIT_SERVICE_URL}/api/habits/internal/active-dates?userId=${encodeURIComponent(userId)}`,
-                { headers, signal: controller.signal }
-            );
-        } finally {
-            clearTimeout(timeoutId);
-        }
-
-        if (!response.ok) return [];
-
-        const payload = await response.json() as { activeDates?: unknown };
-        if (!Array.isArray(payload.activeDates)) return [];
-
-        return payload.activeDates
-            .filter((value): value is string => typeof value === "string")
-            .map((value) => value.trim())
-            .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value));
-    } catch {
-        return [];
+    const headers: Record<string, string> = {};
+    if (HABIT_INTERNAL_SECRET) {
+        headers["x-internal-secret"] = HABIT_INTERNAL_SECRET;
     }
+
+    const result = await requestJson<{ activeDates?: unknown }>({
+        url: `${HABIT_SERVICE_URL}/api/habits/internal/active-dates?userId=${encodeURIComponent(userId)}`,
+        ...(Object.keys(headers).length > 0 ? { headers } : {}),
+        logContext: {
+            service: "analytics-service",
+            subsystem: "stats",
+            dependency: "habit-service",
+            operation: "fetch_active_dates",
+        },
+    });
+
+    if (!result.ok || !result.data || !Array.isArray(result.data.activeDates)) return [];
+
+    return result.data.activeDates
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value));
 };
 
 const getMergedActiveDates = async (userId: string): Promise<string[]> => {

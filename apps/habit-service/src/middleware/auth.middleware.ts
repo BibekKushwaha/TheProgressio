@@ -162,7 +162,9 @@ export const isAuth = async (
             return next(new ErrorHandler(401, "Authentication token is missing"));
         }
 
-        const decodedPayload = jwt.verify(token, process.env.JWT_SEC as string) as JwtPayload;
+        const decodedPayload = jwt.verify(token, process.env.JWT_SEC as string, {
+            algorithms: ["HS256"],
+        }) as JwtPayload;
         if (!decodedPayload?.id) {
             return next(new ErrorHandler(401, "Invalid token"));
         }

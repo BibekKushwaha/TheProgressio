@@ -5,9 +5,22 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from 'express-rate-limit';
 import activityRouter from "./routes/activity.route.js";
 import statsRouter from "./routes/stats.route.js";
+import { getAnalyticsOperationalMetricsSnapshot, recordAnalyticsRequestMetric } from './services/metrics.service.js';
 import { shutdownWorker } from "./services/worker.service.js";
 import { shutdownSimulationService } from "./services/simulation.service.js";
 import { shutdownExportWorker } from "./services/export.service.js";
+import { prisma } from "@repo/db/client";
+import {
+    registerOperationalMiddleware,
+    registerOperationalRoutes,
+    registerProcessSafetyHandlers,
+    validateRequiredEnv,
+} from "@repo/schemas/runtime";
+
+validateRequiredEnv({
+    serviceName: 'analytics-service',
+    requiredEnv: ['DATABASE_URL', 'JWT_SEC'],
+});
 
 export const app = express();
 
@@ -23,6 +36,18 @@ app.use(cookieParser());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+registerOperationalMiddleware({
+    app,
+    serviceName: 'analytics-service',
+});
+app.use((req, res, next) => {
+    res.on('finish', () => {
+        const routePath = (req as typeof req & { route?: { path?: string } }).route?.path ?? req.path;
+        const route = `${req.baseUrl || ''}${routePath}` || req.originalUrl || req.path;
+        recordAnalyticsRequestMetric(req.method, route, res.statusCode);
+    });
+    next();
+});
 
 // Global rate limit
 const globalLimiter = rateLimit({
@@ -38,13 +63,27 @@ app.get("/", (_req, res) => {
     res.json({ message: "Analytics Service API", status: "UP" });
 });
 
+registerOperationalRoutes({
+    app,
+    serviceName: 'analytics-service',
+    collectMetrics: getAnalyticsOperationalMetricsSnapshot,
+    readinessChecks: [
+        {
+            name: 'database',
+            check: async () => {
+                await prisma.$queryRaw`SELECT 1`;
+            },
+        },
+    ],
+});
+
 app.use("/api/activity", activityRouter);
 app.use("/api/stats", statsRouter);
 
 const PORT = process.env.PORT || 4003;
 
 if (process.env.NODE_ENV !== 'test') {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
         console.log(`🚀 Analytics Service running on port ${PORT}`);
         console.log(`🔗 Interface: ${FRONTEND_URL}`);
     });
@@ -53,12 +92,16 @@ if (process.env.NODE_ENV !== 'test') {
     const shutdown = async () => {
         console.log("Shutting down Analytics Service...");
         await Promise.allSettled([
+            new Promise<void>((resolve) => {
+                server.close(() => resolve());
+            }),
             shutdownWorker(),
             shutdownSimulationService(),
             shutdownExportWorker(),
         ]);
-        process.exit(0);
     };
-    process.on("SIGTERM", shutdown);
-    process.on("SIGINT", shutdown);
+    registerProcessSafetyHandlers({
+        serviceName: 'analytics-service',
+        shutdown,
+    });
 }

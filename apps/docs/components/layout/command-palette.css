@@ -1,0 +1,42 @@
+[cmdk-group-heading] {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgb(148, 163, 184); /* text-slate-400 */
+}
+
+[cmdk-item] {
+    position: relative;
+    display: flex;
+    cursor: pointer;
+    user-select: none;
+    align-items: center;
+    border-radius: 0.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 0.875rem;
+    outline: none;
+    color: rgb(226, 232, 240); /* text-slate-200 */
+}
+
+[cmdk-item][data-selected="true"] {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+[cmdk-item][data-disabled="true"] {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+[cmdk-separator] {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin: 0.25rem -0.5rem;
+}

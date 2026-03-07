@@ -5,6 +5,9 @@ import { StoreProvider } from "@repo/store";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
+import { ErrorMonitorBootstrap } from '@/components/providers/ErrorMonitorBootstrap';
+
+import { CommandPalette } from "@/components/layout/CommandPalette";
 
 function isAuthRoute(pathname: string): boolean {
   return (
@@ -28,8 +31,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         disableTransitionOnChange
       >
         <TooltipProvider>
+          <ErrorMonitorBootstrap />
           {children}
           <Toaster richColors position="bottom-right" />
+          {!disableAuthHydrator && <CommandPalette />}
         </TooltipProvider>
       </ThemeProvider>
     </StoreProvider>

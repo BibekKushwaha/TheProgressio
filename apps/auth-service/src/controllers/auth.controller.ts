@@ -17,6 +17,7 @@ import {
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import crypto from "crypto";
 import { addEmailToQueue } from "../services/email.queue.js";
+import { exchangeGoogleCode, fetchGoogleCertsPayload } from "../services/google-http.service.js";
 // Lightweight local cache type (keeps auth-service independent from cache build artifacts)
 export interface LocalUserCacheValue {
   id: string;
@@ -186,17 +187,11 @@ const fetchGoogleCerts = async (): Promise<Record<string, string>> => {
     return googleCertCache.certs;
   }
 
-  const response = await fetch(GOOGLE_CERTS_URL, { method: "GET" });
-  if (!response.ok) {
-    throw new ErrorHandler(502, "Failed to fetch Google certs");
-  }
-
-  const cacheControl = response.headers.get("cache-control") ?? "";
+  const { certs, cacheControl } = await fetchGoogleCertsPayload(GOOGLE_CERTS_URL);
   const maxAgeMatch = cacheControl.match(/max-age=(\d+)/);
   const maxAgeSeconds = maxAgeMatch ? Number.parseInt(maxAgeMatch[1] ?? "0", 10) : 3600;
   const maxAgeMs = Math.max(60_000, maxAgeSeconds * 1000);
 
-  const certs = (await response.json()) as Record<string, string>;
   googleCertCache = { fetchedAtMs: now, maxAgeMs, certs };
   return certs;
 };
@@ -500,14 +495,11 @@ export const googleLoginCallback = TryCatch(async (req, res) => {
   body.set("redirect_uri", redirectUri);
   body.set("grant_type", "authorization_code");
 
-  const tokenRes = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  const tokenJson = (await tokenRes.json().catch(() => ({}))) as any;
-  if (!tokenRes.ok) {
+  const tokenJson = await exchangeGoogleCode({
+    url: GOOGLE_OAUTH_TOKEN_URL,
+    body,
+  }) as any;
+  if (tokenJson?.error && !tokenJson?.id_token) {
     throw new ErrorHandler(401, tokenJson?.error_description ?? "Google token exchange failed");
   }
 

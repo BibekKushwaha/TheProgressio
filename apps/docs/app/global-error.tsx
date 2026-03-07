@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
 import { AlertTriangle, RefreshCcw, Home } from 'lucide-react';
+import { reportError } from '@/lib/errorReporter';
 
 /**
  * Next.js global error boundary.
@@ -24,6 +26,13 @@ export default function GlobalError({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
+    useEffect(() => {
+        reportError(error, {
+            context: 'app.global-error',
+            ...(error.digest ? { digest: error.digest } : {}),
+        });
+    }, [error]);
+
     return (
         <html lang="en">
             <body className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">

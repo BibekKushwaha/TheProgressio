@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from 'react';
 import { AlertTriangle, RefreshCcw } from "lucide-react";
+import { reportError } from '@/lib/errorReporter';
 
 const actionClasses = {
     retry:
@@ -17,6 +19,13 @@ export default function GlobalError({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
+    useEffect(() => {
+        reportError(error, {
+            context: 'app.error',
+            ...(error.digest ? { digest: error.digest } : {}),
+        });
+    }, [error]);
+
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.16),_transparent_36%),linear-gradient(140deg,_#020617_0%,_#0f172a_45%,_#111827_100%)] text-white flex items-center justify-center p-6">
             <div className="w-full max-w-lg rounded-2xl border border-red-500/30 bg-red-500/10 backdrop-blur-xl p-6 text-center">

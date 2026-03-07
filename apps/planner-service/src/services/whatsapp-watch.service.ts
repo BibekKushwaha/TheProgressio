@@ -1,5 +1,6 @@
 import { prisma, Status } from '@repo/db';
 import crypto from 'crypto';
+import { requestJson } from './internal-http.service.js';
 import { sendWhatsAppText } from './meta-whatsapp.service.js';
 
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://localhost:4003';
@@ -31,18 +32,19 @@ const getConsistencyScore = async (userId: string): Promise<number | null> => {
   const secret = process.env.ANALYTICS_INTERNAL_SECRET;
   if (!secret) return null;
 
-  try {
-    const response = await fetch(`${ANALYTICS_SERVICE_URL}/api/stats/internal/consistency?userId=${encodeURIComponent(userId)}`, {
-      method: 'GET',
-      headers: { 'x-internal-secret': secret },
-    });
+  const result = await requestJson<{ consistencyScore?: number }>({
+    url: `${ANALYTICS_SERVICE_URL}/api/stats/internal/consistency?userId=${encodeURIComponent(userId)}`,
+    headers: { 'x-internal-secret': secret },
+    logContext: {
+      service: 'planner-service',
+      subsystem: 'whatsapp-watch',
+      dependency: 'analytics-service',
+      operation: 'fetch_consistency_score',
+    },
+  });
 
-    if (!response.ok) return null;
-    const body = (await response.json()) as { consistencyScore?: number };
-    return typeof body.consistencyScore === 'number' ? body.consistencyScore : null;
-  } catch {
-    return null;
-  }
+  if (!result.ok || !result.data) return null;
+  return typeof result.data.consistencyScore === 'number' ? result.data.consistencyScore : null;
 };
 
 const getOverdueCount = async (userId: string): Promise<number> => {

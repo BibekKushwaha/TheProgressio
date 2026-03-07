@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { ScreenWrapper, GlassCard } from '../../components';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
@@ -8,16 +8,28 @@ import {
     useGetPeakWindowQuery,
     useGetWeeklyTrendsQuery,
     useGetTimeLeakageQuery,
-    useGetTasksQuery,
     useGetHabitsQuery,
     useGetTaskMetricsQuery,
     useGetDailySummaryQuery,
-    TaskStatus,
 } from '@repo/store';
 import type { InsightsScreenProps } from '../../navigation/types';
+import { captureError } from '../../native/sentry';
 
 const BAR_MAX_HEIGHT = 80;
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+function normalizeWeeklyTrends(trends: unknown): Array<{ day: string; hours: number; minutes: number; tasks: number }> {
+    if (!Array.isArray((trends as { data?: unknown[] } | undefined)?.data)) {
+        return [];
+    }
+
+    return ((trends as { data: Array<{ day?: string; date?: string; hours?: number; minutes?: number; tasks?: number }> }).data).map((item) => ({
+        day: item.day ?? item.date ?? 'N/A',
+        hours: Number(item.hours ?? 0),
+        minutes: Number(item.minutes ?? 0),
+        tasks: Number(item.tasks ?? 0),
+    }));
+}
 
 function MetricBox({ label, value, color }: { label: string; value: number | string; color: string }) {
     return (
@@ -35,16 +47,19 @@ const metricStyles = StyleSheet.create({
 });
 
 export const AnalyticsOverviewScreen: React.FC<InsightsScreenProps<'AnalyticsOverview'>> = ({ navigation }) => {
-    const { data: summary } = useGetDashboardSummaryQuery(undefined);
-    const { data: dailySummary } = useGetDailySummaryQuery('7');
-    const { data: peakData } = useGetPeakWindowQuery();
-    const { data: breakdown } = useGetWeeklyTrendsQuery(undefined);
-    const { data: leakage } = useGetTimeLeakageQuery(undefined);
-    const { data: subjects } = useGetSubjectPerformanceQuery('all' as any);
-    const { data: taskMetricsData } = useGetTaskMetricsQuery(undefined);
-    const { data: habitsData } = useGetHabitsQuery(undefined);
+    const { data: summary, isError: isSummaryError, error: summaryError, refetch: refetchSummary } = useGetDashboardSummaryQuery(undefined);
+    const { data: dailySummary, isError: isDailySummaryError, error: dailySummaryError, refetch: refetchDailySummary } = useGetDailySummaryQuery('7');
+    const { data: peakData, isError: isPeakError, error: peakError, refetch: refetchPeak } = useGetPeakWindowQuery();
+    const { data: breakdown, isError: isBreakdownError, error: breakdownError, refetch: refetchBreakdown } = useGetWeeklyTrendsQuery(undefined);
+    const { data: leakage, isError: isLeakageError, error: leakageError, refetch: refetchLeakage } = useGetTimeLeakageQuery(undefined);
+    const { data: subjects, isError: isSubjectsError, error: subjectsError, refetch: refetchSubjects } = useGetSubjectPerformanceQuery('all' as any);
+    const { data: taskMetricsData, isError: isTaskMetricsError, error: taskMetricsError, refetch: refetchTaskMetrics } = useGetTaskMetricsQuery(undefined);
+    const { data: habitsData, isError: isHabitsError, error: habitsError, refetch: refetchHabits } = useGetHabitsQuery(undefined);
 
-    const weeklyFocus: number[] = (breakdown as any)?.weeklyMinutes ?? [0, 0, 0, 0, 0, 0, 0];
+    const weeklyTrendData = useMemo(() => normalizeWeeklyTrends(breakdown), [breakdown]);
+    const weeklyFocus: number[] = weeklyTrendData.length > 0
+        ? weeklyTrendData.map((item) => item.minutes)
+        : [0, 0, 0, 0, 0, 0, 0];
     const maxFocus = Math.max(...weeklyFocus, 1);
 
     const habits = useMemo(
@@ -79,6 +94,59 @@ export const AnalyticsOverviewScreen: React.FC<InsightsScreenProps<'AnalyticsOve
 
     const focusScore = (summary as any)?.focus?.score ?? (summary as any)?.focusScore ?? 0;
     const totalWeeklyHours = Math.round(weeklyFocus.reduce((a, b) => a + b, 0) / 60);
+    const hasPrimaryData = Boolean(summary || breakdown || taskMetricsData || habitsData || subjects || leakage || peakData || dailySummary);
+    const hasAnyFailure = isSummaryError || isDailySummaryError || isPeakError || isBreakdownError || isLeakageError || isSubjectsError || isTaskMetricsError || isHabitsError;
+    const hasFatalFailure = hasAnyFailure && !hasPrimaryData;
+
+    useEffect(() => {
+        const failures = [
+            ['analytics.mobile.dashboardSummary', summaryError],
+            ['analytics.mobile.dailySummary', dailySummaryError],
+            ['analytics.mobile.peakWindow', peakError],
+            ['analytics.mobile.weeklyTrends', breakdownError],
+            ['analytics.mobile.timeLeakage', leakageError],
+            ['analytics.mobile.subjectPerformance', subjectsError],
+            ['analytics.mobile.taskMetrics', taskMetricsError],
+            ['analytics.mobile.habits', habitsError],
+        ] as const;
+
+        failures.forEach(([context, error]) => {
+            if (error) {
+                captureError(error, { context, screen: 'AnalyticsOverviewScreen' });
+            }
+        });
+    }, [summaryError, dailySummaryError, peakError, breakdownError, leakageError, subjectsError, taskMetricsError, habitsError]);
+
+    const retryAll = () => {
+        void refetchSummary();
+        void refetchDailySummary();
+        void refetchPeak();
+        void refetchBreakdown();
+        void refetchLeakage();
+        void refetchSubjects();
+        void refetchTaskMetrics();
+        void refetchHabits();
+    };
+
+    if (hasFatalFailure) {
+        return (
+            <ScreenWrapper scrollable>
+                <View style={styles.header}>
+                    <Text style={styles.title}>📊 Analytics</Text>
+                </View>
+                <GlassCard style={styles.statusCard}>
+                    <Text style={styles.statusIcon}>⚠️</Text>
+                    <Text style={styles.statusTitle}>Analytics are temporarily unavailable</Text>
+                    <Text style={styles.statusText}>
+                        We couldn’t load your insight data right now. Pull again once the connection or backend recovers.
+                    </Text>
+                    <TouchableOpacity onPress={retryAll} style={styles.retryBtn}>
+                        <Text style={styles.retryBtnText}>Retry analytics</Text>
+                    </TouchableOpacity>
+                </GlassCard>
+            </ScreenWrapper>
+        );
+    }
 
     return (
         <ScreenWrapper scrollable>
@@ -91,6 +159,18 @@ export const AnalyticsOverviewScreen: React.FC<InsightsScreenProps<'AnalyticsOve
                     <Text style={styles.stratText}>Strategic →</Text>
                 </TouchableOpacity>
             </View>
+
+            {hasAnyFailure && (
+                <GlassCard style={styles.warningCard}>
+                    <Text style={styles.warningTitle}>Partial data</Text>
+                    <Text style={styles.warningText}>
+                        Some analytics panels are using partial data right now. Totals may be incomplete until the next successful refresh.
+                    </Text>
+                    <TouchableOpacity onPress={retryAll} style={styles.warningBtn}>
+                        <Text style={styles.warningBtnText}>Retry data</Text>
+                    </TouchableOpacity>
+                </GlassCard>
+            )}
 
             {/* Top Stat Cards */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
@@ -212,7 +292,7 @@ export const AnalyticsOverviewScreen: React.FC<InsightsScreenProps<'AnalyticsOve
                     { label: '🏆 Exam War Room', screen: 'ExamWarRoom' as const },
                     { label: '🎓 GPA Calculator', screen: 'GPACalculator' as const },
                     { label: '🥇 Achievements', screen: 'Achievements' as const },
-                    { label: '📄 Reports', screen: 'Reports' as const },
+                    { label: '📄 Weekly Report', screen: 'Reports' as const },
                 ].map((item) => (
                     <TouchableOpacity
                         key={item.label}
@@ -233,6 +313,17 @@ const styles = StyleSheet.create({
     title: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '700' },
     stratBtn: { paddingHorizontal: Spacing['3'], paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
     stratText: { color: Colors.primaryLight, fontSize: Typography.fontSize.sm },
+    statusCard: { alignItems: 'center', paddingVertical: Spacing['6'], marginBottom: Spacing['4'] },
+    statusIcon: { fontSize: 28, marginBottom: Spacing['2'] },
+    statusTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '700', marginBottom: Spacing['2'], textAlign: 'center' },
+    statusText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 20, textAlign: 'center', marginBottom: Spacing['4'] },
+    retryBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'] },
+    retryBtnText: { color: '#fff', fontSize: Typography.fontSize.sm, fontWeight: '700' },
+    warningCard: { marginBottom: Spacing['4'], borderWidth: 1, borderColor: `${Colors.warning}55` },
+    warningTitle: { color: Colors.warning, fontSize: Typography.fontSize.sm, fontWeight: '700', marginBottom: Spacing['1'] },
+    warningText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 20, marginBottom: Spacing['3'] },
+    warningBtn: { alignSelf: 'flex-start', borderRadius: Radius.md, borderWidth: 1, borderColor: `${Colors.warning}99`, paddingHorizontal: Spacing['3'], paddingVertical: Spacing['2'] },
+    warningBtnText: { color: Colors.warning, fontSize: Typography.fontSize.xs, fontWeight: '700' },
     statsScroll: { gap: Spacing['3'], paddingBottom: Spacing['4'], paddingRight: Spacing['4'] },
     statCard: { width: 110, alignItems: 'center', padding: Spacing['3'] },
     statIcon: { fontSize: 20, marginBottom: 2 },

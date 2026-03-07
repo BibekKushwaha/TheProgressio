@@ -16,7 +16,19 @@ import { requireInternalDispatchAuth, requireInternalReadAuth, requireInternalSi
 import { shutdownWorker } from "./services/worker.service.js";
 import { initNudgeDispatchWorker, closeNudgeDispatchWorker } from "./services/nudge-dispatch.worker.js";
 import { closeNudgeDispatchQueue, enqueueDueNudgeDispatchJobs } from "./services/nudge-dispatch.queue.js";
-import { recordLatency } from "./services/metrics.service.js";
+import { getOperationalMetricsSnapshot, recordLatency } from "./services/metrics.service.js";
+import { prisma } from "@repo/db/client";
+import {
+    registerOperationalMiddleware,
+    registerOperationalRoutes,
+    registerProcessSafetyHandlers,
+    validateRequiredEnv,
+} from "@repo/schemas/runtime";
+
+validateRequiredEnv({
+    serviceName: 'habit-service',
+    requiredEnv: ['DATABASE_URL', 'JWT_SEC'],
+});
 
 
 export const app = express();
@@ -33,6 +45,10 @@ app.use(cookieParser());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+registerOperationalMiddleware({
+    app,
+    serviceName: 'habit-service',
+});
 
 // ── Per-endpoint latency middleware ─────────────────────────────────────────
 // Hooks into res 'finish' so the measurement is always taken — even when a
@@ -61,6 +77,20 @@ app.use(globalLimiter);
 
 app.get("/", (_req, res) => {
     res.json({ message: "Habit Service API", status: "UP" });
+});
+
+registerOperationalRoutes({
+    app,
+    serviceName: 'habit-service',
+    collectMetrics: getOperationalMetricsSnapshot,
+    readinessChecks: [
+        {
+            name: 'database',
+            check: async () => {
+                await prisma.$queryRaw`SELECT 1`;
+            },
+        },
+    ],
 });
 
 app.post("/api/habits/events", requireInternalSignature, handleHabitEvent);
@@ -93,7 +123,7 @@ if (process.env.NODE_ENV !== 'test') {
         console.error('[NudgeScheduler] Initial enqueue failed:', err);
     });
 
-    app.listen(PORT, async () => {
+    const server = app.listen(PORT, async () => {
         console.log(`🚀 Habit service running on port ${PORT}`);
         console.log(`🔗 Accepting requests from: ${FRONTEND_URL}`);
     });
@@ -102,12 +132,18 @@ if (process.env.NODE_ENV !== 'test') {
     const gracefulShutdown = async () => {
         console.log("🔄 Shutting down habit-service...");
         clearInterval(nudgeDispatchTimer);
-        await shutdownWorker();
-        await closeNudgeDispatchWorker();
-        await closeNudgeDispatchQueue();
-        process.exit(0);
+        await Promise.allSettled([
+            new Promise<void>((resolve) => {
+                server.close(() => resolve());
+            }),
+            shutdownWorker(),
+            closeNudgeDispatchWorker(),
+            closeNudgeDispatchQueue(),
+        ]);
     };
 
-    process.on("SIGTERM", gracefulShutdown);
-    process.on("SIGINT", gracefulShutdown);
+    registerProcessSafetyHandlers({
+        serviceName: 'habit-service',
+        shutdown: gracefulShutdown,
+    });
 }
