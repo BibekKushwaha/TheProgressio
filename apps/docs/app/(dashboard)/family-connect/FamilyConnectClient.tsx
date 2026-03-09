@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui/stat-card';
 import { TaskListItem } from '@/components/family-connect/TaskListItem';
@@ -358,20 +358,20 @@ export function FamilyConnectClient() {
                             Weekly summary metrics are temporarily unavailable.
                         </div>
                     ) : (
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="p-4 bg-white/5 rounded-xl text-center">
-                            <div className="text-2xl font-black text-white">{summary?.totalTasksCompleted ?? 0}</div>
-                            <div className="text-xs text-slate-400 mt-1">Tasks finished</div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="p-4 bg-white/5 rounded-xl text-center">
+                                <div className="text-2xl font-black text-white">{summary?.totalTasksCompleted ?? 0}</div>
+                                <div className="text-xs text-slate-400 mt-1">Tasks finished</div>
+                            </div>
+                            <div className="p-4 bg-white/5 rounded-xl text-center">
+                                <div className="text-2xl font-black text-white">{summary?.averageSessionLength ? Math.round(summary.averageSessionLength) : 0}m</div>
+                                <div className="text-xs text-slate-400 mt-1">Avg. daily focus</div>
+                            </div>
+                            <div className="p-4 bg-white/5 rounded-xl text-center">
+                                <div className="text-2xl font-black text-white">{summary?.consistencyScore ?? 0}%</div>
+                                <div className="text-xs text-slate-400 mt-1">Consistency score</div>
+                            </div>
                         </div>
-                        <div className="p-4 bg-white/5 rounded-xl text-center">
-                            <div className="text-2xl font-black text-white">{summary?.averageSessionLength ? Math.round(summary.averageSessionLength) : 0}m</div>
-                            <div className="text-xs text-slate-400 mt-1">Avg. daily focus</div>
-                        </div>
-                        <div className="p-4 bg-white/5 rounded-xl text-center">
-                            <div className="text-2xl font-black text-white">{summary?.consistencyScore ?? 0}%</div>
-                            <div className="text-xs text-slate-400 mt-1">Consistency score</div>
-                        </div>
-                    </div>
                     )}
                 </CardContent>
             </Card>
@@ -381,6 +381,9 @@ export function FamilyConnectClient() {
                 <DialogContent className="bg-slate-900 border-white/10 text-white">
                     <DialogHeader>
                         <DialogTitle>Send Encouragement</DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            Write a motivational message to send to the student.
+                        </DialogDescription>
                     </DialogHeader>
                     <p className="text-sm text-slate-400 mb-2">Enter a message to motivate <span className="font-semibold text-slate-200">{user?.username || 'the student'}</span>:</p>
                     <Input
@@ -406,6 +409,9 @@ export function FamilyConnectClient() {
                 <DialogContent className="bg-slate-900 border-white/10 text-white sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold">Share Progress Link</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            Share the student&apos;s progress dashboard via WhatsApp, Instagram, or a copied link.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 mb-2">
                         ⚠️ Public sharing requires a secure backend token. Currently, sharing this link will redirect the recipient to the login screen. Contact your developer to enable tokenized read-only share links.

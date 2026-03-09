@@ -5,6 +5,9 @@ import { useGetWeeklyTrendsQuery, useGetProfileQuery } from '@repo/store';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// Day-name lookup — module-level constant so it doesn't re-allocate on each render.
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
 export function WeeklyActivity() {
     const [viewType, setViewType] = useState<'week' | 'month'>('week');
     const gradientAreaId = useId().replace(/:/g, '');
@@ -28,17 +31,14 @@ export function WeeklyActivity() {
     const rawData = trendsData?.data || [];
     const filteredData = viewType === 'week' ? rawData.slice(-7) : rawData.slice(-30);
 
-    // Map dates to short day names
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const data = useMemo(() => filteredData.map(d => {
         const date = new Date(d.date);
         return {
             ...d,
-            day: days[date.getDay()],
+            day: DAY_NAMES[date.getDay()],
             // Calculate percentage based on user's daily goal for visualization
             percentage: Math.min(100, Math.round((d.hours / dailyLimit) * 100))
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [filteredData, dailyLimit]);
 
     // Generate SVG path for the line and gradient area — must be declared before
@@ -116,8 +116,8 @@ export function WeeklyActivity() {
                             key={option.value}
                             onClick={() => setViewType(option.value)}
                             className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewType === option.value
-                                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
-                                    : 'text-slate-500 hover:text-white'
+                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
+                                : 'text-slate-500 hover:text-white'
                                 }`}
                         >
                             {option.label}

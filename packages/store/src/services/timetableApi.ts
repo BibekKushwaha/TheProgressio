@@ -3,6 +3,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { withAuthRefresh, withRetry } from '../baseQuery';
 import { isNativeRuntime, resolveServiceUrl } from '../runtime';
 import { getAccessTokenSync } from '../mobile-token-store';
+import { calendarApi } from './calendarApi';
 
 const PLANNER_SERVICE_URL = resolveServiceUrl(
     process.env.EXPO_PUBLIC_PLANNER_SERVICE_URL ?? process.env.NEXT_PUBLIC_PLANNER_SERVICE_URL,
@@ -86,6 +87,13 @@ export const timetableApi = createApi({
             }),
             providesTags: ['Timetable'],
         }),
+        getWeeklySchedule: builder.query<{ entries: TimetableEntry[] }, void>({
+            query: () => ({
+                url: '/entries',
+                method: 'GET',
+            }),
+            providesTags: ['Timetable'],
+        }),
         // Timetable Entry CRUD
         createTimetableEntry: builder.mutation<TimetableEntry, { dayOfWeek: number; startTime: string; endTime: string; subjectId: string; rotation?: string | null }>({
             query: (body) => ({
@@ -94,6 +102,12 @@ export const timetableApi = createApi({
                 body,
             }),
             invalidatesTags: ['Timetable'],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    await queryFulfilled;
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
+                } catch { /* ignore */ }
+            },
         }),
         updateTimetableEntry: builder.mutation<TimetableEntry, { id: string; dayOfWeek?: number; startTime?: string; endTime?: string; subjectId?: string; rotation?: string | null }>({
             query: ({ id, ...body }) => ({
@@ -102,6 +116,12 @@ export const timetableApi = createApi({
                 body,
             }),
             invalidatesTags: ['Timetable'],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    await queryFulfilled;
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
+                } catch { /* ignore */ }
+            },
         }),
         deleteTimetableEntry: builder.mutation<{ message: string }, string>({
             query: (id) => ({
@@ -109,6 +129,12 @@ export const timetableApi = createApi({
                 method: 'DELETE',
             }),
             invalidatesTags: ['Timetable'],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    await queryFulfilled;
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
+                } catch { /* ignore */ }
+            },
         }),
 
         // Subject CRUD
@@ -149,6 +175,12 @@ export const timetableApi = createApi({
                 body,
             }),
             invalidatesTags: ['Timetable'],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    await queryFulfilled;
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
+                } catch { /* ignore */ }
+            },
         }),
         updateHoliday: builder.mutation<{ message: string }, { id: string; name?: string; startDate?: string; endDate?: string; pauseNotifications?: boolean }>({
             query: ({ id, ...body }) => ({
@@ -157,6 +189,12 @@ export const timetableApi = createApi({
                 body,
             }),
             invalidatesTags: ['Timetable'],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    await queryFulfilled;
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
+                } catch { /* ignore */ }
+            },
         }),
         deleteHoliday: builder.mutation<{ message: string }, string>({
             query: (id) => ({
@@ -164,12 +202,19 @@ export const timetableApi = createApi({
                 method: 'DELETE',
             }),
             invalidatesTags: ['Timetable'],
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    await queryFulfilled;
+                    dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
+                } catch { /* ignore */ }
+            },
         }),
     }),
 });
 
 export const {
     useGetDailyScheduleQuery,
+    useGetWeeklyScheduleQuery,
     useGetHolidaysQuery,
     useCreateHolidayMutation,
     useUpdateHolidayMutation,

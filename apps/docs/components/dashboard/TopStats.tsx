@@ -26,12 +26,12 @@ export function TopStats() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Daily Goal Card */}
-                <Link href="/analytics/overview" className="block h-full">
-                    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative h-full flex flex-col justify-between">
+            <Link href="/analytics/overview" className="block h-full">
+                <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative h-full flex flex-col justify-between">
                     <div className="flex items-start justify-between mb-4">
                         <div>
                             <div className="text-sm text-slate-400 mb-1">Daily Goal</div>
-                            <div className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                            <div className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
                                 {isSummaryLoading ? (
                                     <Skeleton className="h-9 w-24" />
                                 ) : (
@@ -63,8 +63,8 @@ export function TopStats() {
                                 />
                                 <defs>
                                     <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stopColor="rgb(168, 85, 247)" />
-                                        <stop offset="100%" stopColor="rgb(236, 72, 153)" />
+                                        <stop offset="0%" stopColor="rgba(190, 142, 236, 1)" />
+                                        <stop offset="100%" stopColor="rgba(72, 99, 236, 1)" />
                                     </linearGradient>
                                 </defs>
                             </svg>
@@ -84,12 +84,12 @@ export function TopStats() {
             </Link>
 
             {/* Focus Score Card */}
-                <Link href="/analytics/strategic" className="block h-full">
-                    <div className="group relative bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer h-full flex flex-col justify-between">
+            <Link href="/analytics/strategic" className="block h-full">
+                <div className="group relative bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer h-full flex flex-col justify-between">
                     <div className="flex items-start justify-between mb-4">
                         <div>
                             <div className="text-sm text-slate-400 mb-1">Focus Score</div>
-                            <div className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                            <div className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
                                 {isFocusLoading ? <Skeleton className="h-9 w-12" /> : displayFocusScore}
                             </div>
                         </div>
@@ -131,8 +131,8 @@ export function TopStats() {
             </Link>
 
             {/* Streak Card */}
-                <Link href="/habits" className="block h-full">
-                    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 cursor-pointer relative group h-full flex flex-col justify-between">
+            <Link href="/habits" className="block h-full">
+                <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 cursor-pointer relative group h-full flex flex-col justify-between">
                     <div className="flex items-start justify-between mb-4">
                         <div>
                             <div className="text-sm text-slate-400 mb-1">Active Streak</div>

@@ -87,6 +87,9 @@ export function TasksClient() {
         const params = new URLSearchParams(searchParams.toString());
         params.set('view', view);
         router.replace(`${pathname}?${params.toString()}`, { scroll: false } as Parameters<typeof router.replace>[1]);
+        // pathname, router, and searchParams are stable Next.js references that
+        // do not change between renders. Including them in deps would cause this
+        // effect to fire on every navigation. The only real dep is `view`.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [view]);
 
@@ -254,7 +257,7 @@ export function TasksClient() {
                     />
                 </div>
             </div>
-            
+
             {view === 'kanban' ? (
                 <KanbanBoard
                     searchQuery={searchQuery}

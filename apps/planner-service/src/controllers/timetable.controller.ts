@@ -14,7 +14,25 @@ const parseDateInput = (value: unknown): Date | null => {
 export const getDailySchedule = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.id;
     const { date } = req.query;
-    const targetDate = date ? new Date(date as string) : new Date();
+
+    let targetDate = new Date();
+
+    if (typeof date === "string" && date.trim()) {
+        const parts = date.split('-');
+        if (parts.length === 3) {
+            const y = Number(parts[0]);
+            const m = Number(parts[1]);
+            const d = Number(parts[2]);
+            if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+                // Use local timezone midnight to match client's concept of 'today'
+                targetDate = new Date(y, m - 1, d);
+            } else {
+                throw new ErrorHandler(400, "Invalid date format");
+            }
+        } else {
+            throw new ErrorHandler(400, "Invalid date format. Expected YYYY-MM-DD");
+        }
+    }
 
     if (Number.isNaN(targetDate.getTime())) {
         throw new ErrorHandler(400, "Invalid date format");
@@ -119,6 +137,12 @@ export const deleteHoliday = TryCatch(async (req: AuthenticatedRequest, res: Res
 });
 
 // Timetable Entry CRUD
+export const listTimetableEntries = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const entries = await timetableService.listTimetableEntries(userId);
+    return res.status(200).json({ entries });
+});
+
 export const createTimetableEntry = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.id;
     const { dayOfWeek, startTime, endTime, subjectId, rotation } = req.body;

@@ -10,6 +10,7 @@ import {
     getDailySchedule,
     listHolidays,
     listSubjects,
+    listTimetableEntries,
     updateHoliday,
     updateTimetableEntry,
 } from "../controllers/timetable.controller.js";
@@ -20,6 +21,7 @@ const router = express.Router();
 router.get("/daily", getDailySchedule);
 
 // Timetable Entry CRUD
+router.get("/entries", listTimetableEntries);
 router.post("/entries", createTimetableEntry);
 router.patch("/entries/:id", updateTimetableEntry);
 router.delete("/entries/:id", deleteTimetableEntry);

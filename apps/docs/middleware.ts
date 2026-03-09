@@ -28,7 +28,7 @@ const redirectToLogin = (request: NextRequest): NextResponse => {
     return NextResponse.redirect(loginUrl);
 };
 
-export default async function proxy(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     const isProtected = isProtectedPath(pathname);

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import { HabitsDashboardClient } from "./HabitsDashboardClient";
 import type { BootstrapCritical, DashboardBootstrap } from "@repo/store";
+import { verifyWebSession } from "@/lib/server-auth";
 
 /**
  * HabitsPage — async RSC with React streaming.
@@ -19,7 +20,7 @@ import type { BootstrapCritical, DashboardBootstrap } from "@repo/store";
  *      the full fetch — before the client has even loaded the JS bundle.
  *
  * Cache strategy:
- *   •  next: { revalidate: 30 }  — Next.js Data Cache revalidates every 30 s.
+ *   •  cache: 'no-store'         — always fetch fresh, user-specific habit state.
  *   •  React cache()             — deduplicates identical calls within one render.
  *   •  Redis (backend)           — XP cached 5 min, heatmap cached 12 h; both
  *                                  are invalidated on the next habit log.
@@ -46,7 +47,7 @@ const prefetchCritical = cache(async (token: string): Promise<BootstrapCritical 
     try {
         const res = await fetch(`${HABIT_SERVICE_URL}/api/habits/bootstrap/critical`, {
             headers: { Cookie: `token=${token}` },
-            next: { revalidate: 30 },
+            cache: "no-store",
             signal: ac.signal,
         });
         if (!res.ok) return null;
@@ -69,7 +70,7 @@ const prefetchFull = cache(async (token: string): Promise<DashboardBootstrap | n
     try {
         const res = await fetch(`${HABIT_SERVICE_URL}/api/habits/bootstrap`, {
             headers: { Cookie: `token=${token}` },
-            next: { revalidate: 30 },
+            cache: "no-store",
             signal: ac.signal,
         });
         if (!res.ok) return null;
@@ -83,11 +84,27 @@ const prefetchFull = cache(async (token: string): Promise<DashboardBootstrap | n
 
 export default async function HabitsPage() {
     const cookieStore = await cookies();
+    // Build the full cookie header so verifyWebSession can attempt a token
+    // refresh if the access token is expired but a refreshToken is still valid.
+    const cookieHeader = cookieStore
+        .getAll()
+        .map(({ name, value }) => `${name}=${value}`)
+        .join('; ');
+
+    const session = await verifyWebSession(cookieHeader);
+
+    if (!session.isAuthenticated) {
+        // Unauthenticated — client middleware will redirect to /login.
+        // Return an empty coordinator so the client can handle auth state.
+        return <HabitsDashboardClient criticalData={null} secondaryPromise={Promise.resolve(null)} />;
+    }
+
+    // Extract the raw token for downstream habit-service fetches.
+    // After a refresh, the new token may be in the refreshed cookie headers;
+    // fall back to the original cookie store value.
     const token = cookieStore.get("token")?.value;
 
     if (!token) {
-        // Unauthenticated — client middleware will redirect to /login.
-        // Return an empty coordinator so the client can handle auth state.
         return <HabitsDashboardClient criticalData={null} secondaryPromise={Promise.resolve(null)} />;
     }
 
@@ -105,4 +122,3 @@ export default async function HabitsPage() {
         />
     );
 }
-

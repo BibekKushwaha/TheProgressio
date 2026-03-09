@@ -5,7 +5,7 @@ import { useCreateAttachmentMutation, useDeleteAttachmentMutation } from '@repo/
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTaskDetail } from './TaskDetailContext';
 
@@ -115,6 +115,9 @@ export function AttachmentsList() {
                 <DialogContent className="bg-slate-900 border-white/10 text-white">
                     <DialogHeader>
                         <DialogTitle className="text-white">Add Attachment Link</DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            Paste a URL to attach a reference, document, or resource to this task.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">

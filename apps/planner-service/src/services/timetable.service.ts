@@ -272,6 +272,18 @@ export class TimetableService {
     }
 
     // Timetable Entry CRUD
+    async listTimetableEntries(userId: string) {
+        return prisma.timetable.findMany({
+            where: { userId },
+            include: { subject: true },
+            orderBy: [
+                { dayOfWeek: "asc" },
+                { startTime: "asc" },
+                { createdAt: "asc" }
+            ],
+        });
+    }
+
     async createTimetableEntry(params: {
         userId: string;
         dayOfWeek: number;

@@ -40,11 +40,8 @@ export function HabitsClient({
                 `[Profiler] ${id} re-rendered ${Math.round((actualDuration / baseDuration) * 100)}% of base cost — verify React.memo`,
                 { phase, actual: Math.round(actualDuration), base: Math.round(baseDuration) }
             );
-        } else {
-            console.debug(
-                `[Profiler] ${id} (${phase}) actual=${Math.round(actualDuration)} ms  base=${Math.round(baseDuration)} ms`
-            );
         }
+        // No debug logging on the happy path — it creates noise in DevTools during normal renders.
     };
 
     // Skip when parent coordinator already fetched via bootstrap.
@@ -144,7 +141,9 @@ export function HabitsClient({
                         Create your first habit
                     </Button>
                 </div>
-            ) : (
+            ) : process.env.NODE_ENV === 'development' ? (
+                // Profiler is dev-only: React.Profiler still adds overhead even when the
+                // callback is a no-op, so we dead-code-eliminate it in production builds.
                 <Profiler id="HabitGrid" onRender={onRenderCallback}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredHabits.map((habit) => (
@@ -157,6 +156,17 @@ export function HabitsClient({
                         ))}
                     </div>
                 </Profiler>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredHabits.map((habit) => (
+                        <div key={habit.id} id={`habit-card-${habit.id}`}>
+                            <HabitCard
+                                habit={habit}
+                                highlighted={habit.id === highlightedHabitId}
+                            />
+                        </div>
+                    ))}
+                </div>
             )}
         </div>
     );

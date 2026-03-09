@@ -309,6 +309,7 @@ export { SessionType } from './services/analyticsApi';
 export {
   timetableApi,
   useGetDailyScheduleQuery,
+  useGetWeeklyScheduleQuery,
   useGetHolidaysQuery,
   useCreateHolidayMutation,
   useUpdateHolidayMutation,

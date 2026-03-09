@@ -17,8 +17,8 @@ const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const isDev = process.env.NODE_ENV !== 'production';
 const debugLog = isDev
     ? (msg: string, data?: Record<string, unknown>) =>
-          console.info(`[PushDebug][Client] ${msg}`, data ?? '')
-    : () => {};
+        console.info(`[PushDebug][Client] ${msg}`, data ?? '')
+    : () => { };
 
 type BackendStatus = 'idle' | 'registering' | 'registered' | 'failed';
 
@@ -58,16 +58,24 @@ export function PushNotificationManager() {
 
     // Seed backendStatus from server-side subscription count so the UI
     // doesn't flash "Retry" on every page load while the RTK query loads.
+    // We use a functional updater (prev => ...) to avoid closing over
+    // `backendStatus` — this makes the dep-array omission genuinely safe:
+    // the effect only fires when the subscription count changes, and the
+    // updater reads the latest prev value atomically from React's state queue.
     useEffect(() => {
-        if (pushStatus?.subscriptionCount && pushStatus.subscriptionCount > 0 && backendStatus === 'idle') {
-            setBackendStatus('registered');
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (!pushStatus?.subscriptionCount || pushStatus.subscriptionCount <= 0) return;
+        setBackendStatus((prev) => (prev === 'idle' ? 'registered' : prev));
+        // pushStatus.subscriptionCount is the specific dep; omitting the parent object
+        // avoids extra renders when unrelated pushStatus fields (e.g. vapidConfigured) change.
     }, [pushStatus?.subscriptionCount]);
 
     useEffect(() => {
         if (!isSupported || !user) return;
         void bootstrapSubscription();
+        // bootstrapSubscription is an async function defined inside the component.
+        // Including it in deps would cause re-subscription on every render because
+        // it's re-created on each render. We intentionally depend only on the stable
+        // identifiers that should trigger a re-bootstrap: isSupported and user.id.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isSupported, user?.id]);
 
@@ -95,7 +103,10 @@ export function PushNotificationManager() {
         return () => {
             permStatus?.removeEventListener('change', handlePermissionChange);
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // refetchPushStatus is a stable RTK Query function reference — it does not
+        // change between renders, so omitting it from deps is safe. The effect only
+        // needs to re-run when isSupported changes (i.e. once, after mount).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isSupported]);
 
     // Handle messages posted by the service worker (e.g. permission revoked mid-session).
@@ -114,7 +125,7 @@ export function PushNotificationManager() {
 
         navigator.serviceWorker.addEventListener('message', handleSwMessage);
         return () => navigator.serviceWorker.removeEventListener('message', handleSwMessage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isSupported]);
 
     const ensureRegistration = async (): Promise<ServiceWorkerRegistration> => {

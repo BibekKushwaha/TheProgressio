@@ -6,7 +6,7 @@ import { Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCreateNoteMutation } from '@repo/store';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 export function MobileFAB() {
@@ -29,9 +29,9 @@ export function MobileFAB() {
     };
 
     const actions = [
-        { icon: CheckSquare, label: 'New Task',   onAction: () => router.push('/createtask'), color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
-        { icon: CalendarDays, label: 'Schedule',  onAction: () => router.push('/planner'),    color: 'text-pink-400',    bg: 'bg-pink-500/20'    },
-        { icon: FileText,     label: 'Quick Note', onAction: () => { setIsOpen(false); setNoteDialogOpen(true); }, color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
+        { icon: CheckSquare, label: 'New Task', onAction: () => router.push('/createtask'), color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+        { icon: CalendarDays, label: 'Schedule', onAction: () => router.push('/planner'), color: 'text-pink-400', bg: 'bg-pink-500/20' },
+        { icon: FileText, label: 'Quick Note', onAction: () => { setIsOpen(false); setNoteDialogOpen(true); }, color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
     ];
 
     return (
@@ -105,6 +105,9 @@ export function MobileFAB() {
                             <FileText className="w-5 h-5 text-indigo-400" />
                             Quick Note
                         </DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            Capture a quick thought, class note, or reminder.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <textarea

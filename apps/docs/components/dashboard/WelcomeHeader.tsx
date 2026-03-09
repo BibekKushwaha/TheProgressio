@@ -1,7 +1,7 @@
 "use client"
 import { CalendarDays, Bell } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogTrigger, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import dynamic from 'next/dynamic';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppSelector, useGetNudgesQuery, Nudge, useGetUserXPQuery } from '@repo/store';
@@ -127,6 +127,9 @@ export function WelcomeHeader() {
                         </DialogTrigger>
                         <DialogContent className="max-w-4xl bg-slate-900 border-white/10 text-white p-0 overflow-hidden">
                             <DialogTitle className="sr-only">Your Schedule</DialogTitle>
+                            <DialogDescription className="sr-only">
+                                View and manage your weekly timetable and rotation schedule.
+                            </DialogDescription>
                             <div className="p-6">
                                 <TimetableView />
                             </div>

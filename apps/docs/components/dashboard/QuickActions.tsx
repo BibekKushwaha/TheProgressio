@@ -4,7 +4,7 @@ import { Plus, FileText, Sparkles } from 'lucide-react';
 import { StartFocusButton } from '../planner/StartFocusButton';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { addTask, PriorityEnum, TaskStatus, useAppDispatch, useCreateNoteMutation, useCreateTaskMutation, useGetTasksQuery } from '@repo/store';
 import { toast } from 'sonner';
@@ -142,6 +142,9 @@ export function QuickActions() {
                             <FileText className="w-5 h-5 text-indigo-400" />
                             Quick Note
                         </DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            Capture a thought, class note, or reminder — saved instantly.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <textarea

@@ -43,7 +43,12 @@ function CalendarContent() {
         if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return;
         // Construct a local Date (year, monthIndex, day)
         const parsed = new Date(y, m - 1, d);
-        if (!Number.isNaN(parsed.getTime())) {
+        if (
+            !Number.isNaN(parsed.getTime()) &&
+            parsed.getFullYear() === y &&
+            parsed.getMonth() === m - 1 &&
+            parsed.getDate() === d
+        ) {
             setSelectedDate(parsed);
         }
     }, [searchParams]);
@@ -68,8 +73,8 @@ function CalendarContent() {
                         <button
                             onClick={() => setRotationFilter(!rotationFilter)}
                             className={`ml-auto px-3 py-1 rounded-lg text-xs font-semibold transition-all ${rotationFilter
-                                    ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30'
-                                    : 'bg-white/5 text-violet-400 hover:bg-violet-500/20'
+                                ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30'
+                                : 'bg-white/5 text-violet-400 hover:bg-violet-500/20'
                                 }`}
                         >
                             {rotationFilter ? '✓ Filtering Active' : 'Filter by Rotation'}

@@ -5,7 +5,7 @@ import { useGetGPAQuery, useAddCourseGradeMutation, useUpdateCourseGradeMutation
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GraduationCap, Plus, TrendingUp, Award, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -162,6 +162,11 @@ export function GPACalculator() {
                         <DialogContent className="bg-slate-900 border-white/10 text-white">
                             <DialogHeader>
                                 <DialogTitle>{editingCourseId ? 'Edit Course Grade' : 'Add Course Grade'}</DialogTitle>
+                                <DialogDescription className="text-slate-400">
+                                    {editingCourseId
+                                        ? 'Update the course details and grade point below.'
+                                        : 'Enter course details to track them in your CGPA calculation.'}
+                                </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
                                 <Input

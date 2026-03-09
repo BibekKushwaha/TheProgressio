@@ -56,6 +56,9 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     const progress = totalTime > 0 ? ((totalTime - timeLeft) / totalTime) * 100 : 0;
     const startTimeRef = useRef(new Date().toISOString());
     const liveBootstrapRef = useRef(false);
+    // Ref that always holds the latest timeLeft without being a dep of the heartbeat effect.
+    // This prevents the 15 s interval from being torn down and re-created every second.
+    const timeLeftRef = useRef(timeLeft);
     const [logSession] = useLogSessionMutation();
     const [startLiveSession] = useStartLiveSessionMutation();
     const [pauseLiveSession] = usePauseLiveSessionMutation();
@@ -197,6 +200,12 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
         onComplete();
     }, [liveSessionId, stopLiveSession, taskId, currentTaskTitle, totalTime, timeLeft, logSession, onComplete]);
 
+    // Keep timeLeftRef in sync so the heartbeat can read the latest value without
+    // being included in the heartbeat useEffect dep array.
+    useEffect(() => {
+        timeLeftRef.current = timeLeft;
+    }, [timeLeft]);
+
     useEffect(() => {
         if (isPaused) return;
 
@@ -223,10 +232,13 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     useEffect(() => {
         if (!liveSessionId || isPaused) return;
 
+        // timeLeftRef is read inside the interval callback so we always send the
+        // current remaining seconds without making timeLeft a dep (which would
+        // tear down and re-create this interval every second — 60×/min instead of 4×/min).
         const interval = setInterval(() => {
             heartbeatLiveSession({
                 sessionId: liveSessionId,
-                remainingSeconds: timeLeft,
+                remainingSeconds: timeLeftRef.current,
             }).unwrap().catch((error: unknown) => {
                 const err = error as { status?: number; data?: { message?: string }; message?: string };
                 // Only log if not a 404 (session expired/replaced)
@@ -237,7 +249,8 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
         }, 15000);
 
         return () => clearInterval(interval);
-    }, [liveSessionId, isPaused, timeLeft, heartbeatLiveSession]);
+        // timeLeft intentionally excluded — use timeLeftRef instead to avoid interval churn.
+    }, [liveSessionId, isPaused, heartbeatLiveSession]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;

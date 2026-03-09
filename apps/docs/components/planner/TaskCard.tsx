@@ -10,7 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
@@ -45,7 +45,9 @@ export function TaskCard({ task, completed }: TaskCardProps) {
     const categoryColor = task.category?.colorCode || '#6B7280'; // Default gray
     const categoryName = task.category?.name || 'No Category';
 
-    const isFamilyView = typeof window !== 'undefined' ? !!localStorage.getItem('family_share_token') : false;
+    // family_share_token is written to sessionStorage by FamilyLinkAcceptClient
+    // (tab-scoped so it doesn't leak across sessions on shared devices).
+    const isFamilyView = typeof window !== 'undefined' ? !!sessionStorage.getItem('family_share_token') : false;
 
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
@@ -297,8 +299,8 @@ export function TaskCard({ task, completed }: TaskCardProps) {
 
                 <div className="flex items-center justify-between mt-4">
                     <div className={`flex items-center gap-2 text-sm ${!completed && task.dueDate && new Date(task.dueDate) < new Date() && formatDueDate(task.dueDate).includes('overdue')
-                            ? 'text-rose-400 font-bold'
-                            : 'text-slate-400'
+                        ? 'text-rose-400 font-bold'
+                        : 'text-slate-400'
                         }`}>
                         <Clock className={`w-4 h-4 ${!completed && task.dueDate && new Date(task.dueDate) < new Date() && formatDueDate(task.dueDate).includes('overdue') ? 'text-rose-400 animate-pulse' : ''}`} />
                         <span>{formatDueDate(task.dueDate)}</span>
@@ -316,6 +318,9 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                 <DialogContent className="bg-slate-900 border-white/10 text-white">
                     <DialogHeader>
                         <DialogTitle>Send Nudge</DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            Send an encouraging message to the student about this task.
+                        </DialogDescription>
                     </DialogHeader>
                     <p className="text-sm text-slate-400 mb-2">Enter a message to encourage the student about <span className="font-semibold text-slate-200">{task.title}</span>:</p>
                     <Input

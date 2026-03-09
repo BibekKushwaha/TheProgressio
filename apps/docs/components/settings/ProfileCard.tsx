@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAccountSettingsController } from "@/hooks/useAccountSettingsController";
 import { useDeleteAccountDialogController } from "@/hooks/useDeleteAccountDialogController";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export function ProfileCard() {
     const {
@@ -124,6 +124,9 @@ export function ProfileCard() {
                 <DialogContent className="bg-slate-950 border-white/10 text-white max-w-md">
                     <DialogHeader>
                         <DialogTitle>Delete account</DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            This action is permanent and cannot be undone. All your data will be removed.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3">
                         <p className="text-sm text-slate-400">

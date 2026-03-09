@@ -6,7 +6,6 @@ import { WelcomeHeader } from '@/components/dashboard/WelcomeHeader';
 import { ActivationChecklist } from '@/components/dashboard/ActivationChecklist';
 import { AtRiskCard } from '@/components/dashboard/AtRiskCard';
 import { TopStats } from '@/components/dashboard/TopStats';
-import { TodaysFocusCard } from '@/components/dashboard/TodaysFocusCard';
 import { WeeklyActivity } from '@/components/dashboard/WeeklyActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { TodaysTasks } from '@/components/dashboard/TodaysTasks';
@@ -83,15 +82,12 @@ export function ModifiableDashboard() {
             {layout.showLiveActivity && <Widget><LiveActivityWidget /></Widget>}
             {layout.showTopStats && <Widget><TopStats /></Widget>}
 
-            {/* Today’s Focus — primary CTA anchor: always visible so users always know what to do next */}
-            <Widget><TodaysFocusCard /></Widget>
-
             <DashboardGrid
                 sidebarHeader={layout.showMorningBriefing ? <Widget><AtRiskCard /></Widget> : null}
                 sidebar={
                     <div className="space-y-6">
-                        {layout.showQuickActions && <Widget><QuickActions /></Widget>}
                         {layout.showMorningBriefing && <Widget><MorningBriefing /></Widget>}
+                        {layout.showQuickActions && <Widget><QuickActions /></Widget>}
                         {layout.showNotes && <Widget><NotesWidget /></Widget>}
                         {layout.showActivityLedger && <Widget><ActivityLedger /></Widget>}
                     </div>

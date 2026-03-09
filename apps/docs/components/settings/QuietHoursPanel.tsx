@@ -27,7 +27,7 @@ export function QuietHoursPanel() {
 
     const [isExpanded, setIsExpanded] = useState(false);
 
-    // Load from localStorage on mount
+    // Hydrate local state from the API response on first load.
     useEffect(() => {
         const firstWindow = data?.settings?.quietHours?.[0];
         if (!firstWindow) return;
@@ -65,10 +65,6 @@ export function QuietHoursPanel() {
             console.error('Failed to persist quiet hour settings', error);
             toast.error("Failed to update settings");
         });
-
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('quiet-hours-settings', JSON.stringify(newSettings));
-        }
     };
 
     const SNOOZE_OPTIONS = [5, 10, 15, 30, 60];

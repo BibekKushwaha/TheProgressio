@@ -32,3 +32,8 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# Generated audit artifacts (output of tests/component_audit_script.py)
+# Regenerate with: python tests/component_audit_script.py
+/audit_dependency_report.json
+/component_index_report.json

@@ -41,7 +41,9 @@ export function TaskListCard({ task, completed }: TaskListCardProps) {
 
     const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[PriorityEnum.LOW];
     const categoryName = task.category?.name || 'No Category';
-    const isFamilyView = typeof window !== 'undefined' ? !!localStorage.getItem('family_share_token') : false;
+    // family_share_token is written to sessionStorage by FamilyLinkAcceptClient
+    // (tab-scoped so it doesn't leak across sessions on shared devices).
+    const isFamilyView = typeof window !== 'undefined' ? !!sessionStorage.getItem('family_share_token') : false;
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     const isOverdue = !completed && task.dueDate && new Date(task.dueDate) < new Date() && formatDueDate(task.dueDate).includes('overdue');

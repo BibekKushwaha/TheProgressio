@@ -20,7 +20,6 @@ import {
     Award,
     Layers,
     Shield,
-    Lock,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -38,8 +37,6 @@ type NavItem = {
     href: string;
     menuKey?: MenuKey;
     children?: NavChild[];
-    /** When true the item renders as a locked/teaser row instead of a link */
-    locked?: boolean;
 };
 
 type NavGroup = {
@@ -145,17 +142,6 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
         return NAV_GROUPS.map(group => {
             // Hide the full analytics section until level 2
             if (userLevel < 2 && group.section === "Analytics & Review") return null;
-            // Keep Exam War Room visible but mark it locked so users know it exists
-            if (group.section === "Academic") {
-                return {
-                    ...group,
-                    items: group.items.map(item =>
-                        item.name === "Exam War Room" && userLevel < 2
-                            ? { ...item, locked: true }
-                            : item
-                    ),
-                };
-            }
             return group;
         }).filter(Boolean) as NavGroup[];
     }, [userLevel]);
@@ -197,22 +183,7 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
                     </div>
                     {group.items.map((item) => (
                         <div key={item.href}>
-                            {item.locked ? (
-                                /* Locked feature teaser — visible but non-interactive */
-                                <div
-                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-default select-none"
-                                    title="Complete more tasks to unlock this feature"
-                                >
-                                    <item.icon className="w-5 h-5 text-slate-600 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-medium text-slate-600 text-sm">{item.name}</div>
-                                        <div className="text-[10px] text-indigo-400/70 font-medium mt-0.5 flex items-center gap-1">
-                                            <Lock className="w-2.5 h-2.5" />
-                                            Unlocks at Level 2
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : item.children ? (
+                            {item.children ? (
                                 <>
                                     <button
                                         type="button"

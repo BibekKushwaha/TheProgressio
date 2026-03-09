@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useIsMounted } from '@/hooks/useIsMounted';
 import {
-    useGetDailyScheduleQuery,
+    useGetWeeklyScheduleQuery,
     useCreateTimetableEntryMutation,
     useDeleteTimetableEntryMutation,
     useGetSubjectsQuery,
@@ -22,7 +22,7 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 
 export function ClassManager() {
     const { data: subjects = [] } = useGetSubjectsQuery();
-    const { data: schedule } = useGetDailyScheduleQuery();
+    const { data: weeklySchedule } = useGetWeeklyScheduleQuery();
     const { data: patterns = [] } = useGetRotationPatternsQuery();
     const [createEntry] = useCreateTimetableEntryMutation();
     const [deleteEntry] = useDeleteTimetableEntryMutation();
@@ -275,7 +275,7 @@ export function ClassManager() {
                 )}
 
                 <div className="space-y-3">
-                    {schedule?.entries.map((entry) => (
+                    {weeklySchedule?.entries.map((entry) => (
                         <div
                             key={entry.id}
                             className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 border-l-4"
@@ -309,7 +309,7 @@ export function ClassManager() {
                             </button>
                         </div>
                     ))}
-                    {schedule?.entries.length === 0 && !isAddingEntry && (
+                    {weeklySchedule?.entries.length === 0 && !isAddingEntry && (
                         <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-2xl">
                             <Clock className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                             <p className="text-slate-500 text-sm">No classes scheduled for today.</p>
