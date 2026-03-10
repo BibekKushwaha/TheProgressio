@@ -95,7 +95,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('framer-motion', () => ({
     motion: {
-        div: ({ children, layoutId, ...props }: React.HTMLAttributes<HTMLDivElement> & { layoutId?: string }) => <div {...props}>{children}</div>,
+        div: ({ children, layoutId: _layoutId, ...props }: React.HTMLAttributes<HTMLDivElement> & { layoutId?: string }) => <div {...props}>{children}</div>,
     },
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));

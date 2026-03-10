@@ -38,7 +38,7 @@ export interface ParsedTimetableEntryDraft {
     endTime: string | null;
     rotation: string | null;
     confidence: number;
-    sourceLine?: string;
+    sourceLine?: string | undefined;
     warnings?: string[];
 }
 

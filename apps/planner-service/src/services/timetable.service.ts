@@ -36,7 +36,7 @@ export interface ParsedTimetableEntryDraft {
     endTime: string | null;
     rotation: string | null;
     confidence: number;
-    sourceLine?: string;
+    sourceLine?: string | undefined;
     warnings?: string[];
 }
 
@@ -117,7 +117,7 @@ const normalizeTimeToken = (raw: string): string | null => {
 };
 
 const parseRotationFromLine = (line: string): { rotation: string | null; cleanedLine: string } => {
-    const rotationMatch = line.match(/\b(?:rotation\s*[:\-]?\s*|rot\s*[:\-]?\s*)([a-z0-9]+)\b/i)
+    const rotationMatch = line.match(/\b(?:rotation\s*[:-]?\s*|rot\s*[:-]?\s*)([a-z0-9]+)\b/i)
         ?? line.match(/\b([ab])(?:-?week)?\b/i);
 
     if (!rotationMatch) {
@@ -227,8 +227,8 @@ const parseFlexibleLine = (line: string): ParsedTimetableEntryDraft | null => {
     const { rotation, cleanedLine } = parseRotationFromLine(withoutDay);
     const subjectName = normalizeWhitespace(
         cleanedLine
-            .replace(/^[|,:;\-]+/, "")
-            .replace(/[|,:;\-]+$/, ""),
+            .replace(/^[|,:;-]+/, "")
+            .replace(/[|,:;-]+$/, ""),
     );
 
     if (!subjectName) return null;
