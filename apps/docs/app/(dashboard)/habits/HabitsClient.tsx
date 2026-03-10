@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, Profiler, type ProfilerOnRenderCallback }
 import { useNetworkWaterfall } from "@/hooks/useNetworkWaterfall";
 import { HabitCard } from "@/components/habit/HabitCard";
 import HabitDialog from "@/components/habit/HabitDialog";
+import { HabitQuickCreate } from "@/components/habit/HabitQuickCreate";
 import { useGetHabitsQuery, type Habit } from "@repo/store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SearchBar } from "@/components/SearchBar";
@@ -98,6 +99,8 @@ export function HabitsClient({
                     Add Habit
                 </Button>
             </PageHeader>
+
+            <HabitQuickCreate />
 
             {isDialogOpen && (
                 <HabitDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />

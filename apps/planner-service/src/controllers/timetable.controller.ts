@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { timetableService } from "../services/timetable.service.js";
+import { aiService } from "../services/ai.service.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import ErrorHandler from "../utils/errorHandler.js";
 
@@ -8,6 +9,39 @@ const parseDateInput = (value: unknown): Date | null => {
     if (typeof value !== "string" || !value.trim()) return null;
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const decodeTextFile = (fileBase64: string): string => {
+    const payload = fileBase64.startsWith("data:")
+        ? fileBase64.split(",")[1] ?? ""
+        : fileBase64;
+
+    if (!payload) return "";
+
+    try {
+        return Buffer.from(payload, "base64").toString("utf8");
+    } catch {
+        return "";
+    }
+};
+
+const collectDetectedSubjects = (entries: Array<{ subjectName: string; confidence: number }>) => {
+    const subjectMap = new Map<string, number>();
+
+    for (const entry of entries) {
+        const subjectName = entry.subjectName.trim();
+        if (!subjectName) continue;
+        const key = subjectName.toLowerCase();
+        const current = subjectMap.get(key) ?? 0;
+        subjectMap.set(key, Math.max(current, entry.confidence));
+    }
+
+    return Array.from(subjectMap.entries())
+        .map(([key, confidence]) => ({
+            name: entries.find((entry) => entry.subjectName.trim().toLowerCase() === key)?.subjectName ?? key,
+            confidence,
+        }))
+        .sort((a, b) => b.confidence - a.confidence);
 };
 
 // GET /timetable/daily
@@ -40,6 +74,85 @@ export const getDailySchedule = TryCatch(async (req: AuthenticatedRequest, res: 
 
     const schedule = await timetableService.getDailySchedule(userId, targetDate);
     return res.status(200).json(schedule);
+});
+
+// POST /timetable/import/preview
+export const previewTimetableImport = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const body = req.body ?? {};
+    const sourceType = body.sourceType;
+
+    if (sourceType !== "text" && sourceType !== "file") {
+        throw new ErrorHandler(400, "sourceType must be 'text' or 'file'");
+    }
+
+    let entries: Awaited<ReturnType<typeof timetableService.previewTimetableImport>>["entries"] = [];
+    let warnings: string[] = [];
+    let parser = {
+        deterministicMatches: 0,
+        aiMatches: 0,
+        normalizedLines: 0,
+    };
+
+    if (sourceType === "text") {
+        const text = typeof body.text === "string" ? body.text.trim() : "";
+        if (!text) {
+            throw new ErrorHandler(400, "text is required for sourceType 'text'");
+        }
+
+        const result = timetableService.previewTimetableImport(text);
+        entries = result.entries;
+        warnings = result.warnings;
+        parser = result.parser;
+    } else {
+        const fileBase64 = typeof body.fileBase64 === "string" ? body.fileBase64 : "";
+        const mimeType = typeof body.mimeType === "string" ? body.mimeType.trim().toLowerCase() : "";
+
+        if (!fileBase64 || !mimeType) {
+            throw new ErrorHandler(400, "fileBase64 and mimeType are required for sourceType 'file'");
+        }
+
+        if (mimeType.startsWith("image/")) {
+            entries = await aiService.previewTimetableImportFromImage(fileBase64, mimeType);
+            if (entries.length === 0) {
+                warnings = ["No timetable rows could be extracted from that image."];
+            }
+            parser = {
+                deterministicMatches: 0,
+                aiMatches: entries.length,
+                normalizedLines: 0,
+            };
+        } else {
+            const extractedText =
+                mimeType.includes("pdf")
+                    ? await aiService.extractDocumentText(fileBase64, mimeType)
+                    : decodeTextFile(fileBase64);
+
+            if (!extractedText.trim()) {
+                return res.status(200).json({
+                    entries: [],
+                    detectedSubjects: [],
+                    warnings: ["No readable text could be extracted from that file."],
+                    parser,
+                });
+            }
+
+            const result = timetableService.previewTimetableImport(extractedText);
+            entries = result.entries;
+            warnings = result.warnings;
+            parser = result.parser;
+        }
+    }
+
+    const existingEntries = await timetableService.listTimetableEntries(userId);
+    const decoratedEntries = timetableService.decoratePreviewEntries(entries, existingEntries);
+
+    return res.status(200).json({
+        entries: decoratedEntries,
+        detectedSubjects: collectDetectedSubjects(decoratedEntries),
+        warnings,
+        parser,
+    });
 });
 
 // GET /timetable/holidays

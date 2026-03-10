@@ -6,7 +6,7 @@ import { Clock, Calendar, AlertTriangle, MapPin, User, Edit3 } from 'lucide-reac
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RotationManager } from "./RotationManager";
-import { ClassManager } from "./ClassManager";
+import { TimetableManagerDialog } from "./TimetableManagerDialog";
 
 export function TimetableView() {
     const { data: schedule, isLoading, error } = useGetDailyScheduleQuery();
@@ -96,28 +96,14 @@ export function TimetableView() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <Dialog>
-                        <DialogTrigger asChild>
+                    <TimetableManagerDialog
+                        trigger={
                             <button className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-sm font-semibold text-indigo-300 hover:bg-indigo-500/20 transition-all">
                                 <Edit3 className="w-4 h-4 text-indigo-400" />
                                 Edit Timetable
                             </button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-3xl bg-slate-950 border-white/10 text-white p-0 overflow-hidden shadow-2xl">
-                            <DialogHeader className="p-6 pb-2">
-                                <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                                    <Calendar className="w-5 h-5 text-indigo-400" />
-                                    Timetable Manager
-                                </DialogTitle>
-                                <DialogDescription className="text-slate-400">
-                                    Manage your subjects and weekly class schedule.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="p-6 pt-2">
-                                <ClassManager />
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                        }
+                    />
 
                     <Dialog>
                         <DialogTrigger asChild>

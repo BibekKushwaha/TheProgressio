@@ -31,6 +31,32 @@ export interface TimetableEntry {
     rotation?: string | null;
 }
 
+export interface ParsedTimetableEntryDraft {
+    subjectName: string;
+    dayOfWeek: number | null;
+    startTime: string | null;
+    endTime: string | null;
+    rotation: string | null;
+    confidence: number;
+    sourceLine?: string;
+    warnings?: string[];
+}
+
+export type TimetableImportPreviewRequest =
+    | { sourceType: 'text'; text: string }
+    | { sourceType: 'file'; fileBase64: string; mimeType: string; fileName?: string };
+
+export interface TimetableImportPreviewResponse {
+    entries: ParsedTimetableEntryDraft[];
+    detectedSubjects: Array<{ name: string; confidence: number }>;
+    warnings: string[];
+    parser: {
+        deterministicMatches: number;
+        aiMatches: number;
+        normalizedLines: number;
+    };
+}
+
 export interface TimetableConflict {
     id: string;
     type: 'CLASS_OVERLAP' | 'EXAM_OVERLAP';
@@ -93,6 +119,13 @@ export const timetableApi = createApi({
                 method: 'GET',
             }),
             providesTags: ['Timetable'],
+        }),
+        previewTimetableImport: builder.mutation<TimetableImportPreviewResponse, TimetableImportPreviewRequest>({
+            query: (body) => ({
+                url: '/import/preview',
+                method: 'POST',
+                body,
+            }),
         }),
         // Timetable Entry CRUD
         createTimetableEntry: builder.mutation<TimetableEntry, { dayOfWeek: number; startTime: string; endTime: string; subjectId: string; rotation?: string | null }>({
@@ -215,6 +248,7 @@ export const timetableApi = createApi({
 export const {
     useGetDailyScheduleQuery,
     useGetWeeklyScheduleQuery,
+    usePreviewTimetableImportMutation,
     useGetHolidaysQuery,
     useCreateHolidayMutation,
     useUpdateHolidayMutation,

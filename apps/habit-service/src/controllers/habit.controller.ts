@@ -64,6 +64,100 @@ const getStreakStatus = (
     return lastLogDate >= start && lastLogDate < end ? "active" : "broken";
 };
 
+const inferHabitFrequency = (input: string): Frequency => {
+    if (/\b(weekly|every week|per week|each week)\b/i.test(input)) {
+        return "WEEKLY";
+    }
+    return "DAILY";
+};
+
+const inferHabitUnit = (input: string): "minutes" | "count" | "pages" | "problems" | "sessions" => {
+    if (/\b(min|mins|minute|minutes|hr|hrs|hour|hours)\b/i.test(input)) {
+        return "minutes";
+    }
+    if (/\b(page|pages)\b/i.test(input)) {
+        return "pages";
+    }
+    if (/\b(problem|problems|question|questions)\b/i.test(input)) {
+        return "problems";
+    }
+    if (/\b(session|sessions)\b/i.test(input)) {
+        return "sessions";
+    }
+    return "count";
+};
+
+const inferHabitTargetValue = (
+    input: string,
+    frequency: Frequency,
+    unit: "minutes" | "count" | "pages" | "problems" | "sessions",
+): number => {
+    const explicitMatch = input.match(/\b(\d+)\s*(?:min|mins|minutes|hrs|hours|times|x|pages?|problems?|questions?|sessions?)\b/i) ?? input.match(/\b(\d+)\b/);
+    const parsed = explicitMatch?.[1] ? Number.parseInt(explicitMatch[1], 10) : Number.NaN;
+    if (Number.isFinite(parsed) && parsed > 0) {
+        if (unit === "minutes" && /\b(hr|hrs|hour|hours)\b/i.test(input)) {
+            return parsed * 60;
+        }
+        return parsed;
+    }
+    if (unit === "minutes") return 20;
+    return frequency === "WEEKLY" ? 3 : 1;
+};
+
+const inferHabitCategoryName = (input: string): string | null => {
+    const mappings: Array<{ pattern: RegExp; category: string }> = [
+        { pattern: /\b(math|algebra|geometry|calculus)\b/i, category: "Math" },
+        { pattern: /\b(physics)\b/i, category: "Physics" },
+        { pattern: /\b(chemistry)\b/i, category: "Chemistry" },
+        { pattern: /\b(biology)\b/i, category: "Biology" },
+        { pattern: /\b(english|reading|essay)\b/i, category: "English" },
+        { pattern: /\b(history)\b/i, category: "History" },
+        { pattern: /\b(code|coding|programming|dsa)\b/i, category: "Coding" },
+        { pattern: /\b(revision|study|flashcards|mock test|practice)\b/i, category: "Study" },
+    ];
+
+    for (const mapping of mappings) {
+        if (mapping.pattern.test(input)) {
+            return mapping.category;
+        }
+    }
+
+    return null;
+};
+
+const inferHabitScheduleHint = (input: string): string | null => {
+    if (/\b(morning|every morning)\b/i.test(input)) return "morning";
+    if (/\b(afternoon|every afternoon)\b/i.test(input)) return "afternoon";
+    if (/\b(evening|every evening)\b/i.test(input)) return "evening";
+    if (/\b(nightly|night|every night)\b/i.test(input)) return "night";
+    return null;
+};
+
+const inferHabitName = (input: string): string => {
+    const cleaned = input
+        .replace(/\b(every day|daily|every week|weekly|per week|each week|nightly)\b/gi, " ")
+        .replace(/\b\d+\s*(min|mins|minutes|hrs|hours|times|x|pages?|problems?|questions?|sessions?)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (!cleaned) {
+        return "Study habit";
+    }
+
+    return cleaned
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+};
+
+const inferHabitConfidence = (input: string): number => {
+    let confidence = 0.58;
+    if (/\b(every day|daily|every week|weekly)\b/i.test(input)) confidence += 0.15;
+    if (/\b\d+\s*(min|mins|minutes|hrs|hours|times|x)\b/i.test(input)) confidence += 0.15;
+    if (inferHabitCategoryName(input)) confidence += 0.1;
+    return Math.min(0.98, confidence);
+};
+
 // Internal helper for analytics service to merge habit activity into streaks
 // GET /api/habits/internal/active-dates?userId=...
 export const getInternalActiveDates = TryCatch(async (req: Request, res: Response): Promise<void> => {
@@ -141,6 +235,26 @@ export const getInternalMetrics = TryCatch(async (req: Request, res: Response): 
             return filtered;
         })(),
         latency: getLatencySnapshot(),
+    });
+});
+
+// POST /api/habits/parse
+export const parseHabit = TryCatch(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    if (!text) {
+        throw new ErrorHandler(400, "text is required");
+    }
+
+    const frequency = inferHabitFrequency(text);
+    const unit = inferHabitUnit(text);
+    res.status(200).json({
+        name: inferHabitName(text),
+        frequency,
+        targetValue: inferHabitTargetValue(text, frequency, unit),
+        unit,
+        linkedCategoryName: inferHabitCategoryName(text),
+        scheduleHint: inferHabitScheduleHint(text),
+        confidence: inferHabitConfidence(text),
     });
 });
 

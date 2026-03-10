@@ -2,6 +2,7 @@
  * Unit tests for RTK Query API definitions — timetableApi
  */
 import { describe, it, expect } from 'vitest'
+import type { TimetableImportPreviewResponse } from '../src/services/timetableApi'
 import { timetableApi } from '../src/services/timetableApi'
 
 describe('timetableApi — Endpoint Configuration', () => {
@@ -13,6 +14,10 @@ describe('timetableApi — Endpoint Configuration', () => {
 
   it('has getHolidays query', () => {
     expect(endpoints).toHaveProperty('getHolidays')
+  })
+
+  it('has previewTimetableImport mutation', () => {
+    expect(endpoints).toHaveProperty('previewTimetableImport')
   })
 
   it('has createHoliday mutation', () => {
@@ -41,5 +46,20 @@ describe('timetableApi — Reducer & Metadata', () => {
   it('exports middleware', () => {
     expect(timetableApi.middleware).toBeDefined()
     expect(typeof timetableApi.middleware).toBe('function')
+  })
+
+  it('types preview responses with parser metadata', () => {
+    const response: TimetableImportPreviewResponse = {
+      entries: [],
+      detectedSubjects: [],
+      warnings: [],
+      parser: {
+        deterministicMatches: 0,
+        aiMatches: 0,
+        normalizedLines: 0,
+      },
+    }
+
+    expect(response.parser.aiMatches).toBe(0)
   })
 })

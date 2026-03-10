@@ -262,6 +262,51 @@ describe('Habit endpoints — CRUD', () => {
     });
 });
 
+describe('Habit endpoints — Quick Parse', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('POST /api/habits/parse — returns a normalized habit draft', async () => {
+        const res = await request(server)
+            .post('/api/habits/parse')
+            .send({ text: 'revise chemistry 20 min every day' });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({
+            name: 'Revise Chemistry',
+            frequency: 'DAILY',
+            targetValue: 20,
+            unit: 'minutes',
+            linkedCategoryName: 'Chemistry',
+            scheduleHint: null,
+        });
+        expect(res.body.confidence).toBeGreaterThan(0.5);
+    });
+
+    it('POST /api/habits/parse — returns schedule hints when present', async () => {
+        const res = await request(server)
+            .post('/api/habits/parse')
+            .send({ text: 'read 5 pages nightly' });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({
+            name: 'Read',
+            frequency: 'DAILY',
+            targetValue: 5,
+            unit: 'pages',
+            scheduleHint: 'night',
+        });
+    });
+
+    it('POST /api/habits/parse — returns 400 when text is missing', async () => {
+        const res = await request(server)
+            .post('/api/habits/parse')
+            .send({});
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toContain('text is required');
+    });
+});
+
 // ─── Habit Logging ──────────────────────────────────────────────────────────────
 
 describe('Habit endpoints — Log Completion', () => {

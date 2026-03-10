@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
     createHabit,
+    parseHabit,
     deleteHabit,
     getAllHabits,
     getHabitStats,
@@ -43,6 +44,7 @@ router.post("/nudges/read-all", markAllNudgesAsRead);
 router.get("/briefing", getMorningBriefing);
 
 // ── Core CRUD ──────────────────────────
+router.post("/parse", parseHabit);
 router.post("/", createHabit);
 router.post("/:id/log", logHabitCompletion);
 router.get("/", getAllHabits);

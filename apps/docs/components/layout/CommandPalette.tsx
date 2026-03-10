@@ -148,7 +148,7 @@ export function CommandPalette() {
                                     <Plus className="mr-2 w-4 h-4 text-purple-400" />
                                     <span>Create New Task</span>
                                 </Command.Item>
-                                <Command.Item onSelect={() => runCommand(() => router.push("/planner"))}>
+                                <Command.Item onSelect={() => runCommand(() => router.push("/tasks"))}>
                                     <CalendarDays className="mr-2 w-4 h-4 text-pink-400" />
                                     <span>Schedule Study Session</span>
                                 </Command.Item>

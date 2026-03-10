@@ -53,6 +53,16 @@ export interface CreateHabitRequest {
     linkedCategoryId?: string | null;
 }
 
+export interface ParseHabitResponse {
+    name: string;
+    frequency: Frequency;
+    targetValue: number;
+    unit?: 'minutes' | 'count' | 'pages' | 'problems' | 'sessions';
+    linkedCategoryName?: string | null;
+    scheduleHint?: string | null;
+    confidence: number;
+}
+
 export interface UpdateHabitRequest {
     id: string;
     name?: string;
@@ -242,6 +252,13 @@ export const habitsApi = createApi({
                     /* ignore */
                 }
             },
+        }),
+        parseHabit: builder.mutation<ParseHabitResponse, { text: string }>({
+            query: (body) => ({
+                url: '/parse',
+                method: 'POST',
+                body,
+            }),
         }),
         updateHabit: builder.mutation<{ message: string; habit: Habit }, UpdateHabitRequest>({
             query: ({ id, ...body }) => ({
@@ -487,6 +504,7 @@ export const {
     useGetHabitsQuery,
     useGetHabitStatsQuery,
     useCreateHabitMutation,
+    useParseHabitMutation,
     useUpdateHabitMutation,
     useDeleteHabitMutation,
     useLogHabitMutation,

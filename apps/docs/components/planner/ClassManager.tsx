@@ -15,8 +15,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimePickerInput } from '@/components/ui/time-picker-input';
+import { TimetableImportPanel } from '@/components/planner/TimetableImportPanel';
 import { toast } from 'sonner';
-import { Plus, Trash2, BookOpen, Clock, Calendar, X } from 'lucide-react';
+import { Plus, Trash2, BookOpen, Clock, Calendar, X, Upload } from 'lucide-react';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -41,6 +42,7 @@ export function ClassManager() {
     const [newSubject, setNewSubject] = useState({ name: '', color: '#3B82F6', room: '', teacher: '' });
 
     const [isAddingEntry, setIsAddingEntry] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
     const [newEntry, setNewEntry] = useState({
         dayOfWeek: 0, // Will be updated by state above or on use
         startTime: '09:00',
@@ -198,17 +200,32 @@ export function ClassManager() {
                         <Calendar className="w-5 h-5 text-emerald-400" />
                         Weekly Timetable
                     </h3>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsAddingEntry(!isAddingEntry)}
-                        className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
-                        disabled={subjects.length === 0}
-                    >
-                        {isAddingEntry ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                        {isAddingEntry ? 'Cancel' : 'Schedule Class'}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsImporting((current) => !current)}
+                            className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                        >
+                            {isImporting ? <X className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
+                            {isImporting ? 'Close Import' : 'Import Timetable'}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsAddingEntry(!isAddingEntry)}
+                            className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                            disabled={subjects.length === 0}
+                        >
+                            {isAddingEntry ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                            {isAddingEntry ? 'Cancel' : 'Schedule Class'}
+                        </Button>
+                    </div>
                 </div>
+
+                {isImporting && (
+                    <TimetableImportPanel onImported={() => setIsImporting(false)} />
+                )}
 
                 {isAddingEntry && (
                     <Card className="p-4 bg-white/5 border-white/10 space-y-4 animate-in fade-in slide-in-from-top-2">
@@ -312,8 +329,8 @@ export function ClassManager() {
                     {weeklySchedule?.entries.length === 0 && !isAddingEntry && (
                         <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-2xl">
                             <Clock className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                            <p className="text-slate-500 text-sm">No classes scheduled for today.</p>
-                            <p className="text-slate-600 text-xs mt-1">Add your weekly schedule to see it here.</p>
+                            <p className="text-slate-500 text-sm">No classes scheduled for this week yet.</p>
+                            <p className="text-slate-600 text-xs mt-1">Add classes manually or import a timetable to build your weekly schedule.</p>
                         </div>
                     )}
                 </div>

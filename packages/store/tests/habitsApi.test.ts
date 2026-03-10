@@ -5,7 +5,8 @@
  * without needing a real server. Tests the API slice shape only.
  */
 import { describe, it, expect } from 'vitest';
-import { habitsApi } from '../src/services/habitsApi';
+import type { ParseHabitResponse } from '../src/services/habitsApi';
+import { Frequency, habitsApi } from '../src/services/habitsApi';
 
 describe('habitsApi — Endpoint Configuration', () => {
     const endpoints = habitsApi.endpoints;
@@ -22,6 +23,10 @@ describe('habitsApi — Endpoint Configuration', () => {
 
     it('has createHabit mutation endpoint', () => {
         expect(endpoints).toHaveProperty('createHabit');
+    });
+
+    it('has parseHabit mutation endpoint', () => {
+        expect(endpoints).toHaveProperty('parseHabit');
     });
 
     it('has updateHabit mutation endpoint', () => {
@@ -80,5 +85,18 @@ describe('habitsApi — Reducer & Tag Types', () => {
     it('exports middleware', () => {
         expect(habitsApi.middleware).toBeDefined();
         expect(typeof habitsApi.middleware).toBe('function');
+    });
+
+    it('types parsed habit responses with schedule hints', () => {
+        const response: ParseHabitResponse = {
+            name: 'Read',
+            frequency: Frequency.DAILY,
+            targetValue: 5,
+            unit: 'pages',
+            scheduleHint: 'night',
+            confidence: 0.8,
+        };
+
+        expect(response.scheduleHint).toBe('night');
     });
 });

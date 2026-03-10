@@ -7,8 +7,9 @@ import { useRouter } from 'next/navigation';
 import { TaskInputCard } from '@/components/createtask/TaskInputCard';
 import { MetaChips } from '@/components/createtask/MetaChips';
 import { ExamEntryForm } from '@/components/createtask/ExamEntryForm';
+import { ClassEntryForm } from '@/components/createtask/ClassEntryForm';
 import { TaskDetailsForm } from '@/components/createtask/TaskDetailsForm';
-import { Edit, GraduationCap, Sparkles, Brain } from 'lucide-react';
+import { Edit, GraduationCap, Sparkles, Brain, Calendar } from 'lucide-react';
 import { useAppSelector, selectAuthStatus, selectCurrentUser } from '@repo/store';
 import { useCreateTaskForm } from '@/hooks/useCreateTaskForm';
 
@@ -58,7 +59,7 @@ function CreateTaskPageContent() {
                         <p className="text-sm md:text-base text-slate-400 max-w-2xl mx-auto">
                             {form.taskId
                                 ? 'Update the details below and save when ready.'
-                                : 'Add a focused task or log an exam result in under a minute.'}
+                                : 'Add a focused task, log an exam result, or schedule a class slot in under a minute.'}
                         </p>
                     </motion.div>
 
@@ -73,11 +74,12 @@ function CreateTaskPageContent() {
                             <div
                                 role="tablist"
                                 aria-label="Create mode"
-                                className="grid grid-cols-2 p-1 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-purple-500/10"
+                                className="grid grid-cols-3 p-1 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-purple-500/10"
                             >
                                 {([
                                     { id: 'task', label: 'New Task', icon: Edit },
                                     { id: 'exam', label: 'Exam Mode', icon: GraduationCap },
+                                    { id: 'class', label: 'Class', icon: Calendar },
                                 ] as const).map((mode) => {
                                     const isActive = form.entryType === mode.id;
                                     return (
@@ -116,62 +118,74 @@ function CreateTaskPageContent() {
                             className="panel-surface rounded-4xl p-6 md:p-8 space-y-3"
                         >
                             {/* ── Title input + parsed chips ── */}
-                            <div className="space-y-3">
-                                <p className="text-[11px] tracking-[0.18em] font-semibold text-purple-300/90 uppercase">
-                                    {form.entryType === 'task' ? 'Task Summary' : 'Exam Title / Subject'}
-                                </p>
-                                <TaskInputCard
-                                    value={form.taskDescription}
-                                    onChange={form.setTaskDescription}
-                                    isParsing={form.isSmartCreating || form.isParsingTask}
-                                    highlights={[
-                                        ...(form.parsedMeta.subject
-                                            ? [{ text: form.parsedMeta.subject, type: 'subject' as const }]
-                                            : []),
-                                        ...(form.parsedMeta.date
-                                            ? [{ text: form.parsedMeta.date, type: 'date' as const }]
-                                            : []),
-                                        ...(form.parsedMeta.time
-                                            ? [{ text: form.parsedMeta.time, type: 'time' as const }]
-                                            : []),
-                                    ]}
-                                />
-                                {form.validationErrors.title && (
-                                    <p className="text-xs text-rose-400 px-1">{form.validationErrors.title}</p>
-                                )}
-                                <div className="flex items-center gap-3 flex-wrap">
-                                    <MetaChips
-                                        subject={form.parsedMeta.subject}
-                                        date={form.parsedMeta.date}
-                                        time={form.parsedMeta.time}
-                                        subjectColor={form.matchedCategoryForChip?.colorCode}
-                                    />
-                                    {form.parseConfidence === 'parsing' && (
-                                        <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                                            <Brain className="w-3.5 h-3.5 animate-pulse text-purple-400" />
-                                            Analyzing…
-                                        </span>
-                                    )}
-                                    {form.parseConfidence === 'high' && (
-                                        <span className="flex items-center gap-1.5 text-[11px] text-emerald-400">
-                                            <Brain className="w-3.5 h-3.5" />
-                                            AI confident
-                                        </span>
-                                    )}
-                                    {form.parseConfidence === 'low' && (
-                                        <span className="flex items-center gap-1.5 text-[11px] text-amber-400">
-                                            <Brain className="w-3.5 h-3.5" />
-                                            AI partially matched
-                                        </span>
-                                    )}
-                                    {form.parseConfidence === 'none' && form.taskDescription.trim().length > 5 && (
-                                        <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                                            <Brain className="w-3.5 h-3.5" />
-                                            No AI matches
-                                        </span>
-                                    )}
+                            {form.entryType === 'class' ? (
+                                <div className="space-y-2">
+                                    <p className="text-[11px] tracking-[0.18em] font-semibold text-purple-300/90 uppercase">
+                                        Class Schedule
+                                    </p>
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                                        <p className="text-base font-semibold text-white">Create a weekly class slot</p>
+                                        <p className="text-sm text-slate-400 mt-1">Set the day, time, rotation, and subject details for one recurring class entry.</p>
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <p className="text-[11px] tracking-[0.18em] font-semibold text-purple-300/90 uppercase">
+                                        {form.entryType === 'task' ? 'Task Summary' : 'Exam Title / Subject'}
+                                    </p>
+                                    <TaskInputCard
+                                        value={form.taskDescription}
+                                        onChange={form.setTaskDescription}
+                                        isParsing={form.isSmartCreating || form.isParsingTask}
+                                        highlights={[
+                                            ...(form.parsedMeta.subject
+                                                ? [{ text: form.parsedMeta.subject, type: 'subject' as const }]
+                                                : []),
+                                            ...(form.parsedMeta.date
+                                                ? [{ text: form.parsedMeta.date, type: 'date' as const }]
+                                                : []),
+                                            ...(form.parsedMeta.time
+                                                ? [{ text: form.parsedMeta.time, type: 'time' as const }]
+                                                : []),
+                                        ]}
+                                    />
+                                    {form.validationErrors.title && (
+                                        <p className="text-xs text-rose-400 px-1">{form.validationErrors.title}</p>
+                                    )}
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <MetaChips
+                                            subject={form.parsedMeta.subject}
+                                            date={form.parsedMeta.date}
+                                            time={form.parsedMeta.time}
+                                            subjectColor={form.matchedCategoryForChip?.colorCode}
+                                        />
+                                        {form.parseConfidence === 'parsing' && (
+                                            <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                                                <Brain className="w-3.5 h-3.5 animate-pulse text-purple-400" />
+                                                Analyzing…
+                                            </span>
+                                        )}
+                                        {form.parseConfidence === 'high' && (
+                                            <span className="flex items-center gap-1.5 text-[11px] text-emerald-400">
+                                                <Brain className="w-3.5 h-3.5" />
+                                                AI confident
+                                            </span>
+                                        )}
+                                        {form.parseConfidence === 'low' && (
+                                            <span className="flex items-center gap-1.5 text-[11px] text-amber-400">
+                                                <Brain className="w-3.5 h-3.5" />
+                                                AI partially matched
+                                            </span>
+                                        )}
+                                        {form.parseConfidence === 'none' && form.taskDescription.trim().length > 5 && (
+                                            <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                                                <Brain className="w-3.5 h-3.5" />
+                                                No AI matches
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* ── Mode-specific fields ── */}
                             {form.entryType === 'task' ? (
@@ -199,7 +213,7 @@ function CreateTaskPageContent() {
                                     handleGenerateSubtasks={form.handleGenerateSubtasks}
                                     validationErrors={form.validationErrors}
                                 />
-                            ) : (
+                            ) : form.entryType === 'exam' ? (
                                 <ExamEntryForm
                                     examSubMode={form.examSubMode}
                                     setExamSubMode={form.setExamSubMode}
@@ -221,6 +235,32 @@ function CreateTaskPageContent() {
                                     setExamLocation={form.setExamLocation}
                                     examDuration={form.examDuration}
                                     setExamDuration={form.setExamDuration}
+                                    validationErrors={form.validationErrors}
+                                />
+                            ) : (
+                                <ClassEntryForm
+                                    subjects={form.subjects}
+                                    rotationLabels={form.rotationLabels}
+                                    classDayOfWeek={form.classDayOfWeek}
+                                    setClassDayOfWeek={form.setClassDayOfWeek}
+                                    classStartTime={form.classStartTime}
+                                    setClassStartTime={form.setClassStartTime}
+                                    classEndTime={form.classEndTime}
+                                    setClassEndTime={form.setClassEndTime}
+                                    classRotation={form.classRotation}
+                                    setClassRotation={form.setClassRotation}
+                                    classSubjectId={form.classSubjectId}
+                                    setClassSubjectId={form.setClassSubjectId}
+                                    showInlineSubjectCreate={form.showInlineSubjectCreate}
+                                    setShowInlineSubjectCreate={form.setShowInlineSubjectCreate}
+                                    newClassSubjectName={form.newClassSubjectName}
+                                    setNewClassSubjectName={form.setNewClassSubjectName}
+                                    newClassSubjectColor={form.newClassSubjectColor}
+                                    setNewClassSubjectColor={form.setNewClassSubjectColor}
+                                    newClassSubjectRoom={form.newClassSubjectRoom}
+                                    setNewClassSubjectRoom={form.setNewClassSubjectRoom}
+                                    newClassSubjectTeacher={form.newClassSubjectTeacher}
+                                    setNewClassSubjectTeacher={form.setNewClassSubjectTeacher}
                                     validationErrors={form.validationErrors}
                                 />
                             )}
@@ -267,6 +307,8 @@ function CreateTaskPageContent() {
                                         ? 'Saving…'
                                         : form.taskId
                                             ? 'Update Task'
+                                            : form.entryType === 'class'
+                                                ? 'Create Class'
                                             : form.entryType === 'exam'
                                                 ? form.examSubMode === 'result'
                                                     ? 'Log Result'

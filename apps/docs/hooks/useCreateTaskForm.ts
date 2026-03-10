@@ -18,30 +18,24 @@ import {
     useAddGradeEntryMutation,
     useCreateExamMutation,
     useGetSubjectsQuery,
+    useCreateSubjectMutation,
+    useGetRotationPatternsQuery,
+    useCreateTimetableEntryMutation,
     useAppDispatch,
     type Task,
     type Category,
 } from '@repo/store';
-import type { Subject } from '@repo/store';
+import type { RotationPattern, Subject } from '@repo/store';
 import { EFFORT_OPTIONS } from '@repo/schemas/task';
 import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { buildScheduledIso, toApparentUtcIso } from '@/lib/scheduling';
 
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type EffortOption = (typeof EFFORT_OPTIONS)[number];
 export type EditableField = 'priority' | 'effort' | 'recurring' | 'subject';
 export type ParseConfidence = 'idle' | 'parsing' | 'high' | 'low' | 'none';
-
-/**
- * Shift a local Date object to "apparent UTC" so the backend stores the number
- * the user typed, not the true UTC equivalent.
- * e.g. user picks 15:00 in UTC+5:30 → stored as "2026-03-02T15:00:00.000Z"
- */
-export const toApparentUtcIso = (d: Date): string => {
-    const apparent = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-    return apparent.toISOString();
-};
 
 // ── Draft subtask shape ──────────────────────────────────────────────────────
 export interface SubtaskDraft {
@@ -72,8 +66,8 @@ export interface CreateTaskFormResult {
     aiSubtaskEnabled: boolean;
     setAiSubtaskEnabled: (v: boolean) => void;
     // exam form
-    entryType: 'task' | 'exam';
-    setEntryType: (v: 'task' | 'exam') => void;
+    entryType: 'task' | 'exam' | 'class';
+    setEntryType: (v: 'task' | 'exam' | 'class') => void;
     examSubMode: 'schedule' | 'result';
     setExamSubMode: (v: 'schedule' | 'result') => void; // clears related validation errors
     examType: string;
@@ -90,6 +84,27 @@ export interface CreateTaskFormResult {
     setExamDuration: (v: string) => void;
     selectedExamSubjectId: string;
     setSelectedExamSubjectId: (v: string) => void;
+    classDayOfWeek: number;
+    setClassDayOfWeek: (v: number) => void;
+    classStartTime: string;
+    setClassStartTime: (v: string) => void;
+    classEndTime: string;
+    setClassEndTime: (v: string) => void;
+    classRotation: string;
+    setClassRotation: (v: string) => void;
+    classSubjectId: string;
+    setClassSubjectId: (v: string) => void;
+    newClassSubjectName: string;
+    setNewClassSubjectName: (v: string) => void;
+    newClassSubjectColor: string;
+    setNewClassSubjectColor: (v: string) => void;
+    newClassSubjectRoom: string;
+    setNewClassSubjectRoom: (v: string) => void;
+    newClassSubjectTeacher: string;
+    setNewClassSubjectTeacher: (v: string) => void;
+    showInlineSubjectCreate: boolean;
+    setShowInlineSubjectCreate: (v: boolean) => void;
+    rotationLabels: string[];
     // parsed
     parsedMeta: { subject?: string; date?: string; time?: string };
     parsedDueDate: string | null;
@@ -126,6 +141,10 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const taskId = searchParams.get('id');
     const mode = searchParams.get('mode');
     const title = searchParams.get('title');
+    const prefillDate = searchParams.get('date');
+    const prefillTime = searchParams.get('time');
+    const prefillLocation = searchParams.get('location');
+    const prefillDuration = searchParams.get('duration');
     const dispatch = useAppDispatch();
 
     // ── Form state ──────────────────────────────────────────────────────────
@@ -133,12 +152,22 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const [description, setDescription] = useState('');
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedExamSubjectId, setSelectedExamSubjectId] = useState<string>('');
+    const [classDayOfWeek, setClassDayOfWeek] = useState<number>(new Date().getDay());
+    const [classStartTime, setClassStartTime] = useState('09:00');
+    const [classEndTime, setClassEndTime] = useState('10:00');
+    const [classRotation, setClassRotation] = useState('');
+    const [classSubjectId, setClassSubjectId] = useState('');
+    const [newClassSubjectName, setNewClassSubjectName] = useState('');
+    const [newClassSubjectColor, setNewClassSubjectColor] = useState('#3B82F6');
+    const [newClassSubjectRoom, setNewClassSubjectRoom] = useState('');
+    const [newClassSubjectTeacher, setNewClassSubjectTeacher] = useState('');
+    const [showInlineSubjectCreate, setShowInlineSubjectCreate] = useState(false);
     const [selectedPriority, setSelectedPriority] = useState('Routine');
     const [selectedEffort, setSelectedEffort] = useState<EffortOption>('1h');
     const [subtasks, setSubtasks] = useState<SubtaskDraft[]>([]);
     const [isRecurring, setIsRecurring] = useState(false);
     // Exam state
-    const [entryType, setEntryType] = useState<'task' | 'exam'>('task');
+    const [entryType, setEntryType] = useState<'task' | 'exam' | 'class'>('task');
     const [examSubMode, setExamSubMode] = useState<'schedule' | 'result'>('schedule');
     const [examType, setExamType] = useState('Midterm');
     const [obtainedMarks, setObtainedMarks] = useState('');
@@ -161,14 +190,18 @@ export function useCreateTaskForm(): CreateTaskFormResult {
 
     // ── Refs ────────────────────────────────────────────────────────────────
     const hasHydratedFromExistingTask = useRef(false);
+    const hasHydratedFromQueryParams = useRef(false);
     // Prevents the parse-debounce from overwriting a user-chosen date
     const isDueDateManuallyEditedRef = useRef(false);
+    // Query-prefilled dates should be treated as explicit inputs even before manual edits.
+    const hasPrefilledDueDateRef = useRef(false);
     // Tracks which fields user has manually edited — AI parse will skip these
     const manuallyEditedFieldsRef = useRef(new Set<EditableField>());
 
     // ── RTK mutations & queries ──────────────────────────────────────────────
     const [addGradeEntry, { isLoading: isAddingGrade }] = useAddGradeEntryMutation();
     const [createExam, { isLoading: isCreatingExam }] = useCreateExamMutation();
+    const [createTimetableEntry, { isLoading: isCreatingClass }] = useCreateTimetableEntryMutation();
     const { data: existingTask, isLoading: isLoadingTask } = useGetTaskByIdQuery(taskId || '', { skip: !taskId });
     const [smartCreateTask, { isLoading: isSmartCreating }] = useSmartCreateTaskMutation();
     const [previewSubtasks] = usePreviewSubtasksMutation();
@@ -176,9 +209,13 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const [createSubTask] = useCreateSubTaskMutation();
     const [updateTask, { isLoading: isUpdating }] = useUpdateTaskMutation();
     const [createCategory] = useCreateCategoryMutation();
+    const [createSubject] = useCreateSubjectMutation();
     const [parseTask, { isLoading: isParsingTask }] = useParseTaskMutation();
     const { data: categories } = useGetCategoriesQuery();
     const { data: subjects } = useGetSubjectsQuery();
+    const { data: patterns = [] } = useGetRotationPatternsQuery();
+
+    const rotationLabels = Array.from(new Set((patterns as RotationPattern[]).filter(p => p.isActive).flatMap(p => p.pattern)));
 
     // ── Wrapped setters – mark fields as user-edited ────────────────────────
     const handleSetPriority = (v: string) => {
@@ -230,8 +267,10 @@ export function useCreateTaskForm(): CreateTaskFormResult {
 
     const validateForm = (): boolean => {
         const errors: Record<string, string> = {};
-        if (!taskDescription.trim()) errors.title = 'Task title is required';
-        else if (taskDescription.trim().length > 100) errors.title = 'Title must be under 100 characters';
+        if (entryType !== 'class') {
+            if (!taskDescription.trim()) errors.title = 'Task title is required';
+            else if (taskDescription.trim().length > 100) errors.title = 'Title must be under 100 characters';
+        }
 
         if (entryType === 'exam') {
             if (examSubMode === 'result') {
@@ -243,6 +282,26 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                 errors.dueDate = 'Please pick an exam date';
             }
         }
+
+        if (entryType === 'class') {
+            if (!showInlineSubjectCreate && !classSubjectId) errors.classSubject = 'Please select a subject';
+            if (showInlineSubjectCreate && !newClassSubjectName.trim()) errors.classSubjectName = 'Subject name is required';
+            if (!/^\d{2}:\d{2}$/.test(classStartTime)) errors.classStartTime = 'Enter a valid start time';
+            if (!/^\d{2}:\d{2}$/.test(classEndTime)) errors.classEndTime = 'Enter a valid end time';
+            if (classDayOfWeek < 0 || classDayOfWeek > 6) errors.classDayOfWeek = 'Select a valid day';
+
+            const startParts = classStartTime.split(':').map(Number);
+            const endParts = classEndTime.split(':').map(Number);
+            if (startParts.length === 2 && endParts.length === 2 && !startParts.some(Number.isNaN) && !endParts.some(Number.isNaN)) {
+                const startHour = startParts[0] ?? 0;
+                const startMinute = startParts[1] ?? 0;
+                const endHour = endParts[0] ?? 0;
+                const endMinute = endParts[1] ?? 0;
+                const startMinutes = startHour * 60 + startMinute;
+                const endMinutes = endHour * 60 + endMinute;
+                if (endMinutes <= startMinutes) errors.classTimeRange = 'End time must be after start time';
+            }
+        }
         setValidationErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -250,7 +309,9 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     // ── Hydrate from existing task on edit ──────────────────────────────────
     useEffect(() => {
         hasHydratedFromExistingTask.current = false;
+        hasHydratedFromQueryParams.current = false;
         isDueDateManuallyEditedRef.current = false;
+        hasPrefilledDueDateRef.current = false;
         manuallyEditedFieldsRef.current.clear();
     }, [taskId]);
 
@@ -258,6 +319,7 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         if (taskId) return;
         if (mode === 'exam') setEntryType('exam');
         if (mode === 'task') setEntryType('task');
+        if (mode === 'class') setEntryType('class');
     }, [mode, taskId]);
 
     useEffect(() => {
@@ -265,6 +327,53 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         if (!title) return;
         setTaskDescription((current) => current || title);
     }, [title, taskId]);
+
+    useEffect(() => {
+        if (taskId || hasHydratedFromQueryParams.current) return;
+        hasHydratedFromQueryParams.current = true;
+
+        if (mode === 'exam') {
+            setEntryType('exam');
+            setExamSubMode('schedule');
+            if (prefillLocation) setExamLocation(prefillLocation);
+            if (prefillDuration && /^\d+$/.test(prefillDuration)) setExamDuration(prefillDuration);
+        } else if (mode === 'class') {
+            setEntryType('class');
+        } else if (mode === 'task') {
+            setEntryType('task');
+        }
+
+        const hydratedDueDate = buildScheduledIso(prefillDate ?? '', prefillTime ?? '', {
+            defaultDateToToday: mode === 'task',
+            defaultTime: '00:00',
+            requireExplicitDate: false,
+        });
+
+        if (hydratedDueDate) {
+            setParsedDueDate(hydratedDueDate);
+            setHasExplicitDueDate(Boolean(prefillDate));
+            hasPrefilledDueDateRef.current = true;
+            setParsedMeta((current) => ({
+                ...current,
+                date: prefillDate
+                    ? new Date(`${prefillDate}T00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                    : current.date,
+                time: prefillTime
+                    ? new Date(`${prefillDate || new Date().toISOString().slice(0, 10)}T${prefillTime}`).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                    : current.time,
+            }));
+        }
+    }, [mode, prefillDate, prefillDuration, prefillLocation, prefillTime, taskId]);
+
+    useEffect(() => {
+        if (subjects && subjects.length === 0) {
+            setShowInlineSubjectCreate(true);
+            return;
+        }
+        if (subjects && subjects.length > 0 && !showInlineSubjectCreate && classSubjectId && !subjects.some(subject => subject.id === classSubjectId)) {
+            setClassSubjectId('');
+        }
+    }, [classSubjectId, showInlineSubjectCreate, subjects]);
 
     useEffect(() => {
         if (!existingTask || hasHydratedFromExistingTask.current) return;
@@ -322,7 +431,7 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                                 : undefined,
                         });
 
-                        if (result.dueDate && !isDueDateManuallyEditedRef.current) {
+                        if (result.dueDate && !isDueDateManuallyEditedRef.current && !hasPrefilledDueDateRef.current) {
                             setParsedDueDate(toApparentUtcIso(new Date(result.dueDate)));
                             setHasExplicitDueDate(true);
                         }
@@ -377,19 +486,18 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     // ── Date/time helper ────────────────────────────────────────────────────
     const updateDueDateTime = (nextDate: string, nextTime: string, dateUpdated = false) => {
         isDueDateManuallyEditedRef.current = true;
+        hasPrefilledDueDateRef.current = false;
         if (!nextDate && !nextTime) {
             setParsedDueDate(null);
             setHasExplicitDueDate(false);
             return;
         }
         if (dateUpdated) setHasExplicitDueDate(Boolean(nextDate));
-
-        const safeDate = nextDate || new Date().toISOString().slice(0, 10);
-        const safeTime = nextTime || '00:00';
-        const localD = new Date(`${safeDate}T${safeTime}`);
-        if (!isNaN(localD.getTime())) {
-            setParsedDueDate(toApparentUtcIso(localD));
-        }
+        const iso = buildScheduledIso(nextDate, nextTime, {
+            defaultDateToToday: true,
+            defaultTime: '00:00',
+        });
+        if (iso) setParsedDueDate(iso);
     };
 
     // ── Submit ──────────────────────────────────────────────────────────────
@@ -413,6 +521,39 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                     return;
                 }
                 // AI returned no structured task — fall through to regular create
+            }
+
+            if (entryType === 'class') {
+                let subjectIdToUse = classSubjectId;
+                let subjectNameToUse = subjects?.find(subject => subject.id === classSubjectId)?.name || '';
+
+                if (!subjectIdToUse && showInlineSubjectCreate) {
+                    const createdSubject = await createSubject({
+                        name: newClassSubjectName.trim(),
+                        color: newClassSubjectColor,
+                        room: newClassSubjectRoom.trim() || undefined,
+                        teacher: newClassSubjectTeacher.trim() || undefined,
+                    }).unwrap();
+                    subjectIdToUse = createdSubject.id;
+                    subjectNameToUse = createdSubject.name;
+                }
+
+                await createTimetableEntry({
+                    dayOfWeek: classDayOfWeek,
+                    startTime: classStartTime,
+                    endTime: classEndTime,
+                    subjectId: subjectIdToUse,
+                    rotation: classRotation || null,
+                }).unwrap();
+
+                const dayLabel = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][classDayOfWeek] ?? 'Selected day';
+                toast.success('Class scheduled!', {
+                    description: `${subjectNameToUse || 'Class'} • ${dayLabel} • ${classStartTime} - ${classEndTime}`,
+                    action: { label: 'View Planner', onClick: () => router.push('/planner') },
+                });
+                if (window.navigator?.vibrate) window.navigator.vibrate([100, 50, 100]);
+                router.push('/planner');
+                return;
             }
 
             if (entryType === 'exam') {
@@ -565,7 +706,7 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const dueDateValue = localDateTimeValue.slice(0, 10);
     const dueTimeValue = localDateTimeValue.slice(11, 16);
 
-    const isSubmitting = isSubmittingNow || isCreating || isSmartCreating || isUpdating || isAddingGrade || isCreatingExam;
+    const isSubmitting = isSubmittingNow || isCreating || isSmartCreating || isUpdating || isAddingGrade || isCreatingExam || isCreatingClass;
 
     return {
         taskDescription, setTaskDescription: handleSetTaskDescription,
@@ -586,6 +727,17 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         examLocation, setExamLocation,
         examDuration, setExamDuration,
         selectedExamSubjectId, setSelectedExamSubjectId,
+        classDayOfWeek, setClassDayOfWeek,
+        classStartTime, setClassStartTime,
+        classEndTime, setClassEndTime,
+        classRotation, setClassRotation,
+        classSubjectId, setClassSubjectId,
+        newClassSubjectName, setNewClassSubjectName,
+        newClassSubjectColor, setNewClassSubjectColor,
+        newClassSubjectRoom, setNewClassSubjectRoom,
+        newClassSubjectTeacher, setNewClassSubjectTeacher,
+        showInlineSubjectCreate, setShowInlineSubjectCreate,
+        rotationLabels,
         parsedMeta,
         parsedDueDate,
         hasExplicitDueDate,

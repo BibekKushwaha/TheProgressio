@@ -11,6 +11,7 @@ import {
     listHolidays,
     listSubjects,
     listTimetableEntries,
+    previewTimetableImport,
     updateHoliday,
     updateTimetableEntry,
 } from "../controllers/timetable.controller.js";
@@ -22,6 +23,7 @@ router.get("/daily", getDailySchedule);
 
 // Timetable Entry CRUD
 router.get("/entries", listTimetableEntries);
+router.post("/import/preview", previewTimetableImport);
 router.post("/entries", createTimetableEntry);
 router.patch("/entries/:id", updateTimetableEntry);
 router.delete("/entries/:id", deleteTimetableEntry);

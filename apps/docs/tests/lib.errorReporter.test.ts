@@ -44,4 +44,21 @@ describe('errorReporter', () => {
     expect(url).toBe('/api/client-errors');
     expect(payload).toBeInstanceOf(Blob);
   });
+
+  it('ignores known ResizeObserver browser noise', () => {
+    const sendBeacon = vi.fn().mockReturnValue(true);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    Object.defineProperty(navigator, 'sendBeacon', {
+      value: sendBeacon,
+      configurable: true,
+      writable: true,
+    });
+
+    reportError(new Error('ResizeObserver loop completed with undelivered notifications.'), {
+      context: 'window.error',
+    });
+
+    expect(sendBeacon).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+  });
 });

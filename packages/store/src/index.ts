@@ -194,6 +194,7 @@ export {
   // Critical-only bootstrap for React streaming (habits + XP, no heatmap)
   useGetDashboardBootstrapCriticalQuery,
   useCreateHabitMutation,
+  useParseHabitMutation,
   useUpdateHabitMutation,
   useDeleteHabitMutation,
   useLogHabitMutation,
@@ -221,6 +222,7 @@ export type {
   NotificationSettings,
   MorningBriefing,
   CreateHabitRequest,
+  ParseHabitResponse,
   UpdateHabitRequest,
 } from './services/habitsApi';
 
@@ -310,6 +312,7 @@ export {
   timetableApi,
   useGetDailyScheduleQuery,
   useGetWeeklyScheduleQuery,
+  usePreviewTimetableImportMutation,
   useGetHolidaysQuery,
   useCreateHolidayMutation,
   useUpdateHolidayMutation,
@@ -326,7 +329,10 @@ export type {
   TimetableConflict,
   SchoolHoliday,
   DailySchedule,
+  ParsedTimetableEntryDraft,
   Subject,
+  TimetableImportPreviewRequest,
+  TimetableImportPreviewResponse,
 } from './services/timetableApi';
 
 // Calendar API

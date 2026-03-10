@@ -26,6 +26,10 @@ type BrowserErrorPayload = {
 };
 
 const CLIENT_ERROR_ENDPOINT = '/api/client-errors';
+const IGNORED_BROWSER_ERROR_MESSAGES = new Set([
+    'ResizeObserver loop completed with undelivered notifications.',
+    'ResizeObserver loop limit exceeded',
+]);
 
 /** Wired-in Sentry capture function (set once at bootstrap). */
 let _capture: CaptureException | null = null;
@@ -52,6 +56,11 @@ const normalizeError = (error: unknown): Pick<BrowserErrorPayload, 'message' | '
         message: 'Unknown error',
         name: 'UnknownError',
     };
+};
+
+const isIgnorableBrowserError = (error: unknown): boolean => {
+    const { message } = normalizeError(error);
+    return IGNORED_BROWSER_ERROR_MESSAGES.has(message);
 };
 
 const emitBrowserError = (error: unknown, context?: ErrorContext): boolean => {
@@ -105,6 +114,9 @@ export function resetErrorReporterForTests(): void {
  * console.error so log aggregators / Sentry's console integration can pick it up.
  */
 export function reportError(error: unknown, context?: ErrorContext): void {
+    if (isIgnorableBrowserError(error)) {
+        return;
+    }
     if (_capture) {
         _capture(error, context);
         return;

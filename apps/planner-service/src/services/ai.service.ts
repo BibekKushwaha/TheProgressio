@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { createRequire } from "module";
 import { getRedisClient } from "@repo/cache";
 import { normalizeEffortValue } from "@repo/schemas/effort";
+import type { ParsedTimetableEntryDraft } from "./timetable.service.js";
 
 const require = createRequire(import.meta.url);
 const API_KEY = process.env.MISTRAL_API_KEY;
@@ -33,6 +34,52 @@ export interface ParsedSyllabusItem {
     priority?: "LOW" | "MEDIUM" | "HIGH";
     subject?: string;
 }
+
+const normalizePreviewTime = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const normalized = value.trim().toLowerCase().replace(/\./g, ":");
+    const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+    if (!match) return null;
+
+    let hours = Number.parseInt(match[1] ?? "", 10);
+    const minutes = Number.parseInt(match[2] ?? "0", 10);
+    const meridiem = match[3]?.toLowerCase();
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes) || minutes < 0 || minutes > 59) {
+        return null;
+    }
+
+    if (meridiem) {
+        if (hours < 1 || hours > 12) return null;
+        if (meridiem === "pm" && hours < 12) hours += 12;
+        if (meridiem === "am" && hours === 12) hours = 0;
+    } else if (hours > 23) {
+        return null;
+    }
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const normalizePreviewDay = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 6) {
+        return value;
+    }
+    if (typeof value !== "string") return null;
+
+    const normalized = value.trim().toLowerCase();
+    const aliases: Array<{ day: number; labels: string[] }> = [
+        { day: 0, labels: ["sun", "sunday"] },
+        { day: 1, labels: ["mon", "monday"] },
+        { day: 2, labels: ["tue", "tues", "tuesday"] },
+        { day: 3, labels: ["wed", "wednesday"] },
+        { day: 4, labels: ["thu", "thur", "thurs", "thursday"] },
+        { day: 5, labels: ["fri", "friday"] },
+        { day: 6, labels: ["sat", "saturday"] },
+    ];
+
+    const found = aliases.find((item) => item.labels.includes(normalized));
+    return found?.day ?? null;
+};
 
 export interface AIRequestOptions {
     disableAI?: boolean;
@@ -1459,6 +1506,111 @@ JSON schema:
         }
 
         return items;
+    }
+
+    async extractDocumentText(fileBase64: string, mimeType: string): Promise<string> {
+        const normalizedMimeType = (mimeType || "").toLowerCase();
+        if (normalizedMimeType.includes("pdf")) {
+            return this.extractPdfTextFromBase64(fileBase64);
+        }
+
+        const normalizedBase64 = this.decodeBase64Payload(fileBase64);
+        if (!normalizedBase64) return "";
+
+        if (
+            normalizedMimeType.startsWith("text/") ||
+            normalizedMimeType.includes("csv") ||
+            normalizedMimeType.includes("json")
+        ) {
+            try {
+                return Buffer.from(normalizedBase64, "base64").toString("utf8");
+            } catch {
+                return "";
+            }
+        }
+
+        return "";
+    }
+
+    async previewTimetableImportFromImage(
+        imageBase64: string,
+        mimeType: string,
+    ): Promise<ParsedTimetableEntryDraft[]> {
+        if (!this.client) {
+            return [];
+        }
+
+        let imageUrl = imageBase64;
+        if (!imageBase64.startsWith("data:")) {
+            imageUrl = `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+        }
+
+        const prompt = `
+        You are extracting weekly class timetable rows from a student timetable image.
+        Return ONLY a JSON array.
+
+        Each item must have:
+        - subjectName: string
+        - dayOfWeek: integer 0-6 where 0=Sunday
+        - startTime: HH:mm 24h string or null
+        - endTime: HH:mm 24h string or null
+        - rotation: string or null
+        - confidence: number between 0 and 1
+        - sourceLine: string or null
+
+        Rules:
+        - Extract recurring timetable/class rows only.
+        - Ignore headers, lunch breaks, notes, footers, and page furniture.
+        - If a field is unclear, use null instead of guessing.
+        - Use subjectName exactly as seen, but keep it concise.
+        - Return [] if no timetable rows are visible.
+        `;
+
+        try {
+            const result = await this.client.chat.complete({
+                model: this.modelIdentifier,
+                temperature: 0,
+                maxTokens: 800,
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: prompt },
+                            { type: "image_url", imageUrl },
+                        ],
+                    },
+                ],
+            });
+
+            const textResponse = result.choices?.[0]?.message?.content;
+            if (typeof textResponse !== "string") {
+                return [];
+            }
+
+            const parsedArray = this.extractJsonArray(textResponse);
+            return parsedArray
+                .map((item): ParsedTimetableEntryDraft | null => {
+                    if (!item || typeof item !== "object") return null;
+                    const raw = item as Record<string, unknown>;
+                    const subjectName = typeof raw.subjectName === "string" ? raw.subjectName.trim() : "";
+                    if (!subjectName) return null;
+
+                    return {
+                        subjectName,
+                        dayOfWeek: normalizePreviewDay(raw.dayOfWeek),
+                        startTime: normalizePreviewTime(raw.startTime),
+                        endTime: normalizePreviewTime(raw.endTime),
+                        rotation: typeof raw.rotation === "string" && raw.rotation.trim() ? raw.rotation.trim().toUpperCase() : null,
+                        confidence: typeof raw.confidence === "number" ? Math.max(0, Math.min(1, raw.confidence)) : 0.65,
+                        sourceLine: typeof raw.sourceLine === "string" ? raw.sourceLine.trim() : undefined,
+                    };
+                })
+                .filter((item): item is ParsedTimetableEntryDraft => item !== null)
+                .slice(0, 60);
+        } catch (error) {
+            console.warn("⚠️ Timetable image preview failed:", this.toErrorSummary(error));
+            return [];
+        }
     }
 
     async scanSyllabusImage(imageBase64: string, mimeType: string, options: AIRequestOptions = {}): Promise<ParsedSyllabusItem[]> {
