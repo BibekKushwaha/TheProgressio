@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { FileSpreadsheet, CalendarDays, ExternalLink, CheckCircle } from 'lucide-react';
 import { RevisionScheduler } from '@/components/analytics/RevisionScheduler';
 import { SubjectPerformanceSummary } from '@/components/analytics/SubjectPerformanceSummary';
+import { SyllabusRevisionPlanner } from '@/components/analytics/SyllabusRevisionPlanner';
 import { useGetNudgesQuery, useMarkNudgeAsReadMutation, type Nudge } from '@repo/store';
 import { navigateDeepLink, parseNudgeMetadata, resolveNudgeDeepLink, formatScheduledAt } from '@/components/notifications/notificationUtils';
 import { useRouter } from 'next/navigation';
@@ -169,10 +170,11 @@ export default function ExamWarRoomPage() {
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-4">
                     <FileSpreadsheet className="w-4 h-4 text-cyan-300" />
-                    Revision Planner
+                    Exam Strategy Schedule
                 </div>
                 <RevisionScheduler />
             </div>
+            <SyllabusRevisionPlanner />
             {/* Subject Performance Summary */}
             {/* Subject Performance Summary */}
             <SubjectPerformanceSummary />

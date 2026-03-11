@@ -16,6 +16,8 @@ const addGradeEntryMock = vi.fn().mockReturnValue({ unwrap: () => Promise.resolv
 const createExamMock = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 const createSubjectMock = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ id: 'subject-new', name: 'Physics', color: '#3B82F6' }) });
 const createTimetableEntryMock = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ id: 'entry-1' }) });
+const setTaskSyllabusTopicsMock = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ links: [] }) });
+const mockAllSyllabusTopics = [{ id: 'topic-1', title: 'Thermodynamics', chapter: 'Unit 3', categoryId: 'category-1' }];
 
 const mockSubjects = [{ id: 'subject-1', name: 'Math', color: '#3B82F6' }];
 const mockPatterns = [{ id: 'rotation-1', name: 'Main', pattern: ['A', 'B'], startDate: '2026-01-01', cycleLengthDays: 2, userId: 'u1', isActive: true, createdAt: '', updatedAt: '' }];
@@ -46,6 +48,9 @@ vi.mock('@repo/store', () => ({
     useCreateSubjectMutation: () => [createSubjectMock],
     useGetRotationPatternsQuery: () => ({ data: mockPatterns }),
     useCreateTimetableEntryMutation: () => [createTimetableEntryMock, { isLoading: false }],
+    useGetTaskSyllabusTopicsQuery: () => ({ data: { links: [] } }),
+    useGetSyllabusTopicsQuery: () => ({ data: { topics: mockAllSyllabusTopics } }),
+    useSetTaskSyllabusTopicsMutation: () => [setTaskSyllabusTopicsMock],
     useAppDispatch: () => dispatchMock,
 }));
 
@@ -67,6 +72,7 @@ describe('useCreateTaskForm', () => {
         createExamMock.mockClear();
         createSubjectMock.mockClear();
         createTimetableEntryMock.mockClear();
+        setTaskSyllabusTopicsMock.mockClear();
     });
 
     it('hydrates task mode title, date, and time from query params', async () => {
@@ -120,6 +126,17 @@ describe('useCreateTaskForm', () => {
             expect(result.current.dueDateValue).toBe('');
             expect(result.current.dueTimeValue).toBe('');
             expect(result.current.hasExplicitDueDate).toBe(false);
+        });
+    });
+
+    it('hydrates a shortcut topic selection from query params', async () => {
+        searchParams = new URLSearchParams('mode=task&title=Heat+Engines&topicId=topic-1');
+
+        const { result } = renderHook(() => useCreateTaskForm());
+
+        await waitFor(() => {
+            expect(result.current.selectedSubjectId).toBe('category-1');
+            expect(result.current.selectedSyllabusTopicIds).toEqual(['topic-1']);
         });
     });
 
@@ -216,5 +233,26 @@ describe('useCreateTaskForm', () => {
             subjectId: 'subject-new',
             rotation: null,
         });
+    });
+
+    it('creates a task atomically with selected syllabus topic ids', async () => {
+        const { result } = renderHook(() => useCreateTaskForm());
+
+        act(() => {
+            result.current.setTaskDescription('Study Heat Engines');
+            result.current.setSelectedSubjectId('category-1');
+            result.current.setSelectedSyllabusTopicIds(['topic-1']);
+        });
+
+        await act(async () => {
+            await result.current.handleSaveTask();
+        });
+
+        expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Study Heat Engines',
+            categoryId: 'category-1',
+            topicIds: ['topic-1'],
+        }));
+        expect(setTaskSyllabusTopicsMock).not.toHaveBeenCalled();
     });
 });

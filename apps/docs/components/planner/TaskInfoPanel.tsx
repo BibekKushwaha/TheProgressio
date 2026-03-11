@@ -70,11 +70,23 @@ export function TaskInfoPanel() {
     const { data: linksData } = useGetTaskSyllabusTopicsQuery(task?.id ?? '', { skip: !task?.id });
     const [setLinks, { isLoading: isSavingLinks }] = useSetTaskSyllabusTopicsMutation();
 
-    const topics = (topicsData?.topics ?? []) as Array<{ id: string; chapter: string; title: string }>;
+    const topics = useMemo(
+        () => (topicsData?.topics ?? []) as Array<{ id: string; chapter: string; title: string }>,
+        [topicsData?.topics]
+    );
     const existingTopicIds = useMemo(
         () => new Set((linksData?.links ?? []).map((l: { topicId: string }) => l.topicId)),
         [linksData]
     );
+    const groupedTopics = useMemo(() => {
+        const map = new Map<string, Array<{ id: string; chapter: string; title: string }>>();
+        for (const topic of topics) {
+            const chapter = topic.chapter || 'General';
+            if (!map.has(chapter)) map.set(chapter, []);
+            map.get(chapter)?.push(topic);
+        }
+        return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    }, [topics]);
 
     // Track user's checkbox changes locally as a Map<topicId, wantsChecked>.
     // The final selected set is derived from server state + local overrides,
@@ -141,46 +153,57 @@ export function TaskInfoPanel() {
                                 Link this task to syllabus topics for better AI breakdowns.
                             </div>
                         </div>
-                        <Link href="/syllabus" className="text-xs text-indigo-300 hover:text-indigo-200">
-                            Manage syllabus →
-                        </Link>
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400">
+                                {selectedTopicIds.size} linked topic{selectedTopicIds.size === 1 ? '' : 's'}
+                            </div>
+                            <Link href="/syllabus" className="text-xs text-indigo-300 hover:text-indigo-200">
+                                Manage syllabus →
+                            </Link>
+                        </div>
                     </div>
 
                     {topics.length === 0 ? (
-                        <div className="text-xs text-slate-500">
-                            No topics defined for this subject yet.
+                        <div className="space-y-2 text-xs text-slate-500">
+                            <div>No topics defined for this subject yet.</div>
+                            <Link href="/createtask?mode=syllabus" className="text-indigo-300 hover:text-indigo-200">
+                                Import syllabus topics →
+                            </Link>
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {topics.slice(0, 12).map((topic) => {
-                                const checked = selectedTopicIds.has(topic.id);
-                                return (
-                                    <label key={topic.id} className="flex items-center gap-2 text-sm text-slate-200">
-                                        <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            onChange={() => {
-                                                setLocalToggles((prev) => {
-                                                    const next = new Map(prev);
-                                                    // Toggle relative to the server-side baseline
-                                                    const serverHas = existingTopicIds.has(topic.id);
-                                                    const currentlyChecked = checked;
-                                                    if (currentlyChecked === serverHas) {
-                                                        // Toggling away from server state — record override
-                                                        next.set(topic.id, !currentlyChecked);
-                                                    } else {
-                                                        // Toggling back to server state — clear override
-                                                        next.delete(topic.id);
-                                                    }
-                                                    return next;
-                                                });
-                                            }}
-                                        />
-                                        <span className="text-slate-400 text-xs">{topic.chapter}:</span>
-                                        <span>{topic.title}</span>
-                                    </label>
-                                );
-                            })}
+                            {groupedTopics.slice(0, 4).map(([chapter, chapterTopics]) => (
+                                <div key={chapter} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+                                    <div className="mb-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">{chapter}</div>
+                                    <div className="space-y-2">
+                                        {chapterTopics.slice(0, 4).map((topic) => {
+                                            const checked = selectedTopicIds.has(topic.id);
+                                            return (
+                                                <label key={topic.id} className="flex items-center gap-2 text-sm text-slate-200">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() => {
+                                                            setLocalToggles((prev) => {
+                                                                const next = new Map(prev);
+                                                                const serverHas = existingTopicIds.has(topic.id);
+                                                                const currentlyChecked = checked;
+                                                                if (currentlyChecked === serverHas) {
+                                                                    next.set(topic.id, !currentlyChecked);
+                                                                } else {
+                                                                    next.delete(topic.id);
+                                                                }
+                                                                return next;
+                                                            });
+                                                        }}
+                                                    />
+                                                    <span>{topic.title}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
 
                             <div className="flex justify-end">
                                 <Button

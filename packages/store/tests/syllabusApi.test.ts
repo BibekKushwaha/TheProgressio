@@ -12,6 +12,10 @@ describe('syllabusApi — Endpoint Configuration', () => {
     expect(endpoints).toHaveProperty('createSyllabusTopic')
   })
 
+  it('has importSyllabusTopics mutation', () => {
+    expect(endpoints).toHaveProperty('importSyllabusTopics')
+  })
+
   it('has updateSyllabusTopic mutation', () => {
     expect(endpoints).toHaveProperty('updateSyllabusTopic')
   })
@@ -22,6 +26,14 @@ describe('syllabusApi — Endpoint Configuration', () => {
 
   it('has getSyllabusEdges query', () => {
     expect(endpoints).toHaveProperty('getSyllabusEdges')
+  })
+
+  it('has getSyllabusProgress query', () => {
+    expect(endpoints).toHaveProperty('getSyllabusProgress')
+  })
+
+  it('has getSyllabusRevisionRecommendations query', () => {
+    expect(endpoints).toHaveProperty('getSyllabusRevisionRecommendations')
   })
 
   it('has createSyllabusEdge mutation', () => {
@@ -53,4 +65,3 @@ describe('syllabusApi — Reducer & Metadata', () => {
     expect(typeof syllabusApi.middleware).toBe('function')
   })
 })
-

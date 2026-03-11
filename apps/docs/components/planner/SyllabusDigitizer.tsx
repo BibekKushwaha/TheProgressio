@@ -2,14 +2,16 @@
 
 import { useState, useRef } from 'react';
 import { Upload, FileText, Sparkles, Check, Loader2 } from 'lucide-react';
-import { useParseTaskMutation, useCreateTaskMutation, useScanSyllabusMutation, useGetCategoriesQuery, TaskStatus, PriorityEnum } from '@repo/store';
+import { useParseTaskMutation, useCreateTaskMutation, useScanSyllabusMutation, useGetCategoriesQuery, useImportSyllabusTopicsMutation, TaskStatus, PriorityEnum } from '@repo/store';
 
 interface ParsedItem {
+    sourceId: string;
     title: string;
     description?: string;
     dueDate?: string;
     priority?: PriorityEnum;
     subject?: string;
+    inferredChapter?: string;
     selected: boolean;
 }
 
@@ -20,16 +22,67 @@ export function SyllabusDigitizer() {
     const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
     const [isParsing, setIsParsing] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+    const [isImportingTopics, setIsImportingTopics] = useState(false);
     const [scanNotice, setScanNotice] = useState('');
     const [bulkIsRecurring, setBulkIsRecurring] = useState<boolean>(false);
     const [isDragging, setIsDragging] = useState(false);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+    const [importedTopicKeys, setImportedTopicKeys] = useState<Set<string>>(new Set());
+    const [importedSourceIds, setImportedSourceIds] = useState<Set<string>>(new Set());
+    const [rowImportOutcome, setRowImportOutcome] = useState<Map<string, 'imported' | 'duplicate' | 'invalid'>>(new Map());
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { data: categories = [] } = useGetCategoriesQuery();
     const [parseTask] = useParseTaskMutation();
     const [scanSyllabus] = useScanSyllabusMutation();
     const [createTask] = useCreateTaskMutation();
+    const [importSyllabusTopics] = useImportSyllabusTopicsMutation();
     type CreateTaskInput = Parameters<typeof createTask>[0];
+
+    const normalizeTopicText = (value: string) => value.toLowerCase().trim().replace(/\s+/g, ' ');
+    const normalizeChapterLabel = (value: string) => value
+        .replace(/^(unit|chapter|ch\.?|module)\s*\d+[:-]?\s*/i, '')
+        .replace(/\(.*?\)\s*$/g, '')
+        .replace(/[:\-–—]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const isValidInferredChapter = (value?: string) => {
+        if (!value?.trim()) return false;
+        if (value.trim().length > 80) return false;
+        if (/[.!?]/.test(value)) return false;
+        if (normalizeChapterLabel(value).split(/\s+/).filter(Boolean).length > 6) return false;
+        return normalizeChapterLabel(value).length > 0;
+    };
+
+    const resolveChapter = (item: ParsedItem) => {
+        if (isValidInferredChapter(item.inferredChapter)) {
+            return normalizeChapterLabel(item.inferredChapter!);
+        }
+        const sources = [item.title, item.description].filter(Boolean) as string[];
+        for (const source of sources) {
+            const match = source.match(/\b((?:Chapter|Ch\.?|Unit|Module)\s*\d+[A-Za-z0-9.-]*)\b/i);
+            if (match?.[1]) {
+                const normalized = normalizeChapterLabel(match[1]);
+                if (normalized) return normalized;
+            }
+        }
+        return 'General';
+    };
+
+    const buildTopicNotes = (item: ParsedItem) => {
+        const parts: string[] = [];
+        if (item.description?.trim()) parts.push(item.description.trim());
+        if (item.dueDate) {
+            const dueLabel = new Date(item.dueDate).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+            });
+            parts.push(`Scheduled milestone: ${dueLabel}`);
+        }
+        return parts.join('\n\n') || null;
+    };
+
+    const buildTopicKey = (chapter: string, title: string) => `${normalizeTopicText(chapter)}::${normalizeTopicText(title)}`;
 
     const handleParse = async () => {
         if (!textInput.trim()) return;
@@ -44,15 +97,17 @@ export function SyllabusDigitizer() {
             const results: ParsedItem[] = settled.map((result, i) => {
                 if (result.status === 'fulfilled') {
                     return {
+                        sourceId: `text_${i + 1}`,
                         title: result.value.title || lines[i]!.trim(),
                         description: result.value.description,
                         dueDate: result.value.dueDate,
                         priority: result.value.priority,
                         subject: result.value.subject,
+                        inferredChapter: undefined,
                         selected: true,
                     };
                 }
-                return { title: lines[i]!.trim(), selected: true };
+                return { sourceId: `text_${i + 1}`, title: lines[i]!.trim(), selected: true };
             });
             setParsedItems(results);
 
@@ -117,11 +172,13 @@ export function SyllabusDigitizer() {
 
                     if (response.items.length > 0) {
                         setParsedItems(response.items.map((item) => ({
+                            sourceId: item.sourceId,
                             title: item.title,
                             description: item.description,
                             dueDate: item.dueDate,
                             priority: item.priority,
                             subject: item.subject,
+                            inferredChapter: item.inferredChapter,
                             selected: true,
                         })));
 
@@ -216,6 +273,76 @@ export function SyllabusDigitizer() {
             toast.error('Failed to create tasks', { id: 'bulk-create' });
         } finally {
             setIsCreating(false);
+        }
+    };
+
+    const handleImportTopics = async () => {
+        const selected = parsedItems.filter((item) => item.selected);
+        if (selected.length === 0) return;
+        if (!selectedCategoryId) {
+            toast.error('Select a subject before importing topics');
+            return;
+        }
+
+        setIsImportingTopics(true);
+        toast.loading(`Importing ${selected.length} topic${selected.length === 1 ? '' : 's'}...`, { id: 'bulk-import-topics' });
+
+        try {
+            const payload = selected.map((item) => {
+                const chapter = resolveChapter(item);
+                return {
+                    sourceId: item.sourceId,
+                    title: item.title,
+                    chapter,
+                    notes: buildTopicNotes(item),
+                };
+            });
+
+            const response = await importSyllabusTopics({
+                categoryId: selectedCategoryId,
+                items: payload,
+                dedupe: true,
+            }).unwrap();
+
+            const importedKeys = new Set(importedTopicKeys);
+            const importedIds = new Set(importedSourceIds);
+            const nextOutcomes = new Map(rowImportOutcome);
+            payload.forEach((item) => importedKeys.add(buildTopicKey(item.chapter ?? 'General', item.title)));
+            payload.forEach((item) => {
+                importedIds.add(item.sourceId);
+                nextOutcomes.set(item.sourceId, 'imported');
+            });
+            response.skipped.forEach((item) => {
+                if (item.sourceId) {
+                    nextOutcomes.set(item.sourceId, item.reason);
+                }
+            });
+            setImportedTopicKeys(importedKeys);
+            setImportedSourceIds(importedIds);
+            setRowImportOutcome(nextOutcomes);
+
+            const createdCount = response.stats.created;
+            const skippedCount = response.stats.skipped;
+            if (createdCount === 0 && skippedCount > 0) {
+                toast.info(`No new topics imported; all selected items were skipped`, { id: 'bulk-import-topics' });
+            } else {
+                toast.success(
+                    skippedCount > 0
+                        ? `Imported ${createdCount} topic${createdCount === 1 ? '' : 's'}; skipped ${skippedCount}`
+                        : `Imported ${createdCount} topic${createdCount === 1 ? '' : 's'} to syllabus`,
+                    {
+                        id: 'bulk-import-topics',
+                        description: skippedCount > 0
+                            ? `${response.stats.duplicates} duplicates, ${response.stats.invalid} invalid`
+                            : undefined,
+                    },
+                );
+            }
+        } catch (error) {
+            console.error('Syllabus import failed:', error);
+            toast.error('Failed to import topics to syllabus', { id: 'bulk-import-topics' });
+        } finally {
+            setIsImportingTopics(false);
         }
     };
 
@@ -326,6 +453,12 @@ export function SyllabusDigitizer() {
                     ) : (
                         <div className="absolute inset-0 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                             {parsedItems.map((item, i) => (
+                                (() => {
+                                    const outcome = rowImportOutcome.get(item.sourceId)
+                                        ?? ((importedSourceIds.has(item.sourceId) || importedTopicKeys.has(buildTopicKey(resolveChapter(item), item.title)))
+                                            ? 'imported'
+                                            : null);
+                                    return (
                                 <div
                                     key={i}
                                     onClick={() => toggleItem(i)}
@@ -350,6 +483,9 @@ export function SyllabusDigitizer() {
                                             </p>
                                         )}
                                         <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-slate-300">
+                                                {resolveChapter(item)}
+                                            </span>
                                             {item.priority && (
                                                 <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${item.priority === 'HIGH' ? 'bg-red-500/20 text-red-300' :
                                                     item.priority === 'MEDIUM' ? 'bg-amber-500/20 text-amber-300' :
@@ -363,9 +499,26 @@ export function SyllabusDigitizer() {
                                                     Due {new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                                 </span>
                                             )}
+                                            {outcome === 'imported' && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">
+                                                    Imported
+                                                </span>
+                                            )}
+                                            {outcome === 'duplicate' && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">
+                                                    Skipped (duplicate)
+                                                </span>
+                                            )}
+                                            {outcome === 'invalid' && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300">
+                                                    Skipped (invalid)
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
+                                    );
+                                })()
                             ))}
                         </div>
                     )}
@@ -373,7 +526,7 @@ export function SyllabusDigitizer() {
 
                 <div className="mt-6 pt-4 border-t border-white/5 flex flex-col gap-4">
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-wrap items-center gap-4">
                             <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-white transition-colors">
                                 <input
                                     type="checkbox"
@@ -398,13 +551,31 @@ export function SyllabusDigitizer() {
                             </select>
                         </div>
 
-                        <button
-                            onClick={handleBulkCreate}
-                            disabled={isCreating || parsedItems.filter(p => p.selected).length === 0}
-                            className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-cyan-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-lg shadow-white/5"
-                        >
-                            {isCreating ? 'Creating...' : 'Create Tasks'}
-                        </button>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button
+                                onClick={handleImportTopics}
+                                disabled={isImportingTopics || parsedItems.filter(p => p.selected).length === 0 || !selectedCategoryId}
+                                className="px-6 py-2.5 bg-cyan-500/10 border border-cyan-500/30 text-cyan-100 font-bold rounded-xl hover:bg-cyan-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            >
+                                {isImportingTopics ? 'Importing...' : 'Import to Syllabus'}
+                            </button>
+                            <button
+                                onClick={handleBulkCreate}
+                                disabled={isCreating || parsedItems.filter(p => p.selected).length === 0}
+                                className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-cyan-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-lg shadow-white/5"
+                            >
+                                {isCreating ? 'Creating...' : 'Create Tasks'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                        <span>
+                            Destination subject: {selectedCategoryId ? (categories.find((cat) => cat.id === selectedCategoryId)?.name ?? 'Selected subject') : 'Select a subject to import topics'}
+                        </span>
+                        <span>
+                            Import adds topics to the syllabus graph and does not remove task creation.
+                        </span>
                     </div>
                 </div>
             </div>

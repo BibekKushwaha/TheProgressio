@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useGetCategoriesQuery } from '@repo/store';
+import { useGetCategoriesQuery, useGetSyllabusProgressQuery } from '@repo/store';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TopicSection } from './_components/TopicSection';
 import { PrerequisiteSection } from './_components/PrerequisiteSection';
+import { SyllabusProgressSection } from './_components/SyllabusProgressSection';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 import { getApiErrorReportStatus } from '@/lib/api-error';
 import { reportApiError } from '@/lib/errorReporter';
@@ -13,6 +15,15 @@ import { reportApiError } from '@/lib/errorReporter';
 export default function SyllabusPage() {
   const { data: categories, isLoading, isError, error, refetch } = useGetCategoriesQuery();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const {
+    data: progressData,
+    isLoading: isProgressLoading,
+    isError: isProgressError,
+    refetch: refetchProgress,
+  } = useGetSyllabusProgressQuery(
+    { categoryId: selectedCategoryId },
+    { skip: !selectedCategoryId },
+  );
 
   useEffect(() => {
     if (error) {
@@ -96,13 +107,39 @@ export default function SyllabusPage() {
 
       {!selectedCategoryId ? (
         <Card variant="glass">
-          <CardContent className="py-12 text-center text-slate-500 text-sm">
-            Pick a subject to start adding topics.
+          <CardContent className="py-12 text-center text-slate-500 text-sm space-y-3">
+            <p>Pick a subject to start adding topics.</p>
+            <p>
+              You can also import scanned syllabus topics from{' '}
+              <Link href="/createtask?mode=syllabus" className="text-indigo-300 hover:text-indigo-200">
+                Create Task → Syllabus
+              </Link>.
+            </p>
           </CardContent>
         </Card>
       ) : (
         <>
-          <TopicSection selectedCategoryId={selectedCategoryId} />
+          {isProgressError ? (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <p>Progress insights are temporarily unavailable. Topic editing still works normally.</p>
+                <button
+                  onClick={() => void refetchProgress()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                >
+                  <RefreshCcw className="h-3.5 w-3.5" />
+                  Retry progress
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {progressData ? <SyllabusProgressSection progress={progressData} /> : null}
+          <TopicSection
+            selectedCategoryId={selectedCategoryId}
+            progressTopics={progressData?.topics ?? []}
+            chapterProgress={progressData?.chapters ?? []}
+            isProgressLoading={isProgressLoading}
+          />
           <PrerequisiteSection selectedCategoryId={selectedCategoryId} />
         </>
       )}

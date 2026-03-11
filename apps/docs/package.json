@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "next build",
-    "analyze": "ANALYZE=true next build",
+    "build": "next build --webpack",
+    "analyze": "ANALYZE=true next build --webpack",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "lint:quiet": "eslint --quiet",

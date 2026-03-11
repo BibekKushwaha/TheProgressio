@@ -58,7 +58,6 @@ const NAV_GROUPS: NavGroup[] = [
                     { name: "Create New", href: "/createtask" },
                     { name: "Task Board", href: "/tasks" },
                     { name: "Task Archive", href: "/planner" },
-                    { name: "Syllabus Digitizer", href: "/syllabus-digitizer" },
                 ],
             },
             { name: "Timetable", icon: Calendar, href: "/calendar" },
@@ -92,10 +91,8 @@ const NAV_GROUPS: NavGroup[] = [
                 href: "/analytics",
                 menuKey: "analytics",
                 children: [
-                    { name: "Overview", href: "/analytics/overview" },
                     { name: "Strategic", href: "/analytics/strategic" },
                     { name: "Weekly Review", href: "/analytics/weekly-review" },
-                    { name: "Reports", href: "/reports" },
                 ],
             },
             { name: "Achievements", icon: Award, href: "/achievement" },
@@ -129,9 +126,8 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
         planner:
             pathname.startsWith("/planner") ||
             pathname.startsWith("/tasks") ||
-            pathname.startsWith("/createtask") ||
-            pathname.startsWith("/syllabus-digitizer"),
-        analytics: pathname.startsWith("/analytics") || pathname.startsWith("/reports"),
+            pathname.startsWith("/createtask"),
+        analytics: pathname.startsWith("/analytics"),
         "exam-warroom": pathname.startsWith("/exam-warroom"),
     });
 
@@ -154,12 +150,10 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
                 prev.planner ||
                 pathname.startsWith("/planner") ||
                 pathname.startsWith("/tasks") ||
-                pathname.startsWith("/createtask") ||
-                pathname.startsWith("/syllabus-digitizer"),
+                pathname.startsWith("/createtask"),
             analytics:
                 prev.analytics ||
-                pathname.startsWith("/analytics") ||
-                pathname.startsWith("/reports"),
+                pathname.startsWith("/analytics"),
             "exam-warroom": prev["exam-warroom"] || pathname.startsWith("/exam-warroom"),
         }));
     }, [pathname]);
@@ -335,31 +329,31 @@ const BottomActions = memo(function BottomActions({
                 <span>Quick actions</span>
             </div>
             <div className="border-t border-white/10 pt-3 space-y-1">
-            <Link
-                href="/settings"
-                onClick={() => {
-                    trackFeatureOpened("/settings", pathname);
-                    onNavigate?.();
-                }}
-            >
-                <div
-                    className={cn(
-                        "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group text-gray-400 hover:bg-white/5 hover:text-white",
-                        isActiveRoute("/settings") && "bg-white/10 text-white"
-                    )}
+                <Link
+                    href="/settings"
+                    onClick={() => {
+                        trackFeatureOpened("/settings", pathname);
+                        onNavigate?.();
+                    }}
                 >
-                    <Settings className="w-5 h-5 group-hover:text-indigo-400" />
-                    <span className="font-medium">Settings</span>
-                </div>
-            </Link>
-            <button
-                onClick={onLogout}
-                disabled={isLoggingOut}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group disabled:opacity-60"
-            >
-                <LogOut className="w-5 h-5 group-hover:text-red-400" />
-                <span className="font-medium">{isLoggingOut ? "Logging out..." : "Logout"}</span>
-            </button>
+                    <div
+                        className={cn(
+                            "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group text-gray-400 hover:bg-white/5 hover:text-white",
+                            isActiveRoute("/settings") && "bg-white/10 text-white"
+                        )}
+                    >
+                        <Settings className="w-5 h-5 group-hover:text-indigo-400" />
+                        <span className="font-medium">Settings</span>
+                    </div>
+                </Link>
+                <button
+                    onClick={onLogout}
+                    disabled={isLoggingOut}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group disabled:opacity-60"
+                >
+                    <LogOut className="w-5 h-5 group-hover:text-red-400" />
+                    <span className="font-medium">{isLoggingOut ? "Logging out..." : "Logout"}</span>
+                </button>
             </div>
         </div>
     );

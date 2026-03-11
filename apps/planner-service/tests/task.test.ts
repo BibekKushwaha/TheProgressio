@@ -76,6 +76,7 @@ vi.mock('@repo/db', () => {
   const Priority = { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH' }
   return {
     prisma: {
+      $transaction: vi.fn(async (callback: (tx: any) => Promise<unknown>) => callback((globalThis as any).__mockPrismaTx)),
       task: {
         create: vi.fn(),
         findMany: vi.fn(),
@@ -86,6 +87,7 @@ vi.mock('@repo/db', () => {
       category: {
         create: vi.fn(),
         findMany: vi.fn(),
+        findFirst: vi.fn(),
         findUnique: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
@@ -96,6 +98,13 @@ vi.mock('@repo/db', () => {
         findUnique: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
+      },
+      syllabusTopic: {
+        findMany: vi.fn(),
+      },
+      taskSyllabusTopic: {
+        createMany: vi.fn(),
+        deleteMany: vi.fn(),
       },
       attachment: {
         create: vi.fn(),
@@ -125,6 +134,8 @@ import { app } from '../src/index.js'
 import { prisma } from '@repo/db'
 import { emitTaskEvent } from '../src/services/queue.service.js'
 
+(globalThis as any).__mockPrismaTx = prisma
+
 // ─── Task CRUD Tests ────────────────────────────────────────────────────────────
 
 describe('Task endpoints', () => {
@@ -148,6 +159,27 @@ describe('Task endpoints', () => {
       'task.created', 't1', 'user-1',
       expect.objectContaining({ title: 'New Task' })
     )
+  })
+
+  it('creates a task atomically with syllabus topic links', async () => {
+    const categoryId = '11111111-1111-4111-8111-111111111111'
+    const topicId = '22222222-2222-4222-8222-222222222222'
+    const created = { id: 't1', title: 'Linked Task', userId: 'user-1', status: 'PENDING', priority: 'MEDIUM', categoryId }
+    ; (prisma.syllabusTopic.findMany as any).mockResolvedValue([{ id: topicId, categoryId }])
+    ; (prisma.task.create as any).mockResolvedValue(created)
+    ; (prisma.taskSyllabusTopic.deleteMany as any).mockResolvedValue({ count: 0 })
+    ; (prisma.taskSyllabusTopic.createMany as any).mockResolvedValue({ count: 1 })
+
+    const res = await request(app)
+      .post('/api/tasks')
+      .send({ title: 'Linked Task', categoryId, topicIds: [topicId] })
+
+    expect(res.status).toBe(201)
+    expect(prisma.task.create).toHaveBeenCalled()
+    expect(prisma.taskSyllabusTopic.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 'user-1', taskId: 't1', topicId }],
+      skipDuplicates: true,
+    })
   })
 
   it('returns 400 when title is missing', async () => {
@@ -227,6 +259,46 @@ describe('Task endpoints', () => {
       'task.updated', 't1', 'user-1',
       expect.objectContaining({ changedFields: expect.objectContaining({ title: 'Updated' }) })
     )
+  })
+
+  it('rejects atomic update when linked topics belong to a different category', async () => {
+    const existing = { id: 't1', userId: 'user-1', status: 'PENDING', title: 'Old', categoryId: 'cat-1' }
+    const topicId = '99999999-9999-4999-8999-999999999999'
+    ; (prisma.task.findUnique as any).mockResolvedValue(existing)
+    ; (prisma.syllabusTopic.findMany as any).mockResolvedValue([{ id: topicId, categoryId: 'cat-2' }])
+
+    const res = await request(app)
+      .patch('/api/tasks/t1')
+      .send({ topicIds: [topicId] })
+
+    expect(res.status).toBe(400)
+    expect(res.body.message).toContain("task's category")
+    expect(prisma.task.update).not.toHaveBeenCalled()
+  })
+
+  it('clears existing topic links when category changes without topicIds', async () => {
+    const existing = {
+      id: 't1',
+      userId: 'user-1',
+      status: 'PENDING',
+      title: 'Old',
+      categoryId: '33333333-3333-4333-8333-333333333333',
+    }
+    const updated = { ...existing, categoryId: '44444444-4444-4444-8444-444444444444' }
+    ; (prisma.task.findUnique as any).mockResolvedValue(existing)
+    ; (prisma.task.update as any).mockResolvedValue(updated)
+    ; (prisma.taskSyllabusTopic.deleteMany as any).mockResolvedValue({ count: 2 })
+
+    const res = await request(app)
+      .patch('/api/tasks/t1')
+      .send({ categoryId: '44444444-4444-4444-8444-444444444444' })
+
+    expect(res.status).toBe(200)
+    expect(prisma.task.update).toHaveBeenCalled()
+    expect(prisma.taskSyllabusTopic.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', taskId: 't1' },
+    })
+    expect(prisma.taskSyllabusTopic.createMany).not.toHaveBeenCalled()
   })
 
   it('emits task.completed when status changes to COMPLETED via update', async () => {
@@ -371,6 +443,96 @@ describe('Task endpoints', () => {
       .send({})
 
     expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when syllabus progress categoryId is missing', async () => {
+    const res = await request(app).get('/api/syllabus/progress')
+
+    expect(res.status).toBe(400)
+    expect(res.body.message).toContain('categoryId is required')
+  })
+
+  it('returns 400 when syllabus progress categoryId is malformed', async () => {
+    const res = await request(app).get('/api/syllabus/progress?categoryId=not-a-uuid')
+
+    expect(res.status).toBe(400)
+    expect(res.body.message).toContain('valid UUID')
+  })
+
+  it('returns 404 when syllabus progress category does not belong to the user', async () => {
+    ; (prisma.category.findFirst as any).mockResolvedValue(null)
+
+    const res = await request(app)
+      .get('/api/syllabus/progress?categoryId=11111111-1111-4111-8111-111111111111')
+
+    expect(res.status).toBe(404)
+  })
+
+  it('returns syllabus revision recommendation buckets for a subject', async () => {
+    ; (prisma.category.findFirst as any).mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111' })
+    ; (prisma.syllabusTopic.findMany as any).mockResolvedValue([
+      {
+        id: 'topic-1',
+        chapter: 'Thermodynamics',
+        title: 'Heat Engines',
+        taskLinks: [],
+      },
+      {
+        id: 'topic-2',
+        chapter: 'Thermodynamics',
+        title: 'Entropy',
+        taskLinks: [{ taskId: 'task-1', task: { status: 'PENDING' } }],
+      },
+      {
+        id: 'topic-4',
+        chapter: 'Thermodynamics',
+        title: 'Carnot Cycle',
+        taskLinks: [{ taskId: 'task-3', task: { status: 'IN_PROGRESS' } }],
+      },
+      {
+        id: 'topic-3',
+        chapter: 'Thermodynamics',
+        title: 'Laws of Thermodynamics',
+        taskLinks: [{ taskId: 'task-2', task: { status: 'COMPLETED' } }],
+      },
+    ])
+
+    const res = await request(app)
+      .get('/api/syllabus/revision-recommendations?categoryId=11111111-1111-4111-8111-111111111111')
+
+    expect(res.status).toBe(200)
+    expect(res.body.summary).toEqual({
+      totalTopics: 4,
+      coverageGapCount: 1,
+      needsStudyCount: 2,
+      readyToReviseCount: 1,
+      completedTopics: 1,
+    })
+    expect(res.body.buckets.coverageGap[0]).toEqual(expect.objectContaining({
+      topicId: 'topic-1',
+      recommendationType: 'coverage_gap',
+      reasonCode: 'no_linked_tasks',
+      suggestedAction: 'create_task',
+      reason: 'No task is linked to this topic yet.',
+    }))
+    expect(res.body.buckets.needsStudy[0]).toEqual(expect.objectContaining({
+      topicId: 'topic-4',
+      recommendationType: 'needs_study',
+      reasonCode: 'linked_tasks_in_progress',
+      suggestedAction: 'view_syllabus',
+    }))
+    expect(res.body.buckets.needsStudy[1]).toEqual(expect.objectContaining({
+      topicId: 'topic-2',
+      recommendationType: 'needs_study',
+      reasonCode: 'linked_tasks_not_started',
+      suggestedAction: 'create_task',
+    }))
+    expect(res.body.buckets.readyToRevise[0]).toEqual(expect.objectContaining({
+      topicId: 'topic-3',
+      recommendationType: 'ready_to_revise',
+      reasonCode: 'completed_ready_for_revision',
+      suggestedAction: 'revise_topic',
+    }))
   })
 
   // GENERATE SUBTASKS

@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { withAuthRefresh, withRetry } from '../baseQuery';
 import { calendarApi } from './calendarApi';
 import { analyticsApi } from './analyticsApi';
+import { syllabusApi } from './syllabusApi';
 import { getFamilyShareToken, isAIAssistanceDisabled, isNativeRuntime, resolveServiceUrl } from '../runtime';
 import { getAccessTokenSync } from '../mobile-token-store';
 
@@ -121,6 +122,7 @@ export interface CreateTaskRequest {
     priority?: Priority;
     categoryId?: string;
     dueDate?: string;
+    topicIds?: string[];
     isRecurring?: boolean;
     effort?: EffortOption;
 }
@@ -130,11 +132,13 @@ export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
 }
 
 export interface SyllabusScanItem {
+    sourceId: string;
     title: string;
     description?: string;
     dueDate?: string;
     priority?: Priority;
     subject?: string;
+    inferredChapter?: string;
 }
 
 export interface RecoveryPlanItem {
@@ -229,7 +233,7 @@ export const tasksApi = createApi({
                 body,
             }),
             invalidatesTags: [{ type: 'Tasks', id: 'LIST' }],
-            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+            async onQueryStarted(request, { dispatch, queryFulfilled }) {
                 try {
                     const { data: newTask } = await queryFulfilled;
                     dispatch(
@@ -243,6 +247,9 @@ export const tasksApi = createApi({
                     dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
                     // Also refresh analytics/stats (streaks, daily summaries)
                     dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
+                    if (request.topicIds && request.topicIds.length > 0) {
+                        dispatch(syllabusApi.util.invalidateTags(['Syllabus']));
+                    }
                 } catch {
                     /* ignore */
                 }
@@ -277,6 +284,7 @@ export const tasksApi = createApi({
                     dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
                     // Ensure analytics reflect task updates immediately
                     dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
+                    dispatch(syllabusApi.util.invalidateTags(['Syllabus']));
                 } catch {
                     patchUndefined.undo();
                     patchPaged.undo();
@@ -303,6 +311,7 @@ export const tasksApi = createApi({
                     dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
                     // Ensure analytics reflect task deletions immediately
                     dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
+                    dispatch(syllabusApi.util.invalidateTags(['Syllabus']));
                 } catch {
                     patchUndefined.undo();
                     patchPaged.undo();
@@ -337,6 +346,7 @@ export const tasksApi = createApi({
                     dispatch(calendarApi.util.invalidateTags([{ type: 'Calendar', id: 'LIST' }]));
                     // Ensure analytics/streaks refresh after a toggle
                     dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
+                    dispatch(syllabusApi.util.invalidateTags(['Syllabus']));
                 } catch {
                     /* ignore */
                 }
@@ -411,13 +421,24 @@ export const tasksApi = createApi({
             }),
             invalidatesTags: (_result, _error, { taskId }) => [{ type: 'Tasks', id: taskId }],
         }),
-        smartCreateTask: builder.mutation<{ message: string; task: Task; parsedMeta: any }, { text: string }>({
+        smartCreateTask: builder.mutation<{ message: string; task: Task; parsedMeta: any }, { text: string; categoryId?: string; topicIds?: string[] }>({
             query: (body) => ({
                 url: '/tasks/smart-create',
                 method: 'POST',
                 body,
             }),
             invalidatesTags: [{ type: 'Tasks', id: 'LIST' }],
+            async onQueryStarted(request, { dispatch, queryFulfilled }) {
+                try {
+                    await queryFulfilled;
+                    dispatch(analyticsApi.util.invalidateTags([{ type: 'Stats', id: 'LIST' }]));
+                    if (request.topicIds && request.topicIds.length > 0) {
+                        dispatch(syllabusApi.util.invalidateTags(['Syllabus']));
+                    }
+                } catch {
+                    /* ignore */
+                }
+            },
         }),
         generateSubtasks: builder.mutation<Task, string>({
             query: (id) => ({

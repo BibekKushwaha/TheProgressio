@@ -32,6 +32,54 @@ const parseTaskIntentResultSchema = z.object({
     type: z.enum(["ASSIGNMENT", "EXAM", "STUDY_GOAL"]).optional(),
 });
 
+const normalizeTopicIds = (value: unknown): string[] | undefined => {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value)) return [];
+    return value.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+};
+
+const validateTopicIdsForTask = async (db: any, params: {
+    userId: string;
+    categoryId: string | null;
+    topicIds: string[];
+}) => {
+    const { userId, categoryId, topicIds } = params;
+    if (topicIds.length === 0) return;
+    if (!categoryId) {
+        throw new ErrorHandler(400, "Topics can only be linked when the task has a category");
+    }
+
+    const topics = await db.syllabusTopic.findMany({
+        where: { userId, id: { in: topicIds } },
+        select: { id: true, categoryId: true },
+    });
+
+    const foundIds = new Set(topics.map((topic: { id: string }) => topic.id));
+    const missing = topicIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+        throw new ErrorHandler(400, "One or more topicIds are invalid");
+    }
+
+    const wrongCategory = topics.some((topic: { categoryId: string }) => topic.categoryId !== categoryId);
+    if (wrongCategory) {
+        throw new ErrorHandler(400, "All topics must belong to the task's category");
+    }
+};
+
+const replaceTaskTopicLinks = async (db: any, params: {
+    userId: string;
+    taskId: string;
+    topicIds: string[];
+}) => {
+    const { userId, taskId, topicIds } = params;
+    await db.taskSyllabusTopic.deleteMany({ where: { userId, taskId } });
+    if (topicIds.length === 0) return;
+    await db.taskSyllabusTopic.createMany({
+        data: topicIds.map((topicId) => ({ userId, taskId, topicId })),
+        skipDuplicates: true,
+    });
+};
+
 const serializeTaskEffort = <T extends { effort?: unknown }>(task: T): T & { effort: string | null } => {
     return {
         ...task,
@@ -237,21 +285,53 @@ export const createTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
     }
 
     const { title, description, status, priority, categoryId, dueDate, isRecurring, subjectId, effort } = parsed.data;
+    const topicIds = normalizeTopicIds((req.body as Record<string, unknown> | undefined)?.topicIds);
 
-    const task = await prisma.task.create({
-        data: {
-            title,
-            description: description ?? null,
-            status,
-            priority,
-            dueDate: dueDate ?? null,
-            isRecurring: isRecurring ?? false,
-            effort: toDbEffortValue(effort) ?? null,
-            userId,
-            categoryId: categoryId || null,
-            subjectId: subjectId || null,
-        },
-    });
+    const task = topicIds !== undefined
+        ? await prisma.$transaction(async (tx) => {
+            await validateTopicIdsForTask(tx, {
+                userId,
+                categoryId: categoryId || null,
+                topicIds,
+            });
+
+            const createdTask = await tx.task.create({
+                data: {
+                    title,
+                    description: description ?? null,
+                    status,
+                    priority,
+                    dueDate: dueDate ?? null,
+                    isRecurring: isRecurring ?? false,
+                    effort: toDbEffortValue(effort) ?? null,
+                    userId,
+                    categoryId: categoryId || null,
+                    subjectId: subjectId || null,
+                },
+            });
+
+            await replaceTaskTopicLinks(tx, {
+                userId,
+                taskId: createdTask.id,
+                topicIds,
+            });
+
+            return createdTask;
+        })
+        : await prisma.task.create({
+            data: {
+                title,
+                description: description ?? null,
+                status,
+                priority,
+                dueDate: dueDate ?? null,
+                isRecurring: isRecurring ?? false,
+                effort: toDbEffortValue(effort) ?? null,
+                userId,
+                categoryId: categoryId || null,
+                subjectId: subjectId || null,
+            },
+        });
 
     void logAuditAction(userId, "TASK_CREATED", "TASK", task.id, JSON.stringify({ title }));
 
@@ -417,6 +497,7 @@ export const updateTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
     }
 
     const updates = parsed.data;
+    const topicIds = normalizeTopicIds((req.body as Record<string, unknown> | undefined)?.topicIds);
 
     const existingTask = await prisma.task.findUnique({
         where: { id },
@@ -430,19 +511,72 @@ export const updateTask = TryCatch(async (req: AuthenticatedRequest, res: Respon
         throw new ErrorHandler(403, "Forbidden: You don't own this task");
     }
 
-    const updatedTask = await prisma.task.update({
-        where: { id },
-        data: {
-            ...(updates.title && { title: updates.title }),
-            ...(updates.description !== undefined && { description: updates.description }),
-            ...(updates.status && { status: updates.status }),
-            ...(updates.priority && { priority: updates.priority }),
-            ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
-            ...(updates.isRecurring !== undefined && { isRecurring: updates.isRecurring }),
-            ...(updates.categoryId !== undefined && { categoryId: updates.categoryId || null }),
-            ...(updates.effort !== undefined && { effort: toDbEffortValue(updates.effort) || null }),
-        },
-    });
+    const nextCategoryId = updates.categoryId !== undefined ? updates.categoryId || null : existingTask.categoryId ?? null;
+    const categoryChanged = updates.categoryId !== undefined && nextCategoryId !== (existingTask.categoryId ?? null);
+
+    const updatedTask = topicIds !== undefined
+        ? await prisma.$transaction(async (tx) => {
+            await validateTopicIdsForTask(tx, {
+                userId,
+                categoryId: nextCategoryId,
+                topicIds,
+            });
+
+            const savedTask = await tx.task.update({
+                where: { id },
+                data: {
+                    ...(updates.title && { title: updates.title }),
+                    ...(updates.description !== undefined && { description: updates.description }),
+                    ...(updates.status && { status: updates.status }),
+                    ...(updates.priority && { priority: updates.priority }),
+                    ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
+                    ...(updates.isRecurring !== undefined && { isRecurring: updates.isRecurring }),
+                    ...(updates.categoryId !== undefined && { categoryId: updates.categoryId || null }),
+                    ...(updates.effort !== undefined && { effort: toDbEffortValue(updates.effort) || null }),
+                },
+            });
+
+            await replaceTaskTopicLinks(tx, {
+                userId,
+                taskId: id,
+                topicIds,
+            });
+
+            return savedTask;
+        })
+        : categoryChanged
+            ? await prisma.$transaction(async (tx) => {
+                const savedTask = await tx.task.update({
+                    where: { id },
+                    data: {
+                        ...(updates.title && { title: updates.title }),
+                        ...(updates.description !== undefined && { description: updates.description }),
+                        ...(updates.status && { status: updates.status }),
+                        ...(updates.priority && { priority: updates.priority }),
+                        ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
+                        ...(updates.isRecurring !== undefined && { isRecurring: updates.isRecurring }),
+                        ...(updates.categoryId !== undefined && { categoryId: updates.categoryId || null }),
+                        ...(updates.effort !== undefined && { effort: toDbEffortValue(updates.effort) || null }),
+                    },
+                });
+
+                await tx.taskSyllabusTopic.deleteMany({ where: { userId, taskId: id } });
+
+                return savedTask;
+            })
+            : await prisma.task.update({
+                where: { id },
+                data: {
+                    ...(updates.title && { title: updates.title }),
+                    ...(updates.description !== undefined && { description: updates.description }),
+                    ...(updates.status && { status: updates.status }),
+                    ...(updates.priority && { priority: updates.priority }),
+                    ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
+                    ...(updates.isRecurring !== undefined && { isRecurring: updates.isRecurring }),
+                    ...(updates.categoryId !== undefined && { categoryId: updates.categoryId || null }),
+                    ...(updates.effort !== undefined && { effort: toDbEffortValue(updates.effort) || null }),
+                },
+            });
 
     void logAuditAction(userId, "TASK_UPDATED", "TASK", id, JSON.stringify(updates));
 
@@ -644,6 +778,8 @@ interface CreateTaskFromTextParams {
     metadata?: Record<string, unknown>;
     parsedDataOverride?: Partial<ParsedTaskIntent>;
     disableAI?: boolean;
+    categoryId?: string;
+    topicIds?: string[];
 }
 
 export const createTaskFromText = async ({
@@ -653,6 +789,8 @@ export const createTaskFromText = async ({
     metadata = {},
     parsedDataOverride,
     disableAI = false,
+    categoryId,
+    topicIds,
 }: CreateTaskFromTextParams) => {
     const parsedData = parsedDataOverride
         ? {
@@ -667,18 +805,49 @@ export const createTaskFromText = async ({
         }
         : await aiService.parseTaskIntent(text, { disableAI });
 
-    const task = await prisma.task.create({
-        data: {
-            title: parsedData.title || text,
-            description: parsedData.description || `Generated from: "${text}"`,
-            priority: (parsedData.priority as Priority) || Priority.MEDIUM,
-            status: Status.PENDING,
-            dueDate: parsedData.dueDate || null,
-            effort: toDbEffortValue(parsedData.effort) || null,
-            isRecurring: parsedData.isRecurring || false,
-            userId,
-        }
-    });
+    const normalizedTopicIds = topicIds ?? [];
+    const task = normalizedTopicIds.length > 0 || categoryId
+        ? await prisma.$transaction(async (tx) => {
+            await validateTopicIdsForTask(tx, {
+                userId,
+                categoryId: categoryId ?? null,
+                topicIds: normalizedTopicIds,
+            });
+
+            const createdTask = await tx.task.create({
+                data: {
+                    title: parsedData.title || text,
+                    description: parsedData.description || `Generated from: "${text}"`,
+                    priority: (parsedData.priority as Priority) || Priority.MEDIUM,
+                    status: Status.PENDING,
+                    dueDate: parsedData.dueDate || null,
+                    effort: toDbEffortValue(parsedData.effort) || null,
+                    isRecurring: parsedData.isRecurring || false,
+                    userId,
+                    categoryId: categoryId ?? null,
+                }
+            });
+
+            await replaceTaskTopicLinks(tx, {
+                userId,
+                taskId: createdTask.id,
+                topicIds: normalizedTopicIds,
+            });
+
+            return createdTask;
+        })
+        : await prisma.task.create({
+            data: {
+                title: parsedData.title || text,
+                description: parsedData.description || `Generated from: "${text}"`,
+                priority: (parsedData.priority as Priority) || Priority.MEDIUM,
+                status: Status.PENDING,
+                dueDate: parsedData.dueDate || null,
+                effort: toDbEffortValue(parsedData.effort) || null,
+                isRecurring: parsedData.isRecurring || false,
+                userId,
+            }
+        });
 
     void logAuditAction(userId, "TASK_CREATED", "TASK", task.id, JSON.stringify({ title: task.title }));
 
@@ -702,13 +871,15 @@ export const smartCreateTask = TryCatch(async (req: AuthenticatedRequest, res: R
         throw new ErrorHandler(400, "Text input is required");
     }
 
-    const { text } = parsed.data;
+    const { text, categoryId, topicIds } = parsed.data;
 
     const { task, parsedData } = await createTaskFromText({
         userId: userId,
         text,
         source: "nlp-smart-create",
         disableAI: isAIDisabled(req),
+        ...(categoryId ? { categoryId } : {}),
+        ...(topicIds ? { topicIds } : {}),
     });
 
     return res.status(201).json({

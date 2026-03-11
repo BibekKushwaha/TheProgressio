@@ -21,6 +21,8 @@ import {
     useCreateSubjectMutation,
     useGetRotationPatternsQuery,
     useCreateTimetableEntryMutation,
+    useGetTaskSyllabusTopicsQuery,
+    useGetSyllabusTopicsQuery,
     useAppDispatch,
     type Task,
     type Category,
@@ -59,6 +61,8 @@ export interface CreateTaskFormResult {
     setSelectedEffort: (v: EffortOption) => void;
     subtasks: SubtaskDraft[];
     setSubtasks: (v: SubtaskDraft[]) => void;
+    selectedSyllabusTopicIds: string[];
+    setSelectedSyllabusTopicIds: (v: string[]) => void;
     isRecurring: boolean;
     setIsRecurring: (v: boolean) => void;
     showManualDetails: boolean;
@@ -66,8 +70,8 @@ export interface CreateTaskFormResult {
     aiSubtaskEnabled: boolean;
     setAiSubtaskEnabled: (v: boolean) => void;
     // exam form
-    entryType: 'task' | 'exam' | 'class';
-    setEntryType: (v: 'task' | 'exam' | 'class') => void;
+    entryType: 'task' | 'exam' | 'class' | 'syllabus';
+    setEntryType: (v: 'task' | 'exam' | 'class' | 'syllabus') => void;
     examSubMode: 'schedule' | 'result';
     setExamSubMode: (v: 'schedule' | 'result') => void; // clears related validation errors
     examType: string;
@@ -141,6 +145,7 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const taskId = searchParams.get('id');
     const mode = searchParams.get('mode');
     const title = searchParams.get('title');
+    const shortcutTopicId = searchParams.get('topicId');
     const prefillDate = searchParams.get('date');
     const prefillTime = searchParams.get('time');
     const prefillLocation = searchParams.get('location');
@@ -165,9 +170,10 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const [selectedPriority, setSelectedPriority] = useState('Routine');
     const [selectedEffort, setSelectedEffort] = useState<EffortOption>('1h');
     const [subtasks, setSubtasks] = useState<SubtaskDraft[]>([]);
+    const [selectedSyllabusTopicIds, setSelectedSyllabusTopicIds] = useState<string[]>([]);
     const [isRecurring, setIsRecurring] = useState(false);
     // Exam state
-    const [entryType, setEntryType] = useState<'task' | 'exam' | 'class'>('task');
+    const [entryType, setEntryType] = useState<'task' | 'exam' | 'class' | 'syllabus'>('task');
     const [examSubMode, setExamSubMode] = useState<'schedule' | 'result'>('schedule');
     const [examType, setExamType] = useState('Midterm');
     const [obtainedMarks, setObtainedMarks] = useState('');
@@ -190,7 +196,9 @@ export function useCreateTaskForm(): CreateTaskFormResult {
 
     // ── Refs ────────────────────────────────────────────────────────────────
     const hasHydratedFromExistingTask = useRef(false);
+    const hasHydratedSyllabusLinks = useRef(false);
     const hasHydratedFromQueryParams = useRef(false);
+    const hasHydratedShortcutTopic = useRef(false);
     // Prevents the parse-debounce from overwriting a user-chosen date
     const isDueDateManuallyEditedRef = useRef(false);
     // Query-prefilled dates should be treated as explicit inputs even before manual edits.
@@ -211,6 +219,8 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     const [createCategory] = useCreateCategoryMutation();
     const [createSubject] = useCreateSubjectMutation();
     const [parseTask, { isLoading: isParsingTask }] = useParseTaskMutation();
+    const { data: taskSyllabusLinks } = useGetTaskSyllabusTopicsQuery(taskId || '', { skip: !taskId });
+    const { data: allSyllabusTopics } = useGetSyllabusTopicsQuery(undefined, { skip: !shortcutTopicId || !!taskId });
     const { data: categories } = useGetCategoriesQuery();
     const { data: subjects } = useGetSubjectsQuery();
     const { data: patterns = [] } = useGetRotationPatternsQuery();
@@ -309,7 +319,9 @@ export function useCreateTaskForm(): CreateTaskFormResult {
     // ── Hydrate from existing task on edit ──────────────────────────────────
     useEffect(() => {
         hasHydratedFromExistingTask.current = false;
+        hasHydratedSyllabusLinks.current = false;
         hasHydratedFromQueryParams.current = false;
+        hasHydratedShortcutTopic.current = false;
         isDueDateManuallyEditedRef.current = false;
         hasPrefilledDueDateRef.current = false;
         manuallyEditedFieldsRef.current.clear();
@@ -320,6 +332,7 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         if (mode === 'exam') setEntryType('exam');
         if (mode === 'task') setEntryType('task');
         if (mode === 'class') setEntryType('class');
+        if (mode === 'syllabus') setEntryType('syllabus');
     }, [mode, taskId]);
 
     useEffect(() => {
@@ -339,6 +352,8 @@ export function useCreateTaskForm(): CreateTaskFormResult {
             if (prefillDuration && /^\d+$/.test(prefillDuration)) setExamDuration(prefillDuration);
         } else if (mode === 'class') {
             setEntryType('class');
+        } else if (mode === 'syllabus') {
+            setEntryType('syllabus');
         } else if (mode === 'task') {
             setEntryType('task');
         }
@@ -403,6 +418,28 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         }
         setIsRecurring(Boolean(existingTask.isRecurring));
     }, [existingTask]);
+
+    useEffect(() => {
+        if (!taskId || hasHydratedSyllabusLinks.current || !taskSyllabusLinks) return;
+        hasHydratedSyllabusLinks.current = true;
+        setSelectedSyllabusTopicIds(taskSyllabusLinks.links.map((link) => link.topicId));
+    }, [taskId, taskSyllabusLinks]);
+
+    useEffect(() => {
+        if (taskId || !shortcutTopicId || hasHydratedShortcutTopic.current || !allSyllabusTopics) return;
+        hasHydratedShortcutTopic.current = true;
+        const matchedTopic = allSyllabusTopics.topics.find((topic) => topic.id === shortcutTopicId);
+        if (!matchedTopic) return;
+        setSelectedSubjectId(matchedTopic.categoryId);
+        setSelectedSyllabusTopicIds((current) => (current.includes(matchedTopic.id) ? current : [...current, matchedTopic.id]));
+    }, [allSyllabusTopics, shortcutTopicId, taskId]);
+
+    useEffect(() => {
+        if (entryType !== 'task') return;
+        if (selectedSubjectId) return;
+        if (selectedSyllabusTopicIds.length === 0) return;
+        setSelectedSyllabusTopicIds([]);
+    }, [entryType, selectedSubjectId, selectedSyllabusTopicIds]);
 
     // ── Memoized chip color ─────────────────────────────────────────────────
     const matchedCategoryForChip = useMemo(
@@ -506,9 +543,36 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         if (!validateForm()) return;
         setIsSubmittingNow(true);
         try {
+            let priorityEnum = PriorityEnum.LOW;
+            if (selectedPriority === 'Medium') priorityEnum = PriorityEnum.MEDIUM;
+            if (selectedPriority === 'Urgent') priorityEnum = PriorityEnum.HIGH;
+
+            let categoryIdToUse = selectedSubjectId || undefined;
+            if (parsedMeta.subject) {
+                const subject = parsedMeta.subject;
+                const existingCategory = categories?.find(c => c.name.toLowerCase() === subject.toLowerCase());
+                if (existingCategory) {
+                    categoryIdToUse = existingCategory.id;
+                } else {
+                    try {
+                        const newCategory = await createCategory({
+                            name: subject,
+                            colorCode: 'from-blue-600/40 to-blue-500/40',
+                        }).unwrap();
+                        categoryIdToUse = newCategory.id;
+                    } catch {
+                        categoryIdToUse = undefined;
+                    }
+                }
+            }
+
             // Explicit smart-create toggle (replaces hidden 80-char heuristic)
             if (!taskId && useSmartCreate && entryType === 'task') {
-                const response = await smartCreateTask({ text: taskDescription }).unwrap();
+                const response = await smartCreateTask({
+                    text: taskDescription,
+                    categoryId: categoryIdToUse,
+                    topicIds: selectedSyllabusTopicIds,
+                }).unwrap();
                 if (response?.task) {
                     dispatch(addTask(response.task));
                     const titlePreview = taskDescription.slice(0, 40) + (taskDescription.length > 40 ? '…' : '');
@@ -603,29 +667,6 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                 return;
             }
 
-            let priorityEnum = PriorityEnum.LOW;
-            if (selectedPriority === 'Medium') priorityEnum = PriorityEnum.MEDIUM;
-            if (selectedPriority === 'Urgent') priorityEnum = PriorityEnum.HIGH;
-
-            let categoryIdToUse = selectedSubjectId || undefined;
-            if (parsedMeta.subject) {
-                const subject = parsedMeta.subject;
-                const existingCategory = categories?.find(c => c.name.toLowerCase() === subject.toLowerCase());
-                if (existingCategory) {
-                    categoryIdToUse = existingCategory.id;
-                } else {
-                    try {
-                        const newCategory = await createCategory({
-                            name: subject,
-                            colorCode: 'from-blue-600/40 to-blue-500/40',
-                        }).unwrap();
-                        categoryIdToUse = newCategory.id;
-                    } catch {
-                        categoryIdToUse = undefined;
-                    }
-                }
-            }
-
             if (taskId) {
                 await updateTask({
                     id: taskId,
@@ -636,6 +677,7 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                     dueDate: parsedDueDate || undefined,
                     isRecurring,
                     effort: selectedEffort,
+                    topicIds: selectedSyllabusTopicIds,
                 }).unwrap();
             } else {
                 const createdTask = await createTask({
@@ -647,6 +689,7 @@ export function useCreateTaskForm(): CreateTaskFormResult {
                     dueDate: parsedDueDate || undefined,
                     isRecurring,
                     effort: selectedEffort,
+                    topicIds: selectedSyllabusTopicIds,
                 }).unwrap();
                 if (createdTask) {
                     dispatch(addTask(createdTask));
@@ -715,6 +758,7 @@ export function useCreateTaskForm(): CreateTaskFormResult {
         selectedPriority, setSelectedPriority: handleSetPriority,
         selectedEffort, setSelectedEffort: handleSetEffort,
         subtasks, setSubtasks,
+        selectedSyllabusTopicIds, setSelectedSyllabusTopicIds,
         isRecurring, setIsRecurring: handleSetRecurring,
         showManualDetails, setShowManualDetails,
         aiSubtaskEnabled, setAiSubtaskEnabled,

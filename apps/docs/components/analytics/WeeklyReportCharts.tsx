@@ -1,9 +1,5 @@
 "use client";
 
-// This file is the sole owner of the recharts import — it is loaded via
-// next/dynamic in page.tsx so the heavy recharts bundle is split into its
-// own lazy chunk and doesn't block the initial route paint.
-
 import {
     LineChart,
     Line,
@@ -33,12 +29,12 @@ interface CategoryDataPoint {
     value: number;
 }
 
-interface ReportsChartsProps {
+interface WeeklyReportChartsProps {
     weeklyData: WeeklyDataPoint[];
     categoryData: CategoryDataPoint[];
 }
 
-export default function ReportsCharts({ weeklyData, categoryData }: ReportsChartsProps) {
+export function WeeklyReportCharts({ weeklyData, categoryData }: WeeklyReportChartsProps) {
     const hasWeeklyData = weeklyData.some((point) => (point.hours ?? 0) > 0 || (point.tasks ?? 0) > 0);
     const safeCategoryData = categoryData.length > 0
         ? categoryData
@@ -52,9 +48,7 @@ export default function ReportsCharts({ weeklyData, categoryData }: ReportsChart
 
     return (
         <>
-            {/* Trend + Task bar charts side-by-side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Daily Hours Trend */}
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
                     <h2 className="text-xl font-bold text-white mb-4">Daily Hours Trend</h2>
                     <div className="h-64">
@@ -79,7 +73,6 @@ export default function ReportsCharts({ weeklyData, categoryData }: ReportsChart
                     </div>
                 </div>
 
-                {/* Tasks Completed */}
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
                     <h2 className="text-xl font-bold text-white mb-4">Tasks Completed</h2>
                     <div className="h-64">
@@ -111,7 +104,6 @@ export default function ReportsCharts({ weeklyData, categoryData }: ReportsChart
                 </div>
             </div>
 
-            {/* Performance Radar */}
             <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-white mb-4">Performance Overview</h2>
                 <div className="h-96">

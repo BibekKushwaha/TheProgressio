@@ -175,7 +175,7 @@ export function CommandPalette() {
                             <Flame className="mr-2 w-4 h-4 text-orange-400" />
                             <span>Habit Gallery</span>
                         </Command.Item>
-                        <Command.Item onSelect={() => runCommand(() => router.push("/analytics/overview"))}>
+                        <Command.Item onSelect={() => runCommand(() => router.push("/analytics"))}>
                             <BarChart2 className="mr-2 w-4 h-4 text-slate-400" />
                             <span>Analytics Overview</span>
                         </Command.Item>

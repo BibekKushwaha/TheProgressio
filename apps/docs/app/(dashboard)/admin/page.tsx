@@ -187,7 +187,7 @@ export default function AdminPage() {
                     icon={<TrendingUp className="w-6 h-6 text-green-400" />}
                     title="Platform Analytics"
                     description="System-wide usage metrics and active user insights."
-                    href="/analytics/overview"
+                    href="/analytics"
                 />
                 <AdminCard
                     icon={<Shield className="w-6 h-6 text-red-400" />}

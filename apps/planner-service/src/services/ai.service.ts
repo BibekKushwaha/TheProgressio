@@ -28,11 +28,13 @@ export interface ParsedTaskIntent {
 }
 
 export interface ParsedSyllabusItem {
+    sourceId: string;
     title: string;
     description?: string;
     dueDate?: Date;
     priority?: "LOW" | "MEDIUM" | "HIGH";
     subject?: string;
+    inferredChapter?: string;
 }
 
 const normalizePreviewTime = (value: unknown): string | null => {
@@ -331,10 +333,12 @@ export class AIService {
     private cloneSyllabusItems(items: ParsedSyllabusItem[]): ParsedSyllabusItem[] {
         return items.map((item) => {
             const cloned: ParsedSyllabusItem = {
+                sourceId: item.sourceId,
                 title: item.title,
                 ...(item.description ? { description: item.description } : {}),
                 ...(item.priority ? { priority: item.priority } : {}),
                 ...(item.subject ? { subject: item.subject } : {}),
+                ...(item.inferredChapter ? { inferredChapter: item.inferredChapter } : {}),
             };
 
             if (item.dueDate) {
@@ -449,8 +453,9 @@ export class AIService {
             return [];
         }
 
+        const batchId = Date.now();
         const normalized: ParsedSyllabusItem[] = [];
-        for (const item of parsed) {
+        for (const [index, item] of parsed.entries()) {
             if (!item || typeof item !== "object") continue;
             const record = item as Record<string, unknown>;
 
@@ -468,7 +473,12 @@ export class AIService {
                     ? new Date(record.dueDate)
                     : undefined;
 
-            const normalizedItem: ParsedSyllabusItem = { title };
+            const normalizedItem: ParsedSyllabusItem = {
+                sourceId: typeof record.sourceId === "string" && record.sourceId.trim()
+                    ? record.sourceId.trim()
+                    : `scan_${batchId}_${index + 1}`,
+                title,
+            };
             if (typeof record.description === "string" && record.description.trim()) {
                 normalizedItem.description = record.description.trim();
             }
@@ -480,6 +490,9 @@ export class AIService {
             }
             if (typeof record.subject === "string" && record.subject.trim()) {
                 normalizedItem.subject = record.subject.trim();
+            }
+            if (typeof record.inferredChapter === "string" && record.inferredChapter.trim()) {
+                normalizedItem.inferredChapter = record.inferredChapter.trim().replace(/\s+/g, " ");
             }
 
             normalized.push(normalizedItem);
@@ -959,6 +972,7 @@ JSON schema:
             - dueDate (ISO 8601 string, required)
             - priority ("LOW" | "MEDIUM" | "HIGH", optional. Default to MEDIUM if unsure)
             - subject (string, optional)
+            - inferredChapter (string, optional. If a chapter/unit/module heading is visible, return a cleaned chapter name like "Thermodynamics" or "Kinematics". If not reliable, omit it.)
 
             If there are no clear milestones or topics, return [] only.
             `;
@@ -1099,12 +1113,14 @@ JSON schema:
         - dueDate (ISO 8601 string, required)
         - priority ("LOW" | "MEDIUM" | "HIGH", optional)
         - subject (string, optional)
+        - inferredChapter (string, optional. If a chapter/unit/module heading is visible, return a cleaned chapter name like "Thermodynamics" or "Kinematics". If not reliable, omit it.)
 
         Rules:
         - Extract ALL topics, chapters, assignments, or exam dates found.
         - If the syllabus specifies dates, use them.
         - If NO dates are specified, you MUST generate a logical schedule starting from TODAY.
         - Space tasks out logically (e.g., every 3-4 days) to create a roadmap.
+        - Do not hallucinate chapter names.
         - Return ONLY valid JSON array.
         `;
 
@@ -1487,7 +1503,7 @@ JSON schema:
         const seen = new Set<string>();
         const items: ParsedSyllabusItem[] = [];
 
-        for (const line of picked) {
+        for (const [index, line] of picked.entries()) {
             const parsed = this.fallbackParse(line);
             const title = (parsed.title || line).trim().slice(0, 200);
             if (!title) continue;
@@ -1497,6 +1513,7 @@ JSON schema:
             seen.add(key);
 
             items.push({
+                sourceId: `fallback_${index + 1}`,
                 title,
                 ...(parsed.description ? { description: parsed.description } : {}),
                 ...(parsed.priority ? { priority: parsed.priority } : {}),

@@ -23,12 +23,15 @@ export const taskSchema = z.object({
   dueDate: z.coerce.date().optional(),
   categoryId: z.string().uuid().optional(),
   subjectId: z.string().uuid().optional(),
+  topicIds: z.array(z.string().uuid()).optional(),
   isRecurring: z.boolean().default(false),
   effort: effortSchema.optional(),
 });
 
 export const smartCreateTaskSchema = z.object({
   text: z.string().min(1, "Text input is required"),
+  categoryId: z.string().uuid().optional(),
+  topicIds: z.array(z.string().uuid()).optional(),
 });
 
 export const parseTaskIntentSchema = smartCreateTaskSchema;

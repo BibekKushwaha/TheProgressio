@@ -26,7 +26,7 @@ export function TopStats() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Daily Goal Card */}
-            <Link href="/analytics/overview" className="block h-full">
+            <Link href="/analytics" className="block h-full">
                 <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative h-full flex flex-col justify-between">
                     <div className="flex items-start justify-between mb-4">
                         <div>

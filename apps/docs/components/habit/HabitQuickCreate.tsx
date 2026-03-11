@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Sparkles, Wand2 } from 'lucide-react';
+import { Wand2 } from 'lucide-react';
 import { toCapturedHabitDraft } from '@/lib/capture';
 import { trackLowInputEvent } from '@/lib/lowInputTelemetry';
 
@@ -84,20 +84,19 @@ export function HabitQuickCreate() {
     };
 
     return (
-        <Card className="border-white/10 bg-white/[0.03] p-4">
-            <div className="flex items-start justify-between gap-4">
+        <Card className="border-white/10 bg-white/[0.03] px-4">
+            <div className="flex items-start justify-between gap-1">
                 <div>
                     <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-fuchsia-400" />
-                        Quick create
+                        Quick Habit Create
                     </h3>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="text-xs text-slate-400">
                         Describe the habit once. Review the draft before saving.
                     </p>
                 </div>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 md:flex-row">
+            <div className="mt-1 flex flex-col gap-3 md:flex-row">
                 <Input
                     value={input}
                     onChange={(event) => setInput(event.target.value)}

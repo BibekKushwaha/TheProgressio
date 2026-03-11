@@ -5,8 +5,11 @@ import {
   useCreateSyllabusTopicMutation,
   useDeleteSyllabusTopicMutation,
   useGetSyllabusTopicsQuery,
+  type SyllabusProgressChapter,
+  type SyllabusProgressTopic,
   type SyllabusTopic,
 } from '@repo/store';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -19,9 +22,26 @@ import { reportApiError } from '@/lib/errorReporter';
 
 interface TopicSectionProps {
   selectedCategoryId: string;
+  progressTopics?: SyllabusProgressTopic[];
+  chapterProgress?: SyllabusProgressChapter[];
+  isProgressLoading?: boolean;
 }
 
-export function TopicSection({ selectedCategoryId }: TopicSectionProps) {
+const PROGRESS_STYLES: Record<string, string> = {
+  unlinked: 'border-slate-500/30 bg-slate-500/10 text-slate-300',
+  planned: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+  in_progress: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200',
+  completed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+};
+
+const PROGRESS_LABELS: Record<string, string> = {
+  unlinked: 'Unlinked',
+  planned: 'Planned',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+};
+
+export function TopicSection({ selectedCategoryId, progressTopics = [], chapterProgress = [], isProgressLoading = false }: TopicSectionProps) {
   const { data: topicsData, isLoading: topicsLoading, isError: isTopicsError, error: topicsError, refetch } = useGetSyllabusTopicsQuery(
     { categoryId: selectedCategoryId },
   );
@@ -42,6 +62,14 @@ export function TopicSection({ selectedCategoryId }: TopicSectionProps) {
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [topics]);
+  const progressByTopicId = useMemo(
+    () => new Map(progressTopics.map((topic) => [topic.topicId, topic])),
+    [progressTopics],
+  );
+  const progressByChapter = useMemo(
+    () => new Map(chapterProgress.map((chapter) => [chapter.chapter, chapter])),
+    [chapterProgress],
+  );
 
   const [newChapter, setNewChapter] = useState('Chapter 1');
   const [newTitle, setNewTitle] = useState('');
@@ -81,6 +109,15 @@ export function TopicSection({ selectedCategoryId }: TopicSectionProps) {
       setDeletingId(null);
     }
   }, [deleteTopic]);
+
+  const buildCreateTaskHref = useCallback((topic: SyllabusTopic) => {
+    const params = new URLSearchParams({
+      mode: 'task',
+      title: topic.title,
+      topicId: topic.id,
+    });
+    return `/createtask?${params.toString()}`;
+  }, []);
 
   return (
     <>
@@ -147,14 +184,48 @@ export function TopicSection({ selectedCategoryId }: TopicSectionProps) {
             ) : (
               chapters.map(([chapter, list]) => (
                 <div key={chapter} className="rounded-xl border border-white/10 bg-white/[0.03]">
-                  <div className="px-4 py-3 border-b border-white/10 text-sm font-semibold text-white">
-                    {chapter}
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
+                    <div className="text-sm font-semibold text-white">{chapter}</div>
+                    {progressByChapter.has(chapter) ? (
+                      <div className="text-xs text-slate-400">
+                        {progressByChapter.get(chapter)?.linkedTopics}/{progressByChapter.get(chapter)?.totalTopics} linked
+                        {' • '}
+                        {progressByChapter.get(chapter)?.coveragePercent}% coverage
+                      </div>
+                    ) : isProgressLoading ? (
+                      <div className="text-xs text-slate-500">Loading progress…</div>
+                    ) : null}
                   </div>
                   <div className="divide-y divide-white/10">
                     {list.map((topic) => (
-                      <div key={topic.id} className="flex items-center justify-between px-4 py-3">
-                        <div className="text-sm text-white">{topic.title}</div>
+                      <div key={topic.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm text-white">{topic.title}</div>
+                            {progressByTopicId.has(topic.id) ? (
+                              <span
+                                className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${PROGRESS_STYLES[progressByTopicId.get(topic.id)?.progressState ?? 'unlinked']}`}
+                              >
+                                {PROGRESS_LABELS[progressByTopicId.get(topic.id)?.progressState ?? 'unlinked']}
+                              </span>
+                            ) : null}
+                          </div>
+                          {progressByTopicId.has(topic.id) ? (
+                            <div className="mt-1 text-xs text-slate-400">
+                              {progressByTopicId.get(topic.id)?.linkedTaskCount ?? 0} linked task
+                              {(progressByTopicId.get(topic.id)?.linkedTaskCount ?? 0) === 1 ? '' : 's'}
+                              {' • '}
+                              {progressByTopicId.get(topic.id)?.completedTaskCount ?? 0} completed
+                            </div>
+                          ) : null}
+                        </div>
                         <div className="flex items-center gap-2">
+                          <Link
+                            href={buildCreateTaskHref(topic)}
+                            className="inline-flex items-center rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white transition-colors hover:bg-white/10"
+                          >
+                            Create task
+                          </Link>
                           <Button
                             variant="outline"
                             className="border-white/10 bg-white/5 hover:bg-white/10 text-white"

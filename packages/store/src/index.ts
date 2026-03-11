@@ -382,15 +382,33 @@ export {
   syllabusApi,
   useGetSyllabusTopicsQuery,
   useCreateSyllabusTopicMutation,
+  useImportSyllabusTopicsMutation,
   useUpdateSyllabusTopicMutation,
   useDeleteSyllabusTopicMutation,
   useGetSyllabusEdgesQuery,
+  useGetSyllabusProgressQuery,
+  useGetSyllabusRevisionRecommendationsQuery,
   useCreateSyllabusEdgeMutation,
   useDeleteSyllabusEdgeMutation,
   useGetTaskSyllabusTopicsQuery,
   useSetTaskSyllabusTopicsMutation,
 } from './services/syllabusApi';
-export type { SyllabusTopic, SyllabusEdge, TaskSyllabusLink } from './services/syllabusApi';
+export type {
+  SyllabusTopic,
+  SyllabusEdge,
+  TaskSyllabusLink,
+  ImportSyllabusTopicInput,
+  SyllabusProgressState,
+  SyllabusProgressSummary,
+  SyllabusProgressChapter,
+  SyllabusProgressTopic,
+  SyllabusProgressResponse,
+  RevisionRecommendationType,
+  RevisionReasonCode,
+  RevisionRecommendation,
+  SyllabusRevisionRecommendationSummary,
+  SyllabusRevisionRecommendationsResponse,
+} from './services/syllabusApi';
 
 // Payment API
 export {

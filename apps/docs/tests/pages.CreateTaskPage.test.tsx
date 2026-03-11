@@ -8,7 +8,7 @@ const setEntryTypeMock = vi.fn();
 const baseForm = {
     taskId: null,
     isLoadingTask: false,
-    entryType: 'task' as 'task' | 'exam' | 'class',
+    entryType: 'task' as 'task' | 'exam' | 'class' | 'syllabus',
     setEntryType: setEntryTypeMock,
     taskDescription: 'Task title',
     setTaskDescription: vi.fn(),
@@ -35,6 +35,8 @@ const baseForm = {
     setIsRecurring: vi.fn(),
     subtasks: [],
     setSubtasks: vi.fn(),
+    selectedSyllabusTopicIds: [],
+    setSelectedSyllabusTopicIds: vi.fn(),
     dueDateValue: '',
     dueTimeValue: '',
     updateDueDateTime: vi.fn(),
@@ -131,6 +133,12 @@ vi.mock('@/components/createtask/ExamEntryForm', () => ({
 vi.mock('@/components/createtask/ClassEntryForm', () => ({
     ClassEntryForm: () => <div>__ClassEntryForm__</div>,
 }));
+vi.mock('@/components/createtask/SyllabusTopicSelector', () => ({
+    SyllabusTopicSelector: () => <div>__SyllabusTopicSelector__</div>,
+}));
+vi.mock('@/components/planner/SyllabusDigitizer', () => ({
+    SyllabusDigitizer: () => <div>__SyllabusDigitizer__</div>,
+}));
 
 import CreateTaskPage from '../app/(dashboard)/createtask/page';
 
@@ -147,6 +155,7 @@ describe('CreateTaskPage', () => {
         expect(screen.getByText('New Task')).toBeTruthy();
         expect(screen.getByText('Exam Mode')).toBeTruthy();
         expect(screen.getByText('Class')).toBeTruthy();
+        expect(screen.getByText('Syllabus')).toBeTruthy();
     });
 
     it('shows class-specific content and button label in class mode', () => {

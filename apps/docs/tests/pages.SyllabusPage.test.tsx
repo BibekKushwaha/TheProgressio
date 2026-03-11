@@ -9,6 +9,7 @@ let categoriesState: Record<string, unknown>;
 
 vi.mock('@repo/store', () => ({
   useGetCategoriesQuery: () => categoriesState,
+  useGetSyllabusProgressQuery: () => ({ data: undefined, isLoading: false }),
 }));
 
 vi.mock('@/lib/errorReporter', () => ({
@@ -21,6 +22,9 @@ vi.mock('../app/(dashboard)/syllabus/_components/TopicSection', () => ({
 
 vi.mock('../app/(dashboard)/syllabus/_components/PrerequisiteSection', () => ({
   PrerequisiteSection: () => <div>__PrerequisiteSection__</div>,
+}));
+vi.mock('../app/(dashboard)/syllabus/_components/SyllabusProgressSection', () => ({
+  SyllabusProgressSection: () => <div>__SyllabusProgressSection__</div>,
 }));
 
 vi.mock('@/components/ui/card', () => ({

@@ -7,7 +7,6 @@ import HabitDialog from "@/components/habit/HabitDialog";
 import { HabitQuickCreate } from "@/components/habit/HabitQuickCreate";
 import { useGetHabitsQuery, type Habit } from "@repo/store";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SearchBar } from "@/components/SearchBar";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Plus, Flame, CheckCircle2 } from "lucide-react";
@@ -28,7 +27,6 @@ export function HabitsClient({
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const highlightedHabitId = searchParams.get("habitId") || "";
-    const [searchQuery, setSearchQuery] = useState("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     useNetworkWaterfall('HabitsPage');
@@ -56,16 +54,6 @@ export function HabitsClient({
     );
     const isLoading = serverHabits !== undefined ? serverHabitsLoading : habitsLoading;
 
-    const filteredHabits = useMemo(
-        () =>
-            habits.filter(
-                (habit) =>
-                    habit.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    habit.frequency.toLowerCase().includes(searchQuery.toLowerCase())
-            ),
-        [habits, searchQuery]
-    );
-
     // Scroll to a highlighted habit (from notification deep-link) and clean the URL
     useEffect(() => {
         if (!highlightedHabitId) return;
@@ -85,7 +73,6 @@ export function HabitsClient({
 
     return (
         <div className="space-y-6">
-            <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
             <PageHeader
                 title="Habit Tracker"
@@ -149,7 +136,7 @@ export function HabitsClient({
                 // callback is a no-op, so we dead-code-eliminate it in production builds.
                 <Profiler id="HabitGrid" onRender={onRenderCallback}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredHabits.map((habit) => (
+                        {habits.map((habit) => (
                             <div key={habit.id} id={`habit-card-${habit.id}`}>
                                 <HabitCard
                                     habit={habit}
@@ -161,7 +148,7 @@ export function HabitsClient({
                 </Profiler>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredHabits.map((habit) => (
+                    {habits.map((habit) => (
                         <div key={habit.id} id={`habit-card-${habit.id}`}>
                             <HabitCard
                                 habit={habit}

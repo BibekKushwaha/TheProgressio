@@ -306,6 +306,7 @@ model TaskSyllabusTopic {
 
   @@unique([taskId, topicId])
   @@index([userId, topicId])
+  @@index([userId, taskId])
 }
 
 model Achievement {

@@ -59,9 +59,9 @@ vi.mock('@/components/ui/card', () => ({
   CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-import AnalyticsOverviewPage from '../app/(dashboard)/analytics/overview/page';
+import AnalyticsPage from '../app/(dashboard)/analytics/page';
 
-describe('AnalyticsOverviewPage', () => {
+describe('AnalyticsPage', () => {
   beforeEach(() => {
     reportApiErrorMock.mockReset();
     refetchSummary.mockReset();
@@ -102,7 +102,7 @@ describe('AnalyticsOverviewPage', () => {
   });
 
   it('shows a partial-data banner instead of the empty state when one query fails', () => {
-    render(<AnalyticsOverviewPage />);
+    render(<AnalyticsPage />);
 
     expect(screen.getByText(/Some analytics panels are using partial data/i)).toBeTruthy();
     expect(screen.queryByText(/Your analytics will come alive/i)).toBeNull();
@@ -110,7 +110,7 @@ describe('AnalyticsOverviewPage', () => {
   });
 
   it('retries all analytics queries from the degraded-data banner', () => {
-    render(<AnalyticsOverviewPage />);
+    render(<AnalyticsPage />);
 
     fireEvent.click(screen.getByRole('button', { name: /retry data/i }));
 
