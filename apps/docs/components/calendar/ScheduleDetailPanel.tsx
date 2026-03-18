@@ -11,6 +11,11 @@ interface ScheduleDetailPanelProps {
     date: Date;
 }
 
+function formatScheduleTime(item: MappedCalendarItem): string {
+    const isAllDay = item.startTime === '00:00' && item.endTime === '23:59';
+    if (isAllDay) return 'All Day';
+    return `${item.startTime} - ${item.endTime}`;
+}
 
 function ClassList({ items }: { items: MappedCalendarItem[] }) {
     if (!items.length) {
@@ -85,7 +90,7 @@ export function ScheduleDetailPanel({ date }: ScheduleDetailPanelProps) {
                                     id: item.id,
                                     type: item.kind,
                                     title: item.title,
-                                    time: item.startTime === '00:00' ? 'All Day' : `${item.startTime} - ${item.endTime}`,
+                                    time: formatScheduleTime(item),
                                     subtitle: (item.kind === 'task' ? item.subtitle : item.kind === 'exam' ? item.location : undefined) || undefined,
                                     location: item.kind === 'exam' ? item.location || '' : '',
                                     progress: item.kind === 'task' && item.isCompleted ? 100 : 0,

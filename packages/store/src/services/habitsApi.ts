@@ -23,6 +23,8 @@ export interface Habit {
     currentStreak: number;
     longestStreak: number;
     lastLogDate: string | null;
+    reminderTime?: string | null;
+    scheduleHint?: string | null;
     userId: string;
     mercyDaysAllowed?: number;
     mercyDaysUsed?: number;
@@ -51,6 +53,8 @@ export interface CreateHabitRequest {
     targetValue?: number;
     mercyDaysAllowed?: number;
     linkedCategoryId?: string | null;
+    reminderTime?: string | null;
+    scheduleHint?: string | null;
 }
 
 export interface ParseHabitResponse {
@@ -60,6 +64,7 @@ export interface ParseHabitResponse {
     unit?: 'minutes' | 'count' | 'pages' | 'problems' | 'sessions';
     linkedCategoryName?: string | null;
     scheduleHint?: string | null;
+    reminderTime?: string | null;
     confidence: number;
 }
 
@@ -72,6 +77,8 @@ export interface UpdateHabitRequest {
     targetValue?: number;
     mercyDaysAllowed?: number;
     linkedCategoryId?: string | null;
+    reminderTime?: string | null;
+    scheduleHint?: string | null;
 }
 
 export interface HabitStats {

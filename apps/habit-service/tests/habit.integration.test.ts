@@ -177,6 +177,44 @@ describe('Habit endpoints — CRUD', () => {
         expect(res.body.habit.name).toBe('Morning Run');
     });
 
+    it('POST /api/habits — accepts reminderTime', async () => {
+        const created = {
+            id: 'h-time', name: 'Study', frequency: 'DAILY', targetValue: 1,
+            userId: 'user-1', reminderTime: '15:00', scheduleHint: null,
+        };
+        (prisma.habit.create as any).mockResolvedValue(created);
+
+        const res = await request(server)
+            .post('/api/habits')
+            .send({ name: 'Study', reminderTime: '15:00' });
+
+        expect(res.status).toBe(201);
+        expect(prisma.habit.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ reminderTime: '15:00', scheduleHint: null }),
+            })
+        );
+    });
+
+    it('POST /api/habits — accepts scheduleHint', async () => {
+        const created = {
+            id: 'h-hint', name: 'Read', frequency: 'DAILY', targetValue: 1,
+            userId: 'user-1', reminderTime: null, scheduleHint: 'night',
+        };
+        (prisma.habit.create as any).mockResolvedValue(created);
+
+        const res = await request(server)
+            .post('/api/habits')
+            .send({ name: 'Read', scheduleHint: 'night' });
+
+        expect(res.status).toBe(201);
+        expect(prisma.habit.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ reminderTime: null, scheduleHint: 'night' }),
+            })
+        );
+    });
+
     it('POST /api/habits — 400 when name is missing', async () => {
         const res = await request(server)
             .post('/api/habits')
@@ -294,6 +332,41 @@ describe('Habit endpoints — Quick Parse', () => {
             targetValue: 5,
             unit: 'pages',
             scheduleHint: 'night',
+            reminderTime: null,
+        });
+    });
+
+    it('POST /api/habits/parse — resolves common subject typos to categories', async () => {
+        const res = await request(server)
+            .post('/api/habits/parse')
+            .send({ text: 'revise chemistery 40 min every day 4pm' });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({
+            name: 'Revise Chemistery',
+            frequency: 'DAILY',
+            targetValue: 40,
+            unit: 'minutes',
+            linkedCategoryName: 'Chemistry',
+            reminderTime: '16:00',
+            scheduleHint: null,
+        });
+    });
+
+    it('POST /api/habits/parse — extracts reminderTime when present', async () => {
+        const res = await request(server)
+            .post('/api/habits/parse')
+            .send({ text: 'study dsa 40 min everyday 3 pm' });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({
+            name: 'Study Dsa',
+            frequency: 'DAILY',
+            targetValue: 40,
+            unit: 'minutes',
+            linkedCategoryName: 'Coding',
+            scheduleHint: null,
+            reminderTime: '15:00',
         });
     });
 

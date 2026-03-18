@@ -17,6 +17,13 @@ import { trackLowInputEvent } from '@/lib/lowInputTelemetry';
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
 
+const formatReminderTime = (value: string): string => {
+    // value is HH:mm (local wall-clock). Render it user-friendly.
+    const date = new Date(`1970-01-01T${value}:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+};
+
 export function HabitQuickCreate() {
     const { data: categories = [] } = useGetCategoriesQuery();
     const [parseHabit, { isLoading: isParsing }] = useParseHabitMutation();
@@ -46,7 +53,7 @@ export function HabitQuickCreate() {
             setPreview(toCapturedHabitDraft(parsed, 'text'));
             trackLowInputEvent('habit_parse_succeeded', 'text', {
                 confidence: parsed.confidence,
-                has_schedule_hint: Boolean(parsed.scheduleHint),
+                has_schedule_hint: Boolean(parsed.scheduleHint || parsed.reminderTime),
                 has_unit: Boolean(parsed.unit),
                 frequency: parsed.frequency,
             });
@@ -67,10 +74,12 @@ export function HabitQuickCreate() {
                 frequency: preview.draft.frequency as Frequency,
                 targetValue: preview.draft.targetValue,
                 linkedCategoryId: matchedCategory?.id ?? null,
+                reminderTime: preview.draft.reminderTime ?? null,
+                scheduleHint: preview.draft.scheduleHint ?? null,
             }).unwrap();
             trackLowInputEvent('habit_quick_create_completed', 'text', {
                 confidence: preview.confidence,
-                has_schedule_hint: Boolean(preview.draft.scheduleHint),
+                has_schedule_hint: Boolean(preview.draft.scheduleHint || preview.draft.reminderTime),
                 has_unit: Boolean(preview.draft.unit),
                 linked_category: matchedCategory?.name ?? preview.draft.linkedCategoryName ?? null,
             });
@@ -138,7 +147,11 @@ export function HabitQuickCreate() {
                         </div>
                         <div>
                             <p className="text-[11px] uppercase tracking-wide text-slate-500">Schedule</p>
-                            <p>{preview.draft.scheduleHint ?? 'Any time'}</p>
+                            <p>
+                                {preview.draft.reminderTime
+                                    ? formatReminderTime(preview.draft.reminderTime)
+                                    : (preview.draft.scheduleHint ?? 'Any time')}
+                            </p>
                         </div>
                     </div>
                     <div className="mt-4 flex items-center justify-between gap-3">

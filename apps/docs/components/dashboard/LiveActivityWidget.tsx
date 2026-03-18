@@ -121,7 +121,7 @@ export function LiveActivityWidget() {
 
     // Sync remote and local session state
     useEffect(() => {
-        if (remoteData?.session) {
+        if (remoteData?.session && (remoteData.session.status === 'RUNNING' || remoteData.session.status === 'PAUSED')) {
             setSession({
                 taskTitle: remoteData.session.taskTitle,
                 startTime: remoteData.session.startedAt,

@@ -1,12 +1,18 @@
 'use client';
 
 import { BookOpen } from 'lucide-react';
-import { useGetAllSubjectPerformanceQuery } from '@repo/store';
+import { useGetAllSubjectPerformanceQuery, type SubjectPerformance } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function SubjectPerformanceSummary() {
-    const { data: performanceData, isLoading: perfLoading } = useGetAllSubjectPerformanceQuery();
-    const subjects = performanceData?.data ?? [];
+interface SubjectPerformanceSummaryProps {
+    subjects?: SubjectPerformance[];
+}
+
+export function SubjectPerformanceSummary({ subjects: providedSubjects }: SubjectPerformanceSummaryProps) {
+    const { data: performanceData, isLoading: perfLoading } = useGetAllSubjectPerformanceQuery(undefined, {
+        skip: !!providedSubjects,
+    });
+    const subjects = providedSubjects ?? performanceData?.data ?? [];
 
     const formatAvgScore = (score?: number | null) =>
         typeof score === 'number' ? `${score.toFixed(1)}%` : 'N/A';
@@ -16,7 +22,17 @@ export function SubjectPerformanceSummary() {
     }
 
     if (subjects.length === 0) {
-        return null; // Or return a fallback UI
+        return (
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6">
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-orange-400" />
+                    Subject Performance Summary
+                </h2>
+                <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm text-slate-400">
+                    No subject performance data available yet. Add graded activity to unlock subject-level trends.
+                </div>
+            </div>
+        );
     }
 
     return (

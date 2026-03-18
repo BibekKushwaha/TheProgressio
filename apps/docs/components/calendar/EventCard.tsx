@@ -12,6 +12,7 @@ interface Event {
 
 interface EventCardProps {
     event: Event;
+    compact?: boolean;
 }
 
 const colorStyles: Record<string, { border: string; bg: string; badge: string }> = {
@@ -62,7 +63,7 @@ const colorStyles: Record<string, { border: string; bg: string; badge: string }>
     },
 };
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, compact = false }: EventCardProps) {
     let styles = colorStyles[event.color];
 
     // Handle unknown colors
@@ -83,7 +84,7 @@ export function EventCard({ event }: EventCardProps) {
     }
 
     return (
-        <div className="relative h-full mr-4">
+        <div className="relative h-full mr-4 overflow-hidden">
             {event.hasQuiz && (
                 <div className="absolute -top-2 right-4 px-3 py-1 bg-red-600 rounded-full text-xs font-bold z-10">
                     QUIZ TODAY
@@ -91,35 +92,46 @@ export function EventCard({ event }: EventCardProps) {
             )}
 
             <div
-                className={`h-full bg-gradient-to-br ${styles?.bg} backdrop-blur-md border-l-4 ${styles?.border} border border-white/10 rounded-xl p-4 hover:shadow-xl hover:shadow-${event.color}-500/10 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer`}
+                className={`h-full overflow-hidden bg-gradient-to-br ${styles?.bg} backdrop-blur-md border-l-4 ${styles?.border} border border-white/10 rounded-xl ${compact ? 'px-3 py-2' : 'p-4'} hover:shadow-xl hover:shadow-${event.color}-500/10 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer`}
             >
-                <div className="flex items-center gap-2 mb-2">
-                    <span className={`px-2 py-1 ${styles?.badge} rounded text-xs font-bold`}>
-                        {event.subject}
-                    </span>
-                    <span className="text-xs text-slate-400">• {event.room}</span>
-                </div>
-
-                <h3 className="text-lg font-bold mb-1">{event.title}</h3>
-
-                {event.topic && (
-                    <p className="text-sm text-slate-400 mb-3">{event.topic}</p>
-                )}
-
-                {event.avatars && (
-                    <div className="flex items-center gap-2">
-                        <div className="flex -space-x-2">
-                            {event.avatars.map((avatar, i) => (
-                                <div
-                                    key={i}
-                                    className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full border-2 border-slate-900 flex items-center justify-center text-xs font-bold"
-                                >
-                                    {String.fromCharCode(65 + i)}
-                                </div>
-                            ))}
-                        </div>
-                        <span className="text-xs text-slate-400">+12 others</span>
+                {compact ? (
+                    <div className="flex h-full items-center gap-2 overflow-hidden">
+                        <span className={`shrink-0 px-2 py-1 ${styles?.badge} rounded text-[11px] font-bold`}>
+                            {event.subject}
+                        </span>
+                        <h3 className="truncate text-sm font-semibold text-white">{event.title}</h3>
                     </div>
+                ) : (
+                    <>
+                        <div className="mb-2 flex items-center gap-2">
+                            <span className={`px-2 py-1 ${styles?.badge} rounded text-xs font-bold`}>
+                                {event.subject}
+                            </span>
+                            <span className="truncate text-xs text-slate-400">• {event.room}</span>
+                        </div>
+
+                        <h3 className="mb-1 text-lg font-bold">{event.title}</h3>
+
+                        {event.topic && (
+                            <p className="mb-3 text-sm text-slate-400">{event.topic}</p>
+                        )}
+
+                        {event.avatars && (
+                            <div className="flex items-center gap-2">
+                                <div className="flex -space-x-2">
+                                    {event.avatars.map((avatar, i) => (
+                                        <div
+                                            key={i}
+                                            className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full border-2 border-slate-900 flex items-center justify-center text-xs font-bold"
+                                        >
+                                            {String.fromCharCode(65 + i)}
+                                        </div>
+                                    ))}
+                                </div>
+                                <span className="text-xs text-slate-400">+12 others</span>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

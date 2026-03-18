@@ -107,9 +107,9 @@ const inferHabitTargetValue = (
 const inferHabitCategoryName = (input: string): string | null => {
     const mappings: Array<{ pattern: RegExp; category: string }> = [
         { pattern: /\b(math|algebra|geometry|calculus)\b/i, category: "Math" },
-        { pattern: /\b(physics)\b/i, category: "Physics" },
-        { pattern: /\b(chemistry)\b/i, category: "Chemistry" },
-        { pattern: /\b(biology)\b/i, category: "Biology" },
+        { pattern: /\b(physics|physic[s]?|physix)\b/i, category: "Physics" },
+        { pattern: /\b(chemistry|chemistery|chemis?try|chem)\b/i, category: "Chemistry" },
+        { pattern: /\b(biology|biologi|biolgy|bio)\b/i, category: "Biology" },
         { pattern: /\b(english|reading|essay)\b/i, category: "English" },
         { pattern: /\b(history)\b/i, category: "History" },
         { pattern: /\b(code|coding|programming|dsa)\b/i, category: "Coding" },
@@ -125,6 +125,47 @@ const inferHabitCategoryName = (input: string): string | null => {
     return null;
 };
 
+const inferHabitReminderTime = (input: string): string | null => {
+    const normalized = input.trim().toLowerCase();
+    if (!normalized) return null;
+
+    // 24-hour clock: 15:00 / 15.00
+    const twentyFourHourMatch =
+        normalized.match(/\b([01]?\d|2[0-3])[:.][0-5]\d\b/) ?? null;
+    if (twentyFourHourMatch?.[0]) {
+        const token = twentyFourHourMatch[0].replace(".", ":");
+        const [h, m] = token.split(":");
+        const hours = Number.parseInt(h ?? "", 10);
+        const minutes = Number.parseInt(m ?? "", 10);
+        if (
+            Number.isFinite(hours) &&
+            Number.isFinite(minutes) &&
+            hours >= 0 &&
+            hours <= 23 &&
+            minutes >= 0 &&
+            minutes <= 59
+        ) {
+            return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+        }
+    }
+
+    // 12-hour clock: 3pm / 3 pm / 3:30pm / 3:30 pm
+    const twelveHourMatch =
+        normalized.match(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i) ?? null;
+    if (twelveHourMatch?.[1] && twelveHourMatch?.[3]) {
+        let hours = Number.parseInt(twelveHourMatch[1], 10);
+        const minutes = Number.parseInt(twelveHourMatch[2] ?? "0", 10);
+        const meridiem = twelveHourMatch[3].toLowerCase();
+
+        if (meridiem === "pm" && hours < 12) hours += 12;
+        if (meridiem === "am" && hours === 12) hours = 0;
+
+        return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+
+    return null;
+};
+
 const inferHabitScheduleHint = (input: string): string | null => {
     if (/\b(morning|every morning)\b/i.test(input)) return "morning";
     if (/\b(afternoon|every afternoon)\b/i.test(input)) return "afternoon";
@@ -135,7 +176,10 @@ const inferHabitScheduleHint = (input: string): string | null => {
 
 const inferHabitName = (input: string): string => {
     const cleaned = input
-        .replace(/\b(every day|daily|every week|weekly|per week|each week|nightly)\b/gi, " ")
+        .replace(/\b(every day|everyday|daily|every week|weekly|per week|each week|nightly)\b/gi, " ")
+        .replace(/\b(morning|afternoon|evening|night)\b/gi, " ")
+        .replace(/\b(?:[01]?\d|2[0-3])[:.][0-5]\d\b/g, " ")
+        .replace(/\b(1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b/gi, " ")
         .replace(/\b\d+\s*(min|mins|minutes|hrs|hours|times|x|pages?|problems?|questions?|sessions?)\b/gi, " ")
         .replace(/\s+/g, " ")
         .trim();
@@ -247,13 +291,15 @@ export const parseHabit = TryCatch(async (req: AuthenticatedRequest, res: Respon
 
     const frequency = inferHabitFrequency(text);
     const unit = inferHabitUnit(text);
+    const reminderTime = inferHabitReminderTime(text);
     res.status(200).json({
         name: inferHabitName(text),
         frequency,
         targetValue: inferHabitTargetValue(text, frequency, unit),
         unit,
         linkedCategoryName: inferHabitCategoryName(text),
-        scheduleHint: inferHabitScheduleHint(text),
+        scheduleHint: reminderTime ? null : inferHabitScheduleHint(text),
+        reminderTime,
         confidence: inferHabitConfidence(text),
     });
 });
@@ -379,6 +425,8 @@ export const createHabit = TryCatch(async (
     }
 
     const { name, frequency, targetValue, icon, color, mercyDaysAllowed, linkedCategoryId } = req.body;
+    const reminderTime = req.body?.reminderTime;
+    const scheduleHint = req.body?.scheduleHint;
 
     const parsed = habitSchema.safeParse({
         name,
@@ -388,11 +436,16 @@ export const createHabit = TryCatch(async (
         color,
         mercyDaysAllowed,
         categoryId: linkedCategoryId || undefined,
+        reminderTime,
+        scheduleHint,
     });
 
     if (!parsed.success) {
         throw new ErrorHandler(400, "Invalid habit data");
     }
+
+    const reminderTimeValue = parsed.data.reminderTime ?? null;
+    const scheduleHintValue = reminderTimeValue ? null : parsed.data.scheduleHint ?? null;
 
     const habit = await prisma.habit.create({
         data: {
@@ -404,6 +457,8 @@ export const createHabit = TryCatch(async (
             userId,
             mercyDaysAllowed: parsed.data.mercyDaysAllowed ?? 1,
             linkedCategoryId: (parsed.data as any).categoryId ?? null,
+            reminderTime: reminderTimeValue,
+            scheduleHint: scheduleHintValue,
         },
     });
 
@@ -640,7 +695,17 @@ export const updateHabit = TryCatch(async (
         throw new ErrorHandler(400, "Invalid habit update data");
     }
 
-    const { name, frequency, targetValue, icon, color, mercyDaysAllowed, categoryId: linkedCategoryId } = parsed.data;
+    const {
+        name,
+        frequency,
+        targetValue,
+        icon,
+        color,
+        mercyDaysAllowed,
+        categoryId: linkedCategoryId,
+        reminderTime,
+        scheduleHint,
+    } = parsed.data;
 
     const habit = await prisma.habit.findFirst({
         where: { id, userId },
@@ -648,6 +713,20 @@ export const updateHabit = TryCatch(async (
 
     if (!habit) {
         throw new ErrorHandler(404, "Habit not found");
+    }
+
+    let reminderTimeValue =
+        reminderTime !== undefined ? reminderTime : (habit as any).reminderTime ?? null;
+    let scheduleHintValue =
+        scheduleHint !== undefined ? scheduleHint : (habit as any).scheduleHint ?? null;
+
+    // Enforce mutual exclusivity:
+    // - If a reminder time is present, it wins and scheduleHint is cleared.
+    // - If scheduleHint is explicitly set, clear any existing reminder time.
+    if (typeof reminderTimeValue === "string" && reminderTimeValue.length > 0) {
+        scheduleHintValue = null;
+    } else if (scheduleHint !== undefined && scheduleHintValue) {
+        reminderTimeValue = null;
     }
 
     const updatedHabit = await prisma.habit.update({
@@ -660,6 +739,8 @@ export const updateHabit = TryCatch(async (
             color: color === undefined ? habit.color : color,
             mercyDaysAllowed: mercyDaysAllowed ?? habit.mercyDaysAllowed,
             linkedCategoryId: linkedCategoryId !== undefined ? linkedCategoryId : habit.linkedCategoryId,
+            reminderTime: reminderTimeValue,
+            scheduleHint: scheduleHintValue,
         },
     });
 

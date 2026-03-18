@@ -2,32 +2,34 @@
 
 import { SWOTAnalysis } from '@/components/analytics/SWOTAnalysis';
 import { PredictiveScoreCard } from '@/components/analytics/PredictiveScoreCard';
+import { resolveExamType } from '@/components/analytics/examWarRoomUtils';
 import { Swords, Target, Trophy } from 'lucide-react';
-import { useGetAllSubjectPerformanceQuery } from '@repo/store';
+import { useGetAllSubjectPerformanceQuery, useGetGradeEntriesQuery } from '@repo/store';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SubjectPerformanceSummary } from '@/components/analytics/SubjectPerformanceSummary';
 import { useMemo } from 'react';
 
 export default function ExamWarRoomPage() {
     const { data: performanceData, isLoading } = useGetAllSubjectPerformanceQuery();
+    const { data: gradeEntriesData } = useGetGradeEntriesQuery();
 
-    // Stable reference — prevents difficultyStats from recomputing on every render
-    // when performanceData is undefined (new [] reference each time).
     const subjects = useMemo(() => performanceData?.data ?? [], [performanceData]);
+    const activeExamType = useMemo(
+        () => resolveExamType(undefined, gradeEntriesData?.entries),
+        [gradeEntriesData?.entries],
+    );
 
-    // Derive difficulty breakdown from already-fetched subject performance —
-    // eliminates the useGetGradeEntriesQuery full table scan (no take/where).
-    const difficultyStats = useMemo(() => {
-        const stats = { easy: 0, medium: 0, hard: 0 };
+    const tierStats = useMemo(() => {
+        const stats = { strong: 0, developing: 0, needsWork: 0, totalAttempts: 0 };
         for (const subject of subjects) {
             const score = subject.avgScore ?? 0;
-            if (score >= 80) stats.easy++;
-            else if (score >= 50) stats.medium++;
-            else stats.hard++;
+            stats.totalAttempts += subject.entryCount ?? 0;
+            if (score >= 80) stats.strong++;
+            else if (score >= 50) stats.developing++;
+            else stats.needsWork++;
         }
         return stats;
     }, [subjects]);
-    const totalAttempts = difficultyStats.easy + difficultyStats.medium + difficultyStats.hard;
 
     return (
         <div className="space-y-6">
@@ -41,7 +43,7 @@ export default function ExamWarRoomPage() {
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-5">
                     <div className="text-sm text-slate-400 mb-1">Total Attempts</div>
                     <div className="text-3xl font-bold text-white">
-                        {isLoading ? <div className="h-9 w-16 bg-white/10 rounded animate-pulse" /> : totalAttempts}
+                        {isLoading ? <div className="h-9 w-16 bg-white/10 rounded animate-pulse" /> : tierStats.totalAttempts}
                     </div>
                 </div>
                 <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-5">
@@ -49,7 +51,7 @@ export default function ExamWarRoomPage() {
                         <Trophy className="w-4 h-4" /> Strong (≥80%)
                     </div>
                     <div className="text-3xl font-bold text-green-400">
-                        {isLoading ? <div className="h-9 w-16 bg-green-500/20 rounded animate-pulse" /> : difficultyStats.easy}
+                        {isLoading ? <div className="h-9 w-16 bg-green-500/20 rounded animate-pulse" /> : tierStats.strong}
                     </div>
                 </div>
                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-5">
@@ -57,7 +59,7 @@ export default function ExamWarRoomPage() {
                         <Target className="w-4 h-4" /> Developing (50–79%)
                     </div>
                     <div className="text-3xl font-bold text-yellow-400">
-                        {isLoading ? <div className="h-9 w-16 bg-yellow-500/20 rounded animate-pulse" /> : difficultyStats.medium}
+                        {isLoading ? <div className="h-9 w-16 bg-yellow-500/20 rounded animate-pulse" /> : tierStats.developing}
                     </div>
                 </div>
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5">
@@ -65,19 +67,16 @@ export default function ExamWarRoomPage() {
                         <Swords className="w-4 h-4" /> Needs Work (&lt;50%)
                     </div>
                     <div className="text-3xl font-bold text-red-400">
-                        {isLoading ? <div className="h-9 w-16 bg-red-500/20 rounded animate-pulse" /> : difficultyStats.hard}
+                        {isLoading ? <div className="h-9 w-16 bg-red-500/20 rounded animate-pulse" /> : tierStats.needsWork}
                     </div>
                 </div>
             </div>
 
-            {/* Tabbed Content */}
-            {/* Predictive Score Summary */}
-            <PredictiveScoreCard />
+            <PredictiveScoreCard examType={activeExamType} />
 
-            <SWOTAnalysis />
+            <SWOTAnalysis examType={activeExamType} allowExamTypeChange={false} />
 
-            {/* Subject Performance Summary */}
-            <SubjectPerformanceSummary />
+            <SubjectPerformanceSummary subjects={subjects} />
         </div>
     );
 }

@@ -104,6 +104,7 @@ export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps
                             const startMinutes = startHour * 60 + startMin;
                             const endMinutes = endHour * 60 + endMin;
                             const duration = Math.max(endMinutes - startMinutes, 0);
+                            const renderedHeight = Math.max(duration, 40);
 
                             // Resolve generic fields from specific mapped types
                             let subject = 'General';
@@ -130,6 +131,7 @@ export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps
                                     }}
                                 >
                                     <EventCard
+                                        compact={renderedHeight <= 72}
                                         event={{
                                             title: item.title,
                                             subject: subject,

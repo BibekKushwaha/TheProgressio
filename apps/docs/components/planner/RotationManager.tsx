@@ -149,7 +149,7 @@ export function RotationManager() {
                     </div>
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                         <DialogTrigger asChild>
-                            <Button className="bg-cyan-500 hover:bg-cyan-600">
+                            <Button type="button" className="bg-cyan-500 hover:bg-cyan-600">
                                 <Plus className="w-4 h-4 mr-2" />
                                 Add Pattern
                             </Button>
@@ -185,7 +185,7 @@ export function RotationManager() {
                                     onChange={(e) => setFormData({ ...formData, cycleLengthDays: e.target.value })}
                                     className="bg-white/5 border-white/10"
                                 />
-                                <Button onClick={handleCreate} className="w-full bg-cyan-500 hover:bg-cyan-600">
+                                <Button type="button" onClick={handleCreate} className="w-full bg-cyan-500 hover:bg-cyan-600">
                                     Create Pattern
                                 </Button>
                             </div>
@@ -293,6 +293,7 @@ export function RotationManager() {
 
                             <div className="flex gap-2">
                                 <Button
+                                    type="button"
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleToggleActive(pattern)}
@@ -304,6 +305,7 @@ export function RotationManager() {
                                     {pattern.isActive ? 'Active' : 'Inactive'}
                                 </Button>
                                 <Button
+                                    type="button"
                                     size="sm"
                                     variant="outline"
                                     onClick={() => openEditDialog(pattern)}
@@ -312,9 +314,14 @@ export function RotationManager() {
                                     <Edit className="w-4 h-4" />
                                 </Button>
                                 <Button
+                                    type="button"
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleDelete(pattern.id)}
+                                    onClick={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        handleDelete(pattern.id);
+                                    }}
                                     className="bg-red-500/20 border-red-500/30 text-red-400 hover:bg-red-500/30"
                                 >
                                     <Trash2 className="w-4 h-4" />
@@ -362,7 +369,7 @@ export function RotationManager() {
                             onChange={(e) => setFormData({ ...formData, cycleLengthDays: e.target.value })}
                             className="bg-white/5 border-white/10"
                         />
-                        <Button onClick={handleUpdate} className="w-full bg-cyan-500 hover:bg-cyan-600">
+                        <Button type="button" onClick={handleUpdate} className="w-full bg-cyan-500 hover:bg-cyan-600">
                             Update Pattern
                         </Button>
                     </div>

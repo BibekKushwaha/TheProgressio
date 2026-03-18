@@ -111,6 +111,7 @@ export function ClassManager() {
                         Subjects
                     </h3>
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => setIsAddingSubject(!isAddingSubject)}
@@ -161,7 +162,7 @@ export function ClassManager() {
                                 />
                             </div>
                         </div>
-                        <Button onClick={handleAddSubject} className="w-full bg-indigo-600 hover:bg-indigo-500">
+                        <Button type="button" onClick={handleAddSubject} className="w-full bg-indigo-600 hover:bg-indigo-500">
                             Save Subject
                         </Button>
                     </Card>
@@ -178,7 +179,12 @@ export function ClassManager() {
                                 <span className="text-sm font-medium text-slate-200">{sub.name}</span>
                             </div>
                             <button
-                                onClick={() => deleteSubject(sub.id)}
+                                type="button"
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    void deleteSubject(sub.id);
+                                }}
                                 className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -202,6 +208,7 @@ export function ClassManager() {
                     </h3>
                     <div className="flex items-center gap-2">
                         <Button
+                            type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => setIsImporting((current) => !current)}
@@ -211,6 +218,7 @@ export function ClassManager() {
                             {isImporting ? 'Close Import' : 'Import Timetable'}
                         </Button>
                         <Button
+                            type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => setIsAddingEntry(!isAddingEntry)}
@@ -285,7 +293,7 @@ export function ClassManager() {
                                 </select>
                             </div>
                         </div>
-                        <Button onClick={handleAddEntry} className="w-full bg-emerald-600 hover:bg-emerald-500">
+                        <Button type="button" onClick={handleAddEntry} className="w-full bg-emerald-600 hover:bg-emerald-500">
                             Create Class
                         </Button>
                     </Card>
@@ -319,7 +327,12 @@ export function ClassManager() {
                                 </div>
                             </div>
                             <button
-                                onClick={() => handleDeleteEntry(entry.id)}
+                                type="button"
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    void handleDeleteEntry(entry.id);
+                                }}
                                 className="p-2 hover:bg-white/10 rounded-lg text-slate-500 hover:text-red-400 transition-all"
                             >
                                 <Trash2 className="w-4 h-4" />

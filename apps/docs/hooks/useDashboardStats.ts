@@ -93,10 +93,15 @@ export function useDashboardStats(): DashboardStats {
     // ── Daily Goal ────────────────────────────────────────────────────────
 
     const stats = summaryData?.stats;
-    const activeElapsedMinutes = Math.max(
+    
+    // Only include elapsed time if the session is actually running or paused.
+    // If it's COMPLETED or CANCELLED, it's either in the daily stats already or discarded.
+    const isSessionActive = activeLive?.session?.status === 'RUNNING' || activeLive?.session?.status === 'PAUSED';
+    const activeElapsedMinutes = isSessionActive ? Math.max(
         0,
         Math.floor(toSafeNumber(activeLive?.session?.elapsedSeconds) / 60),
-    );
+    ) : 0;
+    
     const totalMinutes = toSafeNumber(stats?.totalMinutes) + activeElapsedMinutes;
     const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
     const dailyGoalHours = Math.max(0.1, toSafeNumber(stats?.dailyGoalHours, 4));

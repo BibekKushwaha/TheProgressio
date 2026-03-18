@@ -85,21 +85,6 @@ describe('QuickActions', () => {
         expect(screen.getByRole('button', { name: 'Schedule Task' })).toBeTruthy();
     });
 
-    it('renders "Add New Task" button', () => {
-        render(<QuickActions />);
-        expect(screen.getByText('Add New Task')).toBeTruthy();
-    });
-
-    it('renders "New Note" button', () => {
-        render(<QuickActions />);
-        expect(screen.getByText('New Note')).toBeTruthy();
-    });
-
-    it('navigates to /createtask when "Add New Task" is clicked', () => {
-        render(<QuickActions />);
-        fireEvent.click(screen.getByText('Add New Task'));
-        expect(pushMock).toHaveBeenCalledWith('/createtask');
-    });
 
     it('creates a task without dueDate when only a title is entered', async () => {
         render(<QuickActions />);
@@ -207,40 +192,6 @@ describe('QuickActions', () => {
         expect(screen.getByTestId('timetable-dialog-trigger')).toBeTruthy();
     });
 
-    it('opens the note dialog when "New Note" is clicked', async () => {
-        render(<QuickActions />);
-        fireEvent.click(screen.getByText('New Note'));
-        await waitFor(() => {
-            expect(screen.getByText('Quick Note')).toBeTruthy();
-        });
-    });
-
-    it('calls createNote when note is saved', async () => {
-        render(<QuickActions />);
-        fireEvent.click(screen.getByText('New Note'));
-
-        await waitFor(() => screen.getByText('Quick Note'));
-
-        const textarea = document.querySelector('textarea')!;
-        fireEvent.change(textarea, { target: { value: 'hello world' } });
-        fireEvent.click(screen.getByRole('button', { name: /save/i }));
-
-        await waitFor(() => {
-            expect(createNoteMock).toHaveBeenCalledWith({ content: 'hello world' });
-        });
-    });
-
-    it('does not call createNote when textarea is empty', async () => {
-        render(<QuickActions />);
-        fireEvent.click(screen.getByText('New Note'));
-
-        await waitFor(() => screen.getByText('Quick Note'));
-        fireEvent.click(screen.getByRole('button', { name: /save/i }));
-
-        await waitFor(() => {
-            expect(createNoteMock).not.toHaveBeenCalled();
-        });
-    });
 
     it('renders the StartFocusButton', () => {
         render(<QuickActions />);

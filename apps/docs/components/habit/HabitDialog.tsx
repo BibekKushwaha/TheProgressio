@@ -31,6 +31,8 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
     const [selectedEmoji, setSelectedEmoji] = useState(EMOJIS[0]!)
     const [selectedColor, setSelectedColor] = useState(COLORS[0]!)
     const [linkedCategoryId, setLinkedCategoryId] = useState<string>('none')
+    const [reminderTime, setReminderTime] = useState<string>("")
+    const [scheduleHint, setScheduleHint] = useState<string>("")
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const [createHabit, { isLoading: isCreating }] = useCreateHabitMutation()
@@ -49,6 +51,8 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                 const color = COLORS.find(c => c.value === habit.color) || COLORS[0]!
                 setSelectedColor(color)
                 setLinkedCategoryId(habit.linkedCategoryId || 'none')
+                setReminderTime(habit.reminderTime ?? "")
+                setScheduleHint(habit.reminderTime ? "" : (habit.scheduleHint ?? ""))
             } else {
                 setHabitName("")
                 setTargetValue("1")
@@ -56,6 +60,8 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                 setSelectedEmoji(EMOJIS[0]!)
                 setSelectedColor(COLORS[0]!)
                 setLinkedCategoryId('none')
+                setReminderTime("")
+                setScheduleHint("")
             }
             setErrors({})
         }
@@ -80,6 +86,8 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                     icon: selectedEmoji,
                     color: selectedColor.value,
                     linkedCategoryId: linkedCategoryId === 'none' ? null : linkedCategoryId,
+                    reminderTime: reminderTime ? reminderTime : null,
+                    scheduleHint: reminderTime ? null : (scheduleHint ? scheduleHint : null),
                 }).unwrap()
             } else {
                 await createHabit({
@@ -89,6 +97,8 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                     icon: selectedEmoji,
                     color: selectedColor.value,
                     linkedCategoryId: linkedCategoryId === 'none' ? null : linkedCategoryId,
+                    reminderTime: reminderTime ? reminderTime : null,
+                    scheduleHint: reminderTime ? null : (scheduleHint ? scheduleHint : null),
                 }).unwrap()
             }
             onClose()
@@ -202,6 +212,43 @@ const HabitDialog = ({ open, onOpenChange, habit }: HabitDialogProps) => {
                                 >
                                     <option value={Frequency.DAILY} className="bg-slate-900 border-none">Daily</option>
                                     <option value={Frequency.WEEKLY} className="bg-slate-900 border-none">Weekly</option>
+                                </select>
+                            </Field>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <Field>
+                                <Label htmlFor="reminderTime" className="text-slate-300">Reminder Time (Optional)</Label>
+                                <Input
+                                    type="time"
+                                    id="reminderTime"
+                                    value={reminderTime}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setReminderTime(value);
+                                        if (value) setScheduleHint("");
+                                    }}
+                                    className="bg-white/5 border-white/10 focus:ring-purple-500/50 mt-1"
+                                />
+                            </Field>
+
+                            <Field>
+                                <Label htmlFor="scheduleHint" className="text-slate-300">Schedule Window (Optional)</Label>
+                                <select
+                                    id="scheduleHint"
+                                    value={scheduleHint}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setScheduleHint(value);
+                                        if (value) setReminderTime("");
+                                    }}
+                                    className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 mt-1"
+                                >
+                                    <option value="" className="bg-slate-900">Any time</option>
+                                    <option value="morning" className="bg-slate-900">Morning</option>
+                                    <option value="afternoon" className="bg-slate-900">Afternoon</option>
+                                    <option value="evening" className="bg-slate-900">Evening</option>
+                                    <option value="night" className="bg-slate-900">Night</option>
                                 </select>
                             </Field>
                         </div>

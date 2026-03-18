@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useId } from 'react';
+import React, { useMemo, useId } from 'react';
 import { useGetWeeklyTrendsQuery, useGetProfileQuery } from '@repo/store';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,15 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 export function WeeklyActivity() {
-    const [viewType, setViewType] = useState<'week' | 'month'>('week');
     const gradientAreaId = useId().replace(/:/g, '');
     const gradientLineId = useId().replace(/:/g, '');
     const { data: profileData } = useGetProfileQuery();
     const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(undefined);
-    const periodOptions = [
-        { value: 'week' as const, label: 'Week' },
-        { value: 'month' as const, label: 'Month' },
-    ];
 
     const dailyLimit = profileData?.user?.dailyGoalHours || 4;
     const yAxisLabels = [
@@ -29,7 +24,7 @@ export function WeeklyActivity() {
     ];
 
     const rawData = trendsData?.data || [];
-    const filteredData = viewType === 'week' ? rawData.slice(-7) : rawData.slice(-30);
+    const filteredData = rawData.slice(-7);
 
     const data = useMemo(() => filteredData.map(d => {
         const date = new Date(d.date);
@@ -103,26 +98,15 @@ export function WeeklyActivity() {
             <div className="flex items-center justify-between mb-10 relative z-10">
                 <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                        {viewType === 'week' ? 'Weekly' : 'Monthly'} Activity
+                        Weekly Activity
                         <Sparkles className="w-4 h-4 text-purple-400 opacity-50" />
                     </h2>
                     <p className="text-sm text-slate-400 mt-1">
-                        {viewType === 'week' ? 'Consistency check over last 7 days' : 'Consistency check over last 30 days'}
+                        Consistency check over last 7 days
                     </p>
                 </div>
-                <div className="flex gap-2 bg-white/5 border border-white/10 rounded-xl p-1">
-                    {periodOptions.map((option) => (
-                        <button
-                            key={option.value}
-                            onClick={() => setViewType(option.value)}
-                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewType === option.value
-                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
-                                : 'text-slate-500 hover:text-white'
-                                }`}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                    Last 7 Days
                 </div>
             </div>
 
@@ -144,7 +128,7 @@ export function WeeklyActivity() {
                     preserveAspectRatio="none"
                     viewBox="0 0 600 256"
                     role="img"
-                    aria-label={`${viewType === 'week' ? 'Weekly' : 'Monthly'} activity chart — hours studied per day`}
+                    aria-label="Weekly activity chart — hours studied per day"
                 >
                     <defs>
                         <linearGradient id={gradientAreaId} x1="0%" y1="0%" x2="0%" y2="100%">

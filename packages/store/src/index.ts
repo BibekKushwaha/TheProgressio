@@ -298,6 +298,7 @@ export type {
   NotificationIntelligence,
   NotificationContextSignals,
   RevisionScheduleResponse,
+  ScheduledBlock,
   DashboardSummaryResponse,
   DashboardFocusStats,
   StrategicSummaryResponse,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useState, useCallback, useEffect, useMemo } from "react";
+import React, { memo, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Card } from "../ui/card";
-import { logout as logoutAction, useAppDispatch, useAppSelector, useLogoutMutation, selectIsAdmin, useGetUserXPQuery } from "@repo/store";
+import { logout as logoutAction, useAppDispatch, useAppSelector, useLogoutMutation, selectIsAdmin } from "@repo/store";
 import { AUTH_SESSION_KEY } from "@/constant";
 import { toast } from "sonner";
 import { trackFeatureOpened } from "@/lib/navigationTelemetry";
@@ -131,17 +131,6 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
         "exam-warroom": pathname.startsWith("/exam-warroom"),
     });
 
-    const { data: xpData } = useGetUserXPQuery();
-    const userLevel = xpData?.xp?.level ?? 1;
-
-    const filteredGroups = useMemo(() => {
-        return NAV_GROUPS.map(group => {
-            // Hide the full analytics section until level 2
-            if (userLevel < 2 && group.section === "Analytics & Review") return null;
-            return group;
-        }).filter(Boolean) as NavGroup[];
-    }, [userLevel]);
-
     // Sync open state on SPA navigation — auto-open the active section when
     // the user navigates so the active child link is always visible.
     useEffect(() => {
@@ -166,7 +155,7 @@ const NavList = memo(function NavList({ pathname, onNavigate, isAdmin }: NavList
 
     return (
         <nav className="flex-1 space-y-6 overflow-y-auto pr-2 pb-4">
-            {filteredGroups.map((group, groupIdx) => (
+            {NAV_GROUPS.map((group, groupIdx) => (
                 <div key={group.section} className="space-y-1">
                     {/* Only show section headers for groups after the first one, or all if preferred. Let's show all but make Main subtle */}
                     <div className={cn(

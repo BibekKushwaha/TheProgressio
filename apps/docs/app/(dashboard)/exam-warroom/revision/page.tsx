@@ -25,25 +25,42 @@ export default function ExamWarRoomPage() {
         type Group = { examTitle: string; deepLink: string; items: Nudge[]; nextAt: number | null };
         const byExam = new Map<string, Group>();
 
+        const readMetaString = (meta: Record<string, unknown>, keys: string[]) => {
+            for (const key of keys) {
+                const value = meta[key];
+                if (typeof value === 'string' && value.trim()) return value.trim();
+            }
+            return '';
+        };
+
+        const getFallbackTitleFromNudge = (nudge: Nudge) => {
+            const raw = nudge.title?.trim() || nudge.message?.trim() || '';
+            return raw.replace(/^revise\s+/i, '').replace(/^revision\s*[:-]\s*/i, '').trim() || 'Revision Campaign';
+        };
+
         for (const nudge of drip) {
             const meta = parseNudgeMetadata(nudge.metadata);
             const deepLink = resolveNudgeDeepLink(meta);
-
-            let examTitle = 'Revision Campaign';
+            const metadataTitle = readMetaString(meta, ['examTitle', 'exam', 'campaignTitle', 'title']);
+            let examTitle = metadataTitle;
+            let groupingPath = deepLink.split('?')[0] || deepLink;
             try {
                 const url = new URL(deepLink, window.location.origin);
                 const q = url.searchParams.get('exam');
-                if (q && q.trim()) examTitle = q;
+                if (!examTitle && q && q.trim()) examTitle = q.trim();
+                groupingPath = url.pathname || groupingPath;
             } catch {
-                // ignore parse failures; keep fallback label
+                // Keep fallback path for grouping.
             }
 
-            const group = byExam.get(examTitle) ?? { examTitle, deepLink, items: [], nextAt: null };
+            examTitle = examTitle || getFallbackTitleFromNudge(nudge);
+            const groupKey = `${examTitle}::${groupingPath}`;
+            const group = byExam.get(groupKey) ?? { examTitle, deepLink, items: [], nextAt: null };
             const scheduledAtMs = new Date(nudge.scheduledAt).getTime();
             if (!Number.isFinite(scheduledAtMs)) continue;
             if (scheduledAtMs < now) continue; // hide past campaign items
             group.items.push(nudge);
-            byExam.set(examTitle, group);
+            byExam.set(groupKey, group);
         }
 
         const groups = Array.from(byExam.values()).map((g) => {
@@ -170,13 +187,14 @@ export default function ExamWarRoomPage() {
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-4">
                     <FileSpreadsheet className="w-4 h-4 text-cyan-300" />
-                    Exam Strategy Schedule
+                    Generated Exam Strategy Schedule
                 </div>
+                <p className="mb-4 text-sm text-slate-500">
+                    Review the latest suggested revision blocks generated from your current weak areas and exam routine.
+                </p>
                 <RevisionScheduler />
             </div>
             <SyllabusRevisionPlanner />
-            {/* Subject Performance Summary */}
-            {/* Subject Performance Summary */}
             <SubjectPerformanceSummary />
 
         </div>

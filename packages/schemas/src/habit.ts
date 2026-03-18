@@ -13,7 +13,12 @@ export const habitSchema = z.object({
   // Gentle Streak: how many skips before streak breaks
   mercyDaysAllowed: z.number().int().min(0).default(1),
   // For notifications
-  reminderTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:mm)").optional(),
+  reminderTime: z
+    .string()
+    .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:mm)")
+    .nullable()
+    .optional(),
+  scheduleHint: z.enum(["morning", "afternoon", "evening", "night"]).nullable().optional(),
 });
 
 // New schema for logging a completion (The "Check-in")

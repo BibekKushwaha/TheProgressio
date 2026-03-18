@@ -6,6 +6,12 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
 
+const formatReminderTime = (value: string): string => {
+    const date = new Date(`1970-01-01T${value}:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+};
+
 function HabitCardBase({ habit, highlighted = false }: { habit: Habit; highlighted?: boolean }) {
     const hasNewTrophy = Boolean(habit.newTrophy);
     const colorTheme = habit.color || "from-purple-600 to-pink-600";
@@ -24,6 +30,12 @@ function HabitCardBase({ habit, highlighted = false }: { habit: Habit; highlight
         () => habit.name.charAt(0).toUpperCase() + habit.name.slice(1),
         [habit.name]
     );
+
+    const scheduleLabel = useMemo(() => {
+        if (habit.reminderTime) return formatReminderTime(habit.reminderTime);
+        if (habit.scheduleHint) return habit.scheduleHint.charAt(0).toUpperCase() + habit.scheduleHint.slice(1);
+        return "Any time";
+    }, [habit.reminderTime, habit.scheduleHint]);
 
     const progressPct = useMemo(
         () =>
@@ -94,6 +106,9 @@ function HabitCardBase({ habit, highlighted = false }: { habit: Habit; highlight
                     <span className="inline-block px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-bold text-slate-300 uppercase tracking-wider">
                         {habit.frequency}
                     </span>
+                    <div className="mt-1 text-xs text-slate-400">
+                        Schedule: <span className="text-slate-200">{scheduleLabel}</span>
+                    </div>
                 </div>
             </div>
 

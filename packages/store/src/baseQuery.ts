@@ -162,7 +162,8 @@ export function withRetry<BaseQuery extends BaseQueryFn<any, any, any, any, any>
     const result = await (baseQuery as any)(args, api, extraOptions);
     if (result.error) {
       const status = (result.error as { status?: unknown }).status;
-      if (typeof status === 'number' && status >= 400 && status < 500) {
+      // 401 is handled by withAuthRefresh (cookie refresh + retry).
+      if (typeof status === 'number' && status >= 400 && status < 500 && status !== 401) {
         retry.fail(result.error);
       }
     }

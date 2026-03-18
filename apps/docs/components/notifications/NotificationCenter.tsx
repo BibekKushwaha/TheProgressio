@@ -79,6 +79,7 @@ export function NotificationCenter() {
 
                 {unreadCount > 0 && (
                     <Button
+                        type="button"
                         variant="outline"
                         size="sm"
                         disabled={isMarkingAllRead}
@@ -94,6 +95,7 @@ export function NotificationCenter() {
             <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2 scrollbar-hide shrink-0">
                 {FILTER_TABS.map(({ id, label, Icon }) => (
                     <button
+                        type="button"
                         key={id}
                         onClick={() => setFilter(id)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-medium transition-all whitespace-nowrap ${filter === id

@@ -38,7 +38,7 @@ export function HeroSection() {
     ...getDebugPollingOptions('hero.activeLive', 10000),
   });
 
-  const isLive = !!activeLive?.session;
+  const isLive = !!activeLive?.session && (activeLive.session.status === 'RUNNING' || activeLive.session.status === 'PAUSED');
   const showUserContent = mounted && !!user;
 
   return (

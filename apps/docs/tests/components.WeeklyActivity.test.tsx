@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let mockTrendsData: { data: Array<{ date: string; hours: number; sessions: number }> } | undefined;
@@ -52,18 +52,9 @@ describe('WeeklyActivity', () => {
         expect(screen.getByText(/No study sessions logged yet/i)).toBeTruthy();
     });
 
-    it('renders Week / Month toggle buttons', () => {
+    it('shows a fixed last-7-days badge', () => {
         render(<WeeklyActivity />);
-        expect(screen.getByText('Week')).toBeTruthy();
-        expect(screen.getByText('Month')).toBeTruthy();
-    });
-
-    it('switches to Month view when Month button is clicked', () => {
-        render(<WeeklyActivity />);
-        const monthBtn = screen.getByText('Month');
-        fireEvent.click(monthBtn);
-        // After click the Month button should still be in the DOM
-        expect(screen.getByText('Month')).toBeTruthy();
+        expect(screen.getByText('Last 7 Days')).toBeTruthy();
     });
 
     it('renders SVG chart path when data is present', () => {

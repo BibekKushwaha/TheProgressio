@@ -94,6 +94,7 @@ describe('habitsApi — Reducer & Tag Types', () => {
             targetValue: 5,
             unit: 'pages',
             scheduleHint: 'night',
+            reminderTime: null,
             confidence: 0.8,
         };
 

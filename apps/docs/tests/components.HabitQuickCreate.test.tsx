@@ -45,6 +45,7 @@ describe('HabitQuickCreate', () => {
                 unit: 'minutes',
                 linkedCategoryName: 'Chemistry',
                 scheduleHint: 'night',
+                reminderTime: null,
                 confidence: 0.92,
             }),
         });
@@ -73,6 +74,51 @@ describe('HabitQuickCreate', () => {
                 frequency: Frequency.DAILY,
                 targetValue: 20,
                 linkedCategoryId: 'cat-1',
+                reminderTime: null,
+                scheduleHint: 'night',
+            });
+        });
+    });
+
+    it('includes reminderTime when the parser returns an exact time', async () => {
+        parseHabit.mockReturnValue({
+            unwrap: () => Promise.resolve({
+                name: 'Study Dsa',
+                frequency: Frequency.DAILY,
+                targetValue: 40,
+                unit: 'minutes',
+                linkedCategoryName: 'Chemistry',
+                scheduleHint: null,
+                reminderTime: '15:00',
+                confidence: 0.9,
+            }),
+        });
+        createHabit.mockReturnValue({
+            unwrap: () => Promise.resolve({}),
+        });
+
+        render(<HabitQuickCreate />);
+
+        fireEvent.change(screen.getByPlaceholderText('revise chemistry 20 min every day'), {
+            target: { value: 'study dsa 40 min everyday 3 pm' },
+        });
+        fireEvent.click(screen.getByText('Preview'));
+
+        await waitFor(() => {
+            expect(screen.getByText('Study Dsa')).toBeInTheDocument();
+            expect(screen.getByText('40 minutes')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByText('Create Habit'));
+
+        await waitFor(() => {
+            expect(createHabit).toHaveBeenCalledWith({
+                name: 'Study Dsa',
+                frequency: Frequency.DAILY,
+                targetValue: 40,
+                linkedCategoryId: 'cat-1',
+                reminderTime: '15:00',
+                scheduleHint: null,
             });
         });
     });

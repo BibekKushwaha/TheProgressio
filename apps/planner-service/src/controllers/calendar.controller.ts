@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import { prisma } from "@repo/db";
+import { effortToMinutes } from "@repo/schemas/effort";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { timetableService } from "../services/timetable.service.js";
 import { TryCatch } from "../utils/tryCatch.js";
@@ -18,6 +19,29 @@ const parseYMDToLocalDate = (raw: string): Date | null => {
     const d = Number(parts[2]);
     if (![y, m, d].every(Number.isFinite)) return null;
     return new Date(y, m - 1, d);
+};
+
+const formatUtcTime = (date: Date): string => {
+    return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
+};
+
+const buildTaskTimeRange = (task: { dueDate: Date | null; effort?: unknown }): { startTime: string; endTime: string } => {
+    if (!task.dueDate) {
+        return { startTime: "00:00", endTime: "23:59" };
+    }
+
+    const start = new Date(task.dueDate);
+    const effortMinutes = effortToMinutes(task.effort);
+
+    if (!effortMinutes) {
+        return { startTime: formatUtcTime(start), endTime: formatUtcTime(start) };
+    }
+
+    const end = new Date(start.getTime() + effortMinutes * 60_000);
+    return {
+        startTime: formatUtcTime(start),
+        endTime: formatUtcTime(end),
+    };
 };
 
 export const getMonthlyEvents = TryCatch(async (req: AuthenticatedRequest, res: Response) => {
@@ -164,20 +188,23 @@ export const getDailySchedule = TryCatch(async (req: AuthenticatedRequest, res: 
         })),
 
         // Tasks
-        ...tasks.map(task => ({
-            id: `task-${task.id}`,
-            type: 'task',
-            title: task.title,
-            subtitle: task.description || 'Task',
-            startTime: '00:00', // Default to start of day for sorting if no time
-            endTime: '23:59',
-            color: task.category?.colorCode || (task.subject as any)?.color || '#888888',
-            subject: (task.subject as any)?.name,
-            category: task.category?.name || 'General',
-            priority: task.priority,
-            status: task.status,
-            isCompleted: task.status === 'COMPLETED'
-        })),
+        ...tasks.map(task => {
+            const { startTime, endTime } = buildTaskTimeRange(task);
+            return {
+                id: `task-${task.id}`,
+                type: 'task',
+                title: task.title,
+                subtitle: task.description || 'Task',
+                startTime,
+                endTime,
+                color: task.category?.colorCode || (task.subject as any)?.color || '#888888',
+                subject: (task.subject as any)?.name,
+                category: task.category?.name || 'General',
+                priority: task.priority,
+                status: task.status,
+                isCompleted: task.status === 'COMPLETED'
+            };
+        }),
 
         // Exams
         ...exams.map((exam) => ({
@@ -195,10 +222,10 @@ export const getDailySchedule = TryCatch(async (req: AuthenticatedRequest, res: 
     ];
 
     // Sort by start time but push flexible all-day tasks (tasks with '00:00') to the end
-    const minuteOf = (time: string, type?: string) => {
+    const minuteOf = (time: string, type?: string, endTime?: string) => {
         if (!time) return 24 * 60;
         // treat task all-day markers as end of day so they appear after timed classes
-        if (type === 'task' && time === '00:00') return 24 * 60;
+        if (type === 'task' && time === '00:00' && endTime === '23:59') return 24 * 60;
         const [hh = '0', mm = '0'] = time.split(':');
         const h = Number.parseInt(hh, 10);
         const m = Number.parseInt(mm, 10);
@@ -206,7 +233,7 @@ export const getDailySchedule = TryCatch(async (req: AuthenticatedRequest, res: 
         return Math.max(0, Math.min(24 * 60, h * 60 + m));
     };
 
-    scheduleItems.sort((a, b) => minuteOf(a.startTime, a.type) - minuteOf(b.startTime, b.type));
+    scheduleItems.sort((a, b) => minuteOf(a.startTime, a.type, a.endTime) - minuteOf(b.startTime, b.type, b.endTime));
     return res.status(200).json({
         date: toLocalIsoDate(targetDate),
         dayOfWeek: targetDate.getDay(),

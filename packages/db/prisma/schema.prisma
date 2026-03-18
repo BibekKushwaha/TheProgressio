@@ -430,6 +430,10 @@ model Habit {
   icon          String?
   color         String?
   lastLogDate   DateTime? 
+
+  // Optional schedule (local wall-clock time)
+  reminderTime  String?   // HH:mm
+  scheduleHint  String?   // morning|afternoon|evening|night
   
   // Gentle Streak settings
   mercyDaysAllowed Int     @default(1)   // how many skips before streak breaks

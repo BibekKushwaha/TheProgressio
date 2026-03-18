@@ -43,6 +43,7 @@ export function ConfirmDialog({
                 <p className="text-sm text-slate-400 py-2">{description}</p>
                 <DialogFooter className="gap-2 sm:gap-0">
                     <Button
+                        type="button"
                         variant="outline"
                         onClick={() => onOpenChange(false)}
                         className="border-white/10 hover:bg-white/5 text-slate-300"
@@ -50,6 +51,7 @@ export function ConfirmDialog({
                         {cancelLabel}
                     </Button>
                     <Button
+                        type="button"
                         variant={variant}
                         onClick={handleConfirm}
                         className={variant === 'destructive' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}

@@ -12,7 +12,6 @@ import { TodaysTasks } from '@/components/dashboard/TodaysTasks';
 import { MorningBriefing } from '@/components/dashboard/MorningBriefing';
 import { LiveActivityWidget } from '@/components/dashboard/LiveActivityWidget';
 import { ActivityLedger } from '@/components/dashboard/ActivityLedger';
-import { NotesWidget } from '@/components/dashboard/NotesWidget';
 import { DashboardGrid } from '@/components/layout/DashboardGrid';
 import { useDashboardLayout } from './DashboardLayoutContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -88,7 +87,6 @@ export function ModifiableDashboard() {
                     <div className="space-y-6">
                         {layout.showMorningBriefing && <Widget><MorningBriefing /></Widget>}
                         {layout.showQuickActions && <Widget><QuickActions /></Widget>}
-                        {layout.showNotes && <Widget><NotesWidget /></Widget>}
                         {layout.showActivityLedger && <Widget><ActivityLedger /></Widget>}
                     </div>
                 }

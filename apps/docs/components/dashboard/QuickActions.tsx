@@ -1,16 +1,16 @@
 "use client";
 
-import { FileText, Plus, Sparkles, BookOpen } from 'lucide-react';
+import { Sparkles, BookOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
-import { addTask, PriorityEnum, TaskStatus, useAppDispatch, useCreateExamMutation, useCreateNoteMutation, useCreateTaskMutation } from '@repo/store';
+import { addTask, PriorityEnum, TaskStatus, useAppDispatch, useCreateExamMutation, useCreateTaskMutation } from '@repo/store';
 
 import { CreateTaskDatePicker } from '@/components/createtask/CreateTaskDatePicker';
 import { StartFocusButton } from '@/components/planner/StartFocusButton';
 import { TimetableManagerDialog } from '@/components/planner/TimetableManagerDialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
 import { TimePickerInput } from '@/components/ui/time-picker-input';
 import { buildScheduledIso } from '@/lib/scheduling';
 import { toast } from 'sonner';
@@ -48,8 +48,6 @@ export function QuickActions() {
     const dispatch = useAppDispatch();
 
     const [schedulerTab, setSchedulerTab] = useState<SchedulerTab>('task');
-    const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
-    const [noteText, setNoteText] = useState('');
 
     const [taskTitle, setTaskTitle] = useState('');
     const [taskDate, setTaskDate] = useState('');
@@ -61,26 +59,11 @@ export function QuickActions() {
     const [examLocation, setExamLocation] = useState('');
     const [examDuration, setExamDuration] = useState('120');
 
-    const [createNote, { isLoading: isCreatingNote }] = useCreateNoteMutation();
+
     const [createTask, { isLoading: isCreatingTask }] = useCreateTaskMutation();
     const [createExam, { isLoading: isCreatingExam }] = useCreateExamMutation();
 
-    const actionButtons = [
-        {
-            label: 'Add New Task',
-            icon: Plus,
-            onClick: () => router.push('/createtask'),
-            className:
-                'w-full flex items-center justify-center gap-3 px-6 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:-translate-y-1 active:scale-95',
-        },
-        {
-            label: 'New Note',
-            icon: FileText,
-            onClick: () => setIsNoteDialogOpen(true),
-            className:
-                'w-full flex items-center justify-center gap-3 px-6 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:-translate-y-1 active:scale-95 text-indigo-300 hover:text-indigo-200',
-        },
-    ];
+
 
     const taskEditorHref = useMemo(
         () =>
@@ -106,18 +89,7 @@ export function QuickActions() {
         [examDate, examDuration, examLocation, examTime, examTitle]
     );
 
-    const handleSaveNote = async () => {
-        if (!noteText.trim()) return;
 
-        try {
-            await createNote({ content: noteText }).unwrap();
-            setIsNoteDialogOpen(false);
-            setNoteText('');
-            toast.success('Note saved!');
-        } catch {
-            toast.error('Failed to save note. Please try again.');
-        }
-    };
 
     const handleScheduleTask = async () => {
         const title = taskTitle.trim();
@@ -344,53 +316,10 @@ export function QuickActions() {
 
                 <StartFocusButton isInline={true} />
 
-                <div className="grid grid-cols-2 gap-3">
-                    {actionButtons.map((button) => {
-                        const Icon = button.icon;
-                        return (
-                            <button key={button.label} onClick={button.onClick} className={button.className}>
-                                <Icon className="w-5 h-5 mb-1" />
-                                <span className="text-xs">{button.label}</span>
-                            </button>
-                        );
-                    })}
-                </div>
+                
             </div>
 
-            <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
-                <DialogContent className="sm:max-w-md bg-slate-900 border-white/10 text-white">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 font-bold text-xl text-white">
-                            <FileText className="w-5 h-5 text-indigo-400" />
-                            Quick Note
-                        </DialogTitle>
-                        <DialogDescription className="text-slate-400">
-                            Capture a thought, class note, or reminder — saved instantly.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <textarea
-                            value={noteText}
-                            onChange={(e) => setNoteText(e.target.value)}
-                            placeholder="Jot down a quick thought, class note, or reminder..."
-                            className="w-full h-32 p-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none text-sm leading-relaxed"
-                            autoFocus
-                        />
-                        <Button
-                            onClick={handleSaveNote}
-                            disabled={!noteText.trim() || isCreatingNote}
-                            className="btn-primary w-full"
-                        >
-                            {isCreatingNote ? (
-                                <span className="flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                                    Saving…
-                                </span>
-                            ) : 'Save Note'}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            
         </div>
     );
 }

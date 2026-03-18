@@ -2,20 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { CalendarDays, Clock, Target, CheckCircle, Sparkles, Loader2 } from 'lucide-react';
-import { useGetRevisionScheduleQuery } from '@repo/store';
+import { useGetRevisionScheduleQuery, type ScheduledBlock } from '@repo/store';
 
 type ExamType = 'JEE' | 'NEET' | 'UPSC' | 'CUSTOM';
-type ProblemType = 'DPP' | 'PYQ' | 'REVISION';
-
-interface ScheduledBlock {
-    id: string;
-    subject: string;
-    chapter: string;
-    type: ProblemType;
-    time: string;
-    duration: number; // minutes
-    completed: boolean;
-}
+type ProblemType = ScheduledBlock['type'];
 
 const EXAM_ROUTINES: Record<ExamType, { hours: number; blocks: { subject: string; duration: number }[] }> = {
     JEE: {
@@ -146,6 +136,10 @@ export function RevisionScheduler() {
                     </div>
                 </div>
 
+                <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                    This is a generated revision plan. Checking items off only updates this local view and does not save progress yet.
+                </div>
+
                 {/* Schedule Timeline */}
                 <div className="space-y-2">
                     {isLoading ? (
@@ -155,11 +149,11 @@ export function RevisionScheduler() {
                         </div>
                     ) : isError ? (
                         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-                            Couldn&apos;t load revision schedule for {selectedExam}. Try regenerating.
+                            Couldn&apos;t load revision schedule for {selectedExam}. Try refreshing the suggested plan.
                         </div>
                     ) : schedule.length === 0 ? (
                         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-slate-400">
-                            No schedule blocks available yet. Use auto-generate to create tomorrow&apos;s plan.
+                            No schedule blocks available yet. Refresh the suggested plan to generate a new revision run.
                         </div>
                     ) : (
                         schedule.map(block => (
@@ -202,7 +196,7 @@ export function RevisionScheduler() {
                     className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-xl text-sm font-semibold text-indigo-400 hover:from-indigo-500/30 hover:to-purple-500/30 transition-all disabled:opacity-50"
                 >
                     <Sparkles className="w-4 h-4" />
-                    {isLoading ? "Regenerating..." : "Auto-Generate Tomorrow's Schedule from SWOT Weak Areas"}
+                    {isLoading ? "Refreshing..." : "Refresh Suggested Schedule"}
                 </button>
             </div>
 

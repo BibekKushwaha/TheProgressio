@@ -149,6 +149,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     }, [taskId, currentTaskTitle, initialMinutes, recommendedStart, recommendedEnd, startLiveSession]);
 
     const handleSessionEnd = useCallback(async () => {
+        isSessionEndedRef.current = true;
         let handledByLiveContract = false;
         if (liveSessionId) {
             try {
@@ -252,8 +253,10 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
         // timeLeft intentionally excluded — use timeLeftRef instead to avoid interval churn.
     }, [liveSessionId, isPaused, heartbeatLiveSession]);
 
+    const isSessionEndedRef = useRef(false);
+
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined' || isSessionEndedRef.current) return;
         localStorage.setItem('activeFocusSession', JSON.stringify({
             taskTitle: currentTaskTitle,
             startTime: startTimeRef.current,
@@ -272,6 +275,7 @@ export function ActiveFocusTimer({ onComplete }: ActiveFocusTimerProps) {
     }, [minutes, seconds]);
 
     const handleStop = async () => {
+        isSessionEndedRef.current = true;
         if (liveSessionId) {
             try {
                 await stopLiveSession({
