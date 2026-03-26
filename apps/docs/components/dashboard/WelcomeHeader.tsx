@@ -10,7 +10,6 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { TimetableView } from '../planner/TimetableView';
 import { CustomizeLayoutButton } from './CustomizeLayoutButton';
-import { AmbientNudge } from './AmbientNudge';
 
 // NotificationCenter and all its dependencies (NudgeCard, NudgeActions, utils, etc.)
 // are excluded from the initial JS bundle. The chunk is fetched only when the user
@@ -137,7 +136,6 @@ export function WelcomeHeader() {
                     </Dialog>
                 </div>
             </PageHeader>
-            <AmbientNudge />
         </>
     );
 }

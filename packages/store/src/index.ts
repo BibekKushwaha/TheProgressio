@@ -123,8 +123,6 @@ export {
   usePostNotificationDirectReplyMutation,
   useCreateRevisionDripCampaignMutation,
   useTriggerGeofencePingMutation,
-  useMarkAttendanceMutation,
-  useGetAttendanceHistoryQuery,
   useGetNotificationDeepLinkQuery,
   useGetNotesQuery,
   useCreateNoteMutation,
@@ -365,18 +363,6 @@ export type {
   UpdateRotationRequest,
   ResolvedRotation,
 } from './services/rotationsApi';
-
-// Mentorship API
-export {
-  mentorshipApi,
-  useGetMentorAlertSubscriptionsQuery,
-  useCreateMentorAlertSubscriptionMutation,
-  useUpdateMentorAlertSubscriptionMutation,
-  useRevokeMentorAlertSubscriptionMutation,
-  useGetMentorFeedbackQuery,
-  useSendMentorFeedbackMutation,
-} from './services/mentorshipApi';
-export type { MentorAlertSubscription, MentorFeedback } from './services/mentorshipApi';
 
 // Syllabus API
 export {

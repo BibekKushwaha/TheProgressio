@@ -58,7 +58,6 @@ export type ProfileStackParamList = {
     FamilyConnect: undefined;
     FamilyInvite: { token: string };
     Subscription: undefined;
-    QRAttendance: undefined;
     Advanced: undefined;
     AdminDashboard: undefined;
 };

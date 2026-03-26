@@ -67,7 +67,6 @@ const NAV_GROUPS: NavGroup[] = [
         section: "Academic",
         items: [
             { name: "Subject Library", icon: BookOpen, href: "/subjects" },
-            { name: "Knowledge Map", icon: Layers, href: "/syllabus" },
             { name: "Habit Tracker", icon: Flame, href: "/habits" },
             {
                 name: "Exam War Room",

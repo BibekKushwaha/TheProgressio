@@ -1,13 +1,12 @@
 "use client";
 
-import { Wifi, CreditCard, QrCode, Languages, Moon } from "lucide-react";
+import { Wifi, CreditCard, Languages, Moon } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QuietHoursPanel } from "@/components/settings/QuietHoursPanel";
 import { PricingSection } from "@/components/settings/PricingSection";
 import { LanguageSelector } from "@/components/settings/LanguageSelector";
-import { QRAttendance } from "@/components/settings/QRAttendance";
 import { FamilyShareManagement } from "@/components/settings/FamilyShareManagement";
 import { ProfileCard } from "@/components/settings/ProfileCard";
 import { PreferencesCard } from "@/components/settings/PreferencesCard";
@@ -135,19 +134,6 @@ export function SettingsClient() {
             </Card>
 
             <FamilyShareManagement />
-
-            {/* QR Attendance */}
-            <Card variant="glass">
-                <CardHeader>
-                    <div className="flex items-center gap-3">
-                        <QrCode className="w-5 h-5 text-indigo-400" />
-                        <CardTitle>QR Attendance</CardTitle>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <QRAttendance />
-                </CardContent>
-            </Card>
 
             <SecurityAndPrivacyCard />
         </div>

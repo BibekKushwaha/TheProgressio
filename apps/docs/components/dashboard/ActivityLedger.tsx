@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useGetAuditLogsQuery, AuditLog } from '@repo/store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle, Flame, MapPin, Activity, FileText, LucideIcon, Info } from 'lucide-react';
+import { CheckCircle, Flame, Activity, FileText, LucideIcon, Info } from 'lucide-react';
 import { EmptyLedgerIllustration } from '../illustrations/EmptyLedgerIllustration';
 
 export function ActivityLedger() {
@@ -36,15 +36,6 @@ export function ActivityLedger() {
                 icon = Flame;
                 color = 'text-orange-400 bg-orange-500/10';
                 if (log.action === 'HABIT_LOGGED') title = 'Habit Logged';
-            } else if (log.entityType === 'ATTENDANCE') {
-                icon = MapPin;
-                color = 'text-indigo-400 bg-indigo-500/10';
-                if (log.action === 'ATTENDANCE_MARKED') title = 'Attendance Marked';
-
-                try {
-                    const details = log.details ? JSON.parse(log.details) : null;
-                    if (details?.status) title = `Attendance Marked: ${details.status} via ${details.method}`;
-                } catch { /* ignore */ }
             } else if (log.entityType === 'NOTE') {
                 icon = FileText;
                 color = 'text-blue-400 bg-blue-500/10';

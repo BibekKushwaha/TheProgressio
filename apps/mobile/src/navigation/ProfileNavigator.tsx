@@ -6,7 +6,6 @@ import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { FamilyConnectScreen } from '../screens/profile/FamilyConnectScreen';
 import { FamilyInviteScreen } from '../screens/profile/FamilyInviteScreen';
 import { SubscriptionScreen } from '../screens/profile/SubscriptionScreen';
-import { QRAttendanceScreen } from '../screens/profile/QRAttendanceScreen';
 import { AdvancedScreen } from '../screens/profile/AdvancedScreen';
 import { AdminDashboardScreen } from '../screens/profile/AdminDashboardScreen';
 
@@ -24,11 +23,6 @@ export const ProfileNavigator: React.FC = () => (
         <Stack.Screen name="FamilyConnect" component={FamilyConnectScreen} />
         <Stack.Screen name="FamilyInvite" component={FamilyInviteScreen} />
         <Stack.Screen name="Subscription" component={SubscriptionScreen} />
-        <Stack.Screen
-            name="QRAttendance"
-            component={QRAttendanceScreen}
-            options={{ presentation: 'fullScreenModal' }}
-        />
         <Stack.Screen name="Advanced" component={AdvancedScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
     </Stack.Navigator>

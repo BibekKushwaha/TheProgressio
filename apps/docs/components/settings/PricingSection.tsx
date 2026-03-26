@@ -71,7 +71,7 @@ const PLANS: Plan[] = [
         period: '/year',
         features: [
             'Everything in Pro',
-            'QR attendance tracking',
+            'Classroom operations dashboard',
             'Family Connect portal',
             'Mentor dashboards',
             'Batch management',

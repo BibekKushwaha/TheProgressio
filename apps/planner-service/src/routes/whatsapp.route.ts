@@ -8,7 +8,6 @@ import {
 	sendWhatsAppTaskReminder,
 	sendWhatsAppTemplateMessage,
 	toggleAiKillSwitch,
-	triggerSilentWatch,
 	verifyWhatsAppWebhook,
 } from "../controllers/whatsapp.controller.js";
 
@@ -23,8 +22,6 @@ router.post("/webhook", captureWhatsAppTaskWebhook);
 router.post("/reminders/task", sendWhatsAppTaskReminder);
 router.post("/templates/send", sendWhatsAppTemplateMessage);
 router.post("/nudges/outcome", sendOutcomeNudge);
-router.post("/silent-watch/sweep", triggerSilentWatch);
-
 // Internal observability — all require x-whatsapp-secret header
 router.get("/metrics",            getWhatsAppInboundMetrics);    // JSON snapshot
 router.get("/metrics/prometheus", getWhatsAppPrometheusMetrics); // Prometheus text format

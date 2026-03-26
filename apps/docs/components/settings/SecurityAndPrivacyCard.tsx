@@ -21,15 +21,6 @@ export function SecurityAndPrivacyCard() {
                         <CardTitle>Security</CardTitle>
                     </div>
                 </CardHeader>
-                <CardContent>
-                    <Button
-                        variant="outline"
-                        className="w-full md:w-auto border-white/10 hover:bg-white/5"
-                        onClick={() => toast.info("Password change feature is coming soon")}
-                    >
-                        Change Password
-                    </Button>
-                </CardContent>
             </Card>
 
             <ActiveSessions />

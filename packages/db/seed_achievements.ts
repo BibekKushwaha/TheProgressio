@@ -41,6 +41,54 @@ const achievements = [
         icon: 'Trophy',
         type: 'SESSION',
         goalValue: 60
+    },
+    {
+        key: 'EARLY_BIRD',
+        name: 'Early Bird',
+        description: 'Complete a task before 8 AM',
+        icon: 'Award',
+        type: 'TIME',
+        goalValue: 1
+    },
+    {
+        key: 'NIGHT_OWL',
+        name: 'Night Owl',
+        description: 'Complete a task after 10 PM',
+        icon: 'Rocket',
+        type: 'TIME',
+        goalValue: 1
+    },
+    {
+        key: 'STREAK_30',
+        name: 'Consistent Scholar',
+        description: 'Maintain a 30-day streak',
+        icon: 'Crown',
+        type: 'STREAK',
+        goalValue: 30
+    },
+    {
+        key: 'TASK_MASTER_100',
+        name: 'Task Demolisher',
+        description: 'Complete 100 tasks',
+        icon: 'Sword',
+        type: 'TASKS',
+        goalValue: 100
+    },
+    {
+        key: 'EXAM_ACE',
+        name: 'Exam Ace',
+        description: 'Score over 90% in an exam',
+        icon: 'Medal',
+        type: 'EXAM',
+        goalValue: 90
+    },
+    {
+        key: 'DEFENDER',
+        name: 'Iron Shield',
+        description: 'Resist 10 distractive websites during focus sessions',
+        icon: 'Shield',
+        type: 'FOCUS',
+        goalValue: 10
     }
 ];
 

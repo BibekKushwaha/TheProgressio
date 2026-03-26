@@ -414,10 +414,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps<'Profile'>> = ({ navigat
                     <Text style={styles.settingLabel}>💳 Subscription</Text>
                     <Text style={styles.chevron}>›</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.settingRow} onPress={() => navigation.navigate('QRAttendance')}>
-                    <Text style={styles.settingLabel}>📱 QR Attendance</Text>
-                    <Text style={styles.chevron}>›</Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={styles.settingRow} onPress={() => navigation.navigate('Advanced')}>
                     <Text style={styles.settingLabel}>⚙️ Advanced</Text>
                     <Text style={styles.chevron}>›</Text>

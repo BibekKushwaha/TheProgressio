@@ -15,16 +15,16 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold text-white">What we store</h2>
           <ul className="list-disc pl-6 text-sm text-slate-300 space-y-1">
             <li>Account data (email, username) and authentication session cookies.</li>
-            <li>Planner data (tasks, subtasks, attachments metadata, notes, timetable, attendance).</li>
+            <li>Planner data (tasks, subtasks, attachments metadata, notes, and timetable).</li>
             <li>Habit data (habits, logs, streak metadata, nudge settings).</li>
             <li>Analytics inputs you provide (grade entries) and derived insights (rank bands, SWOT summaries).</li>
           </ul>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-bold text-white">Sharing & mentorship</h2>
+          <h2 className="text-xl font-bold text-white">Sharing</h2>
           <p className="text-sm text-slate-300">
-            If you create mentor/parent share links, they grant read-only visibility for the configured duration and can be revoked at any time in Settings.
+            If you create family share links, they grant read-only visibility for the configured duration and can be revoked at any time in Settings.
           </p>
         </section>
 

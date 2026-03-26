@@ -27,7 +27,6 @@ const PERSIST_SLICES = [
   'calendarApi',
   'rotationsApi',
   'syllabusApi',
-  'mentorshipApi',
 ] as const;
 
 interface CacheEnvelope {

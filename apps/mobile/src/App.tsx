@@ -75,7 +75,6 @@ const linkingConfig = {
                             FamilyConnect: 'family-connect',
                             FamilyInvite: 'family-connect/accept',
                             Subscription: 'subscription',
-                            QRAttendance: 'qr-attendance',
                             Advanced: 'settings/advanced',
                         },
                     },

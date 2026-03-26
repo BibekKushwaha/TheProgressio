@@ -9,7 +9,6 @@ import { timetableApi } from './services/timetableApi';
 import { calendarApi } from './services/calendarApi';
 import { rotationsApi } from './services/rotationsApi';
 import { paymentApi } from './services/paymentApi';
-import { mentorshipApi } from './services/mentorshipApi';
 import { syllabusApi } from './services/syllabusApi';
 import authReducer from './slices/authSlice';
 import tasksReducer from './slices/tasksSlice';
@@ -66,7 +65,6 @@ const rootReducer = combineReducers({
   [calendarApi.reducerPath]: calendarApi.reducer,
   [rotationsApi.reducerPath]: rotationsApi.reducer,
   [paymentApi.reducerPath]: paymentApi.reducer,
-  [mentorshipApi.reducerPath]: mentorshipApi.reducer,
   [syllabusApi.reducerPath]: syllabusApi.reducer,
 });
 
@@ -99,7 +97,6 @@ export const makeStore = () => {
         calendarApi.middleware,
         rotationsApi.middleware,
         paymentApi.middleware,
-        mentorshipApi.middleware,
         syllabusApi.middleware
       ),
   });

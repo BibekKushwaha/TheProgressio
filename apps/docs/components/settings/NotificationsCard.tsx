@@ -20,7 +20,7 @@ const NOTIFICATION_BUCKETS: Array<{ key: BucketKey; title: string; description: 
     { key: "MORNING_BRIEFING", title: "Morning Briefing", description: "Top 3 priorities and schedule context" },
     { key: "BEHAVIORAL_NUDGE", title: "Behavioral Nudges", description: "Gentle check-ins for streaks and routines" },
     { key: "ADVANCE_ALERT_3WEEK", title: "Exam Advance Alerts", description: "3-week, 1-week, and 3-day reminders" },
-    { key: "TRANSACTION_SYSTEM", title: "System Updates", description: "Attendance, sync, and confirmation updates" },
+    { key: "TRANSACTION_SYSTEM", title: "System Updates", description: "Sync, billing, and confirmation updates" },
 ];
 
 export function NotificationsCard() {

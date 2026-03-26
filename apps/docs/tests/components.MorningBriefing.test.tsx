@@ -49,11 +49,6 @@ describe('MorningBriefing', () => {
         expect(screen.getByText('Morning Briefing')).toBeTruthy();
     });
 
-    it('renders the attendance reminder row', () => {
-        render(<MorningBriefing />);
-        expect(screen.getByText(/mark attendance/i)).toBeTruthy();
-    });
-
     it('renders loading skeleton when isLoading is true', () => {
         mockLoading = true;
         mockBriefing = null;

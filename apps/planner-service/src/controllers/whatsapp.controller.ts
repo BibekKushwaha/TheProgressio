@@ -36,7 +36,6 @@ import {
     sendWhatsAppTemplate,
     sendWhatsAppText,
 } from "../services/meta-whatsapp.service.js";
-import { runSilentWatchSweep } from "../services/whatsapp-watch.service.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import ErrorHandler from "../utils/errorHandler.js";
 
@@ -741,11 +740,6 @@ export const sendOutcomeNudge = TryCatch(async (req: Request, res: Response) => 
     return res.status(200).json({ message: "Outcome nudge sent", completion });
 });
 
-export const triggerSilentWatch = TryCatch(async (req: Request, res: Response) => {
-    ensureAuthorized(req);
-    const result = await runSilentWatchSweep();
-    return res.status(200).json({ message: "Silent watch sweep completed", ...result });
-});
 
 export const getWhatsAppInboundMetrics = TryCatch(async (req: Request, res: Response) => {
     ensureAuthorized(req);
