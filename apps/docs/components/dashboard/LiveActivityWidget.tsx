@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, Pause, Play, Loader2 } from 'lucide-react';
-import { useGetActiveLiveSessionQuery } from '@repo/store';
+import { useGetActiveLiveSessionQuery, useStopLiveSessionMutation } from '@repo/store';
 
 // ── LiveTimer (isolated) ────────────────────────────────────────────────────
 //
@@ -155,8 +155,23 @@ export function LiveActivityWidget() {
             document.removeEventListener('visibilitychange', onVisibility);
         };
     }, [refetch, checkLocalSession, remoteData, isUninitialized]);
+    const [stopLiveSession] = useStopLiveSessionMutation();
 
-    const handleExpired = useCallback(() => setSession(null), []);
+    const handleExpired = useCallback(async () => {
+        setSession(null);
+        if (typeof window !== 'undefined') {
+            const sid = localStorage.getItem('activeFocusSessionId');
+            if (sid) {
+                try {
+                    await stopLiveSession({ sessionId: sid, outcome: 'COMPLETED' }).unwrap();
+                } catch (e) {
+                    // best effort
+                }
+            }
+            localStorage.removeItem('activeFocusSession');
+            localStorage.removeItem('activeFocusSessionId');
+        }
+    }, [stopLiveSession]);
 
     if (isRemoteLoading) {
         return (

@@ -5,6 +5,12 @@ import { useNetworkWaterfall } from "@/hooks/useNetworkWaterfall";
 import { HabitCard } from "@/components/habit/HabitCard";
 import HabitDialog from "@/components/habit/HabitDialog";
 import { HabitQuickCreate } from "@/components/habit/HabitQuickCreate";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useGetHabitsQuery, type Habit } from "@repo/store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -28,6 +34,7 @@ export function HabitsClient({
     const searchParams = useSearchParams();
     const highlightedHabitId = searchParams.get("habitId") || "";
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [showQuickCreate, setShowQuickCreate] = useState(false);
 
     useNetworkWaterfall('HabitsPage');
 
@@ -71,6 +78,14 @@ export function HabitsClient({
         return () => window.clearTimeout(id);
     }, [highlightedHabitId, pathname, router, searchParams]);
 
+    const openManualCreate = () => {
+        setIsDialogOpen(true);
+    };
+
+    const openAICreate = () => {
+        setShowQuickCreate(true);
+    };
+
     return (
         <div className="space-y-6">
 
@@ -78,16 +93,37 @@ export function HabitsClient({
                 title="Habit Tracker"
                 subtitle="Build small daily systems that support your study goals."
             >
-                <Button
-                    onClick={() => setIsDialogOpen(true)}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-purple-500/25 h-12 px-6 rounded-xl font-bold"
-                >
-                    <Plus className="w-5 h-5 mr-2" />
-                    Add Habit
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-purple-500/25 h-12 px-6 rounded-xl font-bold">
+                            <Plus className="w-5 h-5 mr-2" />
+                            Add Habit
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64 border-white/10 bg-slate-900 text-slate-200">
+                        <DropdownMenuItem
+                            onSelect={openAICreate}
+                            className="cursor-pointer focus:bg-white/10 focus:text-white"
+                        >
+                            <div className="flex flex-col gap-0.5 py-1">
+                                <span className="text-sm font-semibold">AI Create</span>
+                                <span className="text-xs text-slate-400">Describe it once and preview before saving</span>
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onSelect={openManualCreate}
+                            className="cursor-pointer focus:bg-white/10 focus:text-white"
+                        >
+                            <div className="flex flex-col gap-0.5 py-1">
+                                <span className="text-sm font-semibold">Manual Create</span>
+                                <span className="text-xs text-slate-400">Fill in every habit detail yourself</span>
+                            </div>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </PageHeader>
 
-            <HabitQuickCreate />
+            {showQuickCreate && <HabitQuickCreate />}
 
             {isDialogOpen && (
                 <HabitDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
@@ -123,13 +159,34 @@ export function HabitsClient({
                             </div>
                         ))}
                     </div>
-                    <Button
-                        onClick={() => setIsDialogOpen(true)}
-                        className="btn-primary"
-                    >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create your first habit
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button className="btn-primary">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create your first habit
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center" className="w-64 border-white/10 bg-slate-900 text-slate-200">
+                            <DropdownMenuItem
+                                onSelect={openAICreate}
+                                className="cursor-pointer focus:bg-white/10 focus:text-white"
+                            >
+                                <div className="flex flex-col gap-0.5 py-1">
+                                    <span className="text-sm font-semibold">AI Create</span>
+                                    <span className="text-xs text-slate-400">Describe it once and preview before saving</span>
+                                </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={openManualCreate}
+                                className="cursor-pointer focus:bg-white/10 focus:text-white"
+                            >
+                                <div className="flex flex-col gap-0.5 py-1">
+                                    <span className="text-sm font-semibold">Manual Create</span>
+                                    <span className="text-xs text-slate-400">Fill in every habit detail yourself</span>
+                                </div>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             ) : process.env.NODE_ENV === 'development' ? (
                 // Profiler is dev-only: React.Profiler still adds overhead even when the

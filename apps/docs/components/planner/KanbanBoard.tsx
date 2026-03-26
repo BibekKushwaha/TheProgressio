@@ -8,12 +8,11 @@ interface KanbanBoardProps {
     status: string;
     priority: string;
     category: string;
-    effort: string;
     sort: 'default' | 'quickWins';
     tasks: Task[];
 }
 
-export function KanbanBoard({ searchQuery, status, priority, category, effort, sort, tasks }: KanbanBoardProps) {
+export function KanbanBoard({ searchQuery, status, priority, category, sort, tasks }: KanbanBoardProps) {
     void status;
 
     // Filter by status for columns
@@ -22,7 +21,7 @@ export function KanbanBoard({ searchQuery, status, priority, category, effort, s
     const inProgressTasks = tasks.filter(t => t.status === TaskStatus.IN_PROGRESS);
     const completedTasks = tasks.filter(t => t.status === TaskStatus.COMPLETED);
 
-    const filters = { searchQuery, priority, category, status, effort, sort };
+    const filters = { searchQuery, priority, category, status, sort };
     const filteredTodo = filterTasks(todoTasks, filters);
     const filteredInProgress = filterTasks(inProgressTasks, filters);
     const filteredCompleted = filterTasks(completedTasks, filters);

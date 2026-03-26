@@ -11,7 +11,6 @@ interface TimelineViewProps {
     status: string;
     priority: string;
     category: string;
-    effort: string;
     sort: 'default' | 'quickWins';
     tasks: Task[];
 }
@@ -51,7 +50,7 @@ const STATUS_STYLE: Record<TaskStatus, string> = {
     [TaskStatus.COMPLETED]: 'from-emerald-500 to-green-500 border-emerald-300/30',
 };
 
-export function TimelineView({ searchQuery, status, priority, category, effort, sort, tasks }: TimelineViewProps) {
+export function TimelineView({ searchQuery, status, priority, category, sort, tasks }: TimelineViewProps) {
     const router = useRouter();
 
     const timeline = useMemo(() => {
@@ -60,7 +59,7 @@ export function TimelineView({ searchQuery, status, priority, category, effort, 
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         monthEnd.setHours(23, 59, 59, 999);
 
-        const filtered = filterTasks(tasks, { searchQuery, status, priority, category, effort, sort })
+        const filtered = filterTasks(tasks, { searchQuery, status, priority, category, sort })
             .filter((task) => {
                 if (!task.dueDate) return false;
                 const d = new Date(task.dueDate);
@@ -127,7 +126,7 @@ export function TimelineView({ searchQuery, status, priority, category, effort, 
         });
 
         return { rangeStart, rangeEnd, totalDays, bars, ticks, nowPercent };
-    }, [tasks, searchQuery, status, priority, category, effort, sort]);
+    }, [tasks, searchQuery, status, priority, category, sort]);
 
     const showYear = timeline.totalDays > 365;
     const formatLabel = (d: Date) => showYear

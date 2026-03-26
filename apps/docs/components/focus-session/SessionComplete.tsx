@@ -1,5 +1,5 @@
-// components/focus-session/SessionComplete.tsx
 import { Timer, ArrowRight } from 'lucide-react';
+import { useEffect } from 'react';
 import { StatsGrid } from './StatsGrid';
 import { RewardCard } from './RewardCard';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,9 +12,18 @@ export function SessionComplete() {
     const { data: streakData } = useGetUserStreakQuery();
     const streak = streakData?.streak ?? 0;
     const router = useRouter();
-
     // XP is earned based on session duration: 1 XP per 2 minutes
     const xpEarned = Math.round(durationParam / 2);
+
+    // Failsafe: ensure any lingering session data in localStorage is destroyed.
+    // ActiveFocusTimer handles this natively normally, but if the user reaches
+    // here, they are definitely not in an active session anymore.
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('activeFocusSession');
+            localStorage.removeItem('activeFocusSessionId');
+        }
+    }, []);
 
     return (
         <div className="relative min-h-screen flex flex-col items-center justify-start p-6 pt-20">
