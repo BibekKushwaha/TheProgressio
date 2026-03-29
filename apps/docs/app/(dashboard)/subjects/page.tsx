@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { TaskStatus, useGetCategoriesQuery, useGetTasksQuery } from '@repo/store';
-import { GPACalculator } from '@/components/analytics/GPACalculator';
 import { SubjectGradePredictor } from '@/components/analytics/SubjectGradePredictor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getApiErrorReportStatus } from '@/lib/api-error';
@@ -24,7 +23,6 @@ import {
     ChevronRight,
     Clock3,
     FolderKanban,
-    GraduationCap,
     Layers,
     RefreshCcw,
     Search,
@@ -53,7 +51,6 @@ export default function SubjectLibraryPage() {
         refetch: refetchTasks,
     } = useGetTasksQuery(allTasksQueryArgs);
     const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-    const [showGPA, setShowGPA] = useState(false);
     const [subjectSearch, setSubjectSearch] = useState('');
     const [subjectSort, setSubjectSort] = useState<SubjectSortMode>('completion');
     const [selectedTaskSearch, setSelectedTaskSearch] = useState('');
@@ -271,22 +268,7 @@ export default function SubjectLibraryPage() {
                         <p className="text-slate-400 mt-1">Track workload, Completion Speed, and Subject-level momentum.</p>
                     </div>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                    <button
-                        onClick={() => setShowGPA(!showGPA)}
-                        className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-semibold hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex items-center gap-2"
-                    >
-                        <GraduationCap className="w-5 h-5" />
-                        {showGPA ? 'Hide' : 'What-If'} GPA
-                    </button>
-                </div>
             </div>
-
-            {showGPA && (
-                <div className="animate-in slide-in-from-top-4 duration-300">
-                    <GPACalculator />
-                </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">

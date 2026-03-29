@@ -18,17 +18,44 @@ interface CalendarHeaderProps {
 
 export function CalendarHeader({ selectedView, setSelectedView, currentDate, onDateChange }: CalendarHeaderProps) {
     const [holidayOpen, setHolidayOpen] = useState(false);
-    const handlePreviousMonth = () => {
+
+    const handlePrevious = () => {
         const newDate = new Date(currentDate);
-        newDate.setMonth(newDate.getMonth() - 1);
+        if (selectedView === 'Day') {
+            newDate.setDate(newDate.getDate() - 1);
+        } else {
+            newDate.setMonth(newDate.getMonth() - 1);
+        }
         onDateChange(newDate);
     };
 
-    const handleNextMonth = () => {
+    const handleNext = () => {
         const newDate = new Date(currentDate);
-        newDate.setMonth(newDate.getMonth() + 1);
+        if (selectedView === 'Day') {
+            newDate.setDate(newDate.getDate() + 1);
+        } else {
+            newDate.setMonth(newDate.getMonth() + 1);
+        }
         onDateChange(newDate);
     };
+
+    const previousDate = new Date(currentDate);
+    const nextDate = new Date(currentDate);
+    if (selectedView === 'Day') {
+        previousDate.setDate(previousDate.getDate() - 1);
+        nextDate.setDate(nextDate.getDate() + 1);
+    } else {
+        previousDate.setMonth(previousDate.getMonth() - 1, 1);
+        nextDate.setMonth(nextDate.getMonth() + 1, 1);
+    }
+
+    const previousLabel = selectedView === 'Day'
+        ? previousDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        : previousDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    const nextLabel = selectedView === 'Day'
+        ? nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        : nextDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     // 'Today' action was removed from UI; handler not required
 
@@ -71,18 +98,18 @@ export function CalendarHeader({ selectedView, setSelectedView, currentDate, onD
 
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={handlePreviousMonth}
+                        onClick={handlePrevious}
                         className="p-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all duration-300"
-                        aria-label="Previous month"
-                        title={`Go to ${new Date(currentDate.getFullYear(), currentDate.getMonth() - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}
+                        aria-label={selectedView === 'Day' ? 'Previous day' : 'Previous month'}
+                        title={`Go to previous ${selectedView === 'Day' ? 'day' : 'month'} (${previousLabel})`}
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
-                        onClick={handleNextMonth}
+                        onClick={handleNext}
                         className="p-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all duration-300"
-                        aria-label="Next month"
-                        title={`Go to ${new Date(currentDate.getFullYear(), currentDate.getMonth() + 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}
+                        aria-label={selectedView === 'Day' ? 'Next day' : 'Next month'}
+                        title={`Go to next ${selectedView === 'Day' ? 'day' : 'month'} (${nextLabel})`}
                     >
                         <ChevronRight className="w-5 h-5" />
                     </button>

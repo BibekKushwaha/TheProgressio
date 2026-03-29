@@ -1581,7 +1581,13 @@ export const getDashboardSummary = async (
             message: "Dashboard summary",
             leakage,
             peak,
-            focus: focusStats,
+            focus: {
+                score: focusStats.score,
+                totalSessions: focusStats.totalSessions,
+                totalMinutes: focusStats.totalMinutes,
+                activeDays: focusStats.activeDays,
+                avgHoursPerDay: focusStats.avgHoursPerDay,
+            },
             streak,
             // Included here so TopStats can render 14-day history without a
             // separate useGetUserStreakQuery round-trip.

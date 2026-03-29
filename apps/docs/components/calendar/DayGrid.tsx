@@ -1,25 +1,23 @@
 import { useRef, useEffect } from 'react';
 import { TimeSlot } from './TimeSlot';
 import { EventCard } from './EventCard';
-import { useGetCalendarDailyScheduleQuery, ResolvedRotation } from '@repo/store';
+import { useGetCalendarDailyScheduleQuery } from '@repo/store';
 import { toLocalDateKey } from '@/lib/date';
-import { matchesRotationFilter } from '@/lib/rotation';
 import { mapCalendarScheduleItems } from '@/lib/schedule';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
 interface DayGridProps {
     date: Date;
-    rotationFilter?: boolean;
-    rotation?: ResolvedRotation;
 }
 
-export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps) {
+export function DayGrid({ date }: DayGridProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const dateString = toLocalDateKey(date);
     const { data: schedule, isLoading, error } = useGetCalendarDailyScheduleQuery({ date: dateString });
 
     // 1440px total height / 24 hours = 60px per hour. Scroll to 8 AM on mount.
     const SLOT_HEIGHT_PX = 60;
+    const GRID_TOP_PADDING_PX = 16;
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = 8 * SLOT_HEIGHT_PX;
@@ -39,9 +37,7 @@ export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps
             <div className="p-4 border-b border-white/10 flex justify-between items-center">
                 <div>
                     <h2 className="text-lg font-semibold text-white">Daily Schedule</h2>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                        {rotationFilter ? 'Rotation filtered view' : 'All schedule items'}
-                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">All schedule items</div>
                 </div>
                 <div className="text-sm text-slate-400 text-right">
                     {date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -75,22 +71,16 @@ export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps
                 )}
 
                 {/* Time slots background */}
-                <div className="relative min-h-[1440px]">
+                <div
+                    className="relative pt-4"
+                    style={{ minHeight: `${24 * SLOT_HEIGHT_PX + GRID_TOP_PADDING_PX}px` }}
+                >
                     {hours.map((hour) => (
                         <TimeSlot key={hour} time={`${hour.toString().padStart(2, '0')}:00`} />
                     ))}
 
                     {/* Events */}
                     {!isLoading && !error && mapCalendarScheduleItems(schedule?.items)
-                        .filter((it) => {
-                            // Only classes support rotation filtering; other items always show
-                            if (it.kind !== 'class') return true;
-                            return matchesRotationFilter({
-                                rotationFilter,
-                                rotation,
-                                itemRotation: it.rotation,
-                            })
-                        })
                         .map((item) => {
                             // Calculate position 
                             const [startHourStr = '0', startMinStr = '0'] = item.startTime.split(':');
@@ -125,7 +115,7 @@ export function DayGrid({ date, rotationFilter = false, rotation }: DayGridProps
                                     key={item.id}
                                     className="absolute left-20 right-4 z-20"
                                     style={{
-                                        top: `${startMinutes}px`,
+                                        top: `${startMinutes + GRID_TOP_PADDING_PX}px`,
                                         height: `${duration}px`,
                                         minHeight: '40px'
                                     }}

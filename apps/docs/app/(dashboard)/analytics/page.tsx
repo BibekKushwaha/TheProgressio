@@ -1,33 +1,37 @@
 "use client";
 
-import { AnalyticsHeader } from "@/components/analytics/AnalyticHeader";
 import { AnalyticsEmptyState } from "@/components/analytics/AnalyticsEmptyState";
-import Link from "next/link";
 import { FocusTrends } from "@/components/analytics/FocusTrend";
 import { SessionBreakdown } from "@/components/analytics/SessionBreakdown";
-import { StatCards } from "@/components/analytics/StatCard";
 import { MetricGrid } from "@/components/analytics/MetricCard";
+import { WeeklyReviewDetailCards, WeeklyReviewSection } from "@/components/analytics/WeeklyReviewSection";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, CheckCircle, Target, TrendingUp, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getApiErrorReportStatus } from '@/lib/api-error';
 import { reportApiError } from '@/lib/errorReporter';
+import { getDebugRefetchOptions } from "@/lib/refetchDebug";
+import { useExamType } from "@/hooks/useExamType";
 
 import {
   useGetDailySummaryQuery,
   useGetDashboardSummaryQuery,
   useGetHabitsQuery,
   useGetTaskMetricsQuery,
+  useGetWeeklyReviewQuery,
+  useGetWeeklyTrendsQuery,
 } from "@repo/store";
 import { useEffect, useMemo, useState } from "react";
 
 export default function AnalyticsPage() {
+  const examType = useExamType();
   const [pastDays, setPastDays] = useState("1");
+  const [reviewDays, setReviewDays] = useState("7");
+  const numericReviewDays = Number(reviewDays);
 
   const {
     data: summaryData,
     isLoading: isSummaryLoading,
-    isFetching: isSummaryFetching,
     isError: isSummaryError,
     error: summaryError,
     refetch: refetchSummary,
@@ -36,12 +40,39 @@ export default function AnalyticsPage() {
   const {
     data: dashboardData,
     isLoading: isDashLoading,
-    isFetching: isDashFetching,
     isError: isDashError,
     error: dashboardError,
     refetch: refetchDashboard,
   } = useGetDashboardSummaryQuery(
     { leakageDays: parseInt(pastDays) || 7, peakDays: 30 }
+  );
+
+  const {
+    data: weeklyReviewData,
+    isLoading: isWeeklyReviewLoading,
+    isFetching: isWeeklyReviewFetching,
+  } = useGetWeeklyReviewQuery({ days: numericReviewDays, examType });
+
+  const {
+    data: reviewDashboardData,
+    isLoading: isReviewDashboardLoading,
+    isError: isReviewDashboardError,
+    error: reviewDashboardError,
+    refetch: refetchReviewDashboard,
+  } = useGetDashboardSummaryQuery(
+    { leakageDays: numericReviewDays, peakDays: 30 },
+    getDebugRefetchOptions('analytics.weeklyReview.dashboardSummary', 60000)
+  );
+
+  const {
+    data: weeklyTrendsData,
+    isLoading: isWeeklyTrendsLoading,
+    isError: isWeeklyTrendsError,
+    error: weeklyTrendsError,
+    refetch: refetchWeeklyTrends,
+  } = useGetWeeklyTrendsQuery(
+    undefined,
+    getDebugRefetchOptions('analytics.weeklyReview.weeklyTrends', 60000)
   );
 
   const {
@@ -73,6 +104,12 @@ export default function AnalyticsPage() {
   }, [dashboardError]);
 
   useEffect(() => {
+    if (reviewDashboardError) {
+      reportApiError(getApiErrorReportStatus(reviewDashboardError), 'getDashboardSummary', reviewDashboardError);
+    }
+  }, [reviewDashboardError]);
+
+  useEffect(() => {
     if (taskMetricsError) {
       reportApiError(getApiErrorReportStatus(taskMetricsError), 'getTaskMetrics', taskMetricsError);
     }
@@ -83,6 +120,12 @@ export default function AnalyticsPage() {
       reportApiError(getApiErrorReportStatus(habitsError), 'getHabits', habitsError);
     }
   }, [habitsError]);
+
+  useEffect(() => {
+    if (weeklyTrendsError) {
+      reportApiError(getApiErrorReportStatus(weeklyTrendsError), 'getWeeklyTrends', weeklyTrendsError);
+    }
+  }, [weeklyTrendsError]);
 
   const habits = useMemo(() => habitsResponse?.habits || [], [habitsResponse]);
 
@@ -123,9 +166,6 @@ export default function AnalyticsPage() {
       longestStreak,
     };
   }, [habits]);
-
-  const isWeekly = pastDays === "7";
-  const timeLabel = isWeekly ? 'Weekly' : 'Today\'s';
   const failedPanels = [
     isSummaryError && !summaryData ? 'focus summary' : null,
     isDashError && !dashboardData ? 'focus score' : null,
@@ -138,62 +178,6 @@ export default function AnalyticsPage() {
     && habitMetrics.total === 0
     && (summaryData?.stats?.totalHours ?? 0) === 0;
 
-  const stats = useMemo(() => {
-    const isSummaryMissing = !summaryData && (isSummaryLoading || isSummaryFetching);
-    const isDashMissing = !dashboardData && (isDashLoading || isDashFetching);
-    const isSummaryUnavailable = isSummaryError && !summaryData;
-    const isDashUnavailable = isDashError && !dashboardData;
-
-    const hours = summaryData?.stats?.totalHours ?? 0;
-    const formattedHours = hours >= 10 ? Math.round(hours) : hours.toFixed(1);
-
-    const focusScore = dashboardData?.focus?.score ?? 0;
-    const scoreDisplay = Math.round(focusScore).toString();
-
-    const progress = summaryData?.stats?.dailyGoalHours
-      ? Math.min(100, Math.round((hours / summaryData.stats.dailyGoalHours) * 100))
-      : 0;
-
-    return [
-      {
-        label: `${timeLabel} Focus Time`,
-        value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : isSummaryUnavailable ? 'Unavailable' : `${formattedHours}h`,
-        trend: isWeekly ? "Total" : "+12%",
-        trendDirection: (hours > 0 ? 'up' : 'neutral') as 'up' | 'neutral' | 'down',
-        icon: Clock,
-        gradient: 'from-cyan-500 to-blue-500',
-        isLoading: isSummaryLoading && !summaryData
-      },
-      {
-        label: `${timeLabel} Completion`,
-        value: isSummaryMissing ? <Skeleton className="h-8 w-12 bg-white/10" /> : isSummaryUnavailable ? 'Unavailable' : `${summaryData?.stats?.totalTasksCompleted ?? 0}`,
-        trend: "Tasks",
-        trendDirection: ((summaryData?.stats?.totalTasksCompleted ?? 0) > 0 ? 'up' : 'neutral') as 'up' | 'neutral' | 'down',
-        icon: CheckCircle,
-        gradient: 'from-purple-500 to-pink-500',
-        isLoading: isSummaryLoading && !summaryData
-      },
-      {
-        label: 'Overall Focus Score',
-        value: isDashMissing ? <Skeleton className="h-8 w-24 bg-white/10" /> : isDashUnavailable ? 'Unavailable' : `${scoreDisplay}/100`,
-        trend: focusScore >= 80 ? "Excellent" : focusScore >= 60 ? "Good" : "Steady",
-        trendDirection: (focusScore >= 80 ? 'up' : focusScore >= 50 ? 'neutral' : 'down') as 'up' | 'neutral' | 'down',
-        icon: Target,
-        gradient: 'from-green-500 to-emerald-500',
-        isLoading: isDashLoading && !dashboardData
-      },
-      {
-        label: `${isWeekly ? 'Weekly' : 'Daily'} Target`,
-        value: isSummaryMissing ? <Skeleton className="h-8 w-16 bg-white/10" /> : isSummaryUnavailable ? 'Unavailable' : `${progress}%`,
-        trend: "Progress",
-        trendDirection: (progress >= 80 ? 'up' : progress >= 50 ? 'neutral' : 'down') as 'up' | 'neutral' | 'down',
-        icon: TrendingUp,
-        gradient: 'from-orange-500 to-red-500',
-        isLoading: isSummaryLoading && !summaryData
-      },
-    ];
-  }, [summaryData, dashboardData, isSummaryLoading, isSummaryFetching, isSummaryError, isDashLoading, isDashFetching, isDashError, timeLabel, isWeekly]);
-
   const retryAll = () => {
     void Promise.allSettled([
       refetchSummary(),
@@ -203,12 +187,17 @@ export default function AnalyticsPage() {
     ]);
   };
 
+  const reviewFailedPanels = [
+    isReviewDashboardError && !reviewDashboardData ? 'dashboard summary' : null,
+    isWeeklyTrendsError && !weeklyTrendsData ? 'weekly trends' : null,
+  ].filter((value): value is string => Boolean(value));
+
+  const retryWeeklyReview = () => {
+    void Promise.allSettled([refetchReviewDashboard(), refetchWeeklyTrends()]);
+  };
+
   return (
     <div className="space-y-8">
-      <AnalyticsHeader
-        pastDays={pastDays}
-        setPastDays={setPastDays}
-      />
       {failedPanels.length > 0 ? (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -239,13 +228,26 @@ export default function AnalyticsPage() {
         />
       ) : (
         <>
-          <StatCards items={stats} />
+          <WeeklyReviewSection
+            reviewDays={reviewDays}
+            setReviewDays={setReviewDays}
+            reviewData={weeklyReviewData}
+            reviewLoading={isWeeklyReviewLoading}
+            reviewFetching={isWeeklyReviewFetching}
+            dashboardData={reviewDashboardData}
+            dashboardLoading={isReviewDashboardLoading}
+            trendsData={weeklyTrendsData}
+            trendsLoading={isWeeklyTrendsLoading}
+            failedPanels={reviewFailedPanels}
+            onRetry={retryWeeklyReview}
+          />
+
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 min-w-0">
-              <FocusTrends pastDays={pastDays} />
+              <FocusTrends pastDays={pastDays} data={weeklyTrendsData?.data} isLoading={isWeeklyTrendsLoading} />
             </div>
             <div className="min-w-0">
-              <SessionBreakdown pastDays={pastDays} />
+              <SessionBreakdown pastDays={pastDays} summaryStats={summaryData?.stats} isLoading={isSummaryLoading && !summaryData} />
             </div>
           </div>
 
@@ -318,22 +320,10 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          <Card variant="glass" className="p-6">
-            <CardHeader>
-              <CardTitle>Weekly Review</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <p className="max-w-2xl text-sm text-slate-400">
-                Need a tighter weekly snapshot and next-step plan? Open weekly review for priorities, adjustments, and a compact progress summary.
-              </p>
-              <Link
-                href="/analytics/weekly-review"
-                className="inline-flex items-center justify-center rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 transition hover:bg-indigo-500/20"
-              >
-                Open weekly review
-              </Link>
-            </CardContent>
-          </Card>
+          <WeeklyReviewDetailCards
+            reviewData={weeklyReviewData}
+            reviewLoading={isWeeklyReviewLoading}
+          />
         </>
       )}
     </div>

@@ -17,7 +17,6 @@ import {
     useCreateHolidayMutation,
     useGetCalendarDailyScheduleQuery,
     useGetMonthlyEventsQuery,
-    useResolveRotationQuery,
 } from '@repo/store';
 import type { TasksScreenProps } from '../../navigation/types';
 import { sanitizeTaskId } from '../../utils/task';
@@ -58,7 +57,6 @@ export const CalendarScreen: React.FC<TasksScreenProps<'Calendar'>> = ({ navigat
     const [viewMode, setViewMode] = useState<ViewMode>('month');
     const [selectedDate, setSelectedDate] = useState(initialDate);
     const [showDailyDetail, setShowDailyDetail] = useState(Boolean(routeDate));
-    const [rotationFilter, setRotationFilter] = useState(false);
     const [holidayOpen, setHolidayOpen] = useState(false);
     const [holidayName, setHolidayName] = useState('');
     const [holidayStartDate, setHolidayStartDate] = useState(selectedDate);
@@ -75,8 +73,6 @@ export const CalendarScreen: React.FC<TasksScreenProps<'Calendar'>> = ({ navigat
         setShowDailyDetail(true);
     }, [route.params?.date]);
 
-    const { data: rotationData } = useResolveRotationQuery(undefined);
-    const activeRotation = (rotationData as any)?.rotation ?? (rotationData as any)?.pattern?.name ?? null;
     const { data: monthlyEvents, isLoading: monthlyLoading } = useGetMonthlyEventsQuery({
         year: currentMonth.year,
         month: currentMonth.month + 1,
@@ -87,14 +83,8 @@ export const CalendarScreen: React.FC<TasksScreenProps<'Calendar'>> = ({ navigat
 
     const events = (monthlyEvents as any) ?? {};
     const scheduleItems: any[] = Array.isArray((dailySchedule as any)?.items) ? (dailySchedule as any).items : [];
-
-    const filteredItems = useMemo(() => {
-        if (!rotationFilter || !activeRotation) return scheduleItems;
-        return scheduleItems.filter((item: any) => !item?.rotation || item.rotation === activeRotation);
-    }, [scheduleItems, rotationFilter, activeRotation]);
-
-    const tasksAndExams = filteredItems.filter((item) => item?.type === 'task' || item?.type === 'exam');
-    const classItems = filteredItems.filter((item) => item?.type === 'class');
+    const tasksAndExams = scheduleItems.filter((item) => item?.type === 'task' || item?.type === 'exam');
+    const classItems = scheduleItems.filter((item) => item?.type === 'class');
     const conflicts = Array.isArray((dailySchedule as any)?.conflicts) ? (dailySchedule as any).conflicts : [];
 
     const upcomingTasks = useMemo(() => {
@@ -178,22 +168,6 @@ export const CalendarScreen: React.FC<TasksScreenProps<'Calendar'>> = ({ navigat
                     </Text>
                 </View>
             </View>
-
-            {activeRotation && (
-                <GlassCard style={styles.rotationCard}>
-                    <Text style={styles.rotationText}>
-                        Rotation: <Text style={styles.rotationValue}>{activeRotation}</Text>
-                    </Text>
-                    <TouchableOpacity
-                        style={[styles.rotationBtn, rotationFilter && styles.rotationBtnActive]}
-                        onPress={() => setRotationFilter((v) => !v)}
-                    >
-                        <Text style={[styles.rotationBtnText, rotationFilter && styles.rotationBtnTextActive]}>
-                            {rotationFilter ? 'Filtering Active' : 'Filter by Rotation'}
-                        </Text>
-                    </TouchableOpacity>
-                </GlassCard>
-            )}
 
             <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.holidayBtn} onPress={openHolidayModal}>
@@ -427,13 +401,6 @@ const styles = StyleSheet.create({
     },
     syncedDot: { color: Colors.success, fontSize: Typography.fontSize.xs, fontWeight: '700' },
     syncedText: { color: Colors.success, fontSize: Typography.fontSize.xs, fontWeight: '700' },
-    rotationCard: { marginBottom: Spacing['3'], flexDirection: 'row', alignItems: 'center', gap: Spacing['2'] },
-    rotationText: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, flex: 1 },
-    rotationValue: { color: Colors.primaryLight, fontWeight: '700' },
-    rotationBtn: { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full, paddingHorizontal: Spacing['2'], paddingVertical: 4 },
-    rotationBtnActive: { backgroundColor: `${Colors.primary}22`, borderColor: Colors.primary },
-    rotationBtnText: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, fontWeight: '600' },
-    rotationBtnTextActive: { color: Colors.primaryLight },
     actionRow: { gap: Spacing['3'], marginBottom: Spacing['3'] },
     holidayBtn: { alignSelf: 'flex-start', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, paddingHorizontal: Spacing['3'], paddingVertical: Spacing['2'] },
     holidayBtnText: { color: Colors.textPrimary, fontSize: Typography.fontSize.sm, fontWeight: '600' },

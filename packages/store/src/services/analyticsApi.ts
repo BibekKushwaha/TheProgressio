@@ -91,15 +91,13 @@ export interface DailyStats {
     }>;
 }
 
-export interface FocusScoreBreakdown {
-    consistency: number;
-    intensity: number;
-    depth: number;
-}
-
 export interface FocusScoreStats {
     score: number;
-    breakdown: FocusScoreBreakdown;
+    breakdown: {
+        consistency: number;
+        intensity: number;
+        depth: number;
+    };
     totalSessions: number;
     totalMinutes: number;
     activeDays: number;
@@ -155,22 +153,6 @@ export interface FullSWOT {
     topPriorityChapters: string[];
 }
 
-export interface CGPAResult {
-    cgpa: number;
-    totalCredits: number;
-    semesterBreakdown: Array<{ semester: number; gpa: number; credits: number }>;
-    courses: Array<{ id: string; courseName: string; credits: number; gradePoint: number; grade?: string; semester?: number }>;
-}
-
-export interface WhatIfResult {
-    currentGPA: number;
-    targetCGPA: number;
-    requiredAverage: number;
-    projectedGPA: number;
-    isPossible: boolean;
-    strategy: string;
-}
-
 export interface TimeLeakageReport {
     periodDays: number;
     totalPlannedMinutes: number;
@@ -217,15 +199,6 @@ export interface RevisionScheduleResponse {
     overallReadiness: number;
 }
 
-export interface CourseGrade {
-    id: string;
-    courseName: string;
-    credits: number;
-    gradePoint: number;
-    grade?: string;
-    semester?: number;
-}
-
 export interface LearningPace {
     subjectName: string;
     recentScoreAvg: number;
@@ -246,19 +219,6 @@ export interface LearningPace {
 
 export interface PredictiveDataQuality {
     label: 'low' | 'medium' | 'high';
-}
-
-export interface GPAComponentInput {
-    name: string;
-    weight: number;
-    obtainedMarks: number;
-    totalMarks: number;
-}
-
-export interface GPAComponentPreview {
-    weightedPercentage: number;
-    weightedGradePoint: number;
-    scale: 'INDIA_10' | 'US_4' | 'PERCENTAGE';
 }
 
 export interface NotificationIntelligence {
@@ -289,7 +249,6 @@ export interface SubjectPerformance {
 
 export interface DashboardFocusStats {
     score: number;
-    breakdown: FocusScoreBreakdown;
     totalSessions: number;
     totalMinutes: number;
     activeDays: number;
@@ -524,97 +483,6 @@ export const analyticsApi = createApi({
             providesTags: ['Stats'],
         }),
 
-        // ── Phase 3: GPA Calculator ───────────────────────────────────────
-        getGPA: builder.query<{ message: string; result: CGPAResult }, string | void>({
-            query: (scale) => ({
-                url: '/stats/gpa',
-                params: scale ? { scale } : {},
-            }),
-            providesTags: ['Stats'],
-        }),
-        whatIfGPA: builder.mutation<{ message: string; result: WhatIfResult }, { targetCGPA: number; remainingCredits: number; scale?: string }>({
-            query: (body) => ({
-                url: '/stats/gpa/what-if',
-                method: 'POST',
-                body,
-            }),
-        }),
-        previewGPAComponents: builder.mutation<
-            { message: string; result: GPAComponentPreview },
-            { scale: 'INDIA_10' | 'US_4' | 'PERCENTAGE'; components: GPAComponentInput[] }
-        >({
-            queryFn: async ({ scale, components }) => {
-                const normalized = components
-                    .map((component) => ({
-                        name: component.name,
-                        weight: Number.isFinite(component.weight) ? component.weight : 0,
-                        obtainedMarks: Number.isFinite(component.obtainedMarks) ? component.obtainedMarks : 0,
-                        totalMarks: Number.isFinite(component.totalMarks) ? component.totalMarks : 0,
-                    }))
-                    .filter((component) => component.totalMarks > 0 && component.weight > 0);
-
-                if (normalized.length === 0) {
-                    return {
-                        data: {
-                            message: 'No valid components provided',
-                            result: {
-                                weightedPercentage: 0,
-                                weightedGradePoint: 0,
-                                scale,
-                            },
-                        },
-                    };
-                }
-
-                const totalWeight = normalized.reduce((sum, component) => sum + component.weight, 0);
-                const weightedPercentage = normalized.reduce((sum, component) => {
-                    const percentage = Math.max(0, Math.min(100, (component.obtainedMarks / component.totalMarks) * 100));
-                    return sum + percentage * (component.weight / totalWeight);
-                }, 0);
-
-                const weightedGradePoint =
-                    scale === 'US_4'
-                        ? (weightedPercentage / 100) * 4
-                        : scale === 'PERCENTAGE'
-                            ? weightedPercentage
-                            : (weightedPercentage / 100) * 10;
-
-                return {
-                    data: {
-                        message: 'Weighted GPA preview generated',
-                        result: {
-                            weightedPercentage,
-                            weightedGradePoint,
-                            scale,
-                        },
-                    },
-                };
-            },
-        }),
-        addCourseGrade: builder.mutation<{ message: string; course: CourseGrade }, Partial<CourseGrade>>({
-            query: (body) => ({
-                url: '/stats/gpa/course',
-                method: 'POST',
-                body,
-            }),
-            invalidatesTags: ['Stats'],
-        }),
-        updateCourseGrade: builder.mutation<{ message: string; course: CourseGrade }, { id: string } & Partial<CourseGrade>>({
-            query: ({ id, ...body }) => ({
-                url: `/stats/gpa/course/${id}`,
-                method: 'PUT',
-                body,
-            }),
-            invalidatesTags: ['Stats'],
-        }),
-        deleteCourseGrade: builder.mutation<{ message: string }, string>({
-            query: (id) => ({
-                url: `/stats/gpa/course/${id}`,
-                method: 'DELETE',
-            }),
-            invalidatesTags: ['Stats'],
-        }),
-
         // ── Phase 3: Grade Entries ─────────────────────────────────────────
         addGradeEntry: builder.mutation<{ message: string; entry: GradeEntry }, Partial<GradeEntry>>({
             query: (body) => ({
@@ -836,12 +704,6 @@ export const {
     useGetSubjectPerformanceQuery,
     useGetAllSubjectPerformanceQuery,
     useGetRevisionScheduleQuery,
-    useGetGPAQuery,
-    useWhatIfGPAMutation,
-    useAddCourseGradeMutation,
-    useUpdateCourseGradeMutation,
-    useDeleteCourseGradeMutation,
-    usePreviewGPAComponentsMutation,
     useAddGradeEntryMutation,
     useGetGradeEntriesQuery,
     useDeleteGradeEntryMutation,

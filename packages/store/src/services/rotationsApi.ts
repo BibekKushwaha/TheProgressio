@@ -36,18 +36,6 @@ export interface UpdateRotationRequest {
     isActive?: boolean;
 }
 
-export interface ResolvedRotation {
-    date: string;
-    rotation: string;
-    source: 'custom-pattern' | 'algorithmic-fallback';
-    pattern: {
-        id: string;
-        name: string;
-        labels: string[];
-        cycleLengthDays: number;
-    } | null;
-}
-
 export const rotationsApi = createApi({
     reducerPath: 'rotationsApi',
     baseQuery: withAuthRefresh(withRetry(fetchBaseQuery({
@@ -78,21 +66,13 @@ export const rotationsApi = createApi({
             query: (id) => `/${id}`,
             providesTags: (_result, _error, id) => [{ type: 'Rotations' as const, id }],
         }),
-        resolveRotation: builder.query<ResolvedRotation, { date?: string } | void>({
-            query: (params) => ({
-                url: '/resolve',
-                method: 'GET',
-                params: params || {},
-            }),
-            providesTags: [{ type: 'Rotations', id: 'RESOLVED' }],
-        }),
         createRotationPattern: builder.mutation<RotationPattern, CreateRotationRequest>({
             query: (body) => ({
                 url: '/',
                 method: 'POST',
                 body,
             }),
-            invalidatesTags: [{ type: 'Rotations', id: 'LIST' }, { type: 'Rotations', id: 'RESOLVED' }],
+            invalidatesTags: [{ type: 'Rotations', id: 'LIST' }],
         }),
         updateRotationPattern: builder.mutation<RotationPattern, UpdateRotationRequest>({
             query: ({ id, ...body }) => ({
@@ -103,7 +83,6 @@ export const rotationsApi = createApi({
             invalidatesTags: (_result, _error, { id }) => [
                 { type: 'Rotations', id },
                 { type: 'Rotations', id: 'LIST' },
-                { type: 'Rotations', id: 'RESOLVED' },
             ],
         }),
         deleteRotationPattern: builder.mutation<{ message: string }, string>({
@@ -114,7 +93,6 @@ export const rotationsApi = createApi({
             invalidatesTags: (_result, _error, id) => [
                 { type: 'Rotations', id },
                 { type: 'Rotations', id: 'LIST' },
-                { type: 'Rotations', id: 'RESOLVED' },
             ],
         }),
     }),
@@ -123,7 +101,6 @@ export const rotationsApi = createApi({
 export const {
     useGetRotationPatternsQuery,
     useGetRotationPatternByIdQuery,
-    useResolveRotationQuery,
     useCreateRotationPatternMutation,
     useUpdateRotationPatternMutation,
     useDeleteRotationPatternMutation,

@@ -73,11 +73,6 @@ const NAV_GROUPS: NavGroup[] = [
                 icon: Swords,
                 href: "/exam-warroom",
                 menuKey: "exam-warroom",
-                children: [
-                    { name: "Overview", href: "/exam-warroom/overview" },
-                    { name: "Academic", href: "/exam-warroom/academic" },
-                    { name: "Revision", href: "/exam-warroom/revision" },
-                ],
             },
         ],
     },

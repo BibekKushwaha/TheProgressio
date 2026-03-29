@@ -14,12 +14,24 @@ const DEFAULT_TRENDS = [
     { date: 'Sun', hours: 0 },
 ];
 
-export function FocusTrends({ pastDays }: { pastDays: string }) {
+interface TrendPoint {
+    date?: string;
+    day?: string;
+    hours?: number;
+}
+
+interface FocusTrendsProps {
+    pastDays: string;
+    data?: TrendPoint[];
+    isLoading?: boolean;
+}
+
+export function FocusTrends({ pastDays, data: prefetchedData, isLoading: prefetchedLoading }: FocusTrendsProps) {
     const uid = useId();
     // Weekly trend data changes at most once per session-log.
-    const { data: trendsData, isLoading } = useGetWeeklyTrendsQuery(
+    const { data: trendsData, isLoading: queryLoading } = useGetWeeklyTrendsQuery(
         undefined,
-        { refetchOnFocus: false }
+        { refetchOnFocus: false, skip: Boolean(prefetchedData) }
     );
     const chartWidth = 600;
     const chartHeight = 256;
@@ -34,7 +46,8 @@ export function FocusTrends({ pastDays }: { pastDays: string }) {
         return compact.length <= 3 ? compact : compact.slice(0, 3);
     };
 
-    const rawData = trendsData?.data || DEFAULT_TRENDS;
+    const rawData = prefetchedData || trendsData?.data || DEFAULT_TRENDS;
+    const isLoading = prefetchedLoading ?? queryLoading;
 
     const maxPoints = pastDays === "7" ? 7 : Number(pastDays) > 7 ? 14 : 7;
     const visibleRawData = rawData.slice(-maxPoints);

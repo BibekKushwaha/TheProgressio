@@ -1,13 +1,19 @@
 'use client';
 
-import { useGetDailySummaryQuery, SessionType } from '@repo/store';
+import { DailyStats, useGetDailySummaryQuery, SessionType } from '@repo/store';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function SessionBreakdown({ pastDays }: { pastDays: string }) {
+interface SessionBreakdownProps {
+    pastDays: string;
+    summaryStats?: DailyStats;
+    isLoading?: boolean;
+}
+
+export function SessionBreakdown({ pastDays, summaryStats, isLoading: prefetchedLoading }: SessionBreakdownProps) {
     // Daily summary updates via tag invalidation on session log.
-    const { data: summaryData, isLoading } = useGetDailySummaryQuery(
+    const { data: summaryData, isLoading: queryLoading } = useGetDailySummaryQuery(
         pastDays,
-        { refetchOnFocus: false }
+        { refetchOnFocus: false, skip: Boolean(summaryStats) }
     );
 
     const colors: Record<SessionType, string> = {
@@ -22,7 +28,9 @@ export function SessionBreakdown({ pastDays }: { pastDays: string }) {
         [SessionType.BREAK]: 'Break',
     };
 
-    const rawBreakdown = summaryData?.stats?.breakdown || [];
+    const stats = summaryStats || summaryData?.stats;
+    const isLoading = prefetchedLoading ?? queryLoading;
+    const rawBreakdown = stats?.breakdown || [];
     let currentOffset = 0;
 
     const segments = rawBreakdown.map(item => {
@@ -87,7 +95,7 @@ export function SessionBreakdown({ pastDays }: { pastDays: string }) {
                     )}
 
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <div className="text-4xl font-bold">{summaryData?.stats?.totalHours || 0}h</div>
+                        <div className="text-4xl font-bold">{stats?.totalHours || 0}h</div>
                         <div className="text-sm text-slate-400">Total</div>
                     </div>
                 </div>

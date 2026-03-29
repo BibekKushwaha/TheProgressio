@@ -775,31 +775,6 @@ describe('Rotation pattern endpoints', () => {
     expect(res.body).toHaveLength(1)
   })
 
-  it('resolves rotation using custom pattern', async () => {
-    const pattern = {
-      id: 'r1', name: 'Week A/B', pattern: ['A', 'B'],
-      startDate: new Date('2026-01-05'), cycleLengthDays: 7,
-      userId: 'user-1', isActive: true
-    }
-      ; (prisma.rotationPattern.findFirst as any).mockResolvedValue(pattern)
-
-    const res = await request(app).get('/api/rotations/resolve?date=2026-02-10')
-
-    expect(res.status).toBe(200)
-    expect(res.body.source).toBe('custom-pattern')
-    expect(['A', 'B']).toContain(res.body.rotation)
-  })
-
-  it('falls back to algorithmic rotation when no pattern defined', async () => {
-    ; (prisma.rotationPattern.findFirst as any).mockResolvedValue(null)
-
-    const res = await request(app).get('/api/rotations/resolve?date=2026-02-10')
-
-    expect(res.status).toBe(200)
-    expect(res.body.source).toBe('algorithmic-fallback')
-    expect(['A', 'B']).toContain(res.body.rotation)
-  })
-
   it('updates a rotation pattern', async () => {
     const existing = { id: 'r1', userId: 'user-1', name: 'Old', pattern: ['A', 'B'] }
     const updated = { ...existing, name: 'Block Schedule', pattern: ['1', '2', '3', '4'] }

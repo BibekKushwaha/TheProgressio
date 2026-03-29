@@ -23,10 +23,9 @@ interface MonthGridProps {
     onDateSelect: (date: number) => void;
     currentMonth: number;
     currentYear: number;
-    rotationFilter?: boolean;
 }
 
-export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYear, rotationFilter: _rotationFilter = false }: MonthGridProps) {
+export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYear }: MonthGridProps) {
     const { data: events } = useGetMonthlyEventsQuery({ month: currentMonth + 1, year: currentYear });
     const { data: holidayData } = useGetHolidaysQuery();
 
@@ -68,8 +67,10 @@ export function MonthGrid({ selectedDate, onDateSelect, currentMonth, currentYea
         if (dayEvents?.taskCount) eventMarkers.push('task');
         if (dayEvents?.examCount) eventMarkers.push('exam');
 
-        const dateMs = new Date(currentYear, currentMonth, i).setHours(0, 0, 0, 0);
-        const isHoliday = holidayRanges.some(r => dateMs >= r.start && dateMs <= r.end);
+        const currentDate = new Date(currentYear, currentMonth, i);
+        const dateMs = currentDate.setHours(0, 0, 0, 0);
+        const isSunday = currentDate.getDay() === 0;
+        const isHoliday = isSunday || holidayRanges.some(r => dateMs >= r.start && dateMs <= r.end);
 
         days.push({
             key: `cur-${i}`,

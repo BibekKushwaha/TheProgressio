@@ -21,7 +21,6 @@ const PROTECTED_PREFIXES = [
   '/subjects',
   '/syllabus',
   '/exam-warroom',
-  '/advanced',
   '/family-connect',
   '/admin',
 ];

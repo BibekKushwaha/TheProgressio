@@ -179,7 +179,7 @@ export function CommandPalette() {
                             <BarChart2 className="mr-2 w-4 h-4 text-slate-400" />
                             <span>Analytics Overview</span>
                         </Command.Item>
-                        <Command.Item onSelect={() => runCommand(() => router.push("/exam-warroom/overview"))}>
+                        <Command.Item onSelect={() => runCommand(() => router.push("/exam-warroom"))}>
                             <Swords className="mr-2 w-4 h-4 text-rose-400" />
                             <span>Exam War Room</span>
                         </Command.Item>

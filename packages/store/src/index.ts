@@ -247,12 +247,6 @@ export {
   useGetSWOTReportQuery,
   useGetSubjectPerformanceQuery,
   useGetAllSubjectPerformanceQuery,
-  useGetGPAQuery,
-  useAddCourseGradeMutation,
-  useUpdateCourseGradeMutation,
-  useDeleteCourseGradeMutation,
-  useWhatIfGPAMutation,
-  usePreviewGPAComponentsMutation,
   useGetGradeEntriesQuery,
   useAddGradeEntryMutation,
   useDeleteGradeEntryMutation,
@@ -280,8 +274,6 @@ export type {
   SubjectPerformance,
   Achievement,
   // Phase 3 Types
-  CGPAResult,
-  WhatIfResult,
   PredictiveDataQuality,
   FullSWOT,
   DurationPrediction,
@@ -289,10 +281,7 @@ export type {
   PeakProductivityResult,
   LearningPace,
   CycleTimeData,
-  CourseGrade,
   GradeEntry,
-  GPAComponentInput,
-  GPAComponentPreview,
   NotificationIntelligence,
   NotificationContextSignals,
   RevisionScheduleResponse,
@@ -352,7 +341,6 @@ export {
   rotationsApi,
   useGetRotationPatternsQuery,
   useGetRotationPatternByIdQuery,
-  useResolveRotationQuery,
   useCreateRotationPatternMutation,
   useUpdateRotationPatternMutation,
   useDeleteRotationPatternMutation,
@@ -361,7 +349,6 @@ export type {
   RotationPattern,
   CreateRotationRequest,
   UpdateRotationRequest,
-  ResolvedRotation,
 } from './services/rotationsApi';
 
 // Syllabus API

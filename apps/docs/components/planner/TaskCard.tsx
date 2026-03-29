@@ -120,12 +120,12 @@ export function TaskCard({ task, completed }: TaskCardProps) {
                 examTitle: task.title,
                 examDate: task.dueDate || new Date().toISOString(),
                 chapter: task.category?.name || 'General',
-                deepLinkBase: '/exam-warroom/revision',
+                deepLinkBase: '/exam-warroom#revision',
             }).unwrap();
             toast.success('Revision drip campaign scheduled!', {
                 action: {
                     label: 'View revision',
-                    onClick: () => router.push('/exam-warroom/revision'),
+                    onClick: () => router.push('/exam-warroom#revision'),
                 },
             });
         } catch (err) {

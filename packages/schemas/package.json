@@ -47,7 +47,6 @@
     "./rotationPattern": "./dist/rotationPattern.js",
     "./nudge": "./dist/nudge.js",
     "./notification": "./dist/notification.js",
-    "./courseGrade": "./dist/courseGrade.js",
     "./gradeEntry": "./dist/gradeEntry.js",
     "./subtask": "./dist/subtask.js",
     "./attachment": "./dist/attachment.js",

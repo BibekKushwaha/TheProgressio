@@ -83,28 +83,6 @@ describe('analyticsApi — Endpoint Configuration', () => {
         expect(endpoints).toHaveProperty('getSubjectPerformance');
     });
 
-    // ── Phase 3: GPA ───────────────────────────────────────────────────
-
-    it('has getGPA query', () => {
-        expect(endpoints).toHaveProperty('getGPA');
-    });
-
-    it('has whatIfGPA mutation', () => {
-        expect(endpoints).toHaveProperty('whatIfGPA');
-    });
-
-    it('has addCourseGrade mutation', () => {
-        expect(endpoints).toHaveProperty('addCourseGrade');
-    });
-
-    it('has updateCourseGrade mutation', () => {
-        expect(endpoints).toHaveProperty('updateCourseGrade');
-    });
-
-    it('has deleteCourseGrade mutation', () => {
-        expect(endpoints).toHaveProperty('deleteCourseGrade');
-    });
-
     // ── Phase 3: Grade Entries ─────────────────────────────────────────
 
     it('has addGradeEntry mutation', () => {
@@ -143,10 +121,6 @@ describe('analyticsApi — Endpoint Configuration', () => {
         expect(endpoints).toHaveProperty('getRevisionSchedule');
     });
 
-    it('has previewGPAComponents mutation', () => {
-        expect(endpoints).toHaveProperty('previewGPAComponents');
-    });
-
     it('has getNotificationIntelligence query', () => {
         expect(endpoints).toHaveProperty('getNotificationIntelligence');
     });
@@ -171,8 +145,8 @@ describe('analyticsApi — Reducer & Middleware', () => {
 });
 
 describe('analyticsApi — Total endpoint count', () => {
-    it('has exactly 38 endpoints', () => {
+    it('has exactly 32 endpoints', () => {
         const endpointCount = Object.keys(analyticsApi.endpoints).length;
-        expect(endpointCount).toBe(38);
+        expect(endpointCount).toBe(32);
     });
 });

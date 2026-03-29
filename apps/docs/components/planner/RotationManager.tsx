@@ -7,7 +7,6 @@ import {
     useCreateRotationPatternMutation,
     useUpdateRotationPatternMutation,
     useDeleteRotationPatternMutation,
-    useResolveRotationQuery,
     RotationPattern,
 } from '@repo/store';
 import { Card } from '@/components/ui/card';
@@ -22,7 +21,6 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 export function RotationManager() {
     const isMounted = useIsMounted();
     const { data: patternsData, isLoading } = useGetRotationPatternsQuery();
-    const { data: todayRotation } = useResolveRotationQuery();
     const [createPattern] = useCreateRotationPatternMutation();
     const [updatePattern] = useUpdateRotationPatternMutation();
     const [deletePattern] = useDeleteRotationPatternMutation();
@@ -39,6 +37,7 @@ export function RotationManager() {
     });
 
     const patterns = patternsData || [];
+    const activePattern = patterns.find((pattern) => pattern.isActive) ?? null;
 
     const resetForm = () => {
         setFormData({ name: '', pattern: '', startDate: '', cycleLengthDays: '' });
@@ -196,17 +195,15 @@ export function RotationManager() {
                 {/* Today's Rotation & Next Week Preview */}
                 <div className="grid grid-cols-1 xl:grid-cols-[1fr_2.5fr] gap-6">
                     {/* Active Status */}
-                    {todayRotation && (
+                    {activePattern && (
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
                             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                                 <RotateCw className="w-16 h-16" />
                             </div>
                             <div className="relative">
-                                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Current State</div>
-                                <div className="text-4xl font-black text-cyan-400 mb-1">{todayRotation.rotation}</div>
-                                {todayRotation.pattern && (
-                                    <div className="text-sm font-medium text-slate-300">{todayRotation.pattern.name}</div>
-                                )}
+                                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Active Pattern</div>
+                                <div className="text-2xl font-black text-cyan-400 mb-1">{activePattern.name}</div>
+                                <div className="text-sm font-medium text-slate-300">{activePattern.pattern.join(' • ')}</div>
                                 <div className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 bg-cyan-500/10 rounded-full text-[10px] font-bold text-cyan-400 border border-cyan-500/20">
                                     <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse" />
                                     Live Sync
@@ -225,7 +222,6 @@ export function RotationManager() {
                         </div>
                         <div className="grid grid-cols-7 gap-2 h-full">
                             {(() => {
-                                const activePattern = patterns.find(p => p.isActive);
                                 if (!activePattern) return <div className="col-span-7 flex items-center justify-center text-slate-500 text-xs py-4 italic">No active pattern to forecast.</div>;
 
                                 return Array.from({ length: 7 }).map((_, i) => {

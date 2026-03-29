@@ -5,13 +5,9 @@ import {
     getRotationPatternById,
     updateRotationPattern,
     deleteRotationPattern,
-    resolveRotation,
 } from "../controllers/rotation.controller.js";
 
 const router = express.Router();
-
-// GET /rotations/resolve - Resolve rotation for a date
-router.get("/resolve", resolveRotation);
 
 // GET /rotations - Get all rotation patterns
 router.get("/", getRotationPatterns);

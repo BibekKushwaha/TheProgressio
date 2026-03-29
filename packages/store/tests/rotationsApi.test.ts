@@ -26,10 +26,6 @@ describe('rotationsApi — Endpoint Configuration', () => {
   it('has deleteRotationPattern mutation', () => {
     expect(endpoints).toHaveProperty('deleteRotationPattern')
   })
-
-  it('has resolveRotation query', () => {
-    expect(endpoints).toHaveProperty('resolveRotation')
-  })
 })
 
 describe('rotationsApi — Reducer & Metadata', () => {

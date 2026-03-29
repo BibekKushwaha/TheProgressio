@@ -35,10 +35,6 @@ const ProductivityInsights = dynamic(
   () => import('@/components/analytics/ProductivityInsights').then((m) => ({ default: m.ProductivityInsights })),
   { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
 );
-const WhatIfGPASimulator = dynamic(
-  () => import('@/components/analytics/WhatIfGPASimulator').then((m) => ({ default: m.WhatIfGPASimulator })),
-  { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
-);
 const SWOTReport = dynamic(
   () => import('@/components/analytics/SWOTReport').then((m) => ({ default: m.SWOTReport })),
   { ssr: false, loading: () => <Skeleton className="h-56 rounded-2xl" /> },
@@ -168,10 +164,7 @@ export default function AnalyticsStrategicPage() {
                   <PeakProductivityCard initialData={strategicData?.peak} />
                   <TimeLeakageCard initialData={strategicData?.leakage} />
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <CycleTimeScatterPlot initialData={strategicData?.cycleTime} />
-                  <WhatIfGPASimulator />
-                </div>
+                <CycleTimeScatterPlot initialData={strategicData?.cycleTime} />
                 <SWOTReport initialData={strategicData?.swot} />
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-1">
                   <ProductivityInsights

@@ -6,9 +6,6 @@ import { ScheduleDetailPanel } from '@/components/calendar/ScheduleDetailPanel';
 import { UpcomingTasksPanel } from '@/components/calendar/UpcomingTasksPanel';
 import { DayGrid } from '@/components/calendar/DayGrid';
 import { Suspense, useState, useEffect } from 'react';
-import { useResolveRotationQuery } from '@repo/store';
-import { RotateCcw } from 'lucide-react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { normalizeDateInput } from '@/lib/date';
 
@@ -16,8 +13,6 @@ function CalendarContent() {
     const [selectedView, setSelectedView] = useState('Month');
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showDailyDetail, setShowDailyDetail] = useState(false);
-    const [rotationFilter, setRotationFilter] = useState(false);
-    const { data: rotation } = useResolveRotationQuery();
 
     const handleViewChange = (view: string) => {
         setSelectedView(view);
@@ -63,28 +58,6 @@ function CalendarContent() {
                     onDateChange={setSelectedDate}
                 />
 
-                {/* Rotation Indicator + Filter Toggle */}
-                {rotation && (
-                    <div className="flex items-center gap-3 mt-4 px-4 py-3 bg-violet-500/10 border border-violet-500/20 rounded-xl">
-                        <RotateCcw className="w-5 h-5 text-violet-400" />
-                        <span className="text-sm text-slate-300">
-                            Today&apos;s Rotation: <span className="font-bold text-violet-300">{rotation.rotation || rotation.pattern?.name || 'Active'}</span>
-                        </span>
-                        <button
-                            onClick={() => setRotationFilter(!rotationFilter)}
-                            className={`ml-auto px-3 py-1 rounded-lg text-xs font-semibold transition-all ${rotationFilter
-                                ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30'
-                                : 'bg-white/5 text-violet-400 hover:bg-violet-500/20'
-                                }`}
-                        >
-                            {rotationFilter ? '✓ Filtering Active' : 'Filter by Rotation'}
-                        </button>
-                        <Link href="/advanced" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
-                            Manage →
-                        </Link>
-                    </div>
-                )}
-
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mt-8">
                     <div className="xl:col-span-2">
                         {selectedView === 'Month' && (
@@ -98,10 +71,9 @@ function CalendarContent() {
                                 }}
                                 currentMonth={selectedDate.getMonth()}
                                 currentYear={selectedDate.getFullYear()}
-                                rotationFilter={rotationFilter}
                             />
                         )}
-                        {selectedView === 'Day' && <DayGrid date={selectedDate} rotationFilter={rotationFilter} rotation={rotation} />}
+                        {selectedView === 'Day' && <DayGrid date={selectedDate} />}
                     </div>
 
                     <div>

@@ -59,7 +59,7 @@ export function AtRiskCard() {
                 key: 'exams',
                 label: 'Exams in 7 days',
                 value: upcomingExamRisk,
-                href: '/exam-warroom/overview',
+                href: '/exam-warroom#overview',
                 tone: 'info',
             },
         ];
