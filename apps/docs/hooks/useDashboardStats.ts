@@ -71,6 +71,12 @@ export interface DashboardStats {
     historyDots: HistoryDot[];
 }
 
+interface FocusBreakdown {
+    consistency?: number;
+    intensity?: number;
+    depth?: number;
+}
+
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useDashboardStats(): DashboardStats {
@@ -125,29 +131,31 @@ export function useDashboardStats(): DashboardStats {
         return { label: 'Keep going', color: 'text-slate-400', bg: 'bg-slate-500/20', border: 'border-slate-500/30' };
     }, [focusScoreNumeric]);
 
+    const focusBreakdown = (focusScoreStats as { breakdown?: FocusBreakdown } | undefined)?.breakdown;
+
     const scoreBreakdown = useMemo((): ScoreBreakdownItem[] => [
         {
             label: 'Consistency',
-            value: toSafeNumber(focusScoreStats?.breakdown?.consistency),
+            value: toSafeNumber(focusBreakdown?.consistency),
             max: 40,
             textColor: 'text-indigo-400',
             barColor: 'bg-indigo-500',
         },
         {
             label: 'Intensity',
-            value: toSafeNumber(focusScoreStats?.breakdown?.intensity),
+            value: toSafeNumber(focusBreakdown?.intensity),
             max: 30,
             textColor: 'text-pink-400',
             barColor: 'bg-pink-500',
         },
         {
             label: 'Depth',
-            value: toSafeNumber(focusScoreStats?.breakdown?.depth),
+            value: toSafeNumber(focusBreakdown?.depth),
             max: 30,
             textColor: 'text-purple-400',
             barColor: 'bg-purple-500',
         },
-    ], [focusScoreStats]);
+    ], [focusBreakdown]);
 
     // ── Streak & History ──────────────────────────────────────────────────
 

@@ -25,7 +25,7 @@ import { useEffect, useMemo, useState } from "react";
 
 export default function AnalyticsPage() {
   const examType = useExamType();
-  const [pastDays, setPastDays] = useState("1");
+  const [pastDays] = useState("1");
   const [reviewDays, setReviewDays] = useState("7");
   const numericReviewDays = Number(reviewDays);
 

@@ -164,7 +164,7 @@ export function LiveActivityWidget() {
             if (sid) {
                 try {
                     await stopLiveSession({ sessionId: sid, outcome: 'COMPLETED' }).unwrap();
-                } catch (e) {
+                } catch (_e) {
                     // best effort
                 }
             }

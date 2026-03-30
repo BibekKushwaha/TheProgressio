@@ -3,13 +3,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const refetchCategories = vi.fn();
+const refetchTasks = vi.fn();
 const reportApiErrorMock = vi.fn();
 
 let categoriesState: Record<string, unknown>;
+let tasksState: Record<string, unknown>;
 
 vi.mock('@repo/store', () => ({
   useGetCategoriesQuery: () => categoriesState,
-  useGetSyllabusProgressQuery: () => ({ data: undefined, isLoading: false }),
+  useGetTasksQuery: () => tasksState,
 }));
 
 vi.mock('@/lib/errorReporter', () => ({
@@ -43,12 +45,17 @@ vi.mock('@/components/ui/select', () => ({
   SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
 }));
 
-import SyllabusPage from '../app/(dashboard)/syllabus/page';
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
+}));
 
-describe('SyllabusPage', () => {
+import SubjectLibraryPage from '../app/(dashboard)/subjects/page';
+
+describe('SubjectLibraryPage', () => {
   beforeEach(() => {
     reportApiErrorMock.mockReset();
     refetchCategories.mockReset();
+    refetchTasks.mockReset();
 
     categoriesState = {
       data: [{ id: 'cat-1', name: 'Math' }],
@@ -57,20 +64,30 @@ describe('SyllabusPage', () => {
       error: { status: 503, data: { message: 'categories down' } },
       refetch: refetchCategories,
     };
+
+    tasksState = {
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: undefined,
+      refetch: refetchTasks,
+      isFetching: false,
+    };
   });
 
   it('shows a degraded-data banner when category sync fails but cached categories still exist', () => {
-    render(<SyllabusPage />);
+    render(<SubjectLibraryPage />);
 
-    expect(screen.getByText(/Category sync is temporarily unavailable/i)).toBeTruthy();
+    expect(screen.getByText(/Some subject insights are using partial data because/i)).toBeTruthy();
     expect(reportApiErrorMock).toHaveBeenCalledWith(503, 'getCategories', expect.anything());
   });
 
   it('retries category loading from the degraded-data banner', () => {
-    render(<SyllabusPage />);
+    render(<SubjectLibraryPage />);
 
     fireEvent.click(screen.getByRole('button', { name: /retry data/i }));
 
     expect(refetchCategories).toHaveBeenCalledTimes(1);
+    expect(refetchTasks).toHaveBeenCalledTimes(1);
   });
 });

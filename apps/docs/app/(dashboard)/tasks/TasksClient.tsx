@@ -13,7 +13,7 @@ import { useHighlightedTaskScroll, useTaskQuerySyncFromUrl } from '@/hooks/useTa
 import { mergeTaskSources } from '@/lib/mergeTasks';
 import { getApiErrorMessage, getApiErrorReportStatus } from '@/lib/api-error';
 import { reportApiError } from '@/lib/errorReporter';
-import { ArrowUpDown, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
 export function TasksClient() {
     const router = useRouter();
@@ -35,7 +35,7 @@ export function TasksClient() {
     const [status, setStatus] = useState('all');
     const [priority, setPriority] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [sort, setSort] = useState<'default' | 'quickWins'>('default');
+    const [sort, _setSort] = useState<'default' | 'quickWins'>('default');
     const [view, setView] = useState<'kanban' | 'list' | 'timetable' | 'timeline'>('kanban');
 
     const localHydrated = useLocalDbHydration();

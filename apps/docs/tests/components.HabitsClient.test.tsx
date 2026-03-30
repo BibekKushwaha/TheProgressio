@@ -42,8 +42,6 @@ vi.mock('@/components/layout/PageHeader', () => ({
 }));
 
 vi.mock('@/components/ui/dropdown-menu', () => {
-  const React = require('react');
-
   const MenuContext = React.createContext<{ open: boolean; setOpen: (open: boolean) => void }>({
     open: false,
     setOpen: () => undefined,
@@ -59,7 +57,13 @@ vi.mock('@/components/ui/dropdown-menu', () => {
         </MenuContext.Provider>
       );
     },
-    DropdownMenuTrigger: ({ asChild, children }: { asChild?: boolean; children: React.ReactElement }) => {
+    DropdownMenuTrigger: ({
+      asChild,
+      children,
+    }: {
+      asChild?: boolean;
+      children: React.ReactElement<{ onClick?: (event: React.MouseEvent) => void }>;
+    }) => {
       const { setOpen } = React.useContext(MenuContext);
 
       if (asChild) {

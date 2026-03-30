@@ -18,7 +18,6 @@ import {
     X,
     ChevronDown,
     Award,
-    Layers,
     Shield,
     type LucideIcon,
 } from "lucide-react";

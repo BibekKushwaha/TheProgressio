@@ -4,8 +4,6 @@ import { Lock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { usePrivacySettingsController } from "@/hooks/usePrivacySettingsController";
 import { ActiveSessions } from "@/components/settings/ActiveSessions";
 
