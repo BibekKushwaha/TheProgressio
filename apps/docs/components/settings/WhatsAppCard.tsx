@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquare, Clock, Smartphone } from "lucide-react";
+import { MessageSquare, Clock, Smartphone, CheckCircle2, PencilLine, PlusCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -114,6 +114,47 @@ export function WhatsAppCard() {
                 )}
 
                 <Separator className="bg-white/10" />
+
+                <div className="space-y-4">
+                    <div>
+                        <div className="text-sm font-medium text-white">Habit commands you can send on WhatsApp</div>
+                        <div className="text-sm text-slate-400">
+                            After pairing, message the bot with plain English commands. Include the word <span className="font-mono text-green-300">habit</span> so it knows you mean a habit, not a task.
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3">
+                        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+                                <PlusCircle className="h-4 w-4 text-emerald-400" />
+                                Create a habit
+                            </div>
+                            <code className="block rounded-lg bg-black/30 px-3 py-2 text-sm text-emerald-300">
+                                create habit revise chemistry 20 min every day
+                            </code>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+                                <PencilLine className="h-4 w-4 text-amber-300" />
+                                Update a habit
+                            </div>
+                            <code className="block rounded-lg bg-black/30 px-3 py-2 text-sm text-amber-200">
+                                update habit revise chemistry to revise chemistry 30 min every day 7pm
+                            </code>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+                                <CheckCircle2 className="h-4 w-4 text-cyan-300" />
+                                Complete a habit
+                            </div>
+                            <code className="block rounded-lg bg-black/30 px-3 py-2 text-sm text-cyan-200">
+                                complete habit revise chemistry
+                            </code>
+                        </div>
+                    </div>
+                </div>
 
                 <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Clock className="w-4 h-4 text-green-400" />

@@ -210,6 +210,28 @@ export const resolveWhatsAppUserId = async (params: {
     }
 };
 
+export const hasActiveWhatsAppSession = async (userId: string): Promise<boolean> => {
+    const now = new Date();
+    try {
+        const activeSession = await prisma.mobileRefreshToken.findFirst({
+            where: {
+                userId,
+                revokedAt: null,
+                expiresAt: { gt: now },
+                OR: [
+                    { absoluteExpiresAt: null },
+                    { absoluteExpiresAt: { gt: now } },
+                ],
+            },
+            select: { id: true },
+        });
+        return Boolean(activeSession);
+    } catch (error) {
+        console.error("[WhatsApp Service] session lookup error:", error);
+        return false;
+    }
+};
+
 // ─── Replay-attack / Idempotency helpers ────────────────────────────────────
 
 /** How many seconds old a Meta webhook timestamp may be before we treat it as a replay. */

@@ -34,6 +34,16 @@ import { dispatchWhatsAppNudges } from "../services/whatsapp-outbound.service.js
 import { enqueueDueNudgeDispatchJobs, cancelPendingWhatsAppFallbackJobsForUser } from "../services/nudge-dispatch.queue.js";
 import { getLatencySnapshot, getMetricsSnapshot, incrementMetric, logMetricEvent } from "../services/metrics.service.js";
 
+type WhatsAppHabitAction = "create" | "update" | "complete";
+type HabitActionResponse = {
+    handled: boolean;
+    action: WhatsAppHabitAction;
+    message: string;
+    habit?: Record<string, unknown>;
+    alreadyLogged?: boolean;
+    clarificationRequired?: boolean;
+};
+
 const startOfDay = (date: Date): Date => {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -202,6 +212,230 @@ const inferHabitConfidence = (input: string): number => {
     return Math.min(0.98, confidence);
 };
 
+const sanitizeWhatsAppHabitSpec = (input: string): string =>
+    input
+        .replace(/\b(create|add|start|new|update|change|edit|modify|complete|completed|done|log|check(?:\s|-)?in)\b/gi, " ")
+        .replace(/\bhabit\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+const normalizeHabitReference = (value: string): string =>
+    value.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+
+const scoreHabitReference = (reference: string, habitName: string): number => {
+    const normalizedReference = normalizeHabitReference(reference);
+    const normalizedHabit = normalizeHabitReference(habitName);
+    if (!normalizedReference || !normalizedHabit) return 0;
+    if (normalizedReference === normalizedHabit) return 1;
+    if (normalizedHabit.includes(normalizedReference)) {
+        return Math.max(0.92, normalizedReference.length / normalizedHabit.length);
+    }
+    if (normalizedReference.includes(normalizedHabit)) {
+        return Math.max(0.86, normalizedHabit.length / normalizedReference.length);
+    }
+
+    const referenceTokens = normalizedReference.split(" ").filter((token) => token.length >= 2);
+    const habitTokens = normalizedHabit.split(" ").filter((token) => token.length >= 2);
+    if (referenceTokens.length === 0 || habitTokens.length === 0) return 0;
+
+    const habitTokenSet = new Set(habitTokens);
+    const overlap = referenceTokens.filter((token) => habitTokenSet.has(token)).length;
+    if (overlap === 0) return 0;
+
+    const recall = overlap / referenceTokens.length;
+    const precision = overlap / habitTokens.length;
+    const jaccard = overlap / new Set([...referenceTokens, ...habitTokens]).size;
+    return Number((recall * 0.55 + precision * 0.2 + jaccard * 0.25).toFixed(3));
+};
+
+const findBestHabitMatch = async (userId: string, reference: string): Promise<
+    | { kind: "match"; habit: any }
+    | { kind: "ambiguous" }
+    | { kind: "none" }
+> => {
+    const habits = await prisma.habit.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 25,
+    });
+
+    const ranked = habits
+        .map((habit) => ({
+            habit,
+            score: scoreHabitReference(reference, habit.name),
+        }))
+        .filter((candidate) => candidate.score > 0)
+        .sort((left, right) => right.score - left.score);
+
+    const best = ranked[0];
+    const runnerUp = ranked[1];
+
+    if (!best || best.score < 0.6) return { kind: "none" };
+    if (runnerUp && best.score - runnerUp.score < 0.12) return { kind: "ambiguous" };
+    return { kind: "match", habit: best.habit };
+};
+
+const resolveLinkedCategoryIdByName = async (userId: string, linkedCategoryName: string | null): Promise<string | null> => {
+    if (!linkedCategoryName) return null;
+    const prismaAny = prisma as any;
+    if (typeof prismaAny.category?.findFirst !== "function") return null;
+
+    const category = await prismaAny.category.findFirst({
+        where: {
+            userId,
+            name: {
+                equals: linkedCategoryName,
+                mode: "insensitive",
+            },
+        },
+        select: { id: true },
+    });
+
+    return category?.id ?? null;
+};
+
+const parseHabitDraftFromText = async (userId: string, text: string) => {
+    const frequency = inferHabitFrequency(text);
+    const unit = inferHabitUnit(text);
+    const linkedCategoryName = inferHabitCategoryName(text);
+    return {
+        name: inferHabitName(text),
+        frequency,
+        targetValue: inferHabitTargetValue(text, frequency, unit),
+        reminderTime: inferHabitReminderTime(text),
+        scheduleHint: inferHabitReminderTime(text) ? null : inferHabitScheduleHint(text),
+        linkedCategoryId: await resolveLinkedCategoryIdByName(userId, linkedCategoryName),
+        linkedCategoryName,
+        confidence: inferHabitConfidence(text),
+    };
+};
+
+const handleInternalWhatsAppHabitAction = async (params: {
+    userId: string;
+    action: WhatsAppHabitAction;
+    text: string;
+}): Promise<HabitActionResponse> => {
+    const trimmedText = params.text.trim();
+
+    if (params.action === "create") {
+        const spec = sanitizeWhatsAppHabitSpec(trimmedText);
+        if (!spec) {
+            return {
+                handled: true,
+                action: "create",
+                clarificationRequired: true,
+                message: "Please describe the habit more clearly, for example: 'create habit revise chemistry 20 min every day'.",
+            };
+        }
+
+        const draft = await parseHabitDraftFromText(params.userId, spec);
+        const habit = await prisma.habit.create({
+            data: {
+                name: draft.name,
+                frequency: draft.frequency,
+                targetValue: draft.targetValue,
+                userId: params.userId,
+                linkedCategoryId: draft.linkedCategoryId,
+                reminderTime: draft.reminderTime,
+                scheduleHint: draft.scheduleHint,
+                mercyDaysAllowed: 1,
+            },
+        });
+
+        return {
+            handled: true,
+            action: "create",
+            message: `Habit created: ${habit.name}`,
+            habit,
+        };
+    }
+
+    if (params.action === "update") {
+        const updateMatch = trimmedText.match(/\b(?:update|change|edit|modify)\s+habit\s+(.+?)\s+to\s+(.+)$/i);
+        if (!updateMatch?.[1] || !updateMatch?.[2]) {
+            return {
+                handled: true,
+                action: "update",
+                clarificationRequired: true,
+                message: "Please use a message like: 'update habit revise chemistry to revise chemistry 30 min every day 7pm'.",
+            };
+        }
+
+        const targetReference = updateMatch[1].trim();
+        const nextSpec = sanitizeWhatsAppHabitSpec(updateMatch[2].trim());
+        const match = await findBestHabitMatch(params.userId, targetReference);
+
+        if (match.kind !== "match") {
+            return {
+                handled: true,
+                action: "update",
+                clarificationRequired: true,
+                message: "I couldn't tell which habit to update. Please send the habit name more clearly.",
+            };
+        }
+
+        const draft = await parseHabitDraftFromText(params.userId, nextSpec);
+        const updatedHabit = await prisma.habit.update({
+            where: { id: match.habit.id },
+            data: {
+                name: normalizeHabitReference(draft.name) === normalizeHabitReference("Study habit")
+                    ? match.habit.name
+                    : draft.name,
+                frequency: draft.frequency,
+                targetValue: draft.targetValue,
+                linkedCategoryId: draft.linkedCategoryId,
+                reminderTime: draft.reminderTime,
+                scheduleHint: draft.scheduleHint,
+            },
+        });
+
+        return {
+            handled: true,
+            action: "update",
+            message: `Habit updated: ${updatedHabit.name}`,
+            habit: updatedHabit,
+        };
+    }
+
+    const completionReference = sanitizeWhatsAppHabitSpec(trimmedText);
+    const match = await findBestHabitMatch(params.userId, completionReference);
+    if (match.kind !== "match") {
+        return {
+            handled: true,
+            action: "complete",
+            clarificationRequired: true,
+            message: "I couldn't tell which habit to complete. Please send the habit name more clearly, for example: 'complete habit revise chemistry'.",
+        };
+    }
+
+    const result = await logHabitCompletionInternal({ habitId: match.habit.id, completedValue: 1 });
+    if (result.status === "already_logged") {
+        return {
+            handled: true,
+            action: "complete",
+            message: `${match.habit.name} is already logged for this period.`,
+            habit: result.habit,
+            alreadyLogged: true,
+        };
+    }
+
+    if (result.status === "not_found") {
+        return {
+            handled: true,
+            action: "complete",
+            clarificationRequired: true,
+            message: "I couldn't find that habit anymore. Please try again from the app.",
+        };
+    }
+
+    return {
+        handled: true,
+        action: "complete",
+        message: `Habit logged: ${match.habit.name}`,
+        habit: result.habit,
+    };
+};
+
 // Internal helper for analytics service to merge habit activity into streaks
 // GET /api/habits/internal/active-dates?userId=...
 export const getInternalActiveDates = TryCatch(async (req: Request, res: Response): Promise<void> => {
@@ -245,6 +479,24 @@ export const cancelInternalWhatsAppFallback = TryCatch(async (req: Request, res:
         source,
         ...result,
     });
+});
+
+export const handleInternalWhatsAppAction = TryCatch(async (req: Request, res: Response): Promise<void> => {
+    const userId = typeof req.body?.userId === "string" ? req.body.userId.trim() : "";
+    const action = typeof req.body?.action === "string" ? req.body.action.trim().toLowerCase() : "";
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+
+    if (!userId || !text || !["create", "update", "complete"].includes(action)) {
+        throw new ErrorHandler(400, "userId, action, and text are required");
+    }
+
+    const result = await handleInternalWhatsAppHabitAction({
+        userId,
+        action: action as WhatsAppHabitAction,
+        text,
+    });
+
+    res.status(result.action === "create" && !result.clarificationRequired ? 201 : 200).json(result);
 });
 
 // Internal helper for lightweight nudge/dispatch counters + per-endpoint latency

@@ -19,6 +19,7 @@ import {
     isWhatsAppVerificationValid,
     resolveWhatsAppTranscript,
     resolveWhatsAppUserId,
+    hasActiveWhatsAppSession,
     checkWhatsAppPhoneRateLimit,
     recordWhatsAppAbuseSignal,
     isWhatsAppPhoneBlocked,
@@ -36,10 +37,14 @@ import {
     sendWhatsAppTemplate,
     sendWhatsAppText,
 } from "../services/meta-whatsapp.service.js";
+import { requestJson } from "../services/internal-http.service.js";
 import { TryCatch } from "../utils/tryCatch.js";
 import ErrorHandler from "../utils/errorHandler.js";
 
 type CaptureSource = "internal" | "meta";
+
+const HABIT_SERVICE_URL = process.env.HABIT_SERVICE_URL || "http://localhost:4002";
+const HABIT_INTERNAL_SECRET = process.env.HABIT_INTERNAL_SECRET || process.env.ANALYTICS_INTERNAL_SECRET || "";
 
 // ── Prometheus metric help text ───────────────────────────────────────────────
 // Descriptions are stable — changing them would break dashboards that parse
@@ -60,6 +65,7 @@ const PROMETHEUS_METRIC_HELP: Record<string, string> = {
     wa_unsupported_message:    'Inbound messages with no parseable text (sticker/reaction/etc.)',
     wa_pairing_conflict:       'Pairing attempts rejected due to number already linked',
     wa_unknown_phone:          'Inbound messages from unpaired phone numbers',
+    wa_session_missing:        'Inbound messages from paired users with no active Study OS session',
     wa_interactive_action:     'Interactive button replies handled',
     wa_error:                  'Unhandled exceptions in the inbound processing pipeline',
     wa_shadow_moderation:      'Messages where sanitization stripped injection patterns (non-blocking)',
@@ -143,15 +149,163 @@ const formatSubtasksMessage = (taskTitle: string, steps: string[]): string => {
 
 const getIntentGuidanceMessage = (intent: "reschedule_task" | "complete_task" | "list_tasks" | "help") => {
     if (intent === "reschedule_task") {
-        return "I can reschedule tasks soon. For now, send a new reminder like: 'Revise physics tomorrow 7pm'.";
+        return RESCHEDULE_CLARIFICATION_MESSAGE;
     }
     if (intent === "complete_task") {
-        return "To mark done quickly, use task reminder buttons from app notifications. I’ll support text-based completion soon.";
+        return COMPLETE_CLARIFICATION_MESSAGE;
     }
     if (intent === "list_tasks") {
         return "Open Study OS dashboard for your full task list. I’ll add WhatsApp list view support soon.";
     }
     return "Send me a task like 'Math worksheet tomorrow 6pm' and I’ll add it.";
+};
+
+const SESSION_REQUIRED_MESSAGE =
+    "Your WhatsApp is paired, but your Study OS session has expired. Please open the app and log in again.";
+
+const COMPLETE_CLARIFICATION_MESSAGE =
+    "I couldn't tell which task to mark as completed. Please send the task name more clearly, for example: 'complete chemistry assignment'.";
+const RESCHEDULE_CLARIFICATION_MESSAGE =
+    "I couldn't tell which task to reschedule. Please send the task name more clearly, for example: 'move chemistry assignment to tomorrow 7pm'.";
+const RESCHEDULE_TIME_REQUIRED_MESSAGE =
+    "Please tell me the new time or date too, for example: 'move chemistry assignment to tomorrow 7pm'.";
+const HABIT_CREATE_CLARIFICATION_MESSAGE =
+    "Please describe the habit more clearly, for example: 'create habit revise chemistry 20 min every day'.";
+const HABIT_UPDATE_CLARIFICATION_MESSAGE =
+    "Please use a message like: 'update habit revise chemistry to revise chemistry 30 min every day 7pm'.";
+const HABIT_COMPLETE_CLARIFICATION_MESSAGE =
+    "I couldn't tell which habit to complete. Please send the habit name more clearly, for example: 'complete habit revise chemistry'.";
+
+const detectWhatsAppHabitAction = (text: string): "create" | "update" | "complete" | null => {
+    const lower = text.toLowerCase().trim();
+    if (!/\bhabit\b/.test(lower)) return null;
+    if (/\b(complete|completed|done|log|check(?:\s|-)?in)\b/.test(lower)) return "complete";
+    if (/\b(update|change|edit|modify)\b/.test(lower)) return "update";
+    if (/\b(create|add|start|new)\b/.test(lower) || /\b(every day|daily|every week|weekly|nightly)\b/.test(lower)) {
+        return "create";
+    }
+    return "create";
+};
+
+const getHabitClarificationMessage = (action: "create" | "update" | "complete") => {
+    if (action === "update") return HABIT_UPDATE_CLARIFICATION_MESSAGE;
+    if (action === "complete") return HABIT_COMPLETE_CLARIFICATION_MESSAGE;
+    return HABIT_CREATE_CLARIFICATION_MESSAGE;
+};
+
+const performWhatsAppHabitAction = async (params: {
+    userId: string;
+    text: string;
+    action: "create" | "update" | "complete";
+}) => {
+    const result = await requestJson<{
+        handled: boolean;
+        action: "create" | "update" | "complete";
+        message: string;
+        clarificationRequired?: boolean;
+        alreadyLogged?: boolean;
+        habit?: { id?: string; name?: string };
+    }>({
+        url: `${HABIT_SERVICE_URL}/api/habits/internal/whatsapp/action`,
+        method: "POST",
+        headers: {
+            ...(HABIT_INTERNAL_SECRET ? { "x-internal-secret": HABIT_INTERNAL_SECRET } : {}),
+        },
+        body: {
+            userId: params.userId,
+            text: params.text,
+            action: params.action,
+        },
+        logContext: {
+            service: "planner-service",
+            subsystem: "whatsapp",
+            dependency: "habit-service",
+            operation: "whatsapp_habit_action",
+        },
+    });
+
+    return result;
+};
+
+const normalizeTaskReference = (value: string): string =>
+    value
+        .toLowerCase()
+        .replace(/[^\w\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+const tokenizeTaskReference = (value: string): string[] =>
+    normalizeTaskReference(value)
+        .split(" ")
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2);
+
+const scoreTaskReference = (reference: string, title: string): number => {
+    const normalizedReference = normalizeTaskReference(reference);
+    const normalizedTitle = normalizeTaskReference(title);
+
+    if (!normalizedReference || !normalizedTitle) return 0;
+    if (normalizedReference === normalizedTitle) return 1;
+    if (normalizedTitle.includes(normalizedReference)) {
+        return Math.max(0.93, normalizedReference.length / normalizedTitle.length);
+    }
+    if (normalizedReference.includes(normalizedTitle)) {
+        return Math.max(0.88, normalizedTitle.length / normalizedReference.length);
+    }
+
+    const referenceTokens = tokenizeTaskReference(reference);
+    const titleTokens = tokenizeTaskReference(title);
+    if (referenceTokens.length === 0 || titleTokens.length === 0) return 0;
+
+    const titleTokenSet = new Set(titleTokens);
+    const overlap = referenceTokens.filter((token) => titleTokenSet.has(token)).length;
+    if (overlap === 0) return 0;
+
+    const recall = overlap / referenceTokens.length;
+    const precision = overlap / titleTokens.length;
+    const jaccard = overlap / new Set([...referenceTokens, ...titleTokens]).size;
+    return Number((recall * 0.55 + precision * 0.2 + jaccard * 0.25).toFixed(3));
+};
+
+const findBestTaskMatch = async (params: {
+    userId: string;
+    reference: string;
+    includeCompleted?: boolean;
+}): Promise<
+    | { kind: "match"; task: { id: string; title: string; status: Status; dueDate: Date | null; categoryId: string | null } }
+    | { kind: "ambiguous" }
+    | { kind: "none" }
+> => {
+    const tasks = await prisma.task.findMany({
+        where: {
+            userId: params.userId,
+            ...(params.includeCompleted ? {} : { status: { not: Status.COMPLETED } }),
+        },
+        select: {
+            id: true,
+            title: true,
+            status: true,
+            dueDate: true,
+            categoryId: true,
+        },
+        orderBy: [{ dueDate: "asc" }, { title: "asc" }],
+        take: 25,
+    });
+
+    const ranked = tasks
+        .map((task) => ({
+            task,
+            score: scoreTaskReference(params.reference, task.title),
+        }))
+        .filter((candidate) => candidate.score > 0)
+        .sort((left, right) => right.score - left.score);
+
+    const best = ranked[0];
+    const runnerUp = ranked[1];
+
+    if (!best || best.score < 0.6) return { kind: "none" };
+    if (runnerUp && best.score - runnerUp.score < 0.12) return { kind: "ambiguous" };
+    return { kind: "match", task: best.task };
 };
 
 const handleInteractiveAction = async (params: {
@@ -518,6 +672,22 @@ const captureWhatsAppTaskCore = async (req: Request, res: Response, source: Capt
         );
     }
 
+    const shouldEnforceSessionGate = source === "meta" || Boolean((prisma as any).mobileRefreshToken?.findFirst);
+    if (shouldEnforceSessionGate) {
+        const hasActiveSession = await hasActiveWhatsAppSession(userId);
+        if (!hasActiveSession) {
+            if (normalizedSender) {
+                await sendWhatsAppText(normalizedSender, SESSION_REQUIRED_MESSAGE).catch(() => null);
+            }
+            emitAudit({ outcome: "session_missing" });
+            return res.status(source === "meta" ? 200 : 403).json({
+                success: false,
+                message: SESSION_REQUIRED_MESSAGE,
+                code: "WHATSAPP_SESSION_REQUIRED",
+            });
+        }
+    }
+
     if (inbound.interactiveReplyId) {
         const actionResult = await handleInteractiveAction({
             userId,
@@ -572,9 +742,136 @@ const captureWhatsAppTaskCore = async (req: Request, res: Response, source: Capt
         return res.status(200).json({ message: "Ignored empty or unsafe WhatsApp message" });
     }
 
+    const habitAction = detectWhatsAppHabitAction(safeText);
+    if (habitAction) {
+        const habitResult = await performWhatsAppHabitAction({
+            userId,
+            text: safeText,
+            action: habitAction,
+        });
+
+        if (!habitResult.ok || !habitResult.data?.handled) {
+            if (normalizedSender) {
+                await sendWhatsAppText(
+                    normalizedSender,
+                    "I couldn't process that habit request right now. Please try again in a moment.",
+                ).catch(() => null);
+            }
+            emitAudit({ outcome: "error", intent: `habit_${habitAction}` });
+            return res.status(200).json({ message: "Habit action failed", intent: `habit_${habitAction}` });
+        }
+
+        const replyMessage = habitResult.data.message || getHabitClarificationMessage(habitAction);
+        if (normalizedSender) {
+            await sendWhatsAppText(normalizedSender, replyMessage).catch(() => null);
+        }
+
+        emitAudit({
+            outcome: habitResult.data.clarificationRequired ? "non_create_intent" : "interactive_action",
+            intent: `habit_${habitAction}`,
+            taskId: typeof habitResult.data.habit?.id === "string" ? habitResult.data.habit.id : null,
+        });
+
+        return res.status(200).json({
+            message: replyMessage,
+            intent: `habit_${habitAction}`,
+            action: habitAction,
+            habit: habitResult.data.habit ?? null,
+            clarificationRequired: habitResult.data.clarificationRequired === true,
+            alreadyLogged: habitResult.data.alreadyLogged === true,
+        });
+    }
+
     const aiStart    = Date.now();
     const extracted  = await aiService.extractWhatsAppIntentAndTask(safeText);
     recordIntentLatency(extracted.intent, Date.now() - aiStart);
+
+    if (extracted.intent === "complete_task") {
+        const match = await findBestTaskMatch({
+            userId,
+            reference: extracted.title || safeText,
+            includeCompleted: true,
+        });
+
+        if (match.kind === "none" || match.kind === "ambiguous") {
+            if (normalizedSender) {
+                await sendWhatsAppText(normalizedSender, COMPLETE_CLARIFICATION_MESSAGE).catch(() => null);
+            }
+            emitAudit({ outcome: "non_create_intent", intent: extracted.intent, confidence: extracted.confidence });
+            return res.status(200).json({ message: "Clarification required for task completion", intent: extracted.intent });
+        }
+
+        const task = match.task;
+        if (task.status === Status.COMPLETED) {
+            if (normalizedSender) {
+                await sendWhatsAppText(normalizedSender, `✅ '${task.title}' is already completed.`).catch(() => null);
+            }
+            emitAudit({ outcome: "interactive_action", intent: extracted.intent, confidence: extracted.confidence, taskId: task.id });
+            return res.status(200).json({ message: "Task already completed", taskId: task.id });
+        }
+
+        await prisma.task.update({
+            where: { id: task.id },
+            data: { status: Status.COMPLETED },
+        });
+
+        await runTaskCompletionSideEffects({
+            taskId: task.id,
+            userId,
+            title: task.title,
+            categoryId: task.categoryId ?? null,
+        });
+
+        if (normalizedSender) {
+            await sendWhatsAppText(normalizedSender, `✅ Marked '${task.title}' as completed.`).catch(() => null);
+        }
+
+        emitAudit({ outcome: "interactive_action", intent: extracted.intent, confidence: extracted.confidence, taskId: task.id });
+        return res.status(200).json({ message: "Task marked as completed", taskId: task.id });
+    }
+
+    if (extracted.intent === "reschedule_task") {
+        if (!extracted.dueAt) {
+            if (normalizedSender) {
+                await sendWhatsAppText(normalizedSender, RESCHEDULE_TIME_REQUIRED_MESSAGE).catch(() => null);
+            }
+            emitAudit({ outcome: "non_create_intent", intent: extracted.intent, confidence: extracted.confidence });
+            return res.status(200).json({ message: "Clarification required for task reschedule", intent: extracted.intent });
+        }
+
+        const match = await findBestTaskMatch({
+            userId,
+            reference: extracted.title || safeText,
+        });
+
+        if (match.kind === "none" || match.kind === "ambiguous") {
+            if (normalizedSender) {
+                await sendWhatsAppText(normalizedSender, RESCHEDULE_CLARIFICATION_MESSAGE).catch(() => null);
+            }
+            emitAudit({ outcome: "non_create_intent", intent: extracted.intent, confidence: extracted.confidence });
+            return res.status(200).json({ message: "Clarification required for task reschedule", intent: extracted.intent });
+        }
+
+        const nextDueDate = new Date(extracted.dueAt);
+        await prisma.task.update({
+            where: { id: match.task.id },
+            data: { dueDate: nextDueDate },
+        });
+
+        if (normalizedSender) {
+            await sendWhatsAppText(
+                normalizedSender,
+                `⏰ Rescheduled '${match.task.title}' to ${nextDueDate.toLocaleString("en-IN")}.`,
+            ).catch(() => null);
+        }
+
+        emitAudit({ outcome: "interactive_action", intent: extracted.intent, confidence: extracted.confidence, taskId: match.task.id });
+        return res.status(200).json({
+            message: "Task rescheduled",
+            taskId: match.task.id,
+            dueDate: nextDueDate.toISOString(),
+        });
+    }
 
     if (extracted.intent !== "create_task") {
         if (normalizedSender) {

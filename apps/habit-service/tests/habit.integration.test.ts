@@ -625,4 +625,102 @@ describe('Habit endpoints — Internal', () => {
 
         expect(res.status).toBe(400);
     });
+
+    it('POST /api/habits/internal/whatsapp/action — creates a habit from WhatsApp text', async () => {
+        (prisma.habit.create as any).mockResolvedValue({
+            id: 'h-wa-1',
+            name: 'Revise Chemistry',
+            frequency: 'DAILY',
+            targetValue: 20,
+            userId: 'user-1',
+        });
+
+        const res = await request(server)
+            .post('/api/habits/internal/whatsapp/action')
+            .send({ userId: 'user-1', action: 'create', text: 'create habit revise chemistry 20 min every day' });
+
+        expect(res.status).toBe(201);
+        expect(res.body.message).toContain('Habit created');
+        expect(prisma.habit.create).toHaveBeenCalled();
+    });
+
+    it('POST /api/habits/internal/whatsapp/action — updates a matched habit from WhatsApp text', async () => {
+        (prisma.habit.findMany as any).mockResolvedValue([
+            {
+                id: 'h-wa-2',
+                name: 'Revise Chemistry',
+                userId: 'user-1',
+                reminderTime: null,
+                scheduleHint: null,
+                targetValue: 20,
+                frequency: 'DAILY',
+            },
+        ]);
+        (prisma.habit.update as any).mockResolvedValue({
+            id: 'h-wa-2',
+            name: 'Revise Chemistry',
+            targetValue: 30,
+            frequency: 'DAILY',
+            userId: 'user-1',
+        });
+
+        const res = await request(server)
+            .post('/api/habits/internal/whatsapp/action')
+            .send({ userId: 'user-1', action: 'update', text: 'update habit revise chemistry to revise chemistry 30 min every day' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.message).toContain('Habit updated');
+        expect(prisma.habit.update).toHaveBeenCalled();
+    });
+
+    it('POST /api/habits/internal/whatsapp/action — logs a matched habit from WhatsApp text', async () => {
+        (prisma.habit.findMany as any).mockResolvedValue([
+            {
+                id: 'h-wa-3',
+                name: 'Revise Chemistry',
+                userId: 'user-1',
+                frequency: 'DAILY',
+                lastLogDate: null,
+                currentStreak: 0,
+                longestStreak: 0,
+                mercyDaysUsed: 0,
+            },
+        ]);
+        (prisma.habit.findUnique as any).mockResolvedValue({
+            id: 'h-wa-3',
+            name: 'Revise Chemistry',
+            userId: 'user-1',
+            frequency: 'DAILY',
+            lastLogDate: null,
+            currentStreak: 0,
+            longestStreak: 0,
+            mercyDaysAllowed: 1,
+            mercyDaysUsed: 0,
+        });
+        (prisma.habitLog.findFirst as any).mockResolvedValue(null);
+        (prisma.habitLog.create as any).mockResolvedValue({
+            id: 'log-wa-1',
+            habitId: 'h-wa-3',
+            completedValue: 1,
+            loggedAt: new Date(),
+        });
+        (prisma.habit.update as any).mockResolvedValue({
+            id: 'h-wa-3',
+            name: 'Revise Chemistry',
+            userId: 'user-1',
+            frequency: 'DAILY',
+            currentStreak: 1,
+            longestStreak: 1,
+            mercyDaysUsed: 0,
+            lastLogDate: new Date(),
+        });
+
+        const res = await request(server)
+            .post('/api/habits/internal/whatsapp/action')
+            .send({ userId: 'user-1', action: 'complete', text: 'complete habit revise chemistry' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.message).toContain('Habit logged');
+        expect(prisma.habitLog.create).toHaveBeenCalled();
+    });
 });

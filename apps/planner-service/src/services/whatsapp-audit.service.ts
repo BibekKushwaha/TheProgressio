@@ -355,6 +355,7 @@ export function logShadowModerationEvent(event: ShadowModerationEvent): void {
 export type WhatsAppOutcome =
     | 'task_created'
     | 'paired'
+    | 'session_missing'
     | 'rate_limited'
     | 'abuse_blocked'
     | 'duplicate'

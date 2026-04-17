@@ -735,7 +735,13 @@ export class AIService {
         }
 
         cleanedTitle = cleanedTitle
-            .replace(/\b(remind me to|please|task|todo|to do)\b/gi, " ")
+            .replace(/\b(mark|set|task|todo|to do)\b/gi, " ")
+            .replace(/\b(as|to|for)\b(?=\s+complete(?:d)?\b)/gi, " ")
+            .replace(/\b(remind me to|please)\b/gi, " ")
+            .replace(/\b(complete|completed|done|finish|finished)\b/gi, " ")
+            .replace(/\b(reschedule|postpone|move|snooze)\b/gi, " ")
+            .replace(/\b(at|by)\b(?=\s*\d{1,2}(?::\d{2})?\s*(am|pm)\b)/gi, " ")
+            .replace(/\b(to)\b(?=\s+(today|tomorrow|\d{1,2}(?::\d{2})?\s*(am|pm))\b)/gi, " ")
             .replace(/[^\w\s\-:,]/g, " ")
             .replace(/\s+/g, " ")
             .trim();
@@ -765,27 +771,23 @@ export class AIService {
             };
         }
 
-        const ruleIntent = this.parseRuleBasedIntent(text);
-        if (ruleIntent !== "create_task") {
-            return {
-                intent: ruleIntent,
-                title: "",
-                dueAt: null,
-                recurrence: null,
-                confidence: 0.95,
-                source: this.client ? "rule" : "fallback",
-            };
-        }
-
         const ruleResult = this.parseRuleBasedTask(text);
+        const ruleIntent = this.parseRuleBasedIntent(text);
         const normalizedRuleResult: WhatsAppIntentAndTaskExtraction = {
-            intent: "create_task",
+            intent: ruleIntent,
             title: ruleResult.title.slice(0, this.maxWhatsAppTitleLength),
             dueAt: this.toIsoOrNull(ruleResult.dueAt),
             recurrence: this.normalizeRecurrence(ruleResult.recurrence),
             confidence: this.clampConfidence(ruleResult.confidence),
             source: this.client ? "rule" : "fallback",
         };
+
+        if (ruleIntent !== "create_task") {
+            if (ruleResult.title.length > 0 || ruleResult.dueAt) {
+                normalizedRuleResult.confidence = Math.max(0.8, normalizedRuleResult.confidence);
+            }
+            return normalizedRuleResult;
+        }
 
         if (!this.client || ruleResult.confidence >= 0.75) {
             return normalizedRuleResult;

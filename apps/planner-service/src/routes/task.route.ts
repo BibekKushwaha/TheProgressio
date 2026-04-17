@@ -61,6 +61,7 @@ router.delete("/:id", deleteTask);
 // PATCH /tasks/:id/toggle - Toggle task status
 router.patch("/:id/toggle", toggleTask);
 
+// Keep static paths above any remaining parameterized routes.
 router.get("/categories", taskCategories);
 
 export default router;

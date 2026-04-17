@@ -8,6 +8,10 @@ const { mockCreateTaskFromText } = vi.hoisted(() => ({
   mockCreateTaskFromText: vi.fn(),
 }));
 
+const { mockRunTaskCompletionSideEffects } = vi.hoisted(() => ({
+  mockRunTaskCompletionSideEffects: vi.fn(),
+}));
+
 const { mockSanitizeIncomingText, mockExtractWhatsAppIntentAndTask } = vi.hoisted(() => ({
   mockSanitizeIncomingText: vi.fn((text: string) => text),
   mockExtractWhatsAppIntentAndTask: vi.fn().mockResolvedValue({
@@ -25,6 +29,7 @@ vi.mock('../src/controllers/task.controller.js', async (importOriginal) => {
   return {
     ...actual,
     createTaskFromText: mockCreateTaskFromText,
+    runTaskCompletionSideEffects: mockRunTaskCompletionSideEffects,
   };
 });
 
@@ -72,6 +77,12 @@ vi.mock('@repo/cache', () => ({
 vi.mock('@repo/db', () => ({
   prisma: {
     user: { findUnique: vi.fn() },
+    mobileRefreshToken: { findFirst: vi.fn() },
+    task: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
     auditLog: { create: vi.fn() },
   },
   Status: { PENDING: 'PENDING', IN_PROGRESS: 'IN_PROGRESS', COMPLETED: 'COMPLETED' },
@@ -91,6 +102,7 @@ vi.mock('../src/services/renewal.service.js', () => ({
 
 import { app } from '../src/index.js';
 import { extractWhatsAppInbound, isWhatsAppMetaSignatureValid, resolveWhatsAppOcr, resolveWhatsAppTranscript } from '../src/services/whatsapp.service.js';
+import { prisma } from '@repo/db';
 
 describe('whatsapp.service — extractWhatsAppInbound', () => {
   it('extracts direct text payload', () => {
@@ -332,6 +344,9 @@ describe('whatsapp.controller — capture endpoint', () => {
       confidence: 0.95,
       source: 'rule',
     });
+
+    vi.mocked(prisma.mobileRefreshToken.findFirst).mockResolvedValue({ id: 'session-1' } as any);
+    vi.mocked(prisma.task.findMany).mockResolvedValue([]);
   });
 
   it('creates task from direct text payload', async () => {
@@ -425,6 +440,255 @@ describe('whatsapp.controller — capture endpoint', () => {
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('Non-create intent handled');
     expect(res.body.intent).toBe('list_tasks');
+    expect(mockCreateTaskFromText).not.toHaveBeenCalled();
+  });
+
+  it('completes a matched task from WhatsApp text', async () => {
+    vi.mocked(prisma.task.findMany).mockResolvedValueOnce([
+      {
+        id: 'task-1',
+        title: 'chemistry assignment',
+        status: 'PENDING',
+        dueDate: null,
+        categoryId: 'cat-1',
+      } as any,
+    ]);
+    vi.mocked(prisma.task.update).mockResolvedValueOnce({
+      id: 'task-1',
+      title: 'chemistry assignment',
+      status: 'COMPLETED',
+      dueDate: null,
+      categoryId: 'cat-1',
+    } as any);
+    mockExtractWhatsAppIntentAndTask.mockResolvedValueOnce({
+      intent: 'complete_task',
+      title: 'chemistry assignment',
+      dueAt: null,
+      recurrence: null,
+      confidence: 0.95,
+      source: 'rule',
+    });
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'complete chemistry assignment', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Task marked as completed');
+    expect(prisma.task.update).toHaveBeenCalledWith({
+      where: { id: 'task-1' },
+      data: { status: 'COMPLETED' },
+    });
+    expect(mockRunTaskCompletionSideEffects).toHaveBeenCalledWith({
+      taskId: 'task-1',
+      userId: 'user-1',
+      title: 'chemistry assignment',
+      categoryId: 'cat-1',
+    });
+  });
+
+  it('returns clarification when completion target is ambiguous', async () => {
+    vi.mocked(prisma.task.findMany).mockResolvedValueOnce([
+      {
+        id: 'task-1',
+        title: 'chemistry assignment',
+        status: 'PENDING',
+        dueDate: null,
+        categoryId: null,
+      } as any,
+      {
+        id: 'task-2',
+        title: 'chemistry assignments',
+        status: 'PENDING',
+        dueDate: null,
+        categoryId: null,
+      } as any,
+    ]);
+    mockExtractWhatsAppIntentAndTask.mockResolvedValueOnce({
+      intent: 'complete_task',
+      title: 'chemistry assign',
+      dueAt: null,
+      recurrence: null,
+      confidence: 0.93,
+      source: 'rule',
+    });
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'complete chemistry assign', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('Clarification required');
+    expect(prisma.task.update).not.toHaveBeenCalled();
+  });
+
+  it('reschedules a matched task from WhatsApp text', async () => {
+    vi.mocked(prisma.task.findMany).mockResolvedValueOnce([
+      {
+        id: 'task-3',
+        title: 'chemistry assignment',
+        status: 'PENDING',
+        dueDate: null,
+        categoryId: null,
+      } as any,
+    ]);
+    vi.mocked(prisma.task.update).mockResolvedValueOnce({
+      id: 'task-3',
+      title: 'chemistry assignment',
+      status: 'PENDING',
+      dueDate: new Date('2026-04-10T13:30:00.000Z'),
+      categoryId: null,
+    } as any);
+    mockExtractWhatsAppIntentAndTask.mockResolvedValueOnce({
+      intent: 'reschedule_task',
+      title: 'chemistry assignment',
+      dueAt: '2026-04-10T13:30:00.000Z',
+      recurrence: null,
+      confidence: 0.95,
+      source: 'rule',
+    });
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'move chemistry assignment to tomorrow 7pm', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Task rescheduled');
+    expect(prisma.task.update).toHaveBeenCalledWith({
+      where: { id: 'task-3' },
+      data: { dueDate: new Date('2026-04-10T13:30:00.000Z') },
+    });
+  });
+
+  it('asks for a new time when reschedule intent has no due date', async () => {
+    mockExtractWhatsAppIntentAndTask.mockResolvedValueOnce({
+      intent: 'reschedule_task',
+      title: 'chemistry assignment',
+      dueAt: null,
+      recurrence: null,
+      confidence: 0.9,
+      source: 'rule',
+    });
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'move chemistry assignment', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('Clarification required for task reschedule');
+    expect(prisma.task.update).not.toHaveBeenCalled();
+  });
+
+  it('delegates explicit habit creation messages to habit-service', async () => {
+    process.env.HABIT_SERVICE_URL = 'http://localhost:4002';
+    process.env.HABIT_INTERNAL_SECRET = 'habit-secret';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        handled: true,
+        action: 'create',
+        message: 'Habit created: Revise Chemistry',
+        habit: { id: 'habit-1', name: 'Revise Chemistry' },
+      }), { status: 201, headers: { 'Content-Type': 'application/json' } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'create habit revise chemistry 20 min every day', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.action).toBe('create');
+    expect(res.body.message).toContain('Habit created');
+    expect(mockCreateTaskFromText).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:4002/api/habits/internal/whatsapp/action',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  it('delegates explicit habit update messages to habit-service', async () => {
+    process.env.HABIT_SERVICE_URL = 'http://localhost:4002';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        handled: true,
+        action: 'update',
+        message: 'Habit updated: Revise Chemistry',
+        habit: { id: 'habit-2', name: 'Revise Chemistry' },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'update habit revise chemistry to revise chemistry 30 min every day', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.action).toBe('update');
+    expect(res.body.message).toContain('Habit updated');
+    expect(mockCreateTaskFromText).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('delegates explicit habit completion messages to habit-service', async () => {
+    process.env.HABIT_SERVICE_URL = 'http://localhost:4002';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        handled: true,
+        action: 'complete',
+        message: 'Habit logged: Revise Chemistry',
+        habit: { id: 'habit-3', name: 'Revise Chemistry' },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'complete habit revise chemistry', from: '919876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.action).toBe('complete');
+    expect(res.body.message).toContain('Habit logged');
+    expect(mockCreateTaskFromText).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('blocks task capture when the paired user has no active session', async () => {
+    vi.mocked(prisma.mobileRefreshToken.findFirst).mockResolvedValueOnce(null);
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', text: 'Finish chemistry assignment at 9pm', from: '919876543210' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('WHATSAPP_SESSION_REQUIRED');
+    expect(res.body.message).toContain('session has expired');
+    expect(mockCreateTaskFromText).not.toHaveBeenCalled();
+  });
+
+  it('blocks interactive actions when the paired user has no active session', async () => {
+    vi.mocked(prisma.mobileRefreshToken.findFirst).mockResolvedValueOnce(null);
+
+    const res = await request(app)
+      .post('/api/integrations/whatsapp/capture')
+      .set('x-whatsapp-secret', 'wa-secret')
+      .send({ userId: 'user-1', from: '919876543210', interactiveReplyId: 'task_complete:t1' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('WHATSAPP_SESSION_REQUIRED');
     expect(mockCreateTaskFromText).not.toHaveBeenCalled();
   });
 });

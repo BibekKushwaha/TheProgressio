@@ -10,7 +10,6 @@ import {
     googleLoginCallback,
     googleLoginStart,
     unpairWhatsApp,
-    verifyWhatsAppWebhook,
     listFamilyShareLinks,
     listSessions,
     loginUser,
@@ -50,7 +49,6 @@ router.post("/reset/:token", resetPassword);
 // WhatsApp Pairing
 router.get("/whatsapp/pairing", getWhatsAppPairingCode);
 router.post("/whatsapp/unpair", unpairWhatsApp);
-router.post("/whatsapp/webhook", verifyWhatsAppWebhook);  // called by the bot when user sends pairing code
 
 // Mobile token lifecycle
 router.post("/mobile/login", mobileLogin);

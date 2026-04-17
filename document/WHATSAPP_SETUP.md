@@ -5,6 +5,7 @@ This repo supports a WhatsApp bot using the official **Meta WhatsApp Business Pl
 It covers:
 - **Inbound** WhatsApp messages → `planner-service` webhook
 - **Pairing** via `PAIR-XXXXXX` code (generated in the app)
+- **Task actions** via WhatsApp for create, reschedule, and complete
 - **Outbound nudges** (scheduled) via **template messages** from `habit-service`
 
 ---
@@ -51,7 +52,7 @@ Required:
 - `WHATSAPP_APP_SECRET` (used to verify `x-hub-signature-256`)
 - `WHATSAPP_VERIFY_TOKEN` (Meta webhook verification handshake)
 
-Internal-only (used by non-Meta internal calls like `/capture`, `/templates/send`, etc.):
+Internal-only (used by non-Meta internal planner endpoints like `/capture`, `/templates/send`, etc. and not by the Meta webhook):
 - `WHATSAPP_WEBHOOK_SECRET`
 
 Optional:
@@ -101,6 +102,7 @@ Then set the webhook callback URL in Meta to:
    - sets `user.whatsappVerified=true`
    - clears `whatsappPairingCode`
 6. UI polling shows “Paired”.
+7. For normal WhatsApp task capture after pairing, the user must still have at least one active Study OS session (`MobileRefreshToken`). Pairing alone is not enough to authorize task actions.
 
 ---
 
@@ -113,6 +115,9 @@ Then set the webhook callback URL in Meta to:
      - signature is missing/invalid
 3. **Pairing**
    - Sending `PAIR-XXXXXX` from WhatsApp updates the user record and triggers a confirmation message.
-4. **Outbound nudges**
+4. **Task actions**
+   - Sending a normal task message creates a task.
+   - Sending a completion message like `complete chemistry assignment` marks the matched open task as completed.
+   - Sending a reschedule message like `move chemistry assignment to tomorrow 7pm` updates the matched task due date.
+5. **Outbound nudges**
    - A scheduled nudge should be delivered as a template message via `habit-service`.
-

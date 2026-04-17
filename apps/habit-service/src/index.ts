@@ -10,6 +10,7 @@ import {
     dispatchNudges,
     getInternalActiveDates,
     getInternalMetrics,
+    handleInternalWhatsAppAction,
     handleHabitEvent,
 } from "./controllers/habit.controller.js";
 import { requireInternalDispatchAuth, requireInternalReadAuth, requireInternalSignature } from "./middleware/internal.middleware.js";
@@ -98,6 +99,7 @@ app.post("/api/habits/nudges/dispatch", requireInternalDispatchAuth, dispatchNud
 app.get("/api/habits/internal/active-dates", requireInternalReadAuth, getInternalActiveDates);
 app.get("/api/habits/internal/metrics", requireInternalReadAuth, getInternalMetrics);
 app.post("/api/habits/internal/wa-fallback/cancel", requireInternalReadAuth, cancelInternalWhatsAppFallback);
+app.post("/api/habits/internal/whatsapp/action", requireInternalReadAuth, handleInternalWhatsAppAction);
 app.use("/api/habits", isAuth, enforceReadOnlyWrites, habitRouter);
 
 const PORT = process.env.PORT || 4002;
