@@ -1,4 +1,4 @@
-# Student Activity Tracker (TheProgressio)
+# TheProgressio
 
 A unified academic productivity platform that combines:
 - fast task capture (NLP + WhatsApp),
