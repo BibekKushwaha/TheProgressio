@@ -1049,7 +1049,6 @@ export const exportAccountData = TryCatch(async (req, res) => {
       },
       nudges: true,
       gradeEntries: true,
-      courseGrades: true,
       paymentEvents: true,
       syncOperations: true,
       attendance: true,
