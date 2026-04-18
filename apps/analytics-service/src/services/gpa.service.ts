@@ -6,7 +6,7 @@
  * 2. "What-If" simulation: what grades do I need to hit target CGPA?
  * 3. Custom weighted grading scales (10-point, 4-point, percentage)
  */
-import { prisma, type CourseGrade, type Prisma } from "@repo/db";
+import { prisma, type Prisma } from "@repo/db";
 
 // ── Grading Scales ─────────────────────────────────────────────────────
 
@@ -78,6 +78,17 @@ export interface WhatIfResult {
     strategy: string;
 }
 
+export interface CourseGrade {
+    id: string;
+    userId: string;
+    courseName: string;
+    credits: number;
+    gradePoint: number | null;
+    grade: string | null;
+    semester: number;
+    createdAt: Date;
+}
+
 export interface GPAComponentInput {
     name: string;
     weight: number; // percentage weight (0-100)
@@ -101,11 +112,35 @@ export interface GPAComponentPreviewResult {
 
 // ── CGPA Calculation ───────────────────────────────────────────────────
 
+const GPA_EXAM_TYPE = "GPA_COURSE";
+
+const mapGradeEntryToCourseGrade = (entry: {
+    id: string;
+    userId: string;
+    subjectName: string;
+    totalMarks: number;
+    obtainedMarks: number;
+    chapter: string | null;
+    timeTakenMins: number | null;
+    createdAt: Date;
+}): CourseGrade => ({
+    id: entry.id,
+    userId: entry.userId,
+    courseName: entry.subjectName,
+    credits: entry.totalMarks,
+    gradePoint: entry.obtainedMarks,
+    grade: entry.chapter,
+    semester: entry.timeTakenMins ?? 1,
+    createdAt: entry.createdAt,
+});
+
 export async function calculateCGPA(userId: string, scale: GradingScaleKey = "INDIA_10"): Promise<CGPAResult> {
-    const courses = await prisma.courseGrade.findMany({
-        where: { userId },
-        orderBy: [{ semester: "asc" }, { courseName: "asc" }],
+    const gradeEntries = await prisma.gradeEntry.findMany({
+        where: { userId, examType: GPA_EXAM_TYPE },
+        orderBy: [{ timeTakenMins: "asc" }, { subjectName: "asc" }],
     });
+
+    const courses = gradeEntries.map(mapGradeEntryToCourseGrade);
 
     if (courses.length === 0) {
         return {
@@ -134,7 +169,7 @@ export async function calculateCGPA(userId: string, scale: GradingScaleKey = "IN
         let semCredits = 0;
         let semWeighted = 0;
 
-        const courseDetails = semCourses.map(c => {
+        const courseDetails = semCourses.map((c) => {
             const gp = c.gradePoint ?? 0;
             semCredits += c.credits;
             semWeighted += gp * c.credits;
@@ -229,9 +264,18 @@ export async function addCourseGrade(
     userId: string,
     data: { courseName: string; credits: number; gradePoint?: number; grade?: string; semester?: number }
 ): Promise<CourseGrade> {
-    return prisma.courseGrade.create({
-        data: { userId, ...data },
+    const created = await prisma.gradeEntry.create({
+        data: {
+            userId,
+            subjectName: data.courseName,
+            chapter: data.grade ?? null,
+            totalMarks: data.credits,
+            obtainedMarks: data.gradePoint ?? 0,
+            examType: GPA_EXAM_TYPE,
+            timeTakenMins: data.semester ?? 1,
+        },
     });
+    return mapGradeEntryToCourseGrade(created);
 }
 
 export async function updateCourseGrade(
@@ -239,15 +283,21 @@ export async function updateCourseGrade(
     userId: string,
     data: Partial<{ courseName: string; credits: number; gradePoint: number; grade: string; semester: number }>
 ): Promise<Prisma.BatchPayload> {
-    return prisma.courseGrade.updateMany({
-        where: { id, userId },
-        data,
+    return prisma.gradeEntry.updateMany({
+        where: { id, userId, examType: GPA_EXAM_TYPE },
+        data: {
+            ...(data.courseName !== undefined ? { subjectName: data.courseName } : {}),
+            ...(data.credits !== undefined ? { totalMarks: data.credits } : {}),
+            ...(data.gradePoint !== undefined ? { obtainedMarks: data.gradePoint } : {}),
+            ...(data.grade !== undefined ? { chapter: data.grade } : {}),
+            ...(data.semester !== undefined ? { timeTakenMins: data.semester } : {}),
+        },
     });
 }
 
 export async function deleteCourseGrade(id: string, userId: string): Promise<Prisma.BatchPayload> {
-    return prisma.courseGrade.deleteMany({
-        where: { id, userId },
+    return prisma.gradeEntry.deleteMany({
+        where: { id, userId, examType: GPA_EXAM_TYPE },
     });
 }
 

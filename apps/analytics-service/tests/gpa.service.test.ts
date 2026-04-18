@@ -9,11 +9,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { mockPrisma } = vi.hoisted(() => ({
     mockPrisma: {
-        courseGrade: {
+        gradeEntry: {
             findMany: vi.fn(),
             create: vi.fn(),
-            update: vi.fn(),
-            delete: vi.fn(),
             updateMany: vi.fn(),
             deleteMany: vi.fn(),
         },
@@ -36,15 +34,15 @@ import {
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 const makeCourse = (name: string, credits: number, gradePoint: number, semester: number = 1) => ({
-    id: `cg-${name}`,
+    id: `ge-${name}`,
     userId: 'u1',
-    courseName: name,
-    credits,
-    gradePoint,
-    grade: 'A',
-    semester,
+    subjectName: name,
+    totalMarks: credits,
+    obtainedMarks: gradePoint,
+    chapter: 'A',
+    examType: 'GPA_COURSE',
+    timeTakenMins: semester,
     createdAt: new Date(),
-    updatedAt: new Date(),
 });
 
 // ─── Tests ──────────────────────────────────────────────────────────────────────
@@ -72,7 +70,7 @@ describe('GPA Service — calculateCGPA', () => {
     beforeEach(() => vi.clearAllMocks());
 
     it('returns 0 CGPA when no courses exist', async () => {
-        mockPrisma.courseGrade.findMany.mockResolvedValue([]);
+        mockPrisma.gradeEntry.findMany.mockResolvedValue([]);
 
         const result = await calculateCGPA('u1', 'INDIA_10');
 
@@ -87,7 +85,7 @@ describe('GPA Service — calculateCGPA', () => {
             makeCourse('Maths', 4, 10, 1),      // 4 × 10 = 40
         ];
         // Total = 100, Credits = 11, CGPA = 100/11 ≈ 9.09
-        mockPrisma.courseGrade.findMany.mockResolvedValue(courses);
+        mockPrisma.gradeEntry.findMany.mockResolvedValue(courses);
 
         const result = await calculateCGPA('u1', 'INDIA_10');
 
@@ -101,7 +99,7 @@ describe('GPA Service — calculateCGPA', () => {
             makeCourse('Chemistry', 3, 8, 1),
             makeCourse('DataStructures', 4, 7, 2),
         ];
-        mockPrisma.courseGrade.findMany.mockResolvedValue(courses);
+        mockPrisma.gradeEntry.findMany.mockResolvedValue(courses);
 
         const result = await calculateCGPA('u1', 'INDIA_10');
 
@@ -118,7 +116,7 @@ describe('GPA Service — whatIfGPA', () => {
             makeCourse('Physics', 4, 8, 1),
             makeCourse('Chemistry', 3, 7, 1),
         ];
-        mockPrisma.courseGrade.findMany.mockResolvedValue(courses);
+        mockPrisma.gradeEntry.findMany.mockResolvedValue(courses);
 
         const result = await whatIfGPA('u1', 9.0, 10, 'INDIA_10');
 
@@ -134,7 +132,7 @@ describe('GPA Service — whatIfGPA', () => {
         const courses = [
             makeCourse('Physics', 40, 5, 1),  // heavy credits at low grade
         ];
-        mockPrisma.courseGrade.findMany.mockResolvedValue(courses);
+        mockPrisma.gradeEntry.findMany.mockResolvedValue(courses);
 
         // Target 10.0 with only 2 remaining credits is impossible
         const result = await whatIfGPA('u1', 10.0, 2, 'INDIA_10');
@@ -146,7 +144,7 @@ describe('GPA Service — whatIfGPA', () => {
         const courses = [
             makeCourse('Physics', 4, 9, 1),
         ];
-        mockPrisma.courseGrade.findMany.mockResolvedValue(courses);
+        mockPrisma.gradeEntry.findMany.mockResolvedValue(courses);
 
         // Target slightly above current should be achievable
         const result = await whatIfGPA('u1', 9.5, 20, 'INDIA_10');
@@ -160,42 +158,43 @@ describe('GPA Service — CourseGrade CRUD', () => {
 
     it('addCourseGrade creates a new entry', async () => {
         const newCourse = makeCourse('Biology', 3, 8, 1);
-        mockPrisma.courseGrade.create.mockResolvedValue(newCourse);
+        mockPrisma.gradeEntry.create.mockResolvedValue(newCourse);
 
         const result = await addCourseGrade('u1', {
             courseName: 'Biology', credits: 3, gradePoint: 8, semester: 1,
         });
 
         expect(result).toHaveProperty('courseName', 'Biology');
-        expect(mockPrisma.courseGrade.create).toHaveBeenCalledWith(
+        expect(mockPrisma.gradeEntry.create).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({
                     userId: 'u1',
-                    courseName: 'Biology',
+                    subjectName: 'Biology',
+                    examType: 'GPA_COURSE',
                 }),
             })
         );
     });
 
     it('updateCourseGrade updates an existing entry', async () => {
-        mockPrisma.courseGrade.updateMany.mockResolvedValue({ count: 1 });
+        mockPrisma.gradeEntry.updateMany.mockResolvedValue({ count: 1 });
 
         await updateCourseGrade('cg-1', 'u1', { gradePoint: 9 });
 
-        expect(mockPrisma.courseGrade.updateMany).toHaveBeenCalledWith(
+        expect(mockPrisma.gradeEntry.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { id: 'cg-1', userId: 'u1' },
+                where: { id: 'cg-1', userId: 'u1', examType: 'GPA_COURSE' },
             })
         );
     });
 
     it('deleteCourseGrade removes an entry', async () => {
-        mockPrisma.courseGrade.deleteMany.mockResolvedValue({ count: 1 });
+        mockPrisma.gradeEntry.deleteMany.mockResolvedValue({ count: 1 });
 
         await deleteCourseGrade('cg-1', 'u1');
 
-        expect(mockPrisma.courseGrade.deleteMany).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { id: 'cg-1', userId: 'u1' } })
+        expect(mockPrisma.gradeEntry.deleteMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: 'cg-1', userId: 'u1', examType: 'GPA_COURSE' } })
         );
     });
 });
