@@ -6,37 +6,25 @@ node_modules
 .pnp.js
 
 # testing
-coverage
+coverage/
 
-# next.js
-.next/
-out/
-build
-.swc/
-
-# misc
+# info
 .DS_Store
 *.pem
 
 # debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+*-debug.log*
+*-error.log*
 
 # turbo
-.turbo
+.turbo/
 
 # ui
 dist/
-.env
-.vitest-cache
-
-# env files with real values
-.env
-apps/**/.env
+build/
+.next/
+out/
+.swc/
+.env*
+**/.env*
+.vitest-cache/
